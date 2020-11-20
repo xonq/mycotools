@@ -12,7 +12,7 @@ setuptools.setup(
 		"python tools",
 	long_description = long_description,
 	long_description_content_type = "text/markdown",
-	url = "https://gitlab.com/xonq/kontools"
+	url = "https://gitlab.com/xonq/kontools/kontools"
 	packages = setuptools.find_packages(),
 	classifiers = [
 		"Programming Language :: Python :: 3",
