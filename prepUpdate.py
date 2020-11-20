@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 from kontools import collect_files
-import subprocess, sys
+import subprocess, sys, os
 
 
 if __name__ == '__main__':
