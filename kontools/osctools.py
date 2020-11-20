@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-from kontools import eprint
+from kontools.kontools import eprint
 import os, sys, re, subprocess, datetime, time, paramiko, signal
 import pandas as pd
 

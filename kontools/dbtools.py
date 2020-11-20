@@ -2,8 +2,8 @@
 
 import pandas as pd, pandas
 import numpy as np
-import sys, os, time, fastatools, json, re
-from kontools import collect_files
+import sys, os, time, kontools.fastatools, json, re
+from kontools.kontools import collect_files
 from Bio import Entrez
 
 
