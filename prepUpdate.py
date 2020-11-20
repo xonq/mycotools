@@ -1,7 +1,29 @@
 #! /usr/bin/env python3
 
-from kontools import collect_files
-import subprocess, sys, os
+import subprocess, sys, os, glob, re
+
+def collect_files(directory = './', filetype = '*', recursive = True, verbose = False):
+
+    if verbose == True:
+        print('\n\nCompiling files ...')
+
+    if type(filetype) == list:
+        filetypes = filetype.split()
+    else:
+        filetypes = [filetype]
+
+    directory = os.path.normpath(os.path.expanduser(directory)) + '/'
+    filelist = []
+    for filetype in filetypes:
+        if recursive == True:
+            filelist = filelist + (glob.glob(directory + "/**/*." + filetype, recursive = recursive))
+        elif recursive == False:
+            filelist = filelist + (glob.glob(directory + "/*." + filetype, recursive = recursive))
+        else:
+            raise TypeError
+
+    return filelist
+
 
 
 if __name__ == '__main__':
