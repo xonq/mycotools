@@ -1,0 +1,14 @@
+README.md
+setup.py
+mycotools/__init__.py
+mycotools/biofiles.py
+mycotools/dbtools.py
+mycotools/fastatools.py
+mycotools/kontools.py
+mycotools/mstools.py
+mycotools/ncbitools.py
+mycotools/osctools.py
+mycotools.egg-info/PKG-INFO
+mycotools.egg-info/SOURCES.txt
+mycotools.egg-info/dependency_links.txt
+mycotools.egg-info/top_level.txt

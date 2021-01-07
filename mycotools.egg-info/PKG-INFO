@@ -1,0 +1,21 @@
+Metadata-Version: 2.1
+Name: mycotools
+Version: 0.0.8a0
+Summary: A compilation of bioinformatic and computation biology inspired python tools
+Home-page: https://gitlab.com/xonq/mycotools/mycotools_pypi
+Author: xonq
+Author-email: konkelzach@protonmail.com
+License: UNKNOWN
+Description: # kontools | https://gitlab.com/xonq
+        
+        A collection of python functions for computational biology / bioinformatics. 
+        A central feature of kontools is the `dbtools` library which contains functions necessary for contructing and
+        interfacing with a database of proteomes, genomes, and gene coordinate files derived from NCBI and / or JGI
+        (Joint Genome Institute, Department of Energy) genomes.
+        
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX :: Linux
+Requires-Python: >=3.0
+Description-Content-Type: text/markdown
