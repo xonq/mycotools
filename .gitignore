@@ -2,3 +2,6 @@ archive/
 build/
 dist/
 mycotools.egg-info/
+prepUpdate.py
+*.swp
+*.pyc
