@@ -14,7 +14,7 @@ setuptools.setup(
     long_description_content_type = "text/markdown",
     url = "https://gitlab.com/xonq/mycotools/mycotools",
     packages = setuptools.find_packages( ),
-    scripts = ['mycotools/abstractHmm.py', 'mycotools/acc2fa.py', 'mycotools/acc2gff.py', 'mycotools/annotationStats.py', 'mycotools/assemblyStats.py', 'mycotools/curAnnotation.py', 'mycotools/db2hmmsearch.py', 'mycotools/grabClusters.py', 'mycotools/jgiDwnld.py', 'mycotools/ncbiDwnld.py', 'mycotools/proteomeStats.py', 'mycotools/dbqueryDB.py', 'mycotools/dbncbi2db.py', 'mycotools/dbabstractDB.py', 'mycotools/dbpredb2db.py', 'mycotools/dbupdateDB.py', 'mycotools/dbjgi2db.py', 'mycotools/dbdbFiles.py', 'mycotools/dbgff2gff3.py'],
+    scripts = ['mycotools/abstractHmm.py', 'mycotools/acc2fa.py', 'mycotools/acc2gff.py', 'mycotools/annotationStats.py', 'mycotools/assemblyStats.py', 'mycotools/curAnnotation.py', 'mycotools/db2hmmsearch.py', 'mycotools/grabClusters.py', 'mycotools/jgiDwnld.py', 'mycotools/ncbiDwnld.py', 'mycotools/proteomeStats.py', 'mycotools/db/queryDB.py', 'mycotools/db/ncbi2db.py', 'mycotools/db/abstractDB.py', 'mycotools/db/predb2db.py', 'mycotools/db/updateDB.py', 'mycotools/db/jgi2db.py', 'mycotools/db/dbFiles.py', 'mycotools/db/gff2gff3.py'],
     install_requires = [ 'biopython', 'pandas', 'requests', 'scikit-learn' ],
     classifiers = [
         "Programming Language :: Python :: 3",
