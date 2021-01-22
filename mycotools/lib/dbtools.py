@@ -2,8 +2,8 @@
 
 import pandas as pd, pandas
 import numpy as np
-import sys, os, time, mycotools.fastatools, json, re, datetime
-from mycotools.kontools import collect_files, eprint, formatPath
+import sys, os, time, mycotools.lib.fastatools, json, re, datetime
+from mycotools.lib.kontools import collect_files, eprint, formatPath
 from Bio import Entrez
 from urllib.error import HTTPError
 
@@ -11,10 +11,11 @@ from urllib.error import HTTPError
 def genConfig( branch = 'stable' ):
 
     config = { 
-        'forbidden': '$DB/log/forbidden.tsv',
-        'repository': 'https://gitlab.com/xonq/kontools', 
+        'forbidden': '$MYCODB/log/forbidden.tsv',
+        'repository': 'https://gitlab.com/xonq/mycodb', 
         'branch': branch,
-        'nonpublished': False
+        'nonpublished': False,
+        'rogue': False,
     }
 
     return config
@@ -57,7 +58,7 @@ def readLog( log, headers = '', sep = '\t' ):
     return log_dict
 
 
-def masterDB( path = '$DB' ):
+def masterDB( path = '$MYCODB' ):
 
     path = path.replace( '$', '' )
     try:
@@ -87,9 +88,10 @@ def db2df(db_path):
     db_path = formatPath( db_path )
     db_df = pd.read_csv( db_path, sep='\t' )
     if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
-        headers = [ 'internal_ome', 'proteome', 'assembly', 'gff', 'gff3', 'genus', 'species', \
-            'strain', 'taxonomy', 'ecology', 'eco_conf', 'blastdb', 'genome_code', 'source', \
-            'published' ]
+        headers = [ 'internal_ome', 'genus', 'species', 'strain', 'biosample',
+            'assembly', 'proteome', 'gff3',
+            'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
+            'blastdb', 'genome_code' ]
         db_df = pd.read_csv( db_path, sep = '\t', names = headers )
 
     return db_df
@@ -98,13 +100,23 @@ def df2std( df ):
     '''
     Standardized organization of database columns
     '''
-
-    trans_df = df[[ 
-        'internal_ome', 'proteome', 'assembly', 
-        'gff', 'gff3', 'genus', 'species', 'strain', 
-        'taxonomy', 'ecology', 'eco_conf', 'blastdb', 
-        'genome_code', 'source', 'published'
+    # temporary check, will remove when all scripts account for new biosample column
+    if 'biosample' in df.columns:
+        trans_df = df[[
+        'internal_ome', 'genus', 'species',
+        'strain', 'biosample', 'assembly', 
+        'proteome', 'gff3', 'taxonomy',
+        'ecology', 'eco_conf', 'source', 'published', 
+        'blastdb', 'genome_code'
     ]]
+    else:
+        trans_df = df[[
+        'internal_ome', 'genus', 'species',
+        'strain', 'assembly', 
+        'proteome', 'gff', 'gff3', 'taxonomy',
+        'ecology', 'eco_conf', 'source', 'published', 
+        'blastdb', 'genome_code'
+        ]]
 
     return trans_df
 
@@ -159,7 +171,7 @@ def collect_fastas(db_df,assembly=False,ome_index='internal_ome'):
         ome_fasta_dict[ome] = {}
         if assembly:
             if type(row['assembly']) != float:
-                ome_fasta_dict[ome]['fasta'] = os.environ['ASSEMBLY'] + '/' + row['assembly']
+                ome_fasta_dict[ome]['fasta'] = os.environ['MYCOFNA'] + '/' + row['assembly']
                 ome_fasta_dict[ome]['type'] = 'nt'
             else:
                 print('Assembly file does not exist for',ome,'\nExit code 3')
@@ -168,11 +180,11 @@ def collect_fastas(db_df,assembly=False,ome_index='internal_ome'):
         elif not assembly:
             if type(row['proteome']) != float:
                 print('\tproteome')
-                ome_fasta_dict[ome]['fasta'] = os.environ['PROTEOME'] + '/' + row['proteome']
+                ome_fasta_dict[ome]['fasta'] = os.environ['MYCOFAA'] + '/' + row['proteome']
                 ome_fasta_dict[ome]['type'] = 'prot'
             elif type(row['assembly']) != float:
                 print('\tassembly')
-                ome_fasta_dict[ome]['fasta'] = os.environ['ASSEMBLY'] + '/' + row['assembly']
+                ome_fasta_dict[ome]['fasta'] = os.environ['MYCOFNA'] + '/' + row['assembly']
                 ome_fasta_dict[ome]['type'] = 'nt'
             else:
                 print('Assembly file does not exist for',ome,'\nExit code 3')
@@ -261,7 +273,7 @@ def hit2taxonomy(
 
 # gather taxonomy by querying NCBI
 # if `api_key` is set to `1`, it assumes the `Entrez.api` method has been called already
-def gather_taxonomy(df, api_key=0, king='fungi', ome_index = 'internal_ome'):
+def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'):
 
     print('\nGathering taxonomy information')
     tax_dicts = []
@@ -286,10 +298,10 @@ def gather_taxonomy(df, api_key=0, king='fungi', ome_index = 'internal_ome'):
 
 # if there is no api key, sleep for a second after 3 queries
 # if there is an api key, sleep for a second after 10 queries
-        if api_key == 0 and count == 2:
+        if not api_key and count == 2:
             time.sleep(1)
             count = 0
-        elif api_key == 1 and count == 9:
+        elif api_key and count == 9:
             time.sleep(1)
             count = 0
 
@@ -311,10 +323,10 @@ def gather_taxonomy(df, api_key=0, king='fungi', ome_index = 'internal_ome'):
 # for each taxID acquired, fetch the actual taxonomy information
         taxid = 0
         for tax in ids:
-            if api_key == 0 and count == 2:
+            if not api_key and count == 2:
                 time.sleep(1)
                 count = 0
-            elif api_key == 1 and count == 9:
+            elif api_key and count == 9:
                     time.sleep(1)
                     count = 0
             count += 1
@@ -350,10 +362,10 @@ def gather_taxonomy(df, api_key=0, king='fungi', ome_index = 'internal_ome'):
     
         count += 1
         if count == 3 or count == 10:
-            if api_key == 0:
+            if not api_key:
                 time.sleep( 1 )
                 count = 0
-            elif api_key == 1:
+            elif api_key:
                 if count == 10:
                     time.sleep( 1 )
                     count = 0
@@ -377,6 +389,11 @@ def read_tax(taxonomy_string):
 # their path. Can also report values from a list `empty_list` as a `None` type
 def acquire( db_or_row, ome_index = 'internal_ome', empty_list = [''], datatype = 'row' ):
 
+    key2env = {
+        'assembly': 'MYCOFNA',
+        'proteome': 'MYCOFAA',
+        'gff3': 'MYCOGFF3'
+        }
     if ome_index != 'internal_ome':
         alt_ome = 'internal_ome'
     else:
@@ -394,8 +411,9 @@ def acquire( db_or_row, ome_index = 'internal_ome', empty_list = [''], datatype 
                     info_dict[ome]['alt_ome'] = row[alt_ome]
                 elif key == 'taxonomy':
                     info_dict[ome][key] = read_tax( row[key] )
-                elif key == 'gff' or key == 'gff3' or key == 'proteome' or key == 'assembly':
-                    info_dict[ome][key] = os.environ[key.upper()] + '/' + str(row[key])
+                elif key == 'gff3' or key == 'proteome' or key == 'assembly':
+                    new = key2env[key]
+                    info_dict[ome][new] = os.environ[new] + '/' + str(row[key])
                 else:
                     info_dict[ome][key] = row[key]
             else:
@@ -411,8 +429,9 @@ def acquire( db_or_row, ome_index = 'internal_ome', empty_list = [''], datatype 
                         info_dict[ome]['alt_ome'] == row[alt_ome]
                     elif key == 'taxonomy':
                         info_dict[ome][key] == read_tax( row[key] )
-                    elif key == 'gff' or key == 'gff3' or key == 'proteome' or key == 'assembly':
-                        info_dict[ome][key] == os.environ[key.upper()] + '/' + row[key]
+                    elif key == 'gff3' or key == 'proteome' or key == 'assembly':
+                        new = key2env[key]
+                        info_dict[ome][key] == os.environ[new] + '/' + row[key]
                     else:
                         info_dict[ome][key] == row[key]
                 else:
@@ -660,38 +679,4 @@ def report_omes( db_df, ome_index = 'internal_ome' ):
     print('\n\n' + str(ome_list))
 
 
-# converts a `pre_db` file to a `new_db` and returns
-def predb2db( pre_db ):
-
-    data_dict_list = []
-    for i, row in pre_db.iterrows():
-        species_strain = str(row['species_and_strain']).replace( ' ', '_' )
-        spc_str = re.search(r'(.*?)_(.*)', species_strain)
-        if spc_str:
-            species = spc_str[1]
-            strain = spc_str[2]
-        else:
-            species = species_strain
-            strain = ''
-        data_dict_list.append( {
-            'genome_code': row['genome_code'],
-            'genus': row['genus'],
-            'strain': strain,
-            'ecology': '',
-            'eco_conf': '',
-            'species': species,
-            'proteome': row['proteome_full_path'],
-            'gff': row['gff_full_path'],
-            'gff3': row['gff3_full_path'],
-            'assembly': row['assembly_full_path'],
-            'blastdb': 0,
-            'source': row['source'],
-            'published': row['publication']
-        } )
-        if 'taxonomy' in pre_db.columns:
-            data_dict_list[-1]['taxonomy'] = row['taxonomy']
-
-    new_db = pd.DataFrame( data_dict_list )
-
-    return new_db
 

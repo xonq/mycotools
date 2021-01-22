@@ -147,7 +147,7 @@ def gff2dict( gff_path, insert = False, error = True ):
     with open( gff_path, 'r' ) as raw_gff:
         try:
             for line in raw_gff:
-                if not line.startswith('#'): 
+                if not line.startswith('#') and len(line) > 5: 
                     if line.endswith('\n'):
                         line = line.rstrip()
                     col_list = line.split(sep='\t')
@@ -169,13 +169,61 @@ def gff2dict( gff_path, insert = False, error = True ):
 
 def dict2gff( gff_dict ):
 
-    gff_str = '##gff version 3'
+    gff_str = ''
     for line in gff_dict:
         add_str = '\t'.join( str(x) for x in line.values() )
+        gff_str += add_str + '\n'
 
-        gff_str += '\n' + add_str
+    return gff_str.rstrip()
 
-    return gff_str
+def gff3Comps( source = None ):
+
+    comps = {}
+    comps['par'] = r'Parent=([^;]+)'
+    comps['id'] = r'ID=([^;]+)'
+    comps['Alias'] = r'Alias=([^;]+)'
+    comps['product'] = r'product=([^;]*)' 
+    comps['ver'] = 'gff3'
+
+    if source == 'ncbi':
+        comps['prot'] = r';protein_id=([^;]+)'
+    elif source == 'jgi':
+        comps['prot'] = r'proteinId=([^;]+)'
+        comps['transcript'] = r'transcriptId=([^;])'
+   
+    return comps
+
+def gff2Comps():
+
+    comps = {}
+    comps['id'] = r'name "([^"]+)"'
+    comps['prot'] = r'proteinId ([^;]+)'
+    comps['transcript'] = r'transcriptId ([^;]+)'
+    comps['alias'] = r'alias "([^"]+)"'
+    comps['product'] = r'product_name "([^"]+)'
+    comps['ver'] = 'gff2'
+
+    return comps
+
+def gtfComps():
+
+    comps = {}
+    comps['id'] = r'gene_id "([^"]+)"'
+    comps['transcript'] = r'transcript_id "([^"]+)"'
+    comps['alias'] = r'alias "([^"]+)"'
+    comps['ver'] = 'gtf'
+
+    return comps
+
+def grabGffAcc( gff_list, acc ):
+
+    if ';Alias=' in gff_list[0]['attributes']:
+        alias = ';Alias=' + acc
+    elif ' alias "' in gff_list[0]['attributes']:
+        alias = ' alias "' + acc + '"'
+    out_list = [ x for x in gff_list if alias in x['attributes'] ]
+    
+    return out_list
 
 
 def compileExon( gff ):

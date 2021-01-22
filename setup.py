@@ -5,7 +5,7 @@ with open( "README.md", "r" ) as fh:
 
 setuptools.setup(
     name = "mycotools",
-    version = "0.0.8a",
+    version = "0.2.7a1",
     author = "xonq",
     author_email = "konkelzach@protonmail.com",
     description = "A compilation of bioinformatic and computation biology inspired " + \
@@ -14,7 +14,8 @@ setuptools.setup(
     long_description_content_type = "text/markdown",
     url = "https://gitlab.com/xonq/mycotools/mycotools_pypi",
     packages = setuptools.find_packages( ),
-    install_requires = [ 'biopython', 'pandas' ]   
+    scripts = ['mycotools/abstractHmm.py', 'mycotools/acc2fa.py', 'mycotools/acc2gff.py', 'mycotools/annotationStats.py', 'mycotools/assemblyStats.py', 'mycotools/curAnnotation.py', 'mycotools/db2hmmsearch.py', 'mycotools/grabClusters.py', 'mycotools/jgiDwnld.py', 'mycotools/ncbiDwnld.py', 'mycotools/proteomeStats.py', 'mycotools/db/curProteomes.py', 'mycotools/db/queryDB.py', 'mycotools/db/ncbi2db.py', 'mycotools/db/abstractDB.py', 'mycotools/db/predb2db.py', 'mycotools/db/updateDB.py', 'mycotools/db/jgi2db.py', 'mycotools/db/dbFiles.py', 'mycotools/db/gff2gff3.py', 'mycotools/db/curGFF3.py'],
+    install_requires = [ 'biopython', 'pandas' ],
     classifiers = [
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
