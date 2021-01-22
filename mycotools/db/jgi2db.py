@@ -3,12 +3,12 @@
 import subprocess, argparse, sys, os, re, time, getpass
 import pandas as pd
 from io import StringIO
-from predb2db import main as predb2db
+from mycotools.db.predb2db import main as predb2db
 from mycotools.lib.kontools import intro, outro
 from mycotools.lib.dbtools import db2df, df2db, gen_omes
-from jgiDwnld import jgi_login as jgi_login
-from jgiDwnld import retrieveXML as retrieveXML
-from jgiDwnld import JGIdwnld as JGIdwnld
+from mycotools.jgiDwnld import jgi_login as jgi_login
+from mycotools.jgiDwnld import retrieveXML as retrieveXML
+from mycotools.jgiDwnld import JGIdwnld as JGIdwnld
 
 
 def dwnldMycoCosm( mycocosm_url, output ):

@@ -3,10 +3,10 @@
 import argparse, os, sys, subprocess, re
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, gather_taxonomy, assimilate_tax, masterDB, df2std
-from curGFF3 import main as curGFF3
-from gff2gff3 import main as gff2gff3
-from curProteomes import curate as curProteome
-from curAnnotation import main as curRogue
+from mycotools.db.curGFF3 import main as curGFF3
+from mycotools.db.gff2gff3 import main as gff2gff3
+from mycotools.db.curProteomes import curate as curProteome
+from mycotools.curAnnotation import main as curRogue
 from Bio import Entrez
 import pandas as pd
 

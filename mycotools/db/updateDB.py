@@ -5,11 +5,11 @@ from mycotools.lib.dbtools import db2df, df2db, gather_taxonomy, assimilate_tax,
 from mycotools.lib.kontools import intro, outro, formatPath, eprint, prep_output
 from mycotools.lib.fastatools import fasta2dict
 from Bio import Entrez
-from ncbiDwnld import main as ncbiDwnld
-from jgiDwnld import main as jgiDwnld
-from ncbi2db import main as ncbi2db
-from jgi2db import main as jgi2db
-from predb2db import main as predb2db
+from mycotools.ncbiDwnld import main as ncbiDwnld
+from mycotools.jgiDwnld import main as jgiDwnld
+from mycotools.db.ncbi2db import main as ncbi2db
+from mycotools.db.jgi2db import main as jgi2db
+from mycotools.db.predb2db import main as predb2db
 
 
 def initDB( init_dir, branch, envs, rogue = False ):
