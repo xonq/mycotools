@@ -5,14 +5,14 @@ with open( "README.md", "r" ) as fh:
 
 setuptools.setup(
     name = "mycotools",
-    version = "0.2.7a1",
+    version = "0.3.0b1",
     author = "xonq",
     author_email = "konkelzach@protonmail.com",
     description = "A compilation of bioinformatic and computation biology inspired " + \
         "python tools",
     long_description = long_description,
     long_description_content_type = "text/markdown",
-    url = "https://gitlab.com/xonq/mycotools/mycotools_pypi",
+    url = "https://gitlab.com/xonq/mycotools/mycotools",
     packages = setuptools.find_packages( ),
     scripts = ['mycotools/abstractHmm.py', 'mycotools/acc2fa.py', 'mycotools/acc2gff.py', 'mycotools/annotationStats.py', 'mycotools/assemblyStats.py', 'mycotools/curAnnotation.py', 'mycotools/db2hmmsearch.py', 'mycotools/grabClusters.py', 'mycotools/jgiDwnld.py', 'mycotools/ncbiDwnld.py', 'mycotools/proteomeStats.py', 'mycotools/db/curProteomes.py', 'mycotools/db/queryDB.py', 'mycotools/db/ncbi2db.py', 'mycotools/db/abstractDB.py', 'mycotools/db/predb2db.py', 'mycotools/db/updateDB.py', 'mycotools/db/jgi2db.py', 'mycotools/db/dbFiles.py', 'mycotools/db/gff2gff3.py', 'mycotools/db/curGFF3.py'],
     install_requires = [ 'biopython', 'pandas' ],

@@ -1,19 +1,20 @@
-These scripts are currently under heavy development. Before running analyses, it is a good idea to check for upgrades by running `pip install mycotools --upgrade` after activating your conda environment.
+# PURPOSE
+These scripts are a compilation of computational biology tools to increase analysis throughput. In particular, these scripts are tailored toward use with the `mycotools database`, a database schema with modularity as the guiding principle, enabling analyses with datasets of 1000s of fungi to as few as 1 or 2.
 
-These are scripts designed to automate many processes in my computational biology work and interface with the mycotools database. If you want the best experience with them, please install the database as described after the script installation. 
+---
 
 <br />
 
 # INSTALLING SCRIPTS
 ## 1) Download & install miniconda3
-You will need a virtual python3 environment, which essentially is installing you your own local python and isolating it in its own "environment" from the python your system relies on to operate - this allows you to install python packages without interfering with the system and is required to install packages on HPCs like Ohio Supercomputer (OSC). All you need to do is pay attention to the installation if you want to install to a specific path (I install mine to a software folder in my home directory, e.g. `~/software/miniconda3` - make sure to add `miniconda3` as the final portion of the path). Otherwise, answer `y` to all:
+Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered.
 
 ```	
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/miniconda3.sh
 bash ~/miniconda3.sh
 ```
 
-Then edit and add this line to your `~/.bash_profile`:
+If you are using the Ohio Supercomputer, or are having problems with initializing `conda`, edit and add this line to your `~/.bash_profile`:
 ```
 export PATH="<ABSOLUTE/PATH/MINICONDA/INSTALL>/bin:$PATH"
 ```
