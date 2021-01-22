@@ -196,9 +196,8 @@ def download_files( ome_prots, ome, file_types, output_dir, remove = False ):
                 md5_res = md5_cmd.stdout.decode( 'utf-8' )
                 md5_find = re.search(r'\w+', md5_res)
                 md5 = md5_find[0]
-                print(md5 + ' ' + ome_prots[file_type + '_md5'])
                 if md5 == ome_prots[file_type + '_md5']:
-                    print('yes')
+                    dwnld = 0
                     continue
 
             if ftp_link == '':

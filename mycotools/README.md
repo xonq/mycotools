@@ -26,7 +26,7 @@ Restart your login. *Anytime you want to use the python environment you just ins
 
 ```
 source activate base
-pip install mycotools Biopython pandas scikit-learn
+pip install mycotools
 ```
 
 <br />

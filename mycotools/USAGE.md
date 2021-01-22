@@ -1,3 +1,12 @@
+# INDEX
+
+- GENERAL
+	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
+	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
+	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
+	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
+	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
+
 # GENERAL
 ## Creating modular databases
 ### abstractDB.py
@@ -36,7 +45,7 @@ optional arguments:
 ```
 
 
-## Assembly / annotation statistics
+## Sequence data statistics
 ### assemblyStats.py / annotationStats.py
 ```
 assemblyStats.py <ASSEMBLY.fa>
@@ -89,7 +98,7 @@ SAMN02744098
 By default, if you are querying using a mycotools accession then it can search the database without a standalone file.
 Let's say you want to query *Panaeolus cyanescens'* PsiD and the NCBI accession is "PPQ80975.1". Find Panaelous cyanescens' ome code in the database:
 ```
-grep Panaeolus $(mycodb) | grep cyanescens
+grep Panaeolus $(mycodb) | grep cyanescens | cut -f 1
 ```
 
 The first column in the output is `pancya1`, which is the ome code for this organism. Now, prepend the code to the accession and grab it from the db (you can use `>` after the commands to pipe output to a file):
