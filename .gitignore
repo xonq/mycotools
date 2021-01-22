@@ -5,3 +5,4 @@ mycotools.egg-info/
 prepUpdate.py
 *.swp
 *.pyc
+include.txt
