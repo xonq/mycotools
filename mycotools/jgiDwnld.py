@@ -422,10 +422,10 @@ def main(
                 )
                 if type(check) != int:
                     if new_typ == 'gff':
-                        df.at[i, 'jgi_gff_path'] = output + '/' + new_typ \
+                        df.loc[i, 'jgi_gff_path'] = output + '/' + new_typ \
                             + '/' + check
                     else:
-                        df.at[i, new_typ + '_path'] = output + '/' + new_typ + \
+                        df.loc[i, new_typ + '_path'] = output + '/' + new_typ + \
                             '/' + check
                     check = os.path.basename( os.path.abspath( check ) )
                 print('\t\t' + new_typ + ': exit status ' + str(check))

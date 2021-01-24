@@ -324,7 +324,6 @@ def main():
             'MYCOFNA': init_dir + 'data/fna', 
             'MYCOFAA': init_dir + 'data/faa', 
             'MYCOGFF3': init_dir + 'data/gff3', 
-            'MYCOBLAST': init_dir + 'data/faa/blastdb', 
             'MYCODB': init_dir + 'mycodb'
             }
         os.environ['MYCODB'] = init_dir + 'mycodb'
@@ -363,17 +362,20 @@ def main():
             ncbi_df = missing_db_ncbi, email = ncbi_email, api = ncbi_api,
             output_path = update_path
             )
+        print(ncbi_predb)
         ncbi_db = predb2db( ncbi_predb, db )
+        db2df( ncbi_db, update_path + date + '.ncbi.db' )
         jgi_predb = jgiDwnld(
             missing_db_jgi, update_path, jgi_email, jgi_pwd
             )
         jgi_db = predb2db( jgi_predb, db )
+        db2df( jgi_db, update_path + date + '.jgi.db' )
         for i in ['assembly', 'proteome', 'gff3', 'gff']:
             if os.path.isdir( update_path + i ):
                 shutil.rmtree( update_path + i )
         
     elif config['rogue']:
-# NEED preference check (ncbi or jgi)
+# NEED preference check (ncbi or jgi or allow all)
 # NEED to mark none for new databases' refdb
         jgi_db = jgi2db( None, db, update_path )
         if type(db) is not None:
