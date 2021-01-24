@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 import re, os, sys, subprocess
-from mycotools.lib.kontools import sysStart
+from mycotools.lib.kontools import sysStart, formatPath
 
 # converts JGI proteome hedaers for file from `>jgi|ome|accession|description` to `>ome_accession`
 # converts all non letter/number characters in ome code to `.`
