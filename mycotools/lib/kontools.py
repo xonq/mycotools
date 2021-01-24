@@ -18,10 +18,10 @@ def vprint( toPrint, v = False ):
 def gunzip( gzip_file, remove = True, spacer = '\t' ):
     '''gunzips gzip_file and removes if successful'''
 
-    new_file = re.sub( r'\.gz$', '', gzip_file )
+    new_file = re.sub( r'\.gz$', '', formatPath(gzip_file) )
     try:
-        with gzip.open(gzip_file, 'rb') as f_in:
-            with open(new_file, 'w') as f_out:
+        with gzip.open(formatPath(gzip_file), 'rb') as f_in:
+            with open(new_file, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
         if remove:
             os.remove( gzip_file )
