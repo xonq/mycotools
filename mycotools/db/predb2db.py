@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import argparse, os, sys, subprocess, re
+import argparse, os, sys, subprocess, re, numpy as np
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, gather_taxonomy, assimilate_tax, masterDB, df2std
 from mycotools.db.curGFF3 import main as curGFF3
