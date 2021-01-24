@@ -50,21 +50,25 @@ def expandEnvVar( path ):
     return path
 
 
-def formatPath( path ):
+def formatPath( path, isdir = None ):
     '''Goal is to convert all path types to absolute path with explicit dirs'''
    
     if path:
         path = os.path.expanduser( path )
         path = expandEnvVar( path )
         path = os.path.abspath( path )
-        if path.endswith( '/' ):
-            if path.endswith( '//' ):
-                path = path[:-1]
-            if not os.path.isdir( path ):
-                path = path[:-1]
-        elif not path.endswith( '/' ):
-            if os.path.isdir( path ):
+        if isdir:
+            if not path.endswith('/'):
                 path += '/'
+        else:
+            if path.endswith( '/' ):
+                if path.endswith( '//' ):
+                    path = path[:-1]
+                if not os.path.isdir( path ):
+                    path = path[:-1]
+            elif not path.endswith( '/' ):
+                if os.path.isdir( path ):
+                    path += '/'
 
     return path
 
