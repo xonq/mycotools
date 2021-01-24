@@ -1,13 +1,28 @@
 # INDEX
 
-- GENERAL
+<br />
+
+- **MYCODB**
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
+
+<br />
+
+- **SEQUENCE DATA**
 	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
 
-# GENERAL
+<br />
+
+- **ANALYSES**
+	- [mycoDB blast](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycoDB)
+	- [mycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
+	- [fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
+
+---
+<br /><br />
+
 ## Creating modular databases
 ### abstractDB.py
 The core principle behind mycotools is modularity - creating tools that modularly interface with databases ranging from 1 organism to all ~ 1,500 published fungi. Most scripts use the master database by default, but if you are only interested in a portion of the database, then abstract the portion you want.
@@ -44,6 +59,29 @@ optional arguments:
                         column headers (stdout does not)
 ```
 
+<br />
+
+## Acquiring database files
+### dbFiles.py
+Inputs a mycotools `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
+
+Let's say you want protein data from organisms in one family. First, you should abstract a database of organisms you want:
+```
+mkdir pullFiles && cd pullFiles
+abstractDB.py -c family -t Atheliaceae > atheliaceae.db
+```
+
+Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
+```
+dbFiles.py -i atheliaceae.db -p 
+```
+
+Alternatively, if you just need the paths (links) to these files, simply run:
+```
+dbFiles.py -i atheliaceae.db -p -l
+```
+
+<br /><br />
 
 ## Sequence data statistics
 ### assemblyStats.py / annotationStats.py
@@ -113,33 +151,46 @@ acc2gff.py -i <INPUTFILE>
 acc2fa.py -i <INPUTFILE>
 ```
 
-<br />
-
-## Acquiring database files
-### dbFiles.py
-Inputs a mycotools `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
-
-Let's say you want protein data from organisms in one family. First, you should abstract a database of organisms you want:
-```
-mkdir pullFiles && cd pullFiles
-abstractDB.py -c family -t Atheliaceae > atheliaceae.db
-```
-
-Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
-```
-dbFiles.py -i atheliaceae.db -p 
-```
-
-Alternatively, if you just need the paths (links) to these files, simply run:
-```
-dbFiles.py -i atheliaceae.db -p -l
-```
 
 <br /><br />
 
-# EVOLUTION
-## Hidden markov model search
-`db2hmmsearch.py` will compile hmmsearch results and optionally prepare data for a tree from a profile hidden markov model. This script supports multiprocessing and uses all detected cores by default.
+## BLAST mycoDB
+### db2blast.py
+`db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the mycoDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
+
+```
+usage: db2blast.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
+                   [-o OUTPUT] [-p PREVIOUS] [--cpu CPU]
+
+Blasts a query against a db and compiles output fastas for each query.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -b BLAST, --blast BLAST
+                        Blast type { blastn, blastp, tblastn, blastx }
+  -q QUERY, --query QUERY
+                        Query fasta
+  -e EVALUE, --evalue EVALUE
+                        Negative e-value order max, e.g. 2 for 10^-2
+  -s BITSCORE, --bitscore BITSCORE
+                        Bit score minimum
+  -i IDENTITY, --identity IDENTITY
+                        Identity minimum, e.g. 0.6
+  -m MAXHITS, --maxhits MAXHITS
+                        Max hits for each organism
+  -d DATABASE, --database DATABASE
+                        mycodb, DEFAULT: masterdb
+  -o OUTPUT, --output OUTPUT
+  -p PREVIOUS, --previous PREVIOUS
+                        Previous run directory
+  --cpu CPU             DEFAULT: all
+```
+
+<br />
+
+## hmmsearch mycoDB
+### db2hmmsearch.py
+`db2hmmsearch.py` will compile hmmsearch results, optionally ouput fasta/hmmalign to original models/trim alignments from a profile hidden markov model. This script supports multiprocessing and uses all detected cores by default.
 
 e.g.: `db2hmmsearch.py -d profile.hmm` will run the master database referencing the inputted hmmdb. 
 
@@ -176,3 +227,21 @@ optional arguments:
                         "-strictplus -fasta"
 ```
 
+<br />
+
+## Phylogenetic Analysis
+### fa2tree.py
+`fa2tree.py` will input a fasta file, trim, and prepare for job submission (`slurm` or `torque`) or immediate execution. 
+
+```
+usage: fa2tree.py [-h] -i INPUT [-o] [-t TREE]
+
+Takes in a multifasta, aligns, trims, and runs treebuilding: `fasttree`,
+`iqtree`, `raxml` (future).
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+  -o, --osc             Submit ALL steps to OSC.
+  -t TREE, --tree TREE  Tree-building software. DEFAULT: fasttree
+```
