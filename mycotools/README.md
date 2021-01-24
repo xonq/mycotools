@@ -38,10 +38,7 @@ Many of my scripts interface with [mycotools databases](https://gitlab.com/xonq/
 export MYCODB=/fs/project/PAS1046/databases/konkel 	# database
 export MYCOFNA=$MYCODB/assembly/ 	# database assemblies
 export MYCOFAA=$MYCODB/proteome/ 	# database proteomes
-export MYCOGFF=$MYCODB/gff/ 		# database gffs
 export MYCOGFF3=$MYCODB/gff3/ 		# database gff3s
-export MYCOBLAST=$MYCODB/proteome/blastdb 	# blastdbs
-export MYCOSMASH=/fs/project/PAS1046/projects/secmet/antismash 	# antismash outputs
 ```
 
 Restart your login and you're good!
