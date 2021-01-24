@@ -19,6 +19,7 @@
 	- [mycoDB blast](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycoDB)
 	- [mycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
+	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hierachical-agglomerative-clustering)
 
 ---
 <br /><br />
@@ -231,7 +232,7 @@ optional arguments:
 
 ## Phylogenetic Analysis
 ### fa2tree.py
-`fa2tree.py` will input a fasta file, trim, and prepare for job submission (`slurm` or `torque`) or immediate execution. 
+`fa2tree.py` will input a fasta file, trim, and generate a tree either via job submission (`slurm` or `torque`) or immediate execution. 
 
 ```
 usage: fa2tree.py [-h] -i INPUT [-o] [-t TREE]
@@ -244,4 +245,36 @@ optional arguments:
   -i INPUT, --input INPUT
   -o, --osc             Submit ALL steps to OSC.
   -t TREE, --tree TREE  Tree-building software. DEFAULT: fasttree
+```
+
+<br />
+
+## Hiearchical agglomerative clustering
+### aggClus.py
+Inputs a fasta file (or tab delimitted distance file and skips the first step), constructs a distance matrix based on % identity of all pairwise global alignments of sequences, then clusters sequences via hierarchical agglomerative clustering. This script is designed as a drop-in replacement for the proprietary `usearch -calc_distmx` and `usearch clus_aggd` commands.
+
+```
+usage: aggClus.py [-h] [-f FASTA] [-d DISTANCE] [-o OUTPUT] -m MAX_DIST
+                  [-l LINKAGE] [-c CPUS]
+
+Hiearchical agglomerative clustering
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f FASTA, --fasta FASTA
+                        Start from fasta (generate distance matrix)
+  -d DISTANCE, --distance DISTANCE
+                        Start from distance matrix
+  -o OUTPUT, --output OUTPUT
+                        Output prefix other than input name
+  -m MAX_DIST, --max_dist MAX_DIST
+                        Distance or identity threshold - in an identity-based
+                        distance matrix (usearch -calc_distmx), this value is
+                        equal to 1 - minimum_identity.
+  -l LINKAGE, --linkage LINKAGE
+                        Linkage criterion: 'complete' (maximum distance),
+                        'average', or 'single' (minimum distance) DEFAULT:
+                        'single' (minimum)
+  -c CPUS, --cpus CPUS  Cores for alignment during distance matrix
+                        construction
 ```
