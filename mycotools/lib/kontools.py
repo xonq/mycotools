@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import datetime, sys, glob, os, re, subprocess, numpy as np
+import datetime, sys, glob, os, re, subprocess, gzip, shutil, numpy as np
 
 def eprint( *args, **kwargs ):
     '''Prints to stderr'''
@@ -15,22 +15,23 @@ def vprint( toPrint, v = False ):
         print( toPrint, flush = True )
 
 
-def gunzip( gzip_file, remove = True ):
+def gunzip( gzip_file, remove = True, spacer = '\t' ):
     '''gunzips gzip_file and removes if successful'''
 
     new_file = re.sub( r'\.gz$', '', gzip_file )
-    #try:
-    with gzip.open(gzip_file, 'rb') as f_in:
-        with open(new_file, 'w') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-    if remove:
-        os.remove( gzip_file )
-    return new_file
-#    except:
- #       if os.path.isfile( new_file ):
-  #          if os.path.isfile( gzip_file ):
-   #             os.remove( new_file )
-    return False
+    try:
+        with gzip.open(gzip_file, 'rb') as f_in:
+            with open(new_file, 'w') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        if remove:
+            os.remove( gzip_file )
+        return new_file
+    except:
+        eprint('\n' + spacer + 'ERROR: gunzip ' + str(gzip_file) + ' failed.')
+        if os.path.isfile( new_file ):
+            if os.path.isfile( gzip_file ):
+                os.remove( new_file )
+        return False
 
 
 def expandEnvVar( path ):
