@@ -154,39 +154,39 @@ def main( prepdb, refdb, rogue = False ):
             if new_path:
                 predb_omes.at[i, 'proteome'] = new_path
                 if row['source'].lower() in {'ncbi', 'jgi'}:
-                    try:
-                        new_prot = curProteome(formatPath('$MYCOFAA/' + new_path), row['internal_ome'])
-                        cur_prot = re.sub(r'\.uncur$', '', new_path)
-                        to_del.append(formatPath('$MYCOFAA/' + new_path))
-                        with open( formatPath('$MYCOFAA/' + cur_prot), 'w' ) as out:
-                            out.write( new_prot )
-                        predb_omes_tax.at[i, 'proteome'] = cur_prot
-                    except:
-                        eprint('\t' + row['internal_ome'] + ' proteome failed curation')
+#                    try:
+                    new_prot = curProteome(formatPath('$MYCOFAA/' + new_path), row['internal_ome'])
+                    cur_prot = re.sub(r'\.uncur$', '', new_path)
+                    to_del.append(formatPath('$MYCOFAA/' + new_path))
+                    with open( formatPath('$MYCOFAA/' + cur_prot), 'w' ) as out:
+                        out.write( new_prot )
+                    predb_omes_tax.at[i, 'proteome'] = cur_prot
+#                    except:
+ #                       eprint('\t' + row['internal_ome'] + ' proteome failed curation')
                 elif rogue:
                     if not gff3:
                         eprint('\t' + row['internal_ome'] + ' no gff3, cannot curate headers')
                     else:
-                        try:
-                            gff, fa, trans_str, failed, flagged = curRogue(
-                                os.environ['MYCOGFF3'] + '/' + row['gff3'],
-                                os.environ['MYCOFAA'] + '/' + row['proteome'],
-                                row['internal_ome']
-                                )
-                            to_del.append( formatPath('$MYCOGFF3/' + row['gff3'] ) )
-                            cur_gff = re.sub(r'\.uncur$', '', row['gff3'])
-                            with open(formatPath('$MYCOGFF3/' + cur_gff), 'w') as out:
-                                out.write(dict2gff(gff))
-                            predb_omes.at[i, 'gff3'] = cur_prot
-                            to_del.append( formatPath('$MYCOFAA/' + row['proteome'] ) )
-                            cur_prot = re.sub(r'\.uncur$', '', row['proteome'])
-                            with open(formatPath('$MYCOFAA/' + cur_prot), 'w') as out:
-                                out.write(dict2fasta(fa))
-                            predb_omes.at[i, 'proteome'] = cur_prot    
+                     #   try:
+                        gff, fa, trans_str, failed, flagged = curRogue(
+                            os.environ['MYCOGFF3'] + '/' + row['gff3'],
+                            os.environ['MYCOFAA'] + '/' + row['proteome'],
+                            row['internal_ome']
+                            )
+                        to_del.append( formatPath('$MYCOGFF3/' + row['gff3'] ) )
+                        cur_gff = re.sub(r'\.uncur$', '', row['gff3'])
+                        with open(formatPath('$MYCOGFF3/' + cur_gff), 'w') as out:
+                            out.write(dict2gff(gff))
+                        predb_omes.at[i, 'gff3'] = cur_prot
+                        to_del.append( formatPath('$MYCOFAA/' + row['proteome'] ) )
+                        cur_prot = re.sub(r'\.uncur$', '', row['proteome'])
+                        with open(formatPath('$MYCOFAA/' + cur_prot), 'w') as out:
+                            out.write(dict2fasta(fa))
+                        predb_omes.at[i, 'proteome'] = cur_prot    
             # NEED TO MAKE ROGUE OMES A THING AND UPDATE THE CONFIG
-                        except:
-                            eprint('\t' + row['internal_ome'] + ' rogue curation failed. Manually curate')
-                            predb_omes_tax = predb_omes_tax.drop(i)
+        #                except:
+                            #eprint('\t' + row['internal_ome'] + ' rogue curation failed. Manually curate')
+                            #predb_omes_tax = predb_omes_tax.drop(i)
             else:
                 predb_omes.at[i, 'proteome'] = None
 

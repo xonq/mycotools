@@ -35,7 +35,7 @@ def curate(file_, internal_ome):
         headers = re.compile(r'>([A-Za-z0-9\-.]+)\|([A-Za-z0-9\.]+).*')
         data = headers.sub(r'>' + internal_ome + r'_\2',data)
 
-    return data
+    return data.rstrip()
 
 
 if __name__ == '__main__':
