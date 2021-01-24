@@ -201,6 +201,9 @@ def download_files( ome_prots, ome, file_types, output_dir, remove = False ):
                 if md5 == ome_prots[file_type + '_md5']:
                     dwnld = 0
                     continue
+            elif os.path.isfile( file_path[:-3] ):
+                dwnld = 0
+                continue
 
             if ftp_link == '':
                 dwnld = 1
