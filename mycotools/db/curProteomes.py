@@ -39,7 +39,7 @@ def curate(file_, internal_ome):
 
 if __name__ == '__main__':
 
-    usage = 'Imports jgi/ncbi proteome and curates headers'
-    sysStart(sys.argv, usage, 2, files = [sys.argv[1]])
-    new_fa = curate(formatPath(sys.argv[1]), row['internal_ome'])
+    usage = 'Imports jgi/ncbi proteome, ome, and curates headers'
+    sysStart(sys.argv, usage, 3, files = [sys.argv[1]])
+    new_fa = curate(formatPath(sys.argv[1]), sys.argv[2])
     print(dict2fasta(new_fa))
