@@ -63,18 +63,18 @@ def moveBioFile( old_path, ome, typ, env, uncur = '' ):
 
     if old_path.endswith('.gz'):
         gunzip_path = gunzip(old_path)
-        print( '\t' + gunzip_path )
+#        print( '\t' + gunzip_path )
         if gunzip_path:
             new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
-            print( '\t\t' + new_path )
+#            print( '\t\t' + new_path )
             if not os.path.isfile(new_path):
                 if not copyFile(formatPath(gunzip_path), new_path, ome, typ):
                     return False
     else:
         new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
-        print( '\t\t' + new_path )
+#        print( '\t\t' + new_path )
         if not os.path.isfile(new_path):
-            if not copyFile(formatPath(gunzip_path), new_path, ome, typ):
+            if not copyFile(formatPath(old_path), new_path, ome, typ):
                 return False
 
     return os.path.basename(new_path)
@@ -119,7 +119,7 @@ def main( prepdb, refdb, rogue = False ):
                         cur_gff = re.sub(r'\.uncur$', '', new_path)
                         os.remove(formatPath('$MYCOGFF3/' + new_path))
                         with open( formatPath('$MYCOGFF3/' + cur_gff), 'w' ) as out:
-                            out.write( cur_gff )
+                            out.write( new_gff )
                         predb_omes_tax.at[i, 'gff3'] = cur_gff
                     except:
                         eprint('\t' + row['internal_ome'] + ' gff3 failed curation')
@@ -158,7 +158,7 @@ def main( prepdb, refdb, rogue = False ):
                         cur_prot = re.sub(r'\.uncur$', '', new_path)
                         os.remove(formatPath('$MYCOFAA/' + new_path))
                         with open( formatPath('$MYCOFAA/' + cur_prot), 'w' ) as out:
-                            out.write( cur_prot )
+                            out.write( new_prot )
                         predb_omes_tax.at[i, 'proteome'] = cur_prot
                     except:
                         eprint('\t' + row['internal_ome'] + ' proteome failed curation')
