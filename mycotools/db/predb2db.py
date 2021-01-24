@@ -71,6 +71,8 @@ def moveBioFile( old_path, ome, typ, env, uncur = '' ):
             if not os.path.isfile(new_path):
                 if not copyFile(formatPath(gunzip_path), new_path, ome, typ):
                     return False
+        else:
+            return False
     else:
         new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
 #        print( '\t\t' + new_path )
@@ -110,7 +112,7 @@ def main( prepdb, refdb, rogue = False ):
             predb_omes = predb_omes.drop(i)
             continue
 
-        if not pd.isnull(row['gff3']):
+        if not pd.isnull(row['gff3']) and row['gff3']:
             new_path = moveBioFile( row['gff3'], row['internal_ome'], 'gff3', 'MYCOGFF3', uncur = '.uncur' )
             if new_path:
                 predb_omes.at[i, 'gff3'] = new_path
@@ -130,7 +132,7 @@ def main( prepdb, refdb, rogue = False ):
             else:
                 predb_omes.at[i, 'gff3'] = None
 
-        if not pd.isnull(row['gff']):
+        if not pd.isnull(row['gff']) and row['gff']:
             if row['gff'].endswith('.gz'):
                 gff_path = gunzip(row['gff'])
                 if not gff_path:
@@ -150,7 +152,7 @@ def main( prepdb, refdb, rogue = False ):
             except:
                 predb_omes.at[i, 'gff3'] = None
             
-        if not pd.isnull( row['proteome'] ):
+        if not pd.isnull( row['proteome'] ) and row['proteome']:
             new_path = moveBioFile( row['proteome'], row['internal_ome'], 'aa.fa', 'MYCOFAA', uncur = '.uncur' )
             if new_path:
                 predb_omes.at[i, 'proteome'] = new_path
