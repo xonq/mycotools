@@ -69,6 +69,8 @@ def collect_ftps(
 
 # for each row in the assembly, grab the accession number, form the search term for Entrez, use Entrez,
     for index, row in ncbi_df.iterrows():
+        if pd.isnull(row[column]):
+            continue
         accession = row[column]
 #        ome = row['internal_ome']
         if index in ass_prots:
