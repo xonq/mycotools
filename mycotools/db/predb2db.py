@@ -64,16 +64,16 @@ def moveBioFile( old_path, ome, typ, env, uncur = '' ):
 
     if old_path.endswith('.gz'):
         if not os.path.isfile(old_path[:-3]):
-            gunzip_path = gunzip(old_path)
-            if gunzip_path:
+            temp_path = gunzip(old_path)
+            if temp_path:
                 new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
             else:
                 return False
         else:
             new_path = os.environ[env] + '/' + ome + '.' + typ + uncur
-            old_path = old_path[:-3]
+            temp_path = old_path[:-3]
         if not os.path.isfile(new_path):
-            if not copyFile(formatPath(gunzip_path), new_path, ome, typ):
+            if not copyFile(formatPath(temp_path), new_path, ome, typ):
                 return False
     else:
         new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
