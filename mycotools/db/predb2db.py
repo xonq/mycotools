@@ -95,6 +95,7 @@ def main( prepdb, refdb, rogue = False ):
 
     ## need to multiprocess here
     print('\nCopying to database')
+    to_del = []
     for i, row in predb_omes.iterrows():
         gff3 = False
         if not pd.isnull( row['assembly'] ):
@@ -117,7 +118,7 @@ def main( prepdb, refdb, rogue = False ):
                     try:
                         new_gff = curGFF3(formatPath('$MYCOGFF3/' + new_path), row['internal_ome'])
                         cur_gff = re.sub(r'\.uncur$', '', new_path)
-                        os.remove(formatPath('$MYCOGFF3/' + new_path))
+                        to_del.append(formatPath('$MYCOGFF3/' + new_path))
                         with open( formatPath('$MYCOGFF3/' + cur_gff), 'w' ) as out:
                             out.write( new_gff )
                         predb_omes_tax.at[i, 'gff3'] = cur_gff
@@ -156,7 +157,7 @@ def main( prepdb, refdb, rogue = False ):
                     try:
                         new_prot = curProteome(formatPath('$MYCOFAA/' + new_path), row['internal_ome'])
                         cur_prot = re.sub(r'\.uncur$', '', new_path)
-                        os.remove(formatPath('$MYCOFAA/' + new_path))
+                        to_del.append(formatPath('$MYCOFAA/' + new_path))
                         with open( formatPath('$MYCOFAA/' + cur_prot), 'w' ) as out:
                             out.write( new_prot )
                         predb_omes_tax.at[i, 'proteome'] = cur_prot
@@ -172,12 +173,12 @@ def main( prepdb, refdb, rogue = False ):
                                 os.environ['MYCOFAA'] + '/' + row['proteome'],
                                 row['internal_ome']
                                 )
-                            os.remove( formatPath('$MYCOGFF3/' + row['gff3'] ) )
+                            to_del.append( formatPath('$MYCOGFF3/' + row['gff3'] ) )
                             cur_gff = re.sub(r'\.uncur$', '', row['gff3'])
                             with open(formatPath('$MYCOGFF3/' + cur_gff), 'w') as out:
                                 out.write(dict2gff(gff))
                             predb_omes.at[i, 'gff3'] = cur_prot
-                            os.remove( formatPath('$MYCOFAA/' + row['proteome'] ) )
+                            to_del.append( formatPath('$MYCOFAA/' + row['proteome'] ) )
                             cur_prot = re.sub(r'\.uncur$', '', row['proteome'])
                             with open(formatPath('$MYCOFAA/' + cur_prot), 'w') as out:
                                 out.write(dict2fasta(fa))
@@ -189,6 +190,8 @@ def main( prepdb, refdb, rogue = False ):
             else:
                 predb_omes.at[i, 'proteome'] = None
 
+    for i in to_del:
+        os.remove(i)
     del predb_omes['gff']
     return df2std(predb_omes)
 

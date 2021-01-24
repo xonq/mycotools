@@ -110,7 +110,7 @@ def compileGenes( cur_list, par2id, comps = gff3Comps() ):
     return alias_dict, etc_list  
 
 
-def curGff3pass1( gff_list, prot_comp ):
+def curGff3pass1( gff_list, prot_comp, ome ):
 
     cur_list = []
     for line in gff_list:
@@ -149,7 +149,7 @@ def curGff3( gff_list, ome ):
         return gff_list
 
     if not cur_list:
-        cur_list = curGff3pass1( gff_list, prot_comp )
+        cur_list = curGff3pass1( gff_list, prot_comp, ome )
 
     par2id = hashGff3IDs( cur_list, gff3Comps(), 'Alias' )
     alias_dict, etc_list = compileGenes( cur_list, par2id )
