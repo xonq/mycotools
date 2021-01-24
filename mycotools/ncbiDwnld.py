@@ -356,17 +356,16 @@ def main(
         if exit != 0 and remove:
             continue
         if ome in set(ncbi_df.index):
-            ncbi_df.at[ome, 'assembly_path'] = os.path.basename( ass_prots[ome]['assembly'] )
-            ncbi_df.at[ome, 'proteome_path'] = os.path.basename( ass_prots[ome]['proteome'] )
-            ncbi_df.at[ome, 'gff3_path'] = os.path.basename( ass_prots[ome]['gff3'] )
+            ncbi_df.loc[ome, 'assembly_path'] = ass_prots[ome]['assembly']
+            ncbi_df.loc[ome, 'proteome_path'] = ass_prots[ome]['proteome']
+            ncbi_df.loc[ome, 'gff3_path'] = ass_prots[ome]['gff3']
         new_df = new_df.append( ncbi_df.loc[ome] )
  
     new_df = new_df.reset_index()
 # won't work nice if ome isn't in the original dataframe
-    new_df = new_df.rename(columns = { 'index': 'internal_ome' } )
-    del new_df['gff3']
-    del new_df['proteome']
-    del new_df['assembly']
+    new_df = new_df.rename(columns = { 
+        'index': 'internal_ome'
+        } )
 
     return new_df
 

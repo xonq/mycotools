@@ -362,7 +362,6 @@ def main():
             ncbi_df = missing_db_ncbi, email = ncbi_email, api = ncbi_api,
             output_path = update_path
             )
-        print(ncbi_predb)
         ncbi_db = predb2db( ncbi_predb, db )
         db2df( ncbi_db, update_path + date + '.ncbi.db' )
         jgi_predb = jgiDwnld(

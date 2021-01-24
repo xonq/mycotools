@@ -61,7 +61,6 @@ def copyFile( old_path, new_path, ome, typ ):
 
 def moveBioFile( old_path, typ, env, uncur = '' ):
 
-    print(old_path)
     if old_path.endswith('.gz'):
         gunzip_path = gunzip(old_path)
         print( '\t' + gunzip_path )
