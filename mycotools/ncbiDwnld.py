@@ -356,9 +356,12 @@ def main(
         if exit != 0 and remove:
             continue
         if ome in set(ncbi_df.index):
-            ncbi_df.loc[ome, 'assembly_path'] = ass_prots[ome]['assembly']
-            ncbi_df.loc[ome, 'proteome_path'] = ass_prots[ome]['proteome']
-            ncbi_df.loc[ome, 'gff3_path'] = ass_prots[ome]['gff3']
+            ncbi_df.loc[ome, 'assembly_path'] = output_path + 'assembly/' + \
+                os.path.basename(ass_prots[ome]['assembly'])
+            ncbi_df.loc[ome, 'proteome_path'] = output_path + 'proteome/' + \
+                os.path.basename(ass_prots[ome]['proteome'])
+            ncbi_df.loc[ome, 'gff3_path'] = output_path + 'gff3/' + \
+                os.path.basename(ass_prots[ome]['gff3'])
         new_df = new_df.append( ncbi_df.loc[ome] )
  
     new_df = new_df.reset_index()
