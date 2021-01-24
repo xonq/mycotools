@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import argparse, os, sys, subprocess, re, numpy as np
+import argparse, os, sys, subprocess, re, shutil, numpy as np
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, gather_taxonomy, assimilate_tax, masterDB, df2std
 from mycotools.db.curGFF3 import main as curGFF3
@@ -89,6 +89,9 @@ def main( prepdb, refdb, rogue = False ):
         predb_omes = predb
         predb_omes['internal_ome'] = predb['internal_ome']
 
+    for key in ['assembly', 'proteome', 'gff', 'gff3']:
+        if key not in predb_omes.columns:
+            predb_omes[key] = np.nan
 
     ## need to multiprocess here
     print('\nCopying to database')
