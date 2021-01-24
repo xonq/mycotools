@@ -363,12 +363,12 @@ def main():
             output_path = update_path
             )
         ncbi_db = predb2db( ncbi_predb, db )
-        db2df( ncbi_db, update_path + date + '.ncbi.db' )
+        df2db( ncbi_db, update_path + date + '.ncbi.db' )
         jgi_predb = jgiDwnld(
             missing_db_jgi, update_path, jgi_email, jgi_pwd
             )
         jgi_db = predb2db( jgi_predb, db )
-        db2df( jgi_db, update_path + date + '.jgi.db' )
+        df2db( jgi_db, update_path + date + '.jgi.db' )
         for i in ['assembly', 'proteome', 'gff3', 'gff']:
             if os.path.isdir( update_path + i ):
                 shutil.rmtree( update_path + i )

@@ -77,9 +77,11 @@ def moveBioFile( old_path, ome, typ, env, uncur = '' ):
                 return False
     else:
         new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
-        if not os.path.isfile(new_path):
+        if not os.path.isfile(new_path) and os.path.isfile(old_path):
             if not copyFile(formatPath(old_path), new_path, ome, typ):
                 return False
+        elif not os.path.isfile(new_path):
+            return False
 
     return os.path.basename(new_path)
 
