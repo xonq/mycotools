@@ -93,7 +93,7 @@ def main( predb, refdb, rogue = False ):
     for x in [
         'assembly_path', 'gff3_path', 'jgi_gff_path', 'proteome_path'
         ]:
-        if x not in predb_omes.columns:
+        if x not in prepdb_omes.columns:
             prepdb_omes[x] = np.nan
 
     ## need to multiprocess here
