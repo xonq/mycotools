@@ -81,24 +81,24 @@ def moveBioFile( old_path, typ, env, uncur = '' ):
     return os.path.basename(new_path)
 
 
-def main( predb, refdb, rogue = False ):
+def main( prepdb, refdb, rogue = False ):
 
-    prepdb = predb2db( predb )
+    predb = predb2db( prepdb )
     if 'internal_ome' not in predb.columns:
-        prepdb_omes = gen_omes( prepdb, reference = refdb )
+        predb_omes = gen_omes( predb, reference = refdb )
     else:
-        prepdb_omes = prepdb
-        prepdb_omes['internal_ome'] = predb['internal_ome']
+        predb_omes = predb
+        predb_omes['internal_ome'] = predb['internal_ome']
 
     for x in [
         'assembly_path', 'gff3_path', 'jgi_gff_path', 'proteome_path'
         ]:
-        if x not in prepdb_omes.columns:
-            prepdb_omes[x] = np.nan
+        if x not in predb_omes.columns:
+            predb_omes[x] = np.nan
 
     ## need to multiprocess here
     print('\nCopying to database')
-    for i, row in prepdb_omes.iterrows():
+    for i, row in predb_omes.iterrows():
         gff3 = False
         if not pd.isnull( row['assembly_path'] ):
             new_path = moveBioFile( row['assembly_path'], 'fa', 'MYCOFNA' )
