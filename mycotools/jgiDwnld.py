@@ -354,6 +354,7 @@ def main(
     gff = False, transcript = False, est = False, masked = True
     ):
 
+    pd.options.mode.chained_assignment = None  # default='warn'
     if not 'genome_code' in df.columns:
         if len( df.columns ) != 1:
             print( '\nInvalid input. No genome_code column and more than one column.' )
