@@ -2,6 +2,7 @@
 
 import argparse, os, sys, subprocess, re, shutil, numpy as np
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
+from mycotools.lib.fastatools import dict2gff
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, gather_taxonomy, assimilate_tax, masterDB, df2std
 from mycotools.db.curGFF3 import main as curGFF3
 from mycotools.db.gff2gff3 import main as gff2gff3
@@ -120,7 +121,7 @@ def main( prepdb, refdb, rogue = False ):
                         cur_gff = re.sub(r'\.uncur$', '', new_path)
                         to_del.append(formatPath('$MYCOGFF3/' + new_path))
                         with open( formatPath('$MYCOGFF3/' + cur_gff), 'w' ) as out:
-                            out.write( new_gff )
+                            out.write( dict2gff(new_gff) )
                         predb_omes.loc[i, 'gff3'] = cur_gff
                     except:
                         eprint('\t' + row['internal_ome'] + ' gff3 failed curation')

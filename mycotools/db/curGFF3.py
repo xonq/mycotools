@@ -159,96 +159,17 @@ def curGff3( gff_list, ome ):
 
     return final_list
 
-'''
-def checkGff2Alias( temp_out, acc ):
-
-    for line in temp_out:
-        acc_search = re.search( r'alias "([^"]+)"$', line['attributes'] ) 
-        if acc_search is None:
-            if not line['attributes'].endswith( ';' ):
-                line['attributes'] += ';'
-            line['attributes'] += ' alias "' + acc + '"'
-
-    return temp_out
-
-
-def acc2gff2( out_indices, gff_list ):
-    return [ gff_list[x] for x in out_indices ]
-
-
-def hashGff2IDs( gff_list, comps, tag = 'alias' ):
-
-    id_hash = {}
-    for index in range(len(gff_list)):
-        entry = gff_list[index]['attributes']
-        hit_id = re.search( comps['id'], entry )[1]
-        alias = re.search( comps[tag], entry )
-        if hit_id not in id_hash:
-            id_hash[hit_id] = [ None, [] ]
-        if alias is not None:
-            id_hash[hit_id][0] = alias[1]
-        id_hash[hit_id][1].append( index )
-
-    alias_dict = { 
-        id_hash[x][0]: sorted(id_hash[x][1]) for x in id_hash
-        }
-    if None in alias_dict:
-        del alias_dict[None]
-    etc = [ id_hash[x][1] for x in id_hash if not id_hash[x][0]]
-    etc_list = []
-    for hit in etc:
-        for i in hit:
-            etc_list.append( gff_list[i] )
-
-    return alias_dict, etc_list
-
-
-def accFromGff2Hash( id_hash, acc ):
-    return [id_hash[x][1] for x in id_hash if id_hash[x][0] == acc]
-
-
-def curGff2( gff_list, ome ):
-
-    cur_list = []
-    prot_comp = re.compile( r'proteinId (.*?)[;|$]' )
-    for line in gff_list:
-        if line['type'] == 'CDS':
-            prot = prot_comp.search( line['attributes'] )[1]
-            alias = re.search( r' alias ([^;]*)$', line['attributes'] )
-            if alias is None:
-                if not line['attributes'].endswith( ';' ):
-                    line['attributes'] += ';'
-                line['attributes'] += ' alias "' + ome + '_' + prot + '"'
-            elif not line['attributes'].endswith('"'):
-                line['attributes'] = line['attributes'].replace(
-                    ' alias ' + ome + '_' + prot, 
-                    ' alias "' + ome + '_' + prot + '"'
-                    )
-        cur_list.append( line )
-
-    alias_dict, etc_list = hashGff2IDs( cur_list, gff2Comps(), 'alias' )
-    final_list = []
-    for alias in alias_dict:
-        prep_out = [ cur_list[x] for x in alias_dict[alias] ]
-        final_list.extend(checkGff2Alias( prep_out, alias ))
-    final_list.extend( etc_list )
-
-    return final_list
-'''
 
 def main( gff_path, ome):
 
-    gff = gff2dict( gff_path )
+    gff = gff2dict( formatPath(gff_path) )
     typ = acquireFormat( gff )
 
     if not typ:
         eprint('\tERROR: type unknown ' + gff_path)
         return None
 
-  #  if 'gff3' in typ:
     new_gff = curGff3( gff, ome )
-#    else:
- #       new_gff = curGff2( gff, ome )
 
     return new_gff
 
