@@ -1,5 +1,5 @@
 # PURPOSE
-These scripts are a compilation of computational biology tools to increase analysis throughput. In particular, these scripts are tailored toward use with the `mycotools database`, a database schema with modularity as the guiding principle, enabling analyses with datasets of 1000s of fungi to as few as 1 or 2.
+MycoTools is a compilation of computational biology tools and database (MycoDB) maintenance software directed toward the analysis of fungal sequence data. MycoDB is a database schema with modularity as the guiding principle, enabling analyses with datasets of 1000s of fungi to as few as 1 or 2.
 
 <br />
 
@@ -10,8 +10,8 @@ If you use MycoTools or the MycoDB in your analyses, please cite this git reposi
 
 <br />
 
-# INSTALLING SCRIPTS
-## 1) Download & install miniconda3
+# INSTALL
+## 1) Install miniconda3
 Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered.
 
 ```	
@@ -26,17 +26,16 @@ export PATH="<ABSOLUTE/PATH/MINICONDA/INSTALL>/bin:$PATH"
 
 <br />
 
-## 2) Install scripts & dependencies
-Restart your login. *Anytime you want to use the python environment you just installed, you may have to activate it via* `source activate base`. There are relatively easy ways to [make this automatic](https://docs.anaconda.com/anaconda/user-guide/faq/), but it is beyond the scope of this install. 
+## 2) Install MycoTools
+Restart your login. If upon login you do not see `(base)` to the left of your bash shell prompt then *anytime you want to use the python environment you created, you have to activate it via* `source activate base`. There are relatively easy ways to [make this automatic](https://docs.anaconda.com/anaconda/user-guide/faq/), but it is beyond the scope of this install. If necessary, activate the environment, then use `pip` to install MycoTools:
 
 ```
-source activate base
 pip install mycotools
 ```
 
 <br />
 
-## 3) Installing mycodb 
+## 3) Install MycoDB 
 #### OSC
 Many of my scripts interface with [mycotools databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/db/README.md). If you are using the Ohio Supercomputer and have access to PAS1046, then simply append these commands to your `~/.bash_profile` in your OSC home folder.
 ```
