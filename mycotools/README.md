@@ -1,6 +1,11 @@
 # PURPOSE
 These scripts are a compilation of computational biology tools to increase analysis throughput. In particular, these scripts are tailored toward use with the `mycotools database`, a database schema with modularity as the guiding principle, enabling analyses with datasets of 1000s of fungi to as few as 1 or 2.
 
+<br />
+
+# CITING
+If you use MycoTools or the MycoDB in your analyses, please cite this git repository (gitlab.com/xonq/mycotools) and mention MycoTools in line until I have published these scripts in the literature.
+
 ---
 
 <br />
@@ -44,4 +49,4 @@ export MYCOGFF3=$MYCODB/gff3/ 		# database gff3s
 Restart your login and you're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
 #### Non-OSC
-If you are not on OSC or want to learn more about mycotools, you can create your own mycotools database following [this guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/database/README.md). Essentially run `updateDB.py --init <NEW_DATABASE_DIRECTORY>` to get started with default options.
+If you are not on OSC or want to learn more about mycotools, you can create your own mycotools database following [this guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/db/README.md). Essentially run `updateDB.py --init <NEW_DATABASE_DIRECTORY>` to get started with default options.

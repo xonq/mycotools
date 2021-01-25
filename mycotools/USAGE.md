@@ -19,7 +19,7 @@
 	- [mycoDB blast](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycodb)
 	- [mycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
-	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hierarchical-agglomerative-clustering)
+	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hiearchical-agglomerative-clustering)
 
 ---
 <br /><br />
