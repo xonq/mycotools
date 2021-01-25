@@ -9,7 +9,7 @@ from mycotools.ncbiDwnld import main as ncbiDwnld
 from mycotools.jgiDwnld import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
-from mycotools.utils.predb2db import main as predb2db
+from mycotools.predb2db import main as predb2db
 
 
 def initDB( init_dir, branch, envs, rogue = False ):
