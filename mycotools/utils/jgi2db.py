@@ -3,7 +3,7 @@
 import subprocess, argparse, sys, os, re, time, getpass
 import pandas as pd
 from io import StringIO
-from mycotools.db.predb2db import main as predb2db
+from mycotools.predb2db import main as predb2db
 from mycotools.lib.kontools import intro, outro
 from mycotools.lib.dbtools import db2df, df2db, gen_omes
 from mycotools.jgiDwnld import jgi_login as jgi_login

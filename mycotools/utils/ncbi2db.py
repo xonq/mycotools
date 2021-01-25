@@ -3,7 +3,7 @@
 import argparse, sys, os, re, pandas as pd, datetime, numpy as np, subprocess
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, masterDB
 from mycotools.ncbiDwnld import main as ncbiDwnld
-from mycotools.db.predb2db import main as predb2db
+from mycotools.predb2db import main as predb2db
 from mycotools.lib.kontools import intro, outro, eprint
 
 
