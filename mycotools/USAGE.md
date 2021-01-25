@@ -19,7 +19,7 @@
 	- [mycoDB blast](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycodb)
 	- [mycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
-	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hierachical-agglomerative-clustering)
+	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hierarchical-agglomerative-clustering)
 
 ---
 <br /><br />
@@ -232,7 +232,7 @@ optional arguments:
 
 ## Phylogenetic Analysis
 ### fa2tree.py
-`fa2tree.py` will input a fasta file, trim, and generate a tree either via job submission (`slurm` or `torque`) or immediate execution. 
+`fa2tree.py` will input a fasta file or directory of fasta files, trim, and generate a tree either via job submission (`slurm` or `torque`) or immediate execution. 
 
 e.g. Construct a tree from a fasta
 ```

@@ -44,4 +44,4 @@ export MYCOGFF3=$MYCODB/gff3/ 		# database gff3s
 Restart your login and you're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
 #### Non-OSC
-If you are not on OSC or want to learn more about mycotools, you can create your own mycotools database following [this guide](https://gitlab.com/xonq/mycotools_scripts/-/blob/master/database/README.md).
+If you are not on OSC or want to learn more about mycotools, you can create your own mycotools database following [this guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/database/README.md). Essentially run `updateDB.py --init <NEW_DATABASE_DIRECTORY>` to get started with default options.
