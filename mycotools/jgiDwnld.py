@@ -472,7 +472,7 @@ if __name__ == '__main__':
     parser.add_argument( '-o', '--output', default = os.getcwd(), help = 'Output dir' )
     args = parser.parse_args()
 
-    if args.repeatmasked:
+    if args.nonmasked:
         args.assembly = True
 
     if not args.assembly and not args.proteome \
@@ -500,7 +500,7 @@ if __name__ == '__main__':
 
     jgi_df = main( 
         df, output, user, pwd, args.assembly, args.proteome, 
-        args.gff3, args.gff2, args.transcript, args.est, not args.nonmasked
+        args.gff3, args.gff, args.transcript, args.est, not args.nonmasked
         )
     df.to_csv( os.path.normpath(args.input_table) + '_jgiDwnld', sep = '\t', index = False )
 

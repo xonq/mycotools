@@ -504,7 +504,7 @@ def main( gff_path, fasta_path, prefix, fail = True ):
 
     gff = gff2dict( gff_path )
     fa = fasta2dict( fasta_path )
-    if gff_path.endswith( 'gtf' ) or re.search(gtfComps['id'], gff[0]['attributes']) is not None:
+    if gff_path.endswith( 'gtf' ) or re.search(gtfComps()['id'], gff[0]['attributes']) is not None:
         exonGtf = intron2exon( gff )
         exonGtfCur = curCDS( exonGtf )
         exonGtfCurGenes, failed, flagged = addGenes( exonGtfCur, safe = fail )
@@ -527,7 +527,7 @@ if __name__ == '__main__':
         '#### is the is the index from ordered accessions. If you are planning' + \
         ' on using OrthoFiller, you may want to wait to not mix accessions.' )
     parser.add_argument( '-g', '--gff', required = True, help = '.gtf, .gff/.gff3' )
-    parser.add_argument( '-f', '--fasta', required = True )
+    parser.add_argument( '-f', '--fasta', required = True, help = 'Proteome fasta' )
     parser.add_argument( '-p', '--prefix', required = True,
         help = 'Accession prefix' )
     parser.add_argument( '-o', '--output', help = 'Output directory' )
@@ -536,12 +536,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.output:
-        output = formatPath(args.output) + args.prefix
+        output = formatPath(args.output, isdir = True)
+        if not os.path.isdir(output):
+            os.mkdir(output)
+        output += args.prefix
     else:
         output = args.prefix
 
     gff, fa, trans_str, failed, flagged = main(
-        formatPath(argsgff), formatPath(args.fasta), prefix, args.fail
+        formatPath(args.gff), formatPath(args.fasta), args.prefix, args.fail
         )
 
     with open( output + '.aa.fa', 'w' ) as out:

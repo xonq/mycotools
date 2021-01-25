@@ -22,7 +22,7 @@ def gff2gff3( gff_list, ome, jgi_ome ):
             exon_dict[name] += 1
             exon_id = 'ID=exon_' + transcript + '_' + str(exon_dict[name])
             par_id = 'mRNA_' + transcript
-            entry['attributes'] = exon_id + ';' + par_id + ';Alias=' + name
+            entry['attributes'] = exon_id + ';Parent=' + par_id + ';Alias=' + name
         elif entry['type'] == 'CDS':
             name = re.search( comps2['id'], entry['attributes'] )[1]
             protein = re.search( comps2['prot'], entry['attributes'] )[1]
