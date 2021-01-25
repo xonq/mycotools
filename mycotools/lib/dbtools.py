@@ -91,7 +91,7 @@ def db2df(db_path):
         headers = [ 'internal_ome', 'genus', 'species', 'strain', 'biosample',
             'assembly', 'proteome', 'gff3',
             'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-            'blastdb', 'genome_code' ]
+            'genome_code' ]
         db_df = pd.read_csv( db_path, sep = '\t', names = headers )
 
     return db_df
@@ -107,7 +107,7 @@ def df2std( df ):
         'strain', 'biosample', 'assembly', 
         'proteome', 'gff3', 'taxonomy',
         'ecology', 'eco_conf', 'source', 'published', 
-        'blastdb', 'genome_code'
+        'genome_code'
     ]]
     else:
         trans_df = df[[
@@ -115,7 +115,7 @@ def df2std( df ):
         'strain', 'assembly', 
         'proteome', 'gff', 'gff3', 'taxonomy',
         'ecology', 'eco_conf', 'source', 'published', 
-        'blastdb', 'genome_code'
+        'genome_code'
         ]]
 
     return trans_df

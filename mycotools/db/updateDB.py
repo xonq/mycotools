@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import argparse, pandas as pd, sys, os, re, subprocess, json, getpass
+import argparse, pandas as pd, sys, os, re, subprocess, json, getpass, shutil
 from mycotools.lib.dbtools import db2df, df2db, gather_taxonomy, assimilate_tax, masterDB, genConfig
 from mycotools.lib.kontools import intro, outro, formatPath, eprint, prep_output
 from mycotools.lib.fastatools import fasta2dict
@@ -18,6 +18,7 @@ def initDB( init_dir, branch, envs, rogue = False ):
     new_dirs = [
         init_dir + 'data/', init_dir + 'config/', 
         init_dir + 'data/fna/', init_dir + 'data/faa/',
+        init_dir + 'data/fna/blastdb/',
         init_dir + 'data/faa/blastdb/', init_dir + 'data/gff3/', 
         init_dir + 'log/'
     ]
@@ -56,7 +57,6 @@ def initDB( init_dir, branch, envs, rogue = False ):
         env_vars = 'export MYCOFNA=' + envs['MYCOFNA'] + '\n' + \
             'export MYCOFAA=' + envs['MYCOFAA'] + '\n' + \
             'export MYCOGFF3=' + envs['MYCOGFF3'] + '\n' + \
-            'export MYCOBLAST=' + envs['MYCOBLAST'] + '\n' + \
             'export MYCODB=' + envs['MYCODB'] + '\n' + \
             '# end mycotools database\n'
 
@@ -101,22 +101,6 @@ def getMissingEntries( db ):
                 missing_db = missing_db.append(row)
 
     return missing_db
-
-
-def checkBlastDB( row, update = True ):
-    '''Check that the blastDB exists. If not and if the user wants to update then run `makeblastdb`.'''
-
-    ome = row['internal_ome']
-    run_blastdb = 0
-    if not os.path.isfile(os.environ['MYCOBLAST'] + '/' + ome + '.psi'):
-        if update and not pd.isnull(row['proteome']) and os.path.isfile( os.environ['MYCOFAA'] + '/' + row['proteome']):
-            run_blastdb = subprocess.call('makeblastdb -in ' + os.environ['MYCOFAA'] + '/' + \
-                row['proteome'] + ' -dbtype prot ' + '-parse_seqids -out ' + \
-                os.environ['MYCOBLAST'] + '/' + ome, shell = True)
-            if run_blastdb != 0:
-                print('\t' + ome + '\t\tmakeblastdb failed\tExit: ' + str(run_blastdb))
-
-    return run_blastdb
 
 
 def checkAntiSMASH( row, smash_dict, update = True, overwrite = False ):
@@ -419,9 +403,6 @@ def main():
                             out.write( dict2gff(new_gff) ) 
                     if new_name:
                         db.at[i, biotype] = os.path.basename( os.path.abspath( new_name ))
-                blast = checkBlastDB( row, update = args.blastdb )
-                if blast == 0:
-                    db.at[i, 'blastdb'] = True
 
     outro(start_time)
 

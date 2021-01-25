@@ -16,7 +16,7 @@
 <br />
 
 - **ANALYSES**
-	- [mycoDB blast](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycoDB)
+	- [mycoDB blast](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycodb)
 	- [mycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
 	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hierachical-agglomerative-clustering)
@@ -234,47 +234,42 @@ optional arguments:
 ### fa2tree.py
 `fa2tree.py` will input a fasta file, trim, and generate a tree either via job submission (`slurm` or `torque`) or immediate execution. 
 
+e.g. Construct a tree from a fasta
 ```
-usage: fa2tree.py [-h] -i INPUT [-o] [-t TREE]
-
-Takes in a multifasta, aligns, trims, and runs treebuilding: `fasttree`,
-`iqtree`, `raxml` (future).
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i INPUT, --input INPUT
-  -o, --osc             Submit ALL steps to OSC.
-  -t TREE, --tree TREE  Tree-building software. DEFAULT: fasttree
+fa2tree.py -i <FASTA>.fa -t iqtree
 ```
 
 <br />
 
 ## Hiearchical agglomerative clustering
 ### aggClus.py
-Inputs a fasta file (or tab delimitted distance file and skips the first step), constructs a distance matrix based on % identity of all pairwise global alignments of sequences, then clusters sequences via hierarchical agglomerative clustering. This script is designed as a drop-in replacement for the proprietary `usearch -calc_distmx` and `usearch clus_aggd` commands.
+Hiearchical agglomerative clustering is a useful systematic approach to
+extracting groups of sequences for phylogenetic analysis. Ubiquitous genes,
+like P450s, will often yield 10,000s of results for BLAST searches against the
+mycoDB. Constructing and visualizing a tree of this magnitude just is not
+practical in many cases; it is therefore necessary to decrease the size of the 
+dataset to a workable size while relying on biological information (global
+pairwise alignments).
 
+`aggClus.py` will either take a `fasta` and generate a distance matrix using %
+identity of `needle` alignments, or optionally work from a tab-delimited
+distance file (say from `usearch -calc_distmx`). Subsequently, `aggClus.py`
+will cluster sequences via hierarchical agglomerative clustering. Currently,
+constructing a distance matrix takes quite long because `needle` cannot
+throwout alignments when it detects low % identity in the alignment phase,
+whereas `usearch -calc_distmx` does. It is therefore recommended to first
+create the distance matrix using `usearch` and then use `aggClus.py` to perform
+the agglomerative clustering step instead of `usearch -cluster_aggd`, which
+limits dataset size unless the proprietary version is purchased.
+
+e.g. Calculate a distance matrix and cluster from a fasta with a minimum
+identity of 0.3 to consider a connection:
 ```
-usage: aggClus.py [-h] [-f FASTA] [-d DISTANCE] [-o OUTPUT] -m MAX_DIST
-                  [-l LINKAGE] [-c CPUS]
+aggClus.py -f <FASTA>.fa -m 0.7
+```
 
-Hiearchical agglomerative clustering
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -f FASTA, --fasta FASTA
-                        Start from fasta (generate distance matrix)
-  -d DISTANCE, --distance DISTANCE
-                        Start from distance matrix
-  -o OUTPUT, --output OUTPUT
-                        Output prefix other than input name
-  -m MAX_DIST, --max_dist MAX_DIST
-                        Distance or identity threshold - in an identity-based
-                        distance matrix (usearch -calc_distmx), this value is
-                        equal to 1 - minimum_identity.
-  -l LINKAGE, --linkage LINKAGE
-                        Linkage criterion: 'complete' (maximum distance),
-                        'average', or 'single' (minimum distance) DEFAULT:
-                        'single' (minimum)
-  -c CPUS, --cpus CPUS  Cores for alignment during distance matrix
-                        construction
+e.g. Construct a usearch distance matrix and use aggClus.py to cluster:
+```
+usearch -calc_distmx <FASTA>.fa -tabbedout <DISTMX>.tsv -maxdist 0.7
+aggClus.py -d <DISTMX>.tsv
 ```
