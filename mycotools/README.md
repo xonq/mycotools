@@ -10,6 +10,13 @@ If you use MycoTools or the MycoDB in your analyses, please cite this git reposi
 
 <br />
 
+# UPDATE
+```
+pip install mycotools --upgrade
+```
+
+<br />
+
 # INSTALL
 ## 1) Install miniconda3
 Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered.

@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 # parses all fasta files inputted as arguments and stores them as {filename: {genes: {description: }{sequence: }}}
 
+from mycotools.lib.kontools import eprint
 import re, sys
 
 # codon translation table
@@ -162,6 +163,7 @@ def gff2dict( gff_path, insert = False, error = True ):
             if not error:
                 gff_list_dict = None
             else:
+                eprint( line )
                 raise IndexError
             
     return gff_list_dict
