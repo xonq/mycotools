@@ -3,7 +3,7 @@
 import argparse, sys, re
 from mycotools.lib.fastatools import gff2dict, dict2gff, gff2Comps, gff3Comps
 from mycotools.lib.kontools import formatPath, eprint
-from mycotools.bin.curAnnotation import addGenes, removeStartStop
+from mycotools.curAnnotation import addGenes, removeStartStop
 
 def gff2gff3( gff_list, ome, jgi_ome ):
 
