@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 import argparse, subprocess, os, datetime, sys, multiprocessing as mp, pandas as pd, numpy as np
-from mycotools.lib.kontools import eprint, intro, outro, formatPath, multisub, collect_files
+from mycotools.lib.kontools import eprint, intro, outro, formatPath, multisub, collect_files, findExecs
 from mycotools.lib.dbtools import db2df, masterDB
 from mycotools.acc2fa import famain as acc2fa
 
@@ -226,7 +226,7 @@ if __name__ == '__main__':
         )
     parser.add_argument( '-b', '--blast', required = True, 
         help = 'Blast type { blastn, blastp, tblastn, blastx }' )
-    parser.add_argument( '-q', '--query', help = 'Query fasta' )
+    parser.add_argument( '-q', '--query', required = True, help = 'Query fasta' )
     parser.add_argument( '-e', '--evalue', default = -1, type = int,
         help = 'Negative e-value order max, e.g. 2 for 10^-2' )
     parser.add_argument( '-s', '--bitscore', default = 0,
@@ -262,6 +262,8 @@ if __name__ == '__main__':
 
     start_time = intro( 'db2blast', start_args )
     date = start_time.strftime('%Y%m%d')
+    findExecs( [args.blast], exit = set(args.blast) )
+
    
     if not args.previous:
         output_dir = formatPath( args.output ) + date + '_db2blast/'

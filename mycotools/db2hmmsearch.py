@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-from mycotools.lib.kontools import intro, outro, collect_files, multisub
+from mycotools.lib.kontools import intro, outro, collect_files, multisub, findExecs
 from mycotools.lib.dbtools import db2df
 from extractHmmsearch import main as exHmm
 from acc2fa import main as acc2fa
@@ -157,6 +157,7 @@ if __name__ == '__main__':
         'User-specified trimAl commands in "", e.g.: "-strictplus -fasta"' )
 
     args = parser.parse_args()
+    deps = ['hmmsearch']
 
     if args.previous:
         args.output = args.previous
@@ -177,19 +178,9 @@ if __name__ == '__main__':
 
     if args.align:
         args.fasta = True
-        trimalCheck = subprocess.call( 'trimal -h', shell = True, stdout = \
-            subprocess.PIPE, stderr = subprocess.PIPE )
-        if trimalCheck != 0:
-            print('\nERROR: trimal not detected. Please install to contine.\n')
-            sys.exit(4)
+        deps.extend( ['hmmalign', 'trimal'] )
     else:
         trimal = None
-
-    hmmCheck = subprocess.call( 'hmmalign -h', shell = True, stdout = subprocess.PIPE, \
-        stderr = subprocess.PIPE )
-    if hmmCheck != 0:
-        print('\nERROR: hmmer not detected. Please install to continue.\n')
-        sys.exit( 1 )
 
     args_dict = { 
         'Database': args.input, 'Hmm database': args.hmmdb, 'Output': output,
@@ -198,6 +189,7 @@ if __name__ == '__main__':
         'Threshold': args.threshold, 'E-value': args.evalue, 'trimAl args': trimal 
     }
     start_time = intro( 'db2hmmsearch', args_dict )
+    checkExecs( deps, exit = set(deps) )
     db = db2df( args.input )
 
 #    main( args, db, output, cpu, previous = args.previous )

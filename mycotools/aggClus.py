@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 from sklearn.cluster import AgglomerativeClustering
-from mycotools.lib.kontools import multisub
+from mycotools.lib.kontools import multisub, findExecs
 from mycotools.lib.fastatools import fasta2dict, dict2fasta
 import string, argparse, os, sys, itertools, tempfile, re, random, pandas as pd, subprocess
 
@@ -128,9 +128,10 @@ if __name__ == '__main__':
         help = 'Cores for alignment during distance matrix construction' )
     args = parser.parse_args()
 
+
     # `ward` can be implemented if an option is added to create the distance matrix
     if args.linkage not in { 'complete', 'average', 'single' }:
-        print('\nInvalid linkage criterium')
+        eprint('\nERROR: Invalid linkage criterium')
         sys.exit( 1 )
 
     if args.output:
@@ -139,6 +140,7 @@ if __name__ == '__main__':
         output = None
 
     if args.fasta:
+        findExecs( ['needle'], exit = set('needle') )
         print( '\nCalculating global alignment distance matrix' )
         aligns, alignCmds = set(), list()
         if not output:

@@ -8,11 +8,14 @@ def eprint( *args, **kwargs ):
     print(*args, file = sys.stderr, **kwargs )
 
 
-def vprint( toPrint, v = False ):
-    '''Boolean print option'''
+def vprint( toPrint, v = False, e = False ):
+    '''Boolean print option to stdout or stderr (e)'''
 
     if v:
-        print( toPrint, flush = True )
+        if e:
+            eprint( toPrint, flush = True )
+        else:
+            print( toPrint, flush = True )
 
 
 def gunzip( gzip_file, remove = True, spacer = '\t' ):
@@ -32,6 +35,47 @@ def gunzip( gzip_file, remove = True, spacer = '\t' ):
             if os.path.isfile( gzip_file ):
                 os.remove( new_file )
         return False
+
+
+def findExecs( deps, exit = set(), verbose = True ):
+    '''
+    Inputs list of dependencies, `dep`, to check path.
+    If dependency is in exit and dependency is not in path,
+    then exit.
+    '''
+
+    vprint('\nDependency check:', v = verbose, e = True)
+    if type(deps) is str:
+        deps = [deps]
+    for dep in deps:
+        check = shutil.which( dep )
+        vprint('{:<15}'.format(dep + ':') + \
+            str(check), v = verbose, e = True)
+        if not check and dep in exit:
+            eprint('\nERROR: ' + dep + ' not in PATH')
+            sys.exit(300)
+
+
+def findEnvs( envs, exit = set(), verbose = True ):
+    '''
+    Inputs list of paths, `envs`, to check path.
+    If env is not in path and it is in exit, exit.
+    '''
+
+    vprint('\nEnvironment check:', v = verbose, e = True)
+    if type(envs) is str:
+        envs = [envs]
+    eprint()
+    for env in envs:
+        try:
+            vprint('{:<15}'.format(env + ':') + \
+                str(os.environ[env]), v = verbose, e = True)
+        except KeyError:
+            vprint('{:<15}'.format(env + ':') + \
+                'None', v = verbose, e = True)
+            if env in exit:
+                eprint('\nERROR: ' + env + ' not in PATH')
+                sys.exit(301)
 
 
 def expandEnvVar( path ):
@@ -189,7 +233,7 @@ def intro( script_name, args_dict, credit='', log = False, stdout = True):
             str(args_dict[ arg ])
 
     if stdout:
-        print( out_str, flush = True )
+        eprint( out_str, flush = True )
     if log:
         out_file = os.path.abspath( log ) + '/' + date + '.log'
         count = 0
@@ -214,7 +258,7 @@ def outro( start_time, log = False, stdout = True ):
         end_time = datetime.datetime.now()
         duration = end_time - start_time
         dur_min = duration.seconds/60
-        print('\nExecution finished:', str(end_time) + '\t' + \
+        eprint('\nExecution finished:', str(end_time) + '\t' + \
             '\n\t{:.2}'.format(dur_min), 'minutes\n')
     sys.exit(0)
 
