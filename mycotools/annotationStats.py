@@ -61,7 +61,7 @@ def compileExon( gff_path, output ):
     else:
         geneStats = [ total, len(exon_dict), total/len(exon_dict), median ]
 
-    if any( line for line in gff if line['type'] is 'intron' ):
+    if any( line for line in gff if line['type'] == 'intron' ):
         print('WARNING: OrthoFiller outputs do not have exons and will be skipped.\n' + \
             'Curate OrthoFiller with `curAnnotation.py`')
 

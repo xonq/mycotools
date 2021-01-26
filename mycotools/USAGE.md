@@ -59,7 +59,7 @@ grep 'Psilocybe' $(mycodb)
 
 ## Creating modular databases
 ### abstractDB.py
-The core principle behind mycotools is modularity - creating tools that modularly interface with databases ranging from 1 organism to all ~ 1,500 published fungi. Most scripts use the master database by default, but if you are only interested in a portion of the database, then abstract the portion you want.
+The core principle behind MycoDB is modularity and curation - creating tools that modularly interface with curated databases ranging from 1 organism to all ~ 1,500 published fungi. Most scripts use the master database by default, but if you are only interested in a portion of the database, then abstract the portion you want.
 
 e.g. grab a database of a taxonomic order you are interested in: `abstractDB.py -t Atheliales -c order > atheliales.db`
 
@@ -76,7 +76,7 @@ grab a list of `ome`s in a new line delimited file: `abstractDB.py ---ome <OME_F
 
 ## Acquiring database files
 ### dbFiles.py
-Inputs a mycotools `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
+Inputs a MycoDB `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
 
 Let's say you want protein data from organisms in one family. First, you should abstract a database of organisms you want:
 ```
@@ -103,10 +103,10 @@ Substitutes MycoDB organism code names (e.g. `fusgra1`) for taxonomic informatio
 
 e.g. to substitute ome for genus species and strain: `ome2name.py <INPUT> oa`
 ```
-USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCOTOOLSDB] asvg*&
+USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCODB] asvg*&
 DEFAULTS: master db, see script for default forbidden characters
 Input file to regex sub omes with their name.
-optional mycotools db, string of forbidden characters
+optional MycoDB, string of forbidden characters
 "o" no ome | "g" no genus | "s" no species | "v" no strain | "a" no alternative ome
 ```
 
@@ -125,7 +125,7 @@ annotationStats.py <ANNOTATION.gff3>
 
 ## Downloading files
 ### jgiDwnld.py / ncbiDwnld.py
-These scripts` input can be obtained from the mycotools database as described below, or can be manually made as shown at the bottom of this section. Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, abstract entries in the database that are within *Aspergillus* for both JGI & NCBI:
+These scripts` input can be obtained from the MycoDB as described below, or can be manually made as shown at the bottom of this section. Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, abstract entries in the database that are within *Aspergillus* for both JGI & NCBI:
 ```
 mkdir dwnldFiles && cd dwnldFiles
 abstractDB.py -s jgi -c genus -t aspergillus > aspergillus.db_jgi
@@ -166,7 +166,7 @@ SAMN02744098
 
 ## Grab accessions
 ### acc2fa.py / acc2gff.py
-By default, if you are querying using a mycotools accession then it can search the database without a standalone file.
+By default, if you are querying using a MycoDB accession then it can search the database without a standalone file.
 Let's say you want to query *Panaeolus cyanescens'* PsiD and the NCBI accession is "PPQ80975.1". Find Panaelous cyanescens' ome code in the database:
 ```
 grep Panaeolus $(mycodb) | grep cyanescens | cut -f 1

@@ -1,10 +1,11 @@
 # PURPOSE
-MycoTools is a compilation of computational biology tools and database (MycoDB) maintenance software directed toward the analysis of fungal sequence data. MycoDB is a database schema with modularity as the guiding principle, enabling analyses with datasets of 1000s of fungi to as few as 1 or 2.
+MycoTools is a compilation of computational biology tools and database (MycoDB) maintenance software made to increase throughput of analysis of fungal complete genome sequencing data (JGI & NCBI). MycoDB is a database schema with uniform gene coordinate (`gff`) and fasta header curation, systematic code naming, and modularity as guiding principles, which enable more seamless analyses with datasets of 1000s of fungi to as few as 1 or 2. 
+
+By integrating with the curated MycoDB, MycoTools cuts the time investment on routine tasks like retrieving `gff` or `fasta` accessions, running and compiling `fasta`s of MycoDB BLAST/hmmsearches, and other analyses like aligning, trimming, and creating a phylogeny with `fa2tree.py` or wrangling your dataset with agglomerative clustering in `aggClus.py`. Furthermore, users can acquire specific sequence data in batches from the command line using `ncbiDwnld.py` and `jgiDwnld.py`. Check out the [USAGE.md](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md) for a near comprehensive guide of the possibilities MycoTools can enable in your research.
 
 <br />
 
-# CITING
-If you use MycoTools or the MycoDB in your analyses, please cite this git repository (gitlab.com/xonq/mycotools) and mention MycoTools in line until I have published these scripts in the literature.
+If MycoTools and/or MycoDB contribute to your analysis, please cite this git repository (gitlab.com/xonq/mycotools) and mention the MycoTools version in line.
 
 ---
 
@@ -55,4 +56,4 @@ export MYCOGFF3=$MYCODB/gff3/ 		# database gff3s
 Restart your login and you're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
 #### Non-OSC
-If you are not on OSC or want to learn more about mycotools, you can create your own mycotools database following [this guide](https://gitlab.com/xonq/mycodb/-/blob/master/README.md). Essentially run `updateDB.py --init <NEW_DATABASE_DIRECTORY>` to get started with default options.
+If you are not on OSC or want to learn more about MycoDB, you can copy your own MycoDB by following [this guide](https://gitlab.com/xonq/mycodb/-/blob/master/README.md). Essentially run `updateDB.py --init <NEW_DATABASE_DIRECTORY>` to get started with default options.
