@@ -4,6 +4,7 @@
 
 
 ### - **MYCODB TOOLS**
+
 	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycodb-tools)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
@@ -13,6 +14,7 @@
 
 
 ### - **SEQUENCE DATA**
+
 	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
@@ -23,6 +25,7 @@
 
 
 ### - **ANALYSES**
+
 	- [MycoDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycodb)
 	- [MycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
@@ -140,7 +143,7 @@ ncbiDwnld.py -i aspergillus.db_ncbi -t
 
 You will now see folders named after the file types you downloaded and the compressed files stored within. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. Don't submit these as a job, you are required to enter a password for `jgiDwnld.py`, and if the command stops you can simply rerun in the same directory and it should take-off where you left it/where it failed.
 
-<br /><br />
+<br />
 
 
 Manually created input files - the important thing is the column has the exact appropriate header ('genome_code' or 'basename') (substitute `-i aspergillus.db` with this file):
