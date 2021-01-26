@@ -3,8 +3,7 @@
 <br />
 
 
-### - **MYCODB TOOLS**
-
+- **MYCODB TOOLS**
 	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycodb-tools)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
@@ -13,19 +12,17 @@
 <br />
 
 
-### - **SEQUENCE DATA**
-
+- **SEQUENCE DATA**
 	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
 	- [Grabbing clusters](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-clusters)
 	- [Curating annotation](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#curate-annotation)
 
-<br /><br />
+<br />
 
 
-### - **ANALYSES**
-
+- **ANALYSES**
 	- [MycoDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycodb)
 	- [MycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
