@@ -19,11 +19,11 @@ pip install mycotools --upgrade
 
 # INSTALL
 ## 1) Install miniconda3
-Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered.
+Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. Type `yes` at the end to run `conda init`. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered.
 
 ```	
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/miniconda3.sh
-bash ~/miniconda3.sh -y 
+bash ~/miniconda3.sh
 ```
 
 If you are using the Ohio Supercomputer, or are having problems with initializing `conda`, run this to autostart your conda environment upon login:
@@ -44,7 +44,7 @@ pip install mycotools
 
 ## 3) Install MycoDB 
 #### OSC
-Many of my scripts interface with [mycotools databases](https://gitlab.com/xonq/mycodb/-/blob/master/README.md). If you are using the Ohio Supercomputer and have access to PAS1046, then simply append these commands to your `~/.bash_profile` in your OSC home folder.
+Many of my scripts interface with [MycoDBs](https://gitlab.com/xonq/mycodb/-/blob/master/README.md). If you are using the Ohio Supercomputer and have access to PAS1046, then simply append these commands to your `~/.bash_profile` in your OSC home folder.
 ```
 export MYCODB=/fs/project/PAS1046/databases/konkel 	# database
 export MYCOFNA=$MYCODB/assembly/ 	# database assemblies

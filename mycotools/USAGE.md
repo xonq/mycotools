@@ -2,7 +2,8 @@
 
 <br />
 
-- **MYCODB TOOLS**
+
+### - **MYCODB TOOLS**
 	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycodb-tools)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
@@ -10,16 +11,18 @@
 
 <br />
 
-- **SEQUENCE DATA**
+
+### - **SEQUENCE DATA**
 	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
 	- [Grabbing clusters](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-clusters)
 	- [Curating annotation](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#curate-annotation)
 
-<br />
+<br /><br />
 
-- **ANALYSES**
+
+### - **ANALYSES**
 	- [MycoDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycodb)
 	- [MycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
@@ -27,10 +30,13 @@
 
 ---
 
-<br /><br />
+<br /><br /><br />
 
-# MycoDB Tools
+
+# MYCODB TOOLS
 The following are information regarding scripts that manipulate MycoDB files. To learn more about MycoDBs themselves, please refer to the master [MycoDB repository](https://gitlab.com/xonq/mycodb/-/README.md).
+
+<br /><br />
 
 
 ## Interfacing with the master database
@@ -48,7 +54,8 @@ vim $(mycodb)
 grep 'Psilocybe' $(mycodb)
 ```
 
-<br />
+<br /><br />
+
 
 ## Creating modular databases
 ### abstractDB.py
@@ -58,35 +65,14 @@ e.g. grab a database of a taxonomic order you are interested in: `abstractDB.py 
 
 grab all NCBI Aspergilli accessions: `abstractDB.py -s ncbi -t aspergillus -c genus > aspergillus.db_ncbi` 
 
+grab the inverse of your arguments: `abstractDB.py -s ncbi -t aspergillus -c genus -i > notAspergullis.db_notNcbi`
+
 grab a list of orders in a new line delimited file: `abstractDB.py -tl <TAX_FILE> -c order > taxa.db`
-```
-Imports database and file of omes or taxonomy. Abstracts database from
-parameters. E.g. `abstractDB.py -i $DATABASE -t Atheliaceae -c family`
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -t TAXONOMY, --taxonomy TAXONOMY
-                        Taxonomic group to abstract. Requires `-c`
-  -c CLASSIFICATION, --classification CLASSIFICATION
-                        Taxonomic classification to abstract from. Requires
-                        `-t` or `-tl`
-  -s SOURCE, --source SOURCE
-                        Genome source to abstract
-  -n, --nonpublished    Abstract nonpublished rows.
-  --ome OME             New line separated list of omes to include.
-  -tl TAXONOMY_LIST, --taxonomy_list TAXONOMY_LIST
-                        New line separated list of taxonomic groups - must be
-                        same classification. Requires `-c`
-  --inverse             Inverse arguments
-  --headers             Do not output db headers
-  -i INPUT, --input INPUT
-                        Kontools database. DEFAULT: master database
-  -o OUTPUT, --output OUTPUT
-                        Output path instead of print to stdout. Includes
-                        column headers (stdout does not)
-```
+grab a list of `ome`s in a new line delimited file: `abstractDB.py ---ome <OME_FILE>`
 
-<br />
+<br /><br />
+
 
 ## Acquiring database files
 ### dbFiles.py
@@ -108,7 +94,8 @@ Alternatively, if you just need the paths (links) to these files, simply run:
 dbFiles.py -i atheliaceae.db -p -l
 ```
 
-<br />
+<br /><br />
+
 
 ## Other MycoDB scripts
 ### ome2name.py
@@ -123,8 +110,9 @@ optional mycotools db, string of forbidden characters
 "o" no ome | "g" no genus | "s" no species | "v" no strain | "a" no alternative ome
 ```
 
-<br /><br />
+<br /><br /><br />
 
+# SEQUENCE DATA TOOLS
 ## Sequence data statistics
 ### assemblyStats.py / annotationStats.py
 ```
@@ -132,7 +120,8 @@ assemblyStats.py <ASSEMBLY.fa>
 annotationStats.py <ANNOTATION.gff3>
 ```
 
-<br />
+<br /><br />
+
 
 ## Downloading files
 ### jgiDwnld.py / ncbiDwnld.py
@@ -151,7 +140,8 @@ ncbiDwnld.py -i aspergillus.db_ncbi -t
 
 You will now see folders named after the file types you downloaded and the compressed files stored within. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. Don't submit these as a job, you are required to enter a password for `jgiDwnld.py`, and if the command stops you can simply rerun in the same directory and it should take-off where you left it/where it failed.
 
-<br />
+<br /><br />
+
 
 Manually created input files - the important thing is the column has the exact appropriate header ('genome_code' or 'basename') (substitute `-i aspergillus.db` with this file):
 
@@ -171,7 +161,8 @@ SAMN06205226
 SAMN02744098
 ```
 
-<br />
+<br /><br />
+
 
 ## Grab accessions
 ### acc2fa.py / acc2gff.py
@@ -193,7 +184,8 @@ acc2gff.py -i <INPUTFILE>
 acc2fa.py -i <INPUTFILE>
 ```
 
-<br />
+<br /><br />
+
 
 ## Grab clusters
 ### grabClusters.py
@@ -224,7 +216,7 @@ fibsp.1_906343
 (mycotools) -bash4.2$
 ```
 
-<br />
+<br /><br />
 
 ## Curate annotation
 ### curAnnotation.py
@@ -236,8 +228,9 @@ e.g. `curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/res
 There are several scripts in the `utils` used to curate gene coordinate files and proteomes for the MycoDB. `curGFF3.py` is tested with both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycoDB compatible `gff3`, and `curProteome.py` curates NCBI or JGI proteomes.
 
 
-<br /><br />
+<br /><br /><br />
 
+# EVOLUTIONARY ANALYSIS TOOLS
 ## BLAST mycoDB
 ### db2blast.py
 `db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the mycoDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
@@ -270,7 +263,8 @@ optional arguments:
   --cpu CPU             DEFAULT: all
 ```
 
-<br />
+<br /><br />
+
 
 ## hmmsearch mycoDB
 ### db2hmmsearch.py
@@ -311,7 +305,8 @@ optional arguments:
                         "-strictplus -fasta"
 ```
 
-<br />
+<br /><br />
+
 
 ## Phylogenetic Analysis
 ### fa2tree.py
@@ -322,7 +317,8 @@ e.g. Construct a tree from a fasta
 fa2tree.py -i <FASTA>.fa -t iqtree
 ```
 
-<br />
+<br /><br />
+
 
 ## Hiearchical agglomerative clustering
 ### aggClus.py
