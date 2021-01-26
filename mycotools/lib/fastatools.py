@@ -59,7 +59,7 @@ def fasta2dict(fasta_file):
                 descrip = ''
 
             seq = extracted[index][1]
-            if seq[-1] is '\n' or '\r':
+            if seq[-1] == '\n' or seq[-1] == '\r':
                 seq = seq.rstrip()
 
             # prepares dictionaries for each gene with description, seq, rvcmpl_seq, and codons

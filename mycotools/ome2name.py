@@ -82,7 +82,7 @@ def main( args ):
 if __name__ == '__main__':
 
     usage = 'USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE>' \
-        + ' [KONTOOLSDB] asvg*&\nDEFAULTS: kondb, see script for default' \
+        + ' [MYCODB] asvg*&\nDEFAULTS: master db, see script for default' \
         + ' forbidden characters' + \
         '\nInput file to regex sub omes with their name.\n' + \
         'optional mycotools db, string of forbidden characters\n' + \

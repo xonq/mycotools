@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
-import datetime, sys, glob, os, re, subprocess, gzip, shutil, numpy as np
+import datetime, sys, glob, os, re, subprocess, gzip, shutil
+import numpy as np
 
 def eprint( *args, **kwargs ):
     '''Prints to stderr'''
