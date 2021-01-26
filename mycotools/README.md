@@ -1,7 +1,9 @@
 # PURPOSE
 MycoTools is a compilation of computational biology tools and database (MycoDB) software designed to increase throughput analyzing fungal genomic data (JGI & NCBI). MycoDB is a database schema with uniform gene coordinate (`gff`) and fasta header curation, systematic code naming, and modularity as guiding principles, which enable analyses with datasets of 1000s of fungi to as few as 1 or 2. 
 
-By integrating with the curated MycoDB, MycoTools cuts time on routine tasks like retrieving `gff` or `fasta` accessions, running and compiling `fasta`s of MycoDB BLAST/hmmsearches, and other analyses like creating a phylogeny with `fa2tree.py` or wrangling your dataset with agglomerative clustering via `aggClus.py`. MycoTools includes sets of utilities that also enable easy acquisition of batches of sequence data using `ncbiDwnld.py` and `jgiDwnld.py`. Check out the [USAGE.md](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md) for a guide on the possibilities MycoTools can enable in your research.
+By integrating with the curated MycoDB, MycoTools cuts time on routine tasks like retrieving `gff` or `fasta` accessions, running and compiling `fasta`s of MycoDB BLAST/hmmsearches, and other analyses like creating a phylogeny with `fa2tree.py` or wrangling your dataset with agglomerative clustering via `aggClus.py`. MycoTools includes sets of utilities that also enable easy acquisition of batches of sequence data using `ncbiDwnld.py` and `jgiDwnld.py`. Check out the [USAGE.md](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md) for a guide on the possibilities MycoTools can enable in your research. 
+
+MycoDB is not available outside of the Ohio SuperComputer until we publish the tools. Please email `konkelzach@protonmail.com` if you are interested in getting started.
 
 <br />
 
@@ -27,7 +29,7 @@ curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/m
 bash ~/miniconda3.sh
 ```
 
-If you are using the Ohio Supercomputer, or are having problems with initializing `conda`, run this to autostart your conda environment upon login:
+If you are using the Ohio Supercomputer, or are having problems with initializing `conda`, run this to autostart your conda environment upon login (you must enter `yes` when prompted to run `conda init` previously):
 ```
 echo "\nsource ~/.bashrc" >> ~/.bash_profile
 ```
@@ -56,4 +58,4 @@ export MYCOGFF3=$MYCODB/gff3/ 		# database gff3s
 Restart your login and you're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
 #### Non-OSC
-If you are not on OSC or want to learn more about MycoDB, you can copy your own MycoDB by following [this guide](https://gitlab.com/xonq/mycodb/-/blob/master/README.md). Essentially run `updateDB.py --init <NEW_DATABASE_DIRECTORY>` to get started with default options.
+MycoDB is currently not available for widespread use. We are waiting to complete our intial analyses and publish the data before releasing.
