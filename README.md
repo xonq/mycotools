@@ -3,6 +3,6 @@
 To use MycoTools follow [mycotools README/USAGE instructions](https://gitlab.com/xonq/mycotools/-/tree/master/mycotools).
 
 MycoTools is a collection of python functions for computational biology / bioinformatics. 
-A central feature of mycotools is the `dbtools` library and associated `mycoDB` which contains functions necessary for contructing and
+A central feature of is the `MycoDB` and `dbtools` library, which contains functions necessary for contructing and
 interfacing with a database of proteomes, genomes, and gene coordinate files derived from NCBI and / or JGI
 (Joint Genome Institute, Department of Energy) genomes.
