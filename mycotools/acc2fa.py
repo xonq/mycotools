@@ -14,15 +14,18 @@ def extractHeaders( fasta_file, accessions ):
     acc_comp = re.compile( r'(.*?)\[(\d+)\-(\d+)\]$' )
 
     for header in accessions:
-        coord_search = acc_comp.search( header )
-        if coord_search is not None:
-            start = int(coord_search[2]) - 1
-            end = int(coord_search[3])
-            acc = coord_search[1]
-            out_fasta[header] = {
-                'sequence': fasta[acc][start:end],
-                'description': ''
-                }
+        if '[' in header:
+            coord_search = acc_comp.search( header )
+            if coord_search is not None:
+                start = int(coord_search[2]) - 1
+                end = int(coord_search[3])
+                acc = coord_search[1]
+                out_fasta[header] = {
+                    'sequence': fasta[acc][start:end],
+                    'description': ''
+                    }
+            else:
+                out_fasta[header] = fasta[header]
         else:
             out_fasta[header] = fasta[header]
 

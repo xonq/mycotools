@@ -88,7 +88,7 @@ def parseOutput( ome, file_, bitscore = 0, pident = 0 ):
             raw_data = raw.read()
         data = [x.split('\t') for x in raw_data.split('\n') if x]
         for i in data:
-            if int(float(i[-1])) < bitscore and int(1000*float(i[2])) > 100000 * pident:
+            if int(float(i[-1])) > bitscore and int(1000*float(i[2])) > 100000 * pident:
                 ome_results[-1].append(i)
 
     return ome_results
@@ -175,7 +175,7 @@ def main(
         with open( log_name, 'r' ) as raw:
             log = raw.read()
         if log.rstrip() == log_str.rstrip():
-            eprint('\nPicking up where previous run left')
+            eprint('\nPicking up previous run')
             prev = True
         else:
             eprint('\nInconsistent run parameters in log, rerunning')
@@ -208,21 +208,21 @@ def main(
         eprint('\nERROR: invalid blast type: ' + blast)
 
 # NEED to add other threshold options
-    print('\nCompiling blast databases')
-    blast_db, seq_db = compBlastDB( rundb, seq_type )
-    blast_tups = compBlastTups(
-        blast_db, seq_db, blast, seq_type, 
-        report_dir, biotype, env_dir, query, 
-        hsps = hsps, max_hits = max_hits, evalue = evalue
-        )
+    if len(rundb) > 0:
+        print('\nCompiling blast databases')
+        blast_db, seq_db = compBlastDB( rundb, seq_type )
+        blast_tups = compBlastTups(
+            blast_db, seq_db, blast, seq_type, 
+            report_dir, biotype, env_dir, query, 
+            hsps = hsps, max_hits = max_hits, evalue = evalue
+            )
 
-    print('\nBlasting')
-    blast_outs = multisub( blast_tups, processes = cpus )
+        print('\nBlasting')
+        blast_outs = multisub( blast_tups, processes = cpus )
    
-    omes = set(blast_db['internal_ome'])
     parse_tups = []
     for i, row in db.iterrows():
-        if row['internal_ome'] in omes or not pd.isnull(row[biotype]):
+        if not pd.isnull(row[biotype]):
             parse_tups.append( [row['internal_ome'],
                 report_dir + row['internal_ome'] + '.tsv',
                 bitscore, pident ] )
@@ -237,6 +237,7 @@ def main(
     acc2fa_cmds = compAcc2fa( db, biotype, env_dir, output_res )
     output_fas = {}
     for query in acc2fa_cmds:
+        print('\t' + query)
         with mp.get_context('spawn').Pool(processes = cpus) as pool:
             results = pool.starmap( acc2fa, acc2fa_cmds[query] )
         output_fas[query] = '\n'.join(results)
