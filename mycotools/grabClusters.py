@@ -26,11 +26,9 @@ def grabFiles( accession, db ):
     return gff, prot
 
 
-def prepOutputFiles( hit_list, gff, proteome, cpu = 1):
+def prepGffOutput( hit_list, gff_path, cpu = 1):
 
-    gff_list = gff2dict( gff )
-    proteome_dict = fasta2dict( proteome )
-
+    gff_list = gff2dict( gff_path )
     mp_cmds = []
     for hit in hit_list:
         mp_cmds.append( [gff_list, hit] )
@@ -40,11 +38,17 @@ def prepOutputFiles( hit_list, gff, proteome, cpu = 1):
         )
     gff_strs = [ dict2gff(x) for x in gff_list_strs ]
 
+    return '\n'.join( gff_strs )
+
+
+def prepFaaOutput( hit_list, proteome_path ):
+
+    proteome_dict = fasta2dict( proteome_path )
     clus_fa = {}
     for hit in hit_list:
         clus_fa[hit] = proteome_dict[hit]
 
-    return '\n'.join( gff_strs ), dict2fasta( clus_fa )
+    return dict2fasta( clus_fa )
 
 
 def compileCDS( gff_dict ):
@@ -155,9 +159,9 @@ if __name__ == '__main__':
 
     out_indices = {}
     if args.gff: 
-        if not args.faa:
-            print('\nERROR: no proteome')
-            sys.exit( 3 )
+#        if not args.faa:
+ #           print('\nERROR: no proteome')
+  #          sys.exit( 3 )
         for accession in accessions:
             out_indices[accession] = main( formatPath(args.gff), accession, args.plusminus )
     else:
@@ -171,17 +175,23 @@ if __name__ == '__main__':
         for accession in out_indices:
             if args.gff:
                 gff = formatPath(args.gff)
-                prot = formatPath(args.faa)
+                if args.faa:
+                    prot = formatPath(args.faa)
+                else:
+                    prot = None
             else:
                 gff, prot = grabFiles( accession, db )
             for hit in out_indices[accession]:
                 if len( out_indices[accession][hit] ) > 0:
-                    if gff and prot:
-                        gff_str, prot_str = prepOutputFiles( 
-                            out_indices[accession][hit], gff, prot, cpu = args.cpu
-                        )
-                        with open( accession + '_clus.gff3', 'w' ) as out:
-                            out.write( gff_str )
+                    gff_str = prepGffOutput( 
+                        out_indices[accession][hit], gff, cpu = args.cpu
+                    )
+                    with open( accession + '_clus.gff3', 'w' ) as out:
+                        out.write( gff_str )
+                    if prot:
+                        prot_str = prepFaaOutput(
+                            out_indices[accession][hit], prot
+                            )
                         with open( accession + '_clus.aa.fa', 'w' ) as out:
                             out.write( prot_str )
     else:

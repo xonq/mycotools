@@ -220,7 +220,7 @@ fibsp.1_906343
 
 ## Curate annotation
 ### curAnnotation.py
-`curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers for both the input proteome and gene coordinates file, and add an $ALIAS field with the MycoDB compatible accession for each entry.
+`curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and add an `Alias=<PREFIX>` field for MycoDB compatible accession for each entry.
 
 e.g. `curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/results/results.aa.fa -p newname`
 

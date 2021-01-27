@@ -151,7 +151,7 @@ def main(
     db, blast, query, out_dir, hsps = 1, 
     max_hits = None, evalue = 10, bitscore = 0, 
     pident = 0, #coverage = 0, 
-    prev = False, cpus = 1 
+    cpus = 1 
     ):
 
     out_dir, query = formatPath(out_dir), formatPath( query )
@@ -160,11 +160,40 @@ def main(
     if not os.path.isdir( out_dir ):
         os.mkdir( out_dir )
     finished, rundb = set(), db
-    if not os.path.isdir( out_dir + 'reports/' ):
-        os.mkdir( out_dir + 'reports/' )
-    elif prev:
-        reports = collect_files(out_dir + 'reports/', 'tsv')
-        finished = set(os.path.basename(x)[:-4] for x in reports)
+    report_dir = out_dir + 'reports/'
+    if not os.path.isdir( report_dir ):
+        os.mkdir( report_dir )
+
+    prev = False
+    log_str = report_dir + '\n' + blast + '\n' + query + '\n' + \
+        str(max_hits) + '\n' + str(evalue)  
+    log_name = out_dir + '.' + os.path.basename(out_dir[:-1]) + '.log'
+    if not os.path.isfile( log_name ):
+        with open( log_name, 'w' ) as out:
+            out.write( log_str )
+    else:
+        with open( log_name, 'r' ) as raw:
+            log = raw.read()
+        if log.rstrip() == log_str.rstrip():
+            eprint('\nPicking up where previous run left')
+            prev = True
+        else:
+            eprint('\nInconsistent run parameters in log, rerunning')
+            count = 0
+            while os.path.isdir( report_dir ):
+                count += 1
+                report_dir = report_dir[:-1] + str(count) + '/'
+            os.mkdir( report_dir )
+            log_str = report_dir + '\n' + blast + '\n' + query + '\n' + \
+                str(max_hits) + '\n' + str(evalue)  
+            with open( log_name, 'w' ) as out:
+                out.write( log_str )
+    if prev:
+        reports = collect_files(report_dir, 'tsv')
+        finished = {
+            os.path.basename(x)[:-4] for x in reports \
+            if os.path.getsize(x) > 0
+            }
         rundb = db.loc[~db['internal_ome'].isin(finished)]
 
     if blast in {'tblastn', 'blastp'}:
@@ -183,7 +212,7 @@ def main(
     blast_db, seq_db = compBlastDB( rundb, seq_type )
     blast_tups = compBlastTups(
         blast_db, seq_db, blast, seq_type, 
-        out_dir + 'reports/', biotype, env_dir, query, 
+        report_dir, biotype, env_dir, query, 
         hsps = hsps, max_hits = max_hits, evalue = evalue
         )
 
@@ -195,7 +224,7 @@ def main(
     for i, row in db.iterrows():
         if row['internal_ome'] in omes or not pd.isnull(row[biotype]):
             parse_tups.append( [row['internal_ome'],
-                out_dir + 'reports/' + row['internal_ome'] + '.tsv',
+                report_dir + row['internal_ome'] + '.tsv',
                 bitscore, pident ] )
 
     print('\nParsing reports')
@@ -222,7 +251,8 @@ if __name__ == '__main__':
     mp.set_start_method('spawn')
     parser = argparse.ArgumentParser( 
         description = 'Blasts a query against a db and compiles output fastas ' + \
-            'for each query.'
+            'for each query. --evalue and --maxhit thresholds are applied at ' + \
+            'the BLAST step and are therefore incompatible with --previous.'
         )
     parser.add_argument( '-b', '--blast', required = True, 
         help = 'Blast type { blastn, blastp, tblastn, blastx }' )
@@ -235,9 +265,9 @@ if __name__ == '__main__':
         type = float, help = 'Identity minimum, e.g. 0.6' )
     #parser.add_argument( '-c', '--coverage', type = float, help = 'Query coverage +/-, e.g. 0.5' )
     parser.add_argument( '-m', '--maxhits', type = int, help = 'Max hits for each organism' )
-    parser.add_argument( '-d', '--database', default = masterDB(), help = 'mycodb, DEFAULT: masterdb' )
+    parser.add_argument( '-d', '--database', default = masterDB(), 
+        help = 'mycodb, DEFAULT: masterdb' )
     parser.add_argument( '-o', '--output', default = os.getcwd() )
-    parser.add_argument( '-p', '--previous', help = 'Previous run directory' )
     parser.add_argument( '--cpu', default = mp.cpu_count(), type = int, help = 'DEFAULT: all' )
     args = parser.parse_args()
 
@@ -247,33 +277,26 @@ if __name__ == '__main__':
     else:
         cpus = args.cpu
    
-    if args.previous:
-        output_dir = formatPath( args.previous )
-        if not output_dir.endswith('/'):
-            output_dir += '/'
-        
     evalue = 10**( -args.evalue)
     start_args = {
         'Blast': args.blast, 'query': formatPath(args.query), 
         'database': db_path, 'output': args.output, 'evalue': evalue,
         'bitscore': args.bitscore, 'max hits/organism': args.maxhits, #'coverage': args.coverage, 
-        'identity': args.identity, 'cores': cpus, 'previous': args.previous,
+        'identity': args.identity, 'cores': cpus,
         }
 
     start_time = intro( 'db2blast', start_args )
     date = start_time.strftime('%Y%m%d')
-    findExecs( [args.blast], exit = set(args.blast) )
-
+    findExecs( [args.blast], exit = {args.blast} )
    
-    if not args.previous:
-        output_dir = formatPath( args.output ) + date + '_db2blast/'
+    output_dir = formatPath( args.output ) + date + '_db2blast/'
 
     db = db2df(db_path)
 
     output_fas = main( 
         db, args.blast, args.query, output_dir, 
         bitscore = args.bitscore, pident = args.identity,
-        max_hits = args.maxhits, prev = args.previous, cpus = cpus 
+        max_hits = args.maxhits, cpus = cpus 
         )
     if not os.path.isdir( output_dir + 'fastas/' ):
         os.mkdir( output_dir + 'fastas/' )

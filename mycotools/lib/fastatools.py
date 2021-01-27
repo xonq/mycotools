@@ -220,10 +220,17 @@ def gtfComps():
 def grabGffAcc( gff_list, acc ):
 
     if ';Alias=' in gff_list[0]['attributes']:
-        alias = ';Alias=' + acc
+        alias = 'Alias=' + acc
+        alias_on = alias + ';'
     elif ' alias "' in gff_list[0]['attributes']:
-        alias = ' alias "' + acc + '"'
-    out_list = [ x for x in gff_list if alias in x['attributes'] ]
+        alias = 'alias "' + acc + '"'
+        alias_on = 'alias "' + acc + '"'
+    out_list = [ 
+        x for x in gff_list \
+        if x['attributes'].endswith(alias) or \
+            alias_on in x['attributes'] 
+# timed slower        if re.search(alias + r'(?:;|$)', x['attributes'])
+        ]
     
     return out_list
 

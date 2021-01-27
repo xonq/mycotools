@@ -4,6 +4,7 @@ import sys, re, os, copy, argparse
 from mycotools.lib.fastatools import gff2dict, dict2gff, fasta2dict, dict2fasta, \
     gtfComps, gff3Comps, gff2Comps
 from mycotools.lib.kontools import collect_files, eprint, formatPath
+from mycotools.gff2protein import main as gff2proteome
 
 
 def grabOutput( output_pref ):
@@ -370,7 +371,7 @@ def removeStartStop( gtf ):
     return out_gtf
 
 
-def curate( gff, prefix, fa, failed = set() ):
+def curate( gff, prefix, failed = set() ):
 
     for index in range(len(gff)):
         if gff[index]['type'].lower() == 'exon':
@@ -451,30 +452,14 @@ def curate( gff, prefix, fa, failed = set() ):
             cdsCheck[transProt] += 1
         newGff.append( entry )
 
-    new_fa = {}
-    for header in fa:
-        if header in failed or header.replace('-','') in failed:
-            continue
-        try:
-            new_fa[ change_dict[ re.sub( r'-T\d+$', '', header) ] ] = { 
-                'sequence': fa[ header ]['sequence'], 'description': '' 
-                }
-        except KeyError:
-             new_fa[ change_dict[ header.replace('-','') ] ] = { 
-                'sequence': fa[ header ]['sequence'], 'description': '' 
-                }           
-
     translation_str = ''
     for entry in change_dict:
         translation_str += entry + '\t' + change_dict[ entry ] + '\n'
 
-    newFa = {}
     newGff = sorted( newGff, key = lambda x: \
         int( re.search( r'ID=.*?\_(\d+)', x['attributes'])[1] ))
-    for key in sorted( new_fa.keys(), key = lambda x: int(re.search( r'\d+$', x)[0]) ):
-        newFa[key] = new_fa[key]
 
-    return newGff, newFa, translation_str
+    return newGff, translation_str
 
 
 def addExons( gff ):
@@ -503,20 +488,22 @@ def addExons( gff ):
 def main( gff_path, fasta_path, prefix, fail = True ):
 
     gff = gff2dict( gff_path )
-    fa = fasta2dict( fasta_path )
+    assembly = fasta2dict( fasta_path )
     if gff_path.endswith( 'gtf' ) or re.search(gtfComps()['id'], gff[0]['attributes']) is not None:
         exonGtf = intron2exon( gff )
         exonGtfCur = curCDS( exonGtf )
         exonGtfCurGenes, failed, flagged = addGenes( exonGtfCur, safe = fail )
         preGff = removeStartStop( exonGtfCurGenes )
-        gffUncur, fa, trans_str = curate( preGff, prefix, fa, failed ) 
+        gffUncur, trans_str = curate( preGff, prefix, failed ) 
         gff = addExons( gffUncur )
     else:
-        gff, fa, trans_str = curate( 
-            gff, prefix, fa
+        gff, trans_str = curate( 
+            gff, prefix
             ) 
         failed, flagged = None, None
-   
+  
+    fa = gff2proteome( gff, assembly )
+ 
     return gff, fa, trans_str, failed, flagged
 
 
@@ -527,7 +514,7 @@ if __name__ == '__main__':
         '#### is the is the index from ordered accessions. If you are planning' + \
         ' on using OrthoFiller, you may want to wait to not mix accessions.' )
     parser.add_argument( '-g', '--gff', required = True, help = '.gtf, .gff/.gff3' )
-    parser.add_argument( '-f', '--fasta', required = True, help = 'Proteome fasta' )
+    parser.add_argument( '-f', '--fasta', required = True, help = 'Assembly fasta' )
     parser.add_argument( '-p', '--prefix', required = True,
         help = 'Accession prefix' )
     parser.add_argument( '-o', '--output', help = 'Output directory' )
