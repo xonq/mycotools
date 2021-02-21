@@ -184,7 +184,7 @@ def gff3Comps( source = None ):
     comps['par'] = r'Parent=([^;]+)'
     comps['id'] = r'ID=([^;]+)'
     comps['Alias'] = r'Alias=([^;]+)'
-    comps['product'] = r'product=([^;]*)' 
+    comps['product'] = r'product="([^"]*)' 
     comps['ver'] = 'gff3'
 
     if source == 'ncbi':

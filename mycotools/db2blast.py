@@ -281,9 +281,9 @@ if __name__ == '__main__':
     evalue = 10**( -args.evalue)
     start_args = {
         'Blast': args.blast, 'query': formatPath(args.query), 
-        'database': db_path, 'output': args.output, 'evalue': evalue,
-        'bitscore': args.bitscore, 'max hits/organism': args.maxhits, #'coverage': args.coverage, 
-        'identity': args.identity, 'cores': cpus,
+        'database': db_path, 'output': args.output, 'max evalue': evalue,
+        'min bitscore': args.bitscore, 'max hits/organism': args.maxhits, #'coverage': args.coverage, 
+        'min identity': args.identity, 'cores': cpus,
         }
 
     start_time = intro( 'db2blast', start_args )

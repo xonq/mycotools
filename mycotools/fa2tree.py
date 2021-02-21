@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 
 import os, re, sys, subprocess, argparse
-from mycotools.lib.kontools import eprint, vprint, collect_files
+from mycotools.lib.kontools import eprint, vprint, collect_files, formatPath, intro, outro
 from mycotools.lib.fastatools import fasta2dict
 
 
-def mafftRun( fasta, out_dir, hpc ):
+def mafftRun( fasta, out_dir, hpc, verbose = True ):
 
     name = fasta
     if '/' in fasta:
@@ -21,7 +21,11 @@ def mafftRun( fasta, out_dir, hpc ):
             sys.exit( 2 )
     else:
         with open( out_dir + '/mafft.sh', 'w' ) as out:
-            out.write( hpc + '\n\n' + cmd + '\ncd ' + out_dir + '\nqsub trimal.sh')
+            if '#PBS' in hpc:
+                out.write( hpc + '\n\n' + cmd + '\ncd ' + out_dir + '\nqsub trimal.sh')
+            else:
+                 out.write( hpc + '\n\n' + cmd + '\ncd ' + out_dir + '\nsbatch trimal.sh')
+               
         
     return out_dir + '/' + name + '.mafft'
 
@@ -51,7 +55,12 @@ def trimalRun( mafft, out_dir, hpc, tree, verbose ):
 
     else:
         with open( out_dir + '/trimal.sh', 'w' ) as out:
-            out.write( hpc + '\n\n' + cmd1 + '\n' + cmd2 + '\n\ncd ' + out_dir + '\nqsub ' + tree + '.sh' )
+            if '#PBS' in hpc:
+                out.write( hpc + '\n\n' + cmd1 + '\n' + cmd2 + \
+                    '\n\ncd ' + out_dir + '\nqsub ' + tree + '.sh' )
+            else:
+                out.write( hpc + '\n\n' + cmd1 + '\n' + cmd2 + \
+                    '\n\ncd ' + out_dir + '\nsbatch ' + tree + '.sh' )
     
     return out_dir + '/' + name2
 
@@ -91,8 +100,9 @@ def main( fasta_path, tree, slurm = False, torque = False, project = '', output_
     hpc = False
     if slurm:
         vprint('\nHPC mode, preparing submission scripts (Slurm)\n', v = verbose)
-        hpc = '#SBATCH --time=10:00:00\n#SBATCH --nodes=1\n' + \
-            '#SBATCH --ntaskspernode=4\n#SBATCH -A ' + project
+        hpc = '#!/bin/bash\n#SBATCH --time=10:00:00\n#SBATCH --nodes=1\n' + \
+            '#SBATCH --ntasks-per-node=4\n#SBATCH -A ' + project + '\n' + \
+            '#SBATCH --mem=40000'
 #            '\n\nsource activate ' + source
     elif pbs:
         vprint('\nHPC mode, preparing submission scripts (PBS)\n', v = verbose)
@@ -126,10 +136,11 @@ def main( fasta_path, tree, slurm = False, torque = False, project = '', output_
 
     if hpc:
         if slurm:
-            vprint('\nStart pipeline via `sbatch <STARTSTEP>.sh` in ' + out_dir + '\n', v = verbose)
+            vprint('\nStart pipeline via `sbatch <STARTSTEP>.sh` in ' + out_dir + '\n',
+                v = verbose)
         else:
-            vprint('\nStart pipeline via `qsub <STARTSTEP>.sh` in ' + out_dir + \
-            '\n', v = verbose)
+            vprint('\nStart pipeline via `qsub <STARTSTEP>.sh` in ' + out_dir + '\n',
+                v = verbose)
 
    
 
@@ -164,7 +175,7 @@ if __name__ == '__main__':
     if os.path.isfile(args.input):
         main( 
             args.input, args.tree, slurm = args.slurm, 
-            torque = args.torque, project = args.project,
+            torque = args.pbs, project = args.project,
             output_dir = output, verbose = True
             )
     elif os.path.isdir(args.input):
@@ -179,7 +190,7 @@ if __name__ == '__main__':
         for fa in fas:
             print(fa)
             main(
-                fa, args.tree, slurm = args.slurm, torque = args.torque,
+                fa, args.tree, slurm = args.slurm, torque = args.pbs,
                 project = args.project, output_dir = output, verbose = False
                 )
     else:

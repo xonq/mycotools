@@ -73,7 +73,7 @@ def masterDB( path = '$MYCODB' ):
             if dtDate > dtMast:
                 master = date
         if master == '19991231':
-            eprint('\nERROR: master database not found in ' + path)
+            eprint('\nERROR: master db not found in ' + path + '. Have you initialized MycoDB?')
         master_path = formatPath( '$' + path + '/' + master + '.db' )
     except KeyError:
         eprint('\nERROR: ' + path + ' not in path' )
@@ -123,7 +123,7 @@ def df2std( df ):
 # imports dataframe and organizes it in accord with the `std df` format
 # exports as database file into `db_path`. If rescue is set to 1, save in home folder if output doesn't exist
 # if rescue is set to 0, do not output database if output dir does not exit
-def df2db(df, db_path, header = True, overwrite = False, std_col = True, rescue = True):
+def df2db(df, db_path, header = False, overwrite = False, std_col = True, rescue = True):
 
     df = df.set_index('internal_ome')
     df = df.sort_index()
@@ -474,6 +474,11 @@ def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid=['no rank',
 # NEED TO SIMPLIFY THE PUBLISHED STATEMENT TO SIMPLY DELETE ALL VALUES THAT ARENT 1 WHEN PUBLISHED = 1
 def abstract_tax(db, taxonomy, classification, inverse = False ):
 
+    if type(taxonomy) == str:
+        taxonomy = [taxonomy]
+
+    taxonomy = set(x.lower() for x in taxonomy)
+
     if not classification or not taxonomy:
         eprint('\nERROR: Abstracting via taxonomy requires both taxonomy name and classification.')
 
@@ -484,17 +489,17 @@ def abstract_tax(db, taxonomy, classification, inverse = False ):
     if classification != 'genus':
         for i,row in db.iterrows():
             row_taxonomy = read_tax(row['taxonomy'])
-            if row_taxonomy[classification].lower() == taxonomy.lower() and not inverse:
+            if row_taxonomy[classification].lower() in taxonomy and not inverse:
                 new_db = new_db.append(row)
-            elif row_taxonomy[classification].lower() != taxonomy.lower() and inverse:
+            elif row_taxonomy[classification].lower() not in taxonomy and inverse:
                 new_db = new_db.append(row)
 
 # if `classification` is `genus`, simply check if that fits the criteria in `taxonomy`
     elif classification == 'genus':
         for i,row in db.iterrows():
-            if row['genus'].lower() == taxonomy.lower() and not inverse:
+            if row['genus'].lower() in taxonomy and not inverse:
                 new_db = new_db.append(row)
-            elif row['genus'].lower() != taxonomy.lower() and inverse:
+            elif row['genus'].lower() not in taxonomy and inverse:
                 new_db = new_db.append(row)
 
     return new_db

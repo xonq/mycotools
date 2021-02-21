@@ -2,7 +2,7 @@
 
 import argparse, sys, re
 from mycotools.lib.fastatools import gff2dict, dict2gff, gff2Comps, gff3Comps
-from mycotools.lib.kontools import formatPath, eprint
+from mycotools.lib.kontools import formatPath, eprint, vprint
 from mycotools.curAnnotation import addGenes, removeStartStop
 
 def gff2gff3( gff_list, ome, jgi_ome ):
@@ -93,13 +93,13 @@ def gff2gff3( gff_list, ome, jgi_ome ):
     return out_list
 
 
-def main( gff_list, ome, jgi_ome, safe = True ):
+def main( gff_list, ome, jgi_ome, safe = True, verbose = True ):
 
     gff_prep, failed, flagged = addGenes( gff_list, safe = safe )
     if failed:
-        eprint( str(len(failed)) + '\tgenes failed' )
+        vprint( str(len(failed)) + '\tgenes failed', v = verbose )
     if flagged:
-        eprint( str(len(flagged)) + '\tgene coordinates from exons' )
+        vprint( str(len(flagged)) + '\tgene coordinates from exons', v = verbose)
     gff3 = gff2gff3( gff_prep, ome, jgi_ome )
         
     return gff3

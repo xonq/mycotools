@@ -16,11 +16,10 @@ def main( args_dict, db ):
 
         if args.classification:
             new_db = pd.DataFrame()
-            for taxonomy in taxonomy_list:
-                new_db = new_db.append( 
-                    abstract_tax( 
-                        db, taxonomy, 
-                        args.classification, inverse = args.inverse 
+            new_db = new_db.append( 
+                abstract_tax( 
+                    db, taxonomy_list, 
+                    args.classification, inverse = args.inverse 
                     ) 
                 )
 
@@ -51,10 +50,7 @@ def main( args_dict, db ):
             else:
                 new_db.at[i, 'published'] = row['published']
 
-        if args.inverse:
-            new_db = new_db[ new_db['published'] == 0.0 ]
-        else:
-            new_db = new_db[ new_db['published'] != 0.0 ]
+    
 
     return new_db
 
@@ -75,9 +71,9 @@ if __name__ == '__main__':
     parser.add_argument( '--ome', help = "New line separated list of omes to include." )
     parser.add_argument( '-tl', '--taxonomy_list', help = 'New line separated list of ' + \
         'taxonomic groups - must be same classification. Requires `-c`' )
-    parser.add_argument( '--inverse', action = 'store_true', help = 'Inverse arguments' )
-    parser.add_argument( '--headers',  default = True, action = 'store_false', 
-        help = 'Do not output db headers' )
+    parser.add_argument( '--inverse', action = 'store_true', help = 'Inverse non-binary arguments' )
+    parser.add_argument( '--headers',  default = False, action = 'store_true', 
+        help = 'Output db headers' )
     parser.add_argument( '-i', '--input', default = masterDB(), help = "Kontools database. " + \
         'DEFAULT: master database' )
     parser.add_argument( '-o', '--output', help = "Output path instead of print to stdout. " + \

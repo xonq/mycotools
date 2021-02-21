@@ -48,7 +48,7 @@ def main( args ):
        
 
     if goOn:
-        db = db2df( masterDB )
+        db = db2df( masterDB() )
 
     with open( args[1], 'r' ) as raw_input:
         data_input = raw_input.read()

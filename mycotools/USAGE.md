@@ -188,17 +188,17 @@ acc2fa.py -i <INPUTFILE>
 
 
 ## Grab clusters
-### grabClusters.py
+### grabLoci.py
 Inputs an accession (`-a`) or new line separated list of accessions and optional genes +/- (`-p`, default 10). Outputs gene accessions or a gff and protein fasta of the clusters.
 
 output gff and protein fasta of an accession's cluster (outputs to `<ACCESSION>_clus*`):
 ```
-grabClusters.py -o -a <MYCODB_ACCESSION>
+grabLoci.py -o -a <MYCODB_ACCESSION>
 ```
 
 list proximal +/- 5 genes to standard out:
 ```bash
-(mycotools) -bash-4.2$ grabClusters.py -a fibsp.1_906341 -p 5
+(mycotools) -bash-4.2$ grabLoci.py -a fibsp.1_906341 -p 5
 
 fibsp.1_906341 cluster +/- 5
 fibsp.1_880711

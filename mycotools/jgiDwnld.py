@@ -70,7 +70,8 @@ def checkMatches( match1, match2, xml_data, file_type):
             if len(matches) > 1:
                 matches = matches[1]
             else:
-                print('\t\tERROR: no ' + file_type + ' detected.')
+                if file_type != 'gff3':
+                    print('\t\tERROR: no ' + file_type + ' detected.')
                 matches = None
                 preexisting = True
 
@@ -357,13 +358,13 @@ def main(
     pd.options.mode.chained_assignment = None  # default='warn'
     if not 'genome_code' in df.columns:
         if len( df.columns ) != 1:
-            print( '\nInvalid input. No genome_code column and more than one column.' )
+            eprint( '\nInvalid input. No genome_code column and more than one column.' )
         else:
             ome_col = list(df.columns)[0]
     else:
         ome_col = 'genome_code'
 
-    print('\nLogging into JGI ...')
+    eprint('\nLogging into JGI')
     login_attempt = 0
     while jgi_login( user, pwd ) != 0 and login_attempt < 5:
         eprint('\nJGI Login Failed. Attempt: ' + str(login_attempt))
@@ -386,7 +387,12 @@ def main(
         if error_check != -1:
             time.sleep( 0.1 )
 
-    print( '\nDownloading' )
+    eprint( '\nDownloading JGI files\n\tMaximum rate: 1 genome/min' )
+    if len( df ) > 60:
+        eprint( '\tMinimum time: ' + str(len(df)) / 60 + ' hours' )
+    else:
+        eprint( '\tMinimum time: ' + str(len(df)) + ' minutes' )
+    
     dwnlds = []
     if assembly:
         dwnlds.append( 'assembly' )
@@ -416,20 +422,25 @@ def main(
             time.sleep( 60 )
         if ome not in ome_set:
             jgi_login( user, pwd )
-            print( '\t' + ome )
+            if 'internal_ome' in row.keys():
+                eprint( '\t' + row['internal_ome'] + '\t' + ome )
+            else:
+                eprint( '\t' + ome )     
             for typ in dwnlds:
                 check, preexisting, new_typ = JGIdwnld(
                     ome, typ, output, masked = masked
                 )
                 if type(check) != int:
                     if new_typ == 'gff':
-                        df.loc[i, 'jgi_gff_path'] = output + '/' + new_typ \
+                        df.loc[i, 'jgi_gff2_path'] = output + '/' + new_typ \
                             + '/' + check
                     else:
                         df.loc[i, new_typ + '_path'] = output + '/' + new_typ + \
                             '/' + check
                     check = os.path.basename( os.path.abspath( check ) )
-                print('\t\t' + new_typ + ': exit status ' + str(check))
+                elif type(check) == int:
+                    ome_set.add(row[ome_col])
+                eprint('\t\t' + new_typ + ': exit status ' + str(check))
         else:
             eprint( '\t' + ome + ' failed.' )
 
@@ -445,7 +456,7 @@ def main(
     if 'assembly' in df.columns:
         del df['assembly']
 
-    return df
+    return df, ome_set
 
 
 if __name__ == '__main__':

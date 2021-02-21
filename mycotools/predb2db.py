@@ -2,7 +2,7 @@
 
 import argparse, os, sys, subprocess, re, shutil, numpy as np
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
-from mycotools.lib.fastatools import dict2gff
+from mycotools.lib.fastatools import dict2gff, gff2dict
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, gather_taxonomy, assimilate_tax, masterDB, df2std
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
@@ -45,7 +45,7 @@ def predb2db( pre_db ):
             'published': row['publication']
         } )
 
-    new_db = df2std(pd.DataFrame( data_dict_list ))
+    new_db = pd.DataFrame( data_dict_list )
 
     return new_db
 
@@ -101,7 +101,6 @@ def main( prepdb, refdb, rogue = False ):
 
     ## need to multiprocess here
     print('\nCopying to database')
-    to_del = []
     for i, row in predb_omes.iterrows():
         gff3 = False
         if not pd.isnull( row['assembly'] ):
@@ -124,10 +123,10 @@ def main( prepdb, refdb, rogue = False ):
                     try:
                         new_gff = curGFF3(formatPath('$MYCOGFF3/' + new_path), row['internal_ome'])
                         cur_gff = re.sub(r'\.uncur$', '', new_path)
-                        to_del.append(formatPath('$MYCOGFF3/' + new_path))
                         with open( formatPath('$MYCOGFF3/' + cur_gff), 'w' ) as out:
                             out.write( dict2gff(new_gff) )
                         predb_omes.loc[i, 'gff3'] = cur_gff
+                        os.remove(formatPath('$MYCOGFF3/' + new_path))
                     except:
                         eprint('\t' + row['internal_ome'] + ' gff3 failed curation')
                 else:
@@ -146,11 +145,11 @@ def main( prepdb, refdb, rogue = False ):
             try:
                 new_gff3 = gff2gff3(
                     gff2dict(gff_path), 
-                    row['internal_ome'], row['genome_code']
+                    row['internal_ome'], row['genome_code'], verbose = False
                     )
                 new_path = os.environ['MYCOGFF3'] + '/' + row['internal_ome'] + '.gff3'
                 with open( new_path, 'w' ) as out:
-                    out.write( gff2dict(new_gff3) )
+                    out.write( dict2gff(new_gff3) )
                 predb_omes.at[i, 'gff3'] = os.path.basename(new_path)
             except:
                 predb_omes.at[i, 'gff3'] = None
@@ -163,10 +162,11 @@ def main( prepdb, refdb, rogue = False ):
                     try:
                         new_prot = curProteome(formatPath('$MYCOFAA/' + new_path), row['internal_ome'])
                         cur_prot = re.sub(r'\.uncur$', '', new_path)
-                        to_del.append(formatPath('$MYCOFAA/' + new_path))
                         with open( formatPath('$MYCOFAA/' + cur_prot), 'w' ) as out:
                             out.write( new_prot )
                         predb_omes.loc[i, 'proteome'] = cur_prot
+                        os.remove(formatPath('$MYCOFAA/' + new_path))
+
                     except:
                         eprint('\t' + row['internal_ome'] + ' proteome failed curation')
                 elif rogue:
@@ -176,18 +176,18 @@ def main( prepdb, refdb, rogue = False ):
                         try:
                             gff, fa, trans_str, failed, flagged = curRogue(
                                 os.environ['MYCOGFF3'] + '/' + row['gff3'],
-                                os.environ['MYCOFAA'] + '/' + row['proteome'],
+                                os.environ['MYCOFNA'] + '/' + row['assembly'],
                                 row['internal_ome']
                                 )
-                            to_del.append( formatPath('$MYCOGFF3/' + row['gff3'] ) )
                             cur_gff = re.sub(r'\.uncur$', '', row['gff3'])
                             with open(formatPath('$MYCOGFF3/' + cur_gff), 'w') as out:
                                 out.write(dict2gff(gff))
                             predb_omes.at[i, 'gff3'] = cur_prot
-                            to_del.append( formatPath('$MYCOFAA/' + row['proteome'] ) )
+                            os.remove( formatPath('$MYCOGFF3/' + row['gff3'] ) )
                             cur_prot = re.sub(r'\.uncur$', '', row['proteome'])
                             with open(formatPath('$MYCOFAA/' + cur_prot), 'w') as out:
                                 out.write(dict2fasta(fa))
+                            os.remove( formatPath('$MYCOFAA/' + row['proteome'] ) )
                             predb_omes.at[i, 'proteome'] = cur_prot    
             # NEED TO MAKE ROGUE OMES A THING AND UPDATE THE CONFIG
                         except:
@@ -196,8 +196,6 @@ def main( prepdb, refdb, rogue = False ):
             else:
                 predb_omes.at[i, 'proteome'] = None
 
-    for i in to_del:
-        os.remove(i)
     del predb_omes['gff']
     return df2std(predb_omes)
 

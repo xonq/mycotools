@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 from sklearn.cluster import AgglomerativeClustering
-from mycotools.lib.kontools import multisub, findExecs
+from mycotools.lib.kontools import multisub, findExecs, formatPath
 from mycotools.lib.fastatools import fasta2dict, dict2fasta
 import string, argparse, os, sys, itertools, tempfile, re, random, pandas as pd, subprocess
 
@@ -181,7 +181,7 @@ if __name__ == '__main__':
         if not output:
             output = args.distance + '.clus'
         print('\nImporting distance matrix')
-        distanceMatrix = importDist( dist )
+        distanceMatrix = importDist( formatPath(args.distance) )
 
     print('\nClustering')
     clusters = aggd( distanceMatrix, float(args.max_dist), args.linkage )

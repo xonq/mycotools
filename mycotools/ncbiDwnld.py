@@ -3,7 +3,7 @@
 from Bio import Entrez
 import pandas as pd, numpy as np
 import argparse, os, time, subprocess, sys, requests, re
-from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint
+from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint
 from mycotools.lib.dbtools import log_editor
 
 
@@ -61,11 +61,12 @@ def compileLog( output_path, remove = False ):
 # collects paths to download proteomes and assemblies
 def collect_ftps(
     ncbi_df, ass_prots, api_key=0,
-    column='Assembly Accession', database="assembly", output_path = ''
+    column='Assembly Accession', database="assembly", output_path = '',
+    verbose=True
     ):
 
-    print('\nAssembling ftp directories ...')
-    count = 0
+    eprint('\nAssembling NCBI ftp directories')
+    count, failed = 0, []
 
 # for each row in the assembly, grab the accession number, form the search term for Entrez, use Entrez,
     for index, row in ncbi_df.iterrows():
@@ -76,20 +77,28 @@ def collect_ftps(
         if index in ass_prots:
             continue
 
-        ass_prots[str(index)] = {}
 
         search_term = accession + '[' + column + ']'
         handle = Entrez.esearch(db=database, term=search_term)
         genome_id = Entrez.read(handle)['IdList']
-        ID = genome_id[0]
+        try:
+            ID = genome_id[0]
+        except IndexError:
+            if 'internal_ome' in row.keys():
+                accession = row['internal_ome']
+            eprint('\t' + accession + ' failed to find genome ID')
+            failed.append( accession )
+            continue
+        ass_prots[str(index)] = {}
+
 
 # if more than one genome id is found, this needs to be reported because we're only using the first (shouldn't happen)
         if len(genome_id) > 1:
-            print('\t' + accession, 'yields more than one genome ID:')
+            vprint('\t' + accession + ' yields more than one genome ID:', v = verbose)
             for ID in genome_id:
-                print('\t\t' + str(ID))
+                vprint('\t\t' + str(ID), v = verbose)
             ID = genome_id[0]
-            print('\t\tUsing', str(ID))
+            vprint('\t\tUsing ' + str(ID), v = verbose)
 
 # obtain the path from a summary of the ftp directory and create the standard paths for proteomes and assemblies
         esc_count = 0
@@ -102,9 +111,16 @@ def collect_ftps(
                 break
             except IndexError:
                 if esc_count == 20:
-                    print('\t\tFailed to retrieve.')
+                    eprint('\t\tFailed to retrieve.')
                     sys.exit(69)
                 time.sleep(0.1)
+
+        if not ftp_path:
+            if 'internal_ome' in row.keys():
+                accession = row['internal_ome']
+            eprint('\t' + accession + ' failed to return any FTP path')
+            failed.append( accession )
+            continue
 
         ass_md5, gff_md5, trans_md5, prot_md5, md5s = '', '', '', '', {}
         basename = os.path.basename(ftp_path)
@@ -171,79 +187,79 @@ def collect_ftps(
                 time.sleep( 1 )
                 count = 0
 
-    return ass_prots
+    return ass_prots, failed
 
 # download the file depending on the type inputted
 def download_files( ome_prots, ome, file_types, output_dir, remove = False ):
 
-        for file_type in file_types:
-            ftp_link = ome_prots[file_type]
-            if file_type == 'assembly':
-                file_path = output_dir + 'assembly/' + \
-                    os.path.basename(ome_prots[file_type])
-            elif file_type == 'proteome':
-                file_path = output_dir + 'proteome/' + \
-                    os.path.basename(ome_prots[file_type])
-            elif file_type == 'gff3':
-                file_path = output_dir + 'gff3/' + \
-                    os.path.basename(ome_prots[file_type])
-            elif file_type == 'transcript':
-                file_path = output_dir + 'transcript/' + \
-                    os.path.basename(ome_prots[file_type])
+    for file_type in file_types:
+        ftp_link = ome_prots[file_type]
+        if file_type == 'assembly':
+            file_path = output_dir + 'assembly/' + \
+                os.path.basename(ome_prots[file_type])
+        elif file_type == 'proteome':
+            file_path = output_dir + 'proteome/' + \
+                os.path.basename(ome_prots[file_type])
+        elif file_type == 'gff3':
+            file_path = output_dir + 'gff3/' + \
+                os.path.basename(ome_prots[file_type])
+        elif file_type == 'transcript':
+            file_path = output_dir + 'transcript/' + \
+                os.path.basename(ome_prots[file_type])
 
-            if os.path.isfile( file_path ):
-                md5_cmd = subprocess.run( [
-                        'md5sum', file_path],
-                        stdout = subprocess.PIPE )
-                md5_res = md5_cmd.stdout.decode( 'utf-8' )
-                md5_find = re.search(r'\w+', md5_res)
-                md5 = md5_find[0]
-                if md5 == ome_prots[file_type + '_md5']:
-                    dwnld = 0
-                    continue
-            elif os.path.isfile( file_path[:-3] ):
+        if os.path.isfile( file_path ):
+            md5_cmd = subprocess.run( [
+                'md5sum', file_path],
+                stdout = subprocess.PIPE )
+            md5_res = md5_cmd.stdout.decode( 'utf-8' )
+            md5_find = re.search(r'\w+', md5_res)
+            md5 = md5_find[0]
+            if md5 == ome_prots[file_type + '_md5']:
                 dwnld = 0
                 continue
+        elif os.path.isfile( file_path[:-3] ):
+            dwnld = 0
+            continue
 
-            if ftp_link == '':
-                dwnld = 1
-                continue
-            request = requests.get( ftp_link.replace('ftp://','https://' ))
-            if request.status_code != 200:
-                eprint('\t' + ome + '\tno ' + file_type)
-                dwnld = 69
-                ome_prots[file_type] = ''
-                log_editor( output_dir + 'ncbiDwnld.log', str(ome), str(ome) + \
-                    '\t' + ome_prots['biosample'] + '\t' + ome_prots['assembly'] + \
-                    '\t' + ome_prots['proteome'] + '\t' + ome_prots['gff3'] + \
-                    '\t' + ome_prots['transcript'] + '\t' + \
-                    ome_prots['assembly_md5'] + '\t' + \
-                    ome_prots['proteome_md5'] + '\t' + \
-                    ome_prots['gff3_md5'] + '\t' +
-                    ome_prots['transcript_md5'] )
-                if remove:
-                    break
-                continue
+        if ftp_link == '':
+            dwnld = 1
+            continue
+        request = requests.get( ftp_link.replace('ftp://','https://' ))
+        if request.status_code != 200:
+            eprint('\t' + ome + '\tno ' + file_type)
+            dwnld = 69
+            ome_prots[file_type] = ''
+            log_editor( output_dir + 'ncbiDwnld.log', str(ome), str(ome) + \
+                '\t' + ome_prots['biosample'] + '\t' + ome_prots['assembly'] + \
+                '\t' + ome_prots['proteome'] + '\t' + ome_prots['gff3'] + \
+                '\t' + ome_prots['transcript'] + '\t' + \
+                ome_prots['assembly_md5'] + '\t' + \
+                ome_prots['proteome_md5'] + '\t' + \
+                ome_prots['gff3_md5'] + '\t' +
+                ome_prots['transcript_md5'] )
+            if remove:
+                break
+            continue
 
-            dwnld = subprocess.call(
-                ['curl', ftp_link, '-o', file_path], 
-                stdout = subprocess.PIPE, stderr = subprocess.PIPE
-                )
+        dwnld = subprocess.call(
+            ['curl', ftp_link, '-o', file_path], 
+            stdout = subprocess.PIPE, stderr = subprocess.PIPE
+            )
 
-            if dwnld != 0:
-                if remove:
-                    break
-            else:
-                with open( file_path, 'r' ) as data:
-                    try:
-                        if len(data.read()) < 500:
-#                           print('\t' + ome + '\t' + file_type + ' empty')
-                            dwnld = 420
-                            if remove:
-                                break
-                    except UnicodeDecodeError:
-                        continue
-        return dwnld
+        if dwnld != 0:
+            if remove:
+                break
+        else:
+            with open( file_path, 'r' ) as data:
+                try:
+                    if len(data.read()) < 500:
+#                       print('\t' + ome + '\t' + file_type + ' empty')
+                        dwnld = 420
+                        if remove:
+                            break
+                except UnicodeDecodeError:
+                    continue
+    return dwnld
 
 # generates ome codes from biosample accession (default) and first 3 letters of genus and species
 def gen_omes(df,column='#Organism/Name',tag='BioSample Accession'):
@@ -275,51 +291,51 @@ def gen_omes(df,column='#Organism/Name',tag='BioSample Accession'):
     return newdf
 
 
-def callDwnldFTPs( ncbi_df, ass_prots, api, output_path ):
+def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False ):
 
     if 'internal_ome' in ncbi_df.keys() and 'biosample' in ncbi_df.keys():
         ncbi_df = ncbi_df.set_index('internal_ome')
         if not all( x in ass_prots for x in ncbi_df.index ):
-            ass_prots = collect_ftps( 
+            ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, 
                 column = 'biosample', api_key=api,
-                output_path = output_path
+                output_path = output_path, verbose = verbose
                 )
     elif 'biosample' in ncbi_df.keys():
         ncbi_df['index'] = ncbi_df['biosample']
         ncbi_df = ncbi_df.set_index( 'index' )
         ncbi_df.index = ncbi_df.index.astype(str)
         if not all( x in ass_prots for x in ncbi_df.index ):
-            ass_prots = collect_ftps( 
+            ass_prots, failed = collect_ftps( 
             ncbi_df, ass_prots, 
             column = 'biosample', api_key=api, 
-            output_path = output_path 
+            output_path = output_path, verbose = verbose
             )
     elif 'internal_ome' in ncbi_df.keys():
         ncbi_df = ncbi_df.set_index('internal_ome')
         if not all( x in ass_prots for x in ncbi_df.index ):
-            ass_prots = collect_ftps( 
+            ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, 
-                api_key=api, output_path = output_path
+                api_key=api, output_path = output_path, verbose = verbose
                 )
     else:
         if len( ncbi_df.columns ) > 1:
             ncbi_df = ncbi_df.set_index( indices[1] )
         ncbi_df.index = ncbi_df.index.astype(str)
         if not all( x in ass_prots for x in ncbi_df.index ):
-            ass_prots = collect_ftps( 
+            ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, 
                 column = ncbi_df.columns[0], api_key=api,
-                output_path = output_path
+                output_path = output_path, verbose = verbose
             )
 
-    return ncbi_df, ass_prots
+    return ncbi_df, ass_prots, failed
 
 
 def main( 
     email = '', api = None, 
     assembly = True, proteome = True, gff3 = True, transcript = False,
-    ncbi_df = False, remove = False, output_path = os.getcwd()
+    ncbi_df = False, remove = False, output_path = os.getcwd(), verbose = False
     ):
 
     output_path = formatPath(output_path)
@@ -339,23 +355,31 @@ def main(
         ncbi_df['biosample'] = ncbi_df['BioSample Accession']
         del ncbi_df['BioSample Accession']
 
-    ncbi_df, ass_prots = callDwnldFTPs( ncbi_df, ass_prots, api, output_path )
+    ncbi_df, ass_prots, failed = callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose )
     if remove:
         ass_prots = { 
-    o: ass_prots[o] for o in ass_prots if all(ass_prots[o][p] != '' for p in ass_prots[o])
-    }
+            o: ass_prots[o] for o in ass_prots \
+            if all(ass_prots[o][p] != '' for p in ass_prots[o])
+        }
     new_df = pd.DataFrame()
     
-    print('\nDownloading NCBI files')
+    eprint('\nDownloading NCBI files')
     for ome in ass_prots:
-        print('\t' + str(ome))
+        eprint('\t' + str(ome))
         if ome not in set( ncbi_df.index ):
             continue
         if type(ome) is int:
             new_ome = ass_prots[ome]['biosample']
-            exit = download_files( ass_prots[ome], new_ome, file_types, output_path, remove = remove )
+            if ass_prots[ome]:
+                exit = download_files( ass_prots[ome], new_ome, file_types, output_path, remove = remove )
+            else:
+                continue
         else:
-            exit = download_files( ass_prots[ome], ome, file_types, output_path, remove = remove )
+            if ass_prots[ome]:
+                exit = download_files( ass_prots[ome], ome, file_types, output_path, remove = remove )
+            else:
+                failed.append(ome)
+                continue
         if exit != 0 and remove:
             continue
         if ome in set(ncbi_df.index):
@@ -373,7 +397,7 @@ def main(
         'index': 'internal_ome'
         } )
 
-    return new_df
+    return new_df, failed
 
 
 if __name__ == "__main__":
@@ -422,10 +446,10 @@ if __name__ == "__main__":
         eprint('\nERROR: You must choose at least one download option\nExit code 37')
         sys.exit( 37 )
 
-    new_df = main( 
+    new_df, failed = main( 
         email = args.email, api = args.key, assembly = args.assembly,
         proteome = args.proteome, gff3 = args.gff3, transcript = args.transcript,
-        ncbi_df = args.input, output_path = output
+        ncbi_df = args.input, output_path = output, verbose = True
         )
     new_df.to_csv( args.input + '_dwnld', sep = '\t' )
 
