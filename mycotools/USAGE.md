@@ -16,7 +16,9 @@
 	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
-	- [Grabbing clusters](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-clusters)
+	- [Grabbing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-clusters)
+    - [Visualizing
+      loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#gff2svg.py)
 	- [Curating annotation](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#curate-annotation)
 
 <br />
@@ -226,6 +228,22 @@ e.g. `curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/res
 
 ### curGFF3.py / curProteome.py / gff2gff3.py
 There are several scripts in the `utils` used to curate gene coordinate files and proteomes for the MycoDB. `curGFF3.py` is tested with both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycoDB compatible `gff3`, and `curProteome.py` curates NCBI or JGI proteomes.
+
+<br /><br />
+
+## Visualizing Loci
+### gff2svg.py
+This script will input a .gff3, or new line-delimited list of .gff3 paths, 
+and for each contig output an SVG of the locus annotated by function retrieved 
+from the 'product=' field. 
+
+<br />
+
+e.g. make an SVG from a GFF3: `gff2svg.py -g <MY.gff3>`
+
+make SVGs for all GFF3s in a new line delimited list with width set to 20:
+
+`gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20`
 
 
 <br /><br /><br />
