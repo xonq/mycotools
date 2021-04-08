@@ -2,23 +2,118 @@
 
 import pandas as pd, pandas
 import numpy as np
-import sys, os, time, mycotools.lib.fastatools, json, re, datetime
+import sys, os, time, mycotools.lib.fastatools, json, re, datetime, hashlib, getpass, base64
 from mycotools.lib.kontools import collect_files, eprint, formatPath
 from Bio import Entrez
 from urllib.error import HTTPError
 
+def getLogin( ncbi, jgi ):
 
-def genConfig( branch = 'stable' ):
+    ncbi_email, ncbi_api, jgi_email, jgi_pwd = None, None, None, None
+    print()
+    if ncbi:
+        ncbi_email = input( 'NCBI email: ' )
+        ncbi_api = getpass.getpass( prompt = 'NCBI api key (blank if none): ' )
+    if jgi:
+        jgi_email = input( 'JGI email: ' )
+        jgi_pwd = getpass.getpass( prompt = 'JGI password (required): ' )
+    print()
+
+    return ncbi_email, ncbi_api, jgi_email, jgi_pwd
+
+
+def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
+
+    salt = b'D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118'
+    #NEED to make this store a password
+    if os.path.isfile( formatPath(info_path) ):
+        from cryptography.fernet import Fernet
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        from cryptography.hazmat.backends import default_backend
+        kdf = PBKDF2HMAC(
+            algorithm=hashlib.sha256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        print()
+        hash_pwd = getpass.getpass( prompt = 'MycoDB login password: ' )
+        key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
+        fernet = Fernet( key )
+#        with open(formatPath(info_path) + '/.key', 'rb') as raw_key:
+ #           fernet = Fernet(raw_key)
+        with open(formatPath(info_path), 'rb') as raw_file:
+            data = raw_file.read()
+        decrypted = fernet.decrypt(data)
+        data = decrypted.decode('UTF-8').split('\n')
+        if len(data) != 4:
+            eprint('INCORRECT PASSWORD. Delete ~/.mycodb to reset password')
+            sys.exit(8)
+        ncbi_email = data[0].rstrip()
+        ncbi_api = data[1].rstrip()
+        jgi_email = data[2].rstrip()
+        jgi_pwd = data[3].rstrip()
+    else:
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi, jgi)
+        if ncbi and jgi:
+            hash_check = input( 'Would you like to encrypt your login ' + \
+                'information to ' + info_path + ' [Y/n]: ' )
+        else:
+            hash_check = 'n'
+        if hash_check not in {'n', 'N'}:
+            from cryptography.fernet import Fernet
+            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+            from cryptography.hazmat.backends import default_backend
+            kdf = PBKDF2HMAC(
+                algorithm=hashlib.sha256(),
+                length=32,
+                salt=salt,
+                iterations=100000,
+                backend=default_backend()
+            )
+            print()
+            hash_pwd, hash_check = True, False
+            while hash_pwd != hash_check:
+                if hash_pwd != True:
+                    eprint('ERROR: passwords do not match')
+                hash_pwd = getpass.getpass( prompt = 'New MycoDB login password: ' )
+                hash_check = getpass.getpass( prompt = 'Confirm password: ' )
+
+            key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
+            fernet = Fernet( key )
+            out_data = ncbi_email + '\t' + ncbi_api + '\t' + jgi_email + '\t' + jgi_pwd
+            encrypt_data = fernet.encrypt(out_data)
+            with open( formatPath(info_path), 'wb' ) as out:
+                out.write(encrypt_data)
+#
+    return ncbi_email, ncbi_api, jgi_email, jgi_pwd
+
+
+def genConfig( 
+    branch = 'stable', forbidden = '$MYCODB/log/forbidden.tsv',
+    repo = "https://gitlab.com/xonq/mycodb", 
+    rogue = False, nonpublished = False
+    ):
 
     config = { 
-        'forbidden': '$MYCODB/log/forbidden.tsv',
-        'repository': 'https://gitlab.com/xonq/mycodb', 
+        'forbidden': forbidden,
+        'repository': repo, 
         'branch': branch,
-        'nonpublished': False,
-        'rogue': False,
+        'nonpublished': nonpublished,
+        'rogue': rogue,
     }
 
     return config
+
+
+def readJson( config_path ):
+
+    with open( config_path, 'r' ) as json_raw:
+        json_dict = json.load( json_raw )
+
+    return json_dict
+    
 
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit` 
 def log_editor( log, ome, edit ):
@@ -88,10 +183,10 @@ def db2df(db_path):
     db_path = formatPath( db_path )
     db_df = pd.read_csv( db_path, sep='\t' )
     if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
-        headers = [ 'internal_ome', 'genus', 'species', 'strain', 'biosample',
-            'assembly', 'proteome', 'gff3',
+        headers = [ 'internal_ome', 'genus', 'species', 'strain', 'version', 
+            'biosample', 'assembly', 'proteome', 'gff3',
             'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-            'genome_code' ]
+            'genome_code', 'acquisition_date' ]
         db_df = pd.read_csv( db_path, sep = '\t', names = headers )
 
     return db_df
@@ -104,10 +199,10 @@ def df2std( df ):
     if 'biosample' in df.columns:
         trans_df = df[[
         'internal_ome', 'genus', 'species',
-        'strain', 'biosample', 'assembly', 
+        'strain', 'version', 'biosample', 'assembly', 
         'proteome', 'gff3', 'taxonomy',
         'ecology', 'eco_conf', 'source', 'published', 
-        'genome_code'
+        'genome_code', 'acquisition_date'
     ]]
     else:
         trans_df = df[[
@@ -563,7 +658,7 @@ def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
     tax_set = set()
     access = '-'
     if type(reference) == pd.core.frame.DataFrame:
-        tax_set = set(row['internal_ome'])
+        tax_set = set(reference['internal_ome'])
         print('\t' + str(len(tax_set)) + ' omes from reference dataset')
 
     for i, row in df.iterrows():
@@ -580,7 +675,10 @@ def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
             int(re.search(r'.*?(\d+)', x)[1]) for x in list(tax_set) if x.startswith(name)
         ]
         numbers.sort( reverse = True )
-        number = numbers[-1] + 1
+        if numbers:
+            number = numbers[-1] + 1
+        else:
+            number = 1
         ome = name + str(number)
         tax_set.add(ome)
         newdf.at[i, new_col] = ome

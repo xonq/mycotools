@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import argparse, os, sys, subprocess, re, shutil, numpy as np
+import argparse, os, sys, subprocess, re, shutil, datetime, numpy as np
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
 from mycotools.lib.fastatools import dict2gff, gff2dict
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, gather_taxonomy, assimilate_tax, masterDB, df2std
@@ -14,10 +14,13 @@ import pandas as pd
 
 def predb2db( pre_db ):
 
+    start_time = datetime.datetime.now()
+    date = start_time.strftime('%Y%m%d')
     keys = [
         'genome_code', 'genus', 'biosample', 'strain',
         'proteome_path', 'jgi_gff2_path', 'publication',
-        'gff3_path', 'assembly_path', 'source', 'internal_ome'
+        'gff3_path', 'assembly_path', 'source', 'internal_ome',
+        'version'
         ]
     data_dict_list = []
     for key in keys:
@@ -32,6 +35,7 @@ def predb2db( pre_db ):
             'genus': row['genus'],
             'biosample': row['biosample'],
             'strain': row['strain'],
+            'version': row['version'],
             'ecology': '',
             'eco_conf': '',
             'species': row['species'],
@@ -39,10 +43,10 @@ def predb2db( pre_db ):
             'gff': row['jgi_gff2_path'],
             'gff3': row['gff3_path'],
             'assembly': row['assembly_path'],
-            'blastdb': 0,
             'taxonomy': row['taxonomy'],
             'source': row['source'],
-            'published': row['publication']
+            'published': row['publication'],
+            'acquisition_date': date
         } )
 
     new_db = pd.DataFrame( data_dict_list )

@@ -3,6 +3,7 @@
 import subprocess, argparse, sys, os, re, time, getpass
 import pandas as pd
 from mycotools.lib.kontools import eprint, formatPath, outro, intro
+from mycotools.lib.dbtools import loginCheck
 
 def jgi_login( user, pwd ):
     '''Login via JGI's prescribed method by creating a cookie cache and 
@@ -491,6 +492,7 @@ if __name__ == '__main__':
         and not args.est and not args.gff3:
         eprint( '\nERROR: You must choose at least one download option.' )
 
+    ncbi_email, ncbi_api, user, pwd = loginCheck( ncbi = False )
     user = input( 'JGI username: ' )
     pwd = getpass.getpass( prompt='JGI Login Password: ' )
 
