@@ -1,5 +1,6 @@
 archive/
 build/
+conda/
 dist/
 mycotools.egg-info/
 prepUpdate.py
