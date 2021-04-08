@@ -20,7 +20,7 @@ pip install mycotools --upgrade
 
 # INSTALL
 ## 1) Install miniconda3
-Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. If you are using the Ohio Supercomputer Center (OSC) you can access conda by creating an environment as described at the top of [this link](https://www.osc.edu/resources/getting_started/howto/howto_add_python_packages_using_the_conda_package_manager). 
+Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. If you are using the Ohio Supercomputer Center (OSC) you can access conda by creating an environment as described at the top of [this link](https://www.osc.edu/resources/getting_started/howto/howto_add_python_packages_using_the_conda_package_manager). Then proceed to step 2.
 Otherwise, pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered. 
 
 ```	
@@ -28,11 +28,16 @@ curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/m
 bash ~/miniconda3.sh
 ```
 
+Restart your shell and create a new conda environment
+```
+conda create -n mycotools
+conda activate mycotools
+```
+
 <br />
 
 ## 2) Install MycoTools
-Restart your login. If upon login you do not see `(base)` to the left of your bash shell prompt then *anytime you want to use the python environment you created, you have to activate it via* `source activate base`. If necessary, activate the environment, then use `pip` to install MycoTools:
-
+With your environment activated
 ```
 pip install mycotools
 ```
