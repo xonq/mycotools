@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 
-from sklearn.cluster import AgglomerativeClustering
+from scipy.cluster import hierarchy
+from scipy.spatial.distance import squareform, is_valid_dm
+#from sklearn.cluster import AgglomerativeClustering
 from mycotools.lib.kontools import multisub, findExecs, formatPath
 from mycotools.lib.fastatools import fasta2dict, dict2fasta
 import string, argparse, os, sys, itertools, tempfile, re, random, pandas as pd, subprocess
@@ -85,15 +87,15 @@ def importDist( dis_path, sep = '\t' ):
             dist_dict[ vals[0] ] = {}
         if vals[1] not in dist_dict:
             dist_dict[ vals[1] ] = {}
-        dist_dict[ vals[0] ][ vals[1] ] = vals[2]
-        dist_dict[ vals[1] ][ vals[0] ] = vals[2]
+        dist_dict[ vals[0] ][ vals[1] ] = float(vals[2])
+        dist_dict[ vals[1] ][ vals[0] ] = float(vals[2])
 
-    distanceMatrix = pd.DataFrame( dist_dict )
+    distanceMatrix = pd.DataFrame( dist_dict ).sort_index(0).sort_index(1)
 
-    return distanceMatrix.fillna( 1 )
+    return distanceMatrix.fillna( 1.0 )
 
 
-def aggd( distanceMatrix, maxDist = 0.6, linkage = 'single' ):
+def scikitaggd( distanceMatrix, maxDist = 0.6, linkage = 'single' ):
     '''Performs agglomerative clustering and extracts the cluster labels, then sorts according to
     cluster number. In the future, this will also extract a Newick tree.'''
 
@@ -111,9 +113,55 @@ def aggd( distanceMatrix, maxDist = 0.6, linkage = 'single' ):
     return clusters
 
 
+def getNewick(node, newick, parentdist, leaf_names):
+    '''Code from https://stackoverflow.com/questions/28222179/save-dendrogram-to-newick-format
+    adopted from @jfn'''
+    if node.is_leaf():
+        return "%s:%.2f%s" % (leaf_names[node.id], parentdist - node.dist, newick)
+    else:
+        if len(newick) > 0:
+            newick = "):%.2f%s" % (parentdist - node.dist, newick)
+        else:
+            newick = ");"
+        newick = getNewick(node.get_left(), newick, node.dist, leaf_names)
+        newick = getNewick(node.get_right(), ",%s" % (newick), node.dist, leaf_names)
+        newick = "(%s" % (newick)
+        return newick
+
+
+def getClusterLabels( labels, clusters ):
+
+    i = iter(labels)
+    protoclusters = {next(i): x for x in clusters}
+    clusters = {k: v for k, v in sorted(protoclusters.items(), key = lambda item: item[1])}
+
+    return clusters
+
+
+def scipyaggd( distMat, maxDist, method = 'single' ):
+    '''Performs agglomerative clustering using SciPy and extracts the cluster labels, then sorts
+    according to cluster number.'''
+
+    squareform_matrix = squareform(distMat.values)
+    linkage_matrix = hierarchy.linkage(squareform_matrix, method)
+    tree = hierarchy.to_tree(linkage_matrix)
+    fcluster = hierarchy.fcluster(
+        linkage_matrix, maxDist, 
+        criterion = 'distance')
+    clusters = getClusterLabels(distMat.index, fcluster)
+
+    return clusters, tree
+
+
+
+
+
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser( description = "Hiearchical agglomerative clustering" )
+    parser = argparse.ArgumentParser( 
+        description = "Hiearchical agglomerative clustering. " 
+        + "Outputs `.clus` cluster assignments and `.newick` dendrogram"
+        )
     parser.add_argument( '-f', '--fasta',  \
         help = 'Start from fasta (generate distance matrix)' )
     parser.add_argument( '-d', '--distance', help = 'Start from distance matrix' )
@@ -122,20 +170,19 @@ if __name__ == '__main__':
         + 'threshold - in an identity-based distance matrix (usearch -calc_distmx), this ' \
         + 'value is equal to 1 - minimum_identity.' )
     parser.add_argument( '-l', '--linkage', default = 'single', help = "Linkage criterion:" \
-        + " 'complete' (maximum distance), 'average', or 'single' (minimum distance) " \
-        + "DEFAULT: 'single' (minimum)" )
+        + " 'complete' (maximum distance), 'average', 'weighted', 'centroid', or 'single'" \
+        + " (minimum distance) DEFAULT: 'single' (minimum)" )
     parser.add_argument( '-c', '--cpus', default = 1, type = int, \
         help = 'Cores for alignment during distance matrix construction' )
     args = parser.parse_args()
 
 
-    # `ward` can be implemented if an option is added to create the distance matrix
-    if args.linkage not in { 'complete', 'average', 'single' }:
+    if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
         eprint('\nERROR: Invalid linkage criterium')
         sys.exit( 1 )
 
     if args.output:
-        output = args.output + '.clus'
+        output = args.output
     else:
         output = None
 
@@ -172,22 +219,27 @@ if __name__ == '__main__':
                 if str(column) != str(i) and outMatrix.at[i, column] < 1:
                     dist_out += str(i) + '\t' + str(column) + '\t' + \
                         str(outMatrix.at[i, column]) + '\n'
-        with open( re.sub( r'.clus$', '.dist', output ), 'w' ) as out:
+        with open( output + '.dist', 'w' ) as out:
             out.write( dist_out )
         subprocess.call( ['rm', '-rf', tmpdir], stdout = subprocess.PIPE, stderr = \
             subprocess.PIPE )
 
     elif args.distance:
         if not output:
-            output = args.distance + '.clus'
+            output = args.distance
         print('\nImporting distance matrix')
         distanceMatrix = importDist( formatPath(args.distance) )
 
-    print('\nClustering')
-    clusters = aggd( distanceMatrix, float(args.max_dist), args.linkage )
+    print('\nClustering\n')
+    clusters, tree = scipyaggd(distanceMatrix, float(args.max_dist), args.linkage)
+    newick = getNewick(tree, "", tree.dist, list(distanceMatrix.index))
+
+    #clusters = scikitaggd( distanceMatrix, float(args.max_dist), args.linkage )
 
     out_str = '\n'.join( [i + '\t' + str(clusters[i]) for i in clusters] )
-    with open( output, 'w' ) as out:
+    with open( output + '.clus', 'w' ) as out:
         out.write( out_str )
+    with open( output + '.newick', 'w' ) as out:
+        out.write(newick)
 
     sys.exit( 0 )

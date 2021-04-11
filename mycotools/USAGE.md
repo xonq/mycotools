@@ -350,9 +350,11 @@ pairwise alignments).
 `aggClus.py` will either take a `fasta` and generate a distance matrix using %
 identity of `needle` alignments, or optionally work from a tab-delimited
 distance file (say from `usearch -calc_distmx`). Subsequently, `aggClus.py`
-will cluster sequences via hierarchical agglomerative clustering. Currently,
-constructing a distance matrix takes quite long because `needle` cannot
-throwout alignments when it detects low % identity in the alignment phase,
+will cluster sequences via hierarchical agglomerative clustering and output a
+`.clus` file of cluster assignments and `.newick` dendrogram. 
+
+Currently, constructing a distance matrix takes quite long because `needle` 
+cannot throwout alignments when it detects low % identity in the alignment phase,
 whereas `usearch -calc_distmx` does. It is therefore recommended to first
 create the distance matrix using `usearch` and then use `aggClus.py` to perform
 the agglomerative clustering step instead of `usearch -cluster_aggd`, which
@@ -367,5 +369,5 @@ aggClus.py -f <FASTA>.fa -m 0.7
 e.g. Construct a usearch distance matrix and use aggClus.py to cluster:
 ```
 usearch -calc_distmx <FASTA>.fa -tabbedout <DISTMX>.tsv -maxdist 0.7
-aggClus.py -d <DISTMX>.tsv
+aggClus.py -d <DISTMX>.tsv -m 0.7
 ```
