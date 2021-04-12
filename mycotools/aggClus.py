@@ -1,12 +1,13 @@
 #! /usr/bin/env python3
 
 from scipy.cluster import hierarchy
-from scipy.spatial.distance import squareform, is_valid_dm
+from scipy.spatial.distance import squareform
 #from sklearn.cluster import AgglomerativeClustering
 from mycotools.lib.kontools import multisub, findExecs, formatPath
 from mycotools.lib.fastatools import fasta2dict, dict2fasta
 import string, argparse, os, sys, itertools, tempfile, re, random, pandas as pd, subprocess
 
+sys.setrecursionlimit(1000000)
 
 def splitFasta( fa_path, output ):
 
@@ -56,16 +57,29 @@ def createDist( alignments, minIdentity ):
                 out_dict[ names[0] ] = {}
             if names[0] not in dist_dict:
                 dist_dict[ names[0] ] = {}
+                dist_dict[names[0]][names[0]] = 0.0
             if names[1] not in dist_dict:
                 dist_dict[ names[1] ] = {}
-            dist_dict[ names[0] ][ names[1] ] = identity
-            dist_dict[ names[1] ][ names[0] ] = identity
-            out_dict[ names[0] ][ names[1] ] = identity
+                dist_dict[names[1]][names[1]] = 0.0
+            dist_dict[ names[0] ][ names[1] ] = float(identity)
+            dist_dict[ names[1] ][ names[0] ] = float(identity)
+            out_dict[ names[0] ][ names[1] ] = float(identity)
 
-    distanceMatrix = pd.DataFrame( dist_dict )
-    outMatrix = pd.DataFrame( out_dict )
+    distanceMatrix = pd.DataFrame( dist_dict ).sort_index(1).sort_index(0)
+    outMatrix = pd.DataFrame( out_dict ).sort_index(1).sort_index(0)
 
     return distanceMatrix.fillna( 1 ), outMatrix.fillna( 1 )
+
+
+def runUsearch( fasta, output, maxdist ):
+
+    subprocess.call([
+        'usearch', '-calc_distmx', fasta,
+        '-tabbedout', output, '-maxdist',
+        maxdist
+        ] #stdout = subprocess.PIPE,
+        #stderr = subprocess.PIPE
+        )
 
 
 def importDist( dis_path, sep = '\t' ):
@@ -162,13 +176,16 @@ if __name__ == '__main__':
         description = "Hiearchical agglomerative clustering. " 
         + "Outputs `.clus` cluster assignments and `.newick` dendrogram"
         )
-    parser.add_argument( '-f', '--fasta',  \
-        help = 'Start from fasta (generate distance matrix)' )
-    parser.add_argument( '-d', '--distance', help = 'Start from distance matrix' )
-    parser.add_argument( '-o', '--output', help = 'Output prefix other than input name' )
-    parser.add_argument( '-m', '--max_dist', required = True, help = 'Distance or identity ' \
-        + 'threshold - in an identity-based distance matrix (usearch -calc_distmx), this ' \
-        + 'value is equal to 1 - minimum_identity.' )
+    parser.add_argument( '-f', '--fasta', required = True )
+    parser.add_argument( 
+        '-d', '--distance', help = 'Alignment software '
+        + '{"needle", "usearch"}', default = 'usearch' 
+        )
+    parser.add_argument( '-o', '--output', help = 'e.g. "~/name" will output name.clus, etc' )
+    parser.add_argument( '-m', '--min_id', help = 'Minimum identity'
+        + ' for alignment, written as decimal', type = float )
+    parser.add_argument( '-x', '--max_dist', required = True, help = 'Maximum distance'
+        + ' for clustering (1 - minimum identity), written as decimal', type = float)
     parser.add_argument( '-l', '--linkage', default = 'single', help = "Linkage criterion:" \
         + " 'complete' (maximum distance), 'average', 'weighted', 'centroid', or 'single'" \
         + " (minimum distance) DEFAULT: 'single' (minimum)" )
@@ -180,18 +197,22 @@ if __name__ == '__main__':
     if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
         eprint('\nERROR: Invalid linkage criterium')
         sys.exit( 1 )
+    elif args.distance not in {'needle', 'usearch'}:
+        eprint('\nERROR: Invalid alignment method')
+        sys.exit( 2 )
 
     if args.output:
         output = args.output
     else:
-        output = None
+        output = args.fasta
 
-    if args.fasta:
+    if os.path.isfile(output + '.dist'):
+        print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' )
+        distanceMatrix = importDist( output + '.dist' )
+    elif args.distance == 'needle':
         findExecs( ['needle'], exit = set('needle') )
-        print( '\nCalculating global alignment distance matrix' )
+        print( '\nCalculating needle alignments' )
         aligns, alignCmds = set(), list()
-        if not output:
-            output = args.fasta + '.clus'
         tmpdir = tempfile.gettempdir() + '/aggTmpZK' 
         tmpdir += ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         if not os.path.isdir( tmpdir ):
@@ -212,7 +233,7 @@ if __name__ == '__main__':
         print('\tSTEP 2/3: Aligning sequences. Using ' + str(args.cpus) + ' cores')
         codes = multisub( list(alignCmds), processes = args.cpus )
         print('\tSTEP 3/3: Generating distance matrix')
-        distanceMatrix, outMatrix = createDist( aligns, 1 - float(args.max_dist) )
+        distanceMatrix, outMatrix = createDist( aligns, min_id )
         dist_out = ''
         for i, row in outMatrix.iterrows():
             for column in outMatrix.columns:
@@ -223,12 +244,11 @@ if __name__ == '__main__':
             out.write( dist_out )
         subprocess.call( ['rm', '-rf', tmpdir], stdout = subprocess.PIPE, stderr = \
             subprocess.PIPE )
-
-    elif args.distance:
-        if not output:
-            output = args.distance
-        print('\nImporting distance matrix')
-        distanceMatrix = importDist( formatPath(args.distance) )
+    elif args.distance == 'usearch':
+        findExecs( ['usearch'], exit = set('usearch') )
+        print('\nCalculating usearch alignments')
+        runUsearch(args.fasta, output + '.dist', str(1 - args.min_id))
+        distanceMatrix = importDist( output + '.dist' )
 
     print('\nClustering\n')
     clusters, tree = scipyaggd(distanceMatrix, float(args.max_dist), args.linkage)

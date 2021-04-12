@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 import os, re, sys, subprocess, argparse
-from mycotools.lib.kontools import eprint, vprint, collect_files, formatPath, intro, outro
+from mycotools.lib.kontools import eprint, vprint, collect_files, formatPath, intro, outro, findExecs
 from mycotools.lib.fastatools import fasta2dict
 
 
@@ -32,19 +32,19 @@ def mafftRun( fasta, out_dir, hpc, verbose = True ):
 
 def trimalRun( mafft, out_dir, hpc, tree, verbose ):
 
-    name1 = os.path.basename( os.path.abspath(mafft.replace('mafft', 'prelim_trimal')))
-    name2 = re.sub( r'\.prelim_trimal$', '.trimal', name1 )
-    cmd1 = 'trimal -in ' + mafft + ' -automated1 -out ' + out_dir + '/' + name1
-    cmd2 = 'trimal -in ' + out_dir + '/' + name1 + ' -out ' + out_dir + '/' + name2 + ' -gt 0.25'
+#    name1 = os.path.basename( os.path.abspath(mafft.replace('mafft', 'prelim_trimal')))
+    name2 = os.path.basename(os.path.abspath(re.sub( r'\.mafft$', '.trimal', mafft)))
+#    cmd1 = 'trimal -in ' + mafft + ' -automated1 -out ' + out_dir + '/' + name1
+    cmd2 = 'trimal -in ' + mafft + ' -out ' + out_dir + '/' + name2 + ' -gappyout'
 
     if not hpc:
-        if not os.path.isfile( out_dir + '/' + name1 ):
-            vprint('\nTrimming step 1/2', v = verbose)
-            run_trimal1 = subprocess.call( cmd1, shell = True, stdout = subprocess.PIPE )
-            if run_trimal1 != 0:
-                os.remove( out_dir + '/' + name1 )
-                eprint( '\nERROR: preliminary `trimal` failed\n' )
-                sys.exit( 3 )
+#        if not os.path.isfile( out_dir + '/' + name1 ):
+ #           vprint('\nTrimming step 1/2', v = verbose)
+  #          run_trimal1 = subprocess.call( cmd1, shell = True, stdout = subprocess.PIPE )
+   #         if run_trimal1 != 0:
+    #            os.remove( out_dir + '/' + name1 )
+     #           eprint( '\nERROR: preliminary `trimal` failed\n' )
+      #          sys.exit( 3 )
 
         vprint('\nTrimming step 2/2', v = verbose)
         run_trimal2 = subprocess.call( cmd2, shell = True, stdout = subprocess.PIPE )
@@ -56,11 +56,11 @@ def trimalRun( mafft, out_dir, hpc, tree, verbose ):
     else:
         with open( out_dir + '/trimal.sh', 'w' ) as out:
             if '#PBS' in hpc:
-                out.write( hpc + '\n\n' + cmd1 + '\n' + cmd2 + \
-                    '\n\ncd ' + out_dir + '\nqsub ' + tree + '.sh' )
+                out.write( hpc + '\n\n' + #cmd1 + '\n' + 
+                    cmd2 + '\n\ncd ' + out_dir + '\nqsub ' + tree + '.sh' )
             else:
-                out.write( hpc + '\n\n' + cmd1 + '\n' + cmd2 + \
-                    '\n\ncd ' + out_dir + '\nsbatch ' + tree + '.sh' )
+                out.write( hpc + '\n\n' + #cmd1 + '\n' + 
+                    cmd2 + '\n\ncd ' + out_dir + '\nsbatch ' + tree + '.sh' )
     
     return out_dir + '/' + name2
 
@@ -172,6 +172,9 @@ if __name__ == '__main__':
     if args.tree not in { 'fasttree', 'iqtree' }:
         eprint('\nERROR: invalid tree software: ' + args.tree )
         sys.exit(1)
+
+    findExecs( [args.tree, 'mafft', 'trimal'] )
+
     if os.path.isfile(args.input):
         main( 
             args.input, args.tree, slurm = args.slurm, 

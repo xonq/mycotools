@@ -248,9 +248,9 @@ make SVGs for all GFF3s in a new line delimited list with width set to 20:
 <br /><br /><br />
 
 # EVOLUTIONARY ANALYSIS TOOLS
-## BLAST mycoDB
+## BLAST MycoDB
 ### db2blast.py
-`db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the mycoDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
+`db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycoDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
 
 ```
 usage: db2blast.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
@@ -283,7 +283,7 @@ optional arguments:
 <br /><br />
 
 
-## hmmsearch mycoDB
+## hmmsearch MycoDB
 ### db2hmmsearch.py
 `db2hmmsearch.py` will compile hmmsearch results, optionally ouput fasta/hmmalign to original models/trim alignments from a profile hidden markov model. This script supports multiprocessing and uses all detected cores by default.
 
@@ -342,32 +342,22 @@ fa2tree.py -i <FASTA>.fa -t iqtree
 Hiearchical agglomerative clustering is a useful systematic approach to
 extracting groups of sequences for phylogenetic analysis. Ubiquitous genes,
 like P450s, will often yield 10,000s of results for BLAST searches against the
-mycoDB. Constructing and visualizing a tree of this magnitude just is not
+MycoDB. Constructing and visualizing a tree of this magnitude just is not
 practical in many cases; it is therefore necessary to decrease the size of the 
 dataset to a workable size while relying on biological information (global
 pairwise alignments).
 
-`aggClus.py` will either take a `fasta` and generate a distance matrix using %
-identity of `needle` alignments, or optionally work from a tab-delimited
-distance file (say from `usearch -calc_distmx`). Subsequently, `aggClus.py`
-will cluster sequences via hierarchical agglomerative clustering and output a
+`aggClus.py` will either take a `fasta` and generate a distance matrix using 
+`usearch calc_distmx` by default or the % identity of `needle` alignments.
+Then, cluster sequences via hierarchical agglomerative clustering and output a
 `.clus` file of cluster assignments and `.newick` dendrogram. 
 
-Currently, constructing a distance matrix takes quite long because `needle` 
-cannot throwout alignments when it detects low % identity in the alignment phase,
-whereas `usearch -calc_distmx` does. It is therefore recommended to first
-create the distance matrix using `usearch` and then use `aggClus.py` to perform
-the agglomerative clustering step instead of `usearch -cluster_aggd`, which
-limits dataset size unless the proprietary version is purchased.
+Currently, using `needle` takes quite long, so it is recommended to acquire a
+free license for `usearch` and use that instead. The limitations of the free
+license are sufficient for distance matrix calculation even on large datasets. 
 
 e.g. Calculate a distance matrix and cluster from a fasta with a minimum
-identity of 0.3 to consider a connection:
+identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 ```
-aggClus.py -f <FASTA>.fa -m 0.7
-```
-
-e.g. Construct a usearch distance matrix and use aggClus.py to cluster:
-```
-usearch -calc_distmx <FASTA>.fa -tabbedout <DISTMX>.tsv -maxdist 0.7
-aggClus.py -d <DISTMX>.tsv -m 0.7
+aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
 ```
