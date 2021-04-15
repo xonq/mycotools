@@ -25,8 +25,8 @@ def compBlastDB( db, seq_type ):
         db = db.assign( **{seq_type: vsearch4db( db['internal_ome'], blast_dir, '.psd', seq_dir ) } )
 #        db[seq_type] = db.apply(search4db, args(blast_dir, '.psd', seq_dir))
     else:
-        db = db.assign( **{seq_type: vsearch4db( db['internal_ome'], blast_dir, '.psd', seq_dir ) } )
         blast_dir = formatPath( '$MYCOFNA/blastdb' )
+        db = db.assign( **{seq_type: vsearch4db( db['internal_ome'], blast_dir, '.psd', seq_dir ) } )
         seq_dir = os.environ['MYCOFNA'] + '/'
 #        db[seq_type] = db.apply(search4db, args(blast_dir, '.nsd', seq_dir))
 
