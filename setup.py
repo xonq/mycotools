@@ -5,7 +5,7 @@ with open( "README.md", "r" ) as fh:
 
 setuptools.setup(
     name = "mycotools",
-    version = "0.7.3b",
+    version = "0.7.4b0",
     author = "xonq",
     author_email = "konkelzach@protonmail.com",
     description = "A compilation of bioinformatic and computation biology inspired " + \
@@ -15,7 +15,7 @@ setuptools.setup(
     url = "https://gitlab.com/xonq/mycotools/mycotools",
     package_dir={"": "mycotools"},
     packages = setuptools.find_packages( where="mycotools" ),
-    scripts = ['mycotools/abstractHmm.py', 'mycotools/acc2fa.py', 'mycotools/acc2gff.py', 'mycotools/aggClus.py', 'mycotools/annotationStats.py', 'mycotools/assemblyStats.py', 'mycotools/curAnnotation.py', 'mycotools/db2blast.py', 'mycotools/db2hmmsearch.py', 'mycotools/dbFiles.py', 'mycotools/fa2tree.py', 'mycotools/gff2protein.py', 'mycotools/jgiDwnld.py', 'mycotools/ncbiDwnld.py', 'mycotools/ome2name.py', 'mycotools/proteomeStats.py', 'mycotools/predb2db.py', 'mycotools/abstractDB.py', 'mycotools/utils/queryDB.py'],
+    scripts = ['mycotools/mycotools/abstractHmm.py', 'mycotools/mycotools/acc2fa.py', 'mycotools/mycotools/acc2gff.py', 'mycotools/mycotools/aggClus.py', 'mycotools/mycotools/annotationStats.py', 'mycotools/mycotools/assemblyStats.py', 'mycotools/mycotools/curAnnotation.py', 'mycotools/mycotools/db2blast.py', 'mycotools/mycotools/db2hmmsearch.py', 'mycotools/mycotools/dbFiles.py', 'mycotools/mycotools/fa2tree.py', 'mycotools/mycotools/gff2protein.py', 'mycotools/mycotools/jgiDwnld.py', 'mycotools/mycotools/ncbiDwnld.py', 'mycotools/mycotools/ome2name.py', 'mycotools/mycotools/proteomeStats.py', 'mycotools/mycotools/predb2db.py', 'mycotools/mycotools/abstractDB.py', 'mycotools/mycotools/utils/queryDB.py'],
     install_requires = [ 'biopython', 'pandas', 'requests' ],
     classifiers = [
         "Programming Language :: Python :: 3",
