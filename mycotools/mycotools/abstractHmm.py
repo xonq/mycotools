@@ -27,7 +27,7 @@ def hmmExtract( accession, db_str ):
         hmm_search = re.search( r'HMMER\d\/f \[.*?\]\nNAME +' + accession + \
             '\n[^\/]*?\/\/', db_str )
         if not hmm_search:
-            eprint('\nERROR: ' + accession + ' does not exist or unexpected error\n', flush = True, flush = True)
+            eprint('\nERROR: ' + accession + ' does not exist or unexpected error\n', flush = True)
             sys.exit( 2 )
 
     hmm = hmm_search[0] + '\n'
@@ -59,23 +59,23 @@ if __name__ == '__main__':
 
     usage = '\nInputs <`.hmm`> database, optional <accession | new line delimitted accessions file>, returns `hmm` accession. If no accession is specified, a folder of all accessions will be created.\n'
     if len( sys.argv ) < 2:
-        print( usage , flush = True, flush = True)
+        print( usage , flush = True)
         sys.exit( 1 )
     if '-h' in sys.argv or '--help' in sys.argv:
-        print( usage , flush = True, flush = True)
+        print( usage , flush = True)
         sys.exit( 1 )
 
     if not os.path.isfile( sys.argv[1] ):
-        eprint( '\nERROR: Invalid `.hmm` database path' , flush = True, flush = True)
+        eprint( '\nERROR: Invalid `.hmm` database path' , flush = True)
         sys.exit( 2 )
 
-    print('\nReading hmm database ...', flush = True, flush = True)
+    print('\nReading hmm database ...', flush = True)
     with open( sys.argv[1], 'r' ) as raw_hmm_db:
         hmm_db = raw_hmm_db.read()
 
     if len( sys.argv ) > 2:
         hmm_str = main( hmm_db, accessions = sys.argv[2] )
-        print('\nWriting abstracted hmms ...', flush = True, flush = True)
+        print('\nWriting abstracted hmms ...', flush = True)
         with open( sys.argv[2] + '.hmm', 'w' ) as out:
             out.write( hmm_str )
     else:

@@ -195,10 +195,10 @@ if __name__ == '__main__':
 
 
     if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
-        eprint('\nERROR: Invalid linkage criterium', flush = True, flush = True)
+        eprint('\nERROR: Invalid linkage criterium', flush = True)
         sys.exit( 1 )
     elif args.distance not in {'needle', 'usearch'}:
-        eprint('\nERROR: Invalid alignment method', flush = True, flush = True)
+        eprint('\nERROR: Invalid alignment method', flush = True)
         sys.exit( 2 )
 
     if args.output:
@@ -207,11 +207,11 @@ if __name__ == '__main__':
         output = args.fasta
 
     if os.path.isfile(output + '.dist'):
-        print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' , flush = True, flush = True)
+        print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' , flush = True)
         distanceMatrix = importDist( output + '.dist' )
     elif args.distance == 'needle':
         findExecs( ['needle'], exit = set('needle') )
-        print( '\nCalculating needle alignments' , flush = True, flush = True)
+        print( '\nCalculating needle alignments' , flush = True)
         aligns, alignCmds = set(), list()
         tmpdir = tempfile.gettempdir() + '/aggTmpZK' 
         tmpdir += ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -221,7 +221,7 @@ if __name__ == '__main__':
             os.mkdir( tmpdir + '/fastas' )
         if not os.path.isdir( tmpdir + '/aligns' ):
             os.mkdir( tmpdir + '/aligns' )
-        print('\tSTEP 1/3: Preparing data. ' + tmpdir + ' will be removed upon completion', flush = True, flush = True)
+        print('\tSTEP 1/3: Preparing data. ' + tmpdir + ' will be removed upon completion', flush = True)
         fastas = splitFasta( args.fasta, tmpdir + '/fastas' )
         for fa1 in fastas:
             for fa2 in fastas:
@@ -230,9 +230,9 @@ if __name__ == '__main__':
                     if out[0] not in aligns:
                         aligns.add( out[0] )
                         alignCmds.append( out[1] )
-        print('\tSTEP 2/3: Aligning sequences. Using ' + str(args.cpus) + ' cores', flush = True, flush = True)
+        print('\tSTEP 2/3: Aligning sequences. Using ' + str(args.cpus) + ' cores', flush = True)
         codes = multisub( list(alignCmds), processes = args.cpus )
-        print('\tSTEP 3/3: Generating distance matrix', flush = True, flush = True)
+        print('\tSTEP 3/3: Generating distance matrix', flush = True)
         distanceMatrix, outMatrix = createDist( aligns, min_id )
         dist_out = ''
         for i, row in outMatrix.iterrows():
@@ -246,11 +246,11 @@ if __name__ == '__main__':
             subprocess.PIPE )
     elif args.distance == 'usearch':
         findExecs( ['usearch'], exit = set('usearch') )
-        print('\nCalculating usearch alignments', flush = True, flush = True)
+        print('\nCalculating usearch alignments', flush = True)
         runUsearch(args.fasta, output + '.dist', str(1 - args.min_id))
         distanceMatrix = importDist( output + '.dist' )
 
-    print('\nClustering\n', flush = True, flush = True)
+    print('\nClustering\n', flush = True)
     clusters, tree = scipyaggd(distanceMatrix, float(args.max_dist), args.linkage)
     newick = getNewick(tree, "", tree.dist, list(distanceMatrix.index))
 

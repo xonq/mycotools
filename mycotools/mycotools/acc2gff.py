@@ -48,7 +48,7 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
             if not pd.isnull( db['gff3'][ome] ):
                 gff = os.environ['MYCOGFF3'] + '/' + db['gff3'][ome]
                 if not os.path.isfile( gff ):
-                    print( '\t' + ome + ' invalid gff3' , flush = True, flush = True)
+                    print( '\t' + ome + ' invalid gff3' , flush = True)
                     continue
                 gff_list = gff2dict( gff )
                 if gff_list[0]['source'] == 'funannotate':
@@ -65,7 +65,7 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
                     gff_str += dict2gff( mp_str ) + '\n'
                 gff_strs[ome] =  gff_str.rstrip()
             else:
-                print( '\t' + ome + ' no gff3' , flush = True, flush = True)
+                print( '\t' + ome + ' no gff3' , flush = True)
 
     return gff_strs
 
@@ -94,7 +94,7 @@ if __name__ == '__main__':
         else:
             df = pd.read_csv(input_file, sep = '\t')
     elif not args.accession:
-        print('\nERROR: need input file or accession', flush = True, flush = True)
+        print('\nERROR: need input file or accession', flush = True)
         sys.exit( 1 )
 
     if args.cpu < mp.cpu_count():
@@ -117,7 +117,7 @@ if __name__ == '__main__':
             gff_strs = main( df, args.column, gff = gff_path, cpu = args.cpu )
 
     if args.accession:
-        print( gff_strs[list(gff_strs.keys())[0]].rstrip() , flush = True, flush = True)
+        print( gff_strs[list(gff_strs.keys())[0]].rstrip() , flush = True)
     elif args.ome:
         if not os.path.isdir( 'header2gff' ):
             os.mkdir( 'header2gff' )
