@@ -95,7 +95,7 @@ def iqtreeRun( trimal, out_dir, hpc, verbose ):
         out.write( hpc + '\n\n' + cmd )
 
 
-def main( fasta_path, tree, slurm = False, torque = False, project = '', output_dir = None, verbose = True ):
+def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir = None, verbose = True ):
 
     hpc = False
     if slurm:
@@ -178,7 +178,7 @@ if __name__ == '__main__':
     if os.path.isfile(args.input):
         main( 
             args.input, args.tree, slurm = args.slurm, 
-            torque = args.pbs, project = args.project,
+            pbs = args.pbs, project = args.project,
             output_dir = output, verbose = True
             )
     elif os.path.isdir(args.input):
@@ -193,7 +193,7 @@ if __name__ == '__main__':
         for fa in fas:
             print(fa, flush = True)
             main(
-                fa, args.tree, slurm = args.slurm, torque = args.pbs,
+                fa, args.tree, slurm = args.slurm, pbs = args.pbs,
                 project = args.project, output_dir = output, verbose = False
                 )
     else:
