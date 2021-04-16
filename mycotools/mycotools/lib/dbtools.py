@@ -502,7 +502,8 @@ def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
 
     print('\nGenerating omes', flush = True)
     newdf = df
-    newdf[new_col] = ''
+    if not new_col in set(df.keys()):
+        newdf[new_col] = ''
     tax_set = set()
     access = '-'
     if isinstance(reference, pd.core.frame.DataFrame):
@@ -510,6 +511,8 @@ def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
         print('\t' + str(len(tax_set)) + ' omes from reference dataset', flush = True)
 
     for i, row in df.iterrows():
+        if not pd.isnull(row['internal_ome']) and row['internal_ome']:
+            continue
         if pd.isnull(row['species']) or not row['species']:
             newdf.at[i, 'species'] = 'sp.'
             row['species'] = 'sp.'

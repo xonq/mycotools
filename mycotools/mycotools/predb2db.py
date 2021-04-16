@@ -76,8 +76,7 @@ def moveBioFile( old_path, ome, typ, env, uncur = '' ):
         else:
             new_path = os.environ[env] + '/' + ome + '.' + typ + uncur
             temp_path = old_path[:-3]
-        if not os.path.isfile(new_path):
-            if not copyFile(formatPath(temp_path), new_path, ome, typ):
+        if not copyFile(formatPath(temp_path), new_path, ome, typ):
                 return False
     else:
         new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
@@ -86,12 +85,16 @@ def moveBioFile( old_path, ome, typ, env, uncur = '' ):
                 return False
         elif not os.path.isfile(new_path):
             return False
+        else: 
+            if not copyFile(formatPath(old_path), new_path, ome, typ):
+                return False
 
     return os.path.basename(new_path)
 
 
 def main( prepdb, refdb, rogue = False ):
 
+    failed = []
     predb = predb2db( prepdb )
    # if 'internal_ome' not in predb.columns:
     predb_omes = gen_omes( predb, reference = refdb )
@@ -115,6 +118,10 @@ def main( prepdb, refdb, rogue = False ):
                 predb_omes.at[i, 'assembly'] = None
         if not row['assembly'] or pd.isnull(row['assembly']):
             eprint('\t' + row['internal_ome'] + ' no assembly, removing entry', flush = True)
+            if row['source'] == 'ncbi':
+                failed.append([row['biosample'], row['version']])
+            else:
+                failed.append([row['genome_code'], row['version']])
             predb_omes = predb_omes.drop(i)
             continue
 
@@ -206,13 +213,16 @@ def main( prepdb, refdb, rogue = False ):
                             sys.exit(-1)
                         except:
                             eprint('\t' + row['internal_ome'] + ' rogue curation failed. Manually curate', flush = True)
+                            if row['source'] == 'ncbi':
+                                failed.append([row['biosample'], row['version']])
+                            else:
+                                failed.append([row['genome_code'], row['version']])
                             predb_omes = predb_omes.drop(i)
             else:
                 predb_omes.at[i, 'proteome'] = None
 
     del predb_omes['gff']
-    return df2std(predb_omes)
-
+    return df2std(predb_omes), failed
 
 
 if __name__ == '__main__':

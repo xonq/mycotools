@@ -73,6 +73,12 @@ def collect_ftps(
         if pd.isnull(row[column]):
             continue
         accession = row[column]
+        if 'biosample' in set(row.keys()):
+            failure_acc = row['biosample']
+        elif 'BioSample Accession' in set(row.keys()):
+            failure_acc = row['BioSample Accession']
+        else:
+            failure_acc = row[column]
 #        ome = row['internal_ome']
         if index in ass_prots:
             continue
@@ -87,7 +93,8 @@ def collect_ftps(
             if 'internal_ome' in row.keys():
                 accession = row['internal_ome']
             eprint('\t' + accession + ' failed to find genome ID', flush = True)
-            failed.append( accession )
+            if 'Modify Date' in row.keys():
+                failed.append( [failure_acc, row['Modify Date']] )
             continue
         ass_prots[str(index)] = {
             'biosample': '', 'assembly': '', 'proteome': '',
@@ -125,7 +132,8 @@ def collect_ftps(
             if 'internal_ome' in row.keys():
                 accession = row['internal_ome']
             eprint('\t' + accession + ' failed to return any FTP path', flush = True)
-            failed.append( accession )
+            if 'Modify Date' in row.keys():
+                failed.append( [failure_acc, row['Modify Date']] )
             continue
 
         ass_md5, gff_md5, trans_md5, prot_md5, md5s = '', '', '', '', {}
@@ -314,11 +322,8 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False ):
                 column = 'biosample', api_key=api,
                 output_path = output_path, verbose = verbose
                 )
-    elif 'BioSample Accession' in ncbi_df.keys() and '#Organism/Name' in ncbi_df.keys():
-        ncbi_df['index'] = ncbi_df.apply(
-            lambda x: x['#Organism/Name'].replace(' ', '_') + '_' + x['BioSample Accession'],
-            axis = 1
-            )
+    elif 'BioSample Accession' in ncbi_df.keys():
+        ncbi_df['index'] = ncbi_df['BioSample Accession']
         ncbi_df = ncbi_df.set_index( 'index' )
         ncbi_df.index = ncbi_df.index.astype(str)
         if not all( x in ass_prots for x in ncbi_df.index ):
@@ -377,7 +382,10 @@ def main(
         ncbi_df['biosample'] = ncbi_df['BioSample Accession']
         del ncbi_df['BioSample Accession']
 
-    ncbi_df, ass_prots, failed = callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose )
+    if not all(x in ass_prots for x in list(ncbi_df['biosample'])):
+        ncbi_df, ass_prots, failed = callDwnldFTPs( 
+            ncbi_df, ass_prots, api, output_path, verbose 
+            )
     if remove:
         ass_prots = { 
             o: ass_prots[o] for o in ass_prots \
