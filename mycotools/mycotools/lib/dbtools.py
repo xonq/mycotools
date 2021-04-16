@@ -461,8 +461,9 @@ def abstract_tax(db, taxonomy, classification, inverse = False ):
     if classification != 'genus':
         for i,row in db.iterrows():
             row_taxonomy = read_tax(row['taxonomy'])
-            if row_taxonomy[classification].lower() in taxonomy and not inverse:
-                new_db = new_db.append(row)
+            if classification in row_taxonomy:
+                if row_taxonomy[classification].lower() in taxonomy and not inverse:
+                    new_db = new_db.append(row)
 
 # if `classification` is `genus`, simply check if that fits the criteria in `taxonomy`
     elif classification == 'genus':

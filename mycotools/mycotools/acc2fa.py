@@ -2,12 +2,12 @@
 
 import pandas as pd
 import os, sys, argparse, re
-from mycotools.lib.fastatools import fasta2dict, dict2fasta
+from mycotools.lib.fastatools import fasta2dict, dict2fasta, reverse_complement
 from mycotools.lib.dbtools import db2df, masterDB
 from mycotools.lib.kontools import formatPath, eprint
 
 
-def extractHeaders( fasta_file, accessions ):
+def extractHeaders( fasta_file, accessions, ome = None ):
 
     fasta = fasta2dict(fasta_file)
     out_fasta = {}
@@ -20,14 +20,30 @@ def extractHeaders( fasta_file, accessions ):
                 start = int(coord_search[2]) - 1
                 end = int(coord_search[3])
                 acc = coord_search[1]
-                out_fasta[header] = {
-                    'sequence': fasta[acc][start:end],
-                    'description': ''
-                    }
+                if ome:
+                    header = ome + '_' + header
+                if end > start:
+                    out_fasta[header] = {
+                        'sequence': fasta[acc]['sequence'][start:end],
+                        'description': ''
+                        }
+                else:
+                    out_fasta[header] = {
+                        'sequence': reverse_complement(
+                            fasta[acc]['sequence'][end-1:start+1]
+                            ),
+                        'description': ''
+                        }
+            else:
+                if ome:
+                    out_fasta[ome + '_' + header] = fasta[header]
+                else:
+                    out_fasta[header] = fasta[header]
+        else:
+            if ome:
+                out_fasta[ome + '_' + header] = fasta[header]
             else:
                 out_fasta[header] = fasta[header]
-        else:
-            out_fasta[header] = fasta[header]
 
     return out_fasta
    
@@ -60,7 +76,7 @@ def dbmain( db, accs, column = None, start = None, end = None ):
     return fasta_str
 
 
-def famain( accs, fa, column = None, start = None, end = None ):
+def famain( accs, fa, column = None, ome = None, start = None, end = None ):
 
     fasta_str = ''
     if type(accs) is not str:
@@ -71,9 +87,9 @@ def famain( accs, fa, column = None, start = None, end = None ):
                 x + '[' + accs[start][x] + '-' + accs[end][x] + ']' \
                 for x in accessions
                 ]
-        fasta_str += dict2fasta(extractHeaders( fa, accessions )) + '\n'
+        fasta_str += dict2fasta(extractHeaders( fa, accessions, ome )) + '\n'
     else:
-        fasta_str += dict2fasta(extractHeaders( fa, [accs] ))
+        fasta_str += dict2fasta(extractHeaders( fa, [accs], ome ))
         
     return fasta_str.rstrip()
 

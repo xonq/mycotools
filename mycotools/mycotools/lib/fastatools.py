@@ -29,6 +29,26 @@ translation_table = {
     'TAA':'*', 'TGA':'*', 'TAG':'*'
 }
 
+rev_comp_table = {
+    'T': 'A', 'G': 'C', 'C': 'G', 'A': 'T',
+    'N': 'N', 'Y': 'R', 'R': 'Y', 'K': 'M',
+    'M': 'K', 'B': 'V', 'D': 'H', 'H': 'D',
+    'V': 'B', 't': 'a', 'g': 'c', 'c': 'g',
+    'a': 't', 'n': 'n', 'y': 'r', 'r': 'y',
+    'k': 'm', 'm': 'k', 'b': 'v', 'd': 'h',
+    'h': 'd', 'v': 'b'
+    }
+
+
+def reverse_complement(seq):
+
+    new_seq = ''
+    for i in seq[::-1]:
+        new_seq += rev_comp_table[i]
+
+    return new_seq
+
+
 def fasta2dict(fasta_file):
     fasta_dict = {}
 

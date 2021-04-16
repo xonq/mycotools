@@ -118,17 +118,22 @@ def compileResults( res_dict ):
 def compAcc2fa( db, biotype, env_dir, output_res, subhit = False ):
 
     acc2fa_cmds, db, subs = {}, db.set_index('internal_ome'), set()
-    if subhit:
+    if subhit or biotype == 'assembly':
         for query in output_res:
             acc2fa_cmds[query] = []
             for i in output_res[query]:
                 temp_df, accs = pd.DataFrame(), []
                 for hit in output_res[query][i]:
-                    accs.append(hit[0] + '[' + hit[1] + '-' + x[2] + ']')
+                    accs.append(hit[0] + '[' + hit[1] + '-' + hit[2] + ']')
                 temp_df[0] = accs
-                acc2fa_cmds[query].append(
-                    [temp_df, env_dir + db[biotype][i], 0]
-                    )
+                if biotype == 'assembly':
+                    acc2fa_cmds[query].append(
+                        [temp_df, env_dir + db[biotype][i], 0, i]
+                        )
+                else:
+                    acc2fa_cmds[query].append(
+                        [temp_df, env_dir + db[biotype][i], 0]
+                        )
     else:
         for query in output_res:
             acc2fa_cmds[query] = []
