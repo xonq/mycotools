@@ -70,8 +70,6 @@ def collect_ftps(
 
 # for each row in the assembly, grab the accession number, form the search term for Entrez, use Entrez,
     for index, row in ncbi_df.iterrows():
-        if pd.isnull(row[column]):
-            continue
         accession = row[column]
         if 'biosample' in set(row.keys()):
             failure_acc = row['biosample']
@@ -79,14 +77,33 @@ def collect_ftps(
             failure_acc = row['BioSample Accession']
         else:
             failure_acc = row[column]
+        if pd.isnull(row[column]):
+            ass_prots[str(index)] = {
+                'biosample': failure_acc, 'assembly': '',
+                'proteome': '', 'gff3': '', 'transcript': '',
+                'assembly_md5': '', 'proteome_md5': '',
+                'gff3_md5': '', 'transcript_md5': ''
+                }
+            if 'Modify Date' in row.keys():
+                failed.append([failure_acc, row['Modify Date']])
+            continue
+
 #        ome = row['internal_ome']
         if index in ass_prots:
             continue
 
 
-        search_term = accession + '[' + column + ']'
-        handle = Entrez.esearch(db=database, term=search_term)
-        genome_id = Entrez.read(handle)['IdList']
+        search_term, esc_count = accession + '[' + column + ']', 0
+        while esc_count < 10:
+            try:
+                handle = Entrez.esearch(db=database, term=search_term)
+                genome_id = Entrez.read(handle)['IdList']
+                break
+            except RuntimeError:
+                time.sleep(1)
+                esc_count += 1
+        else:
+            print('\tERROR:', index, 'failed to search NCBI')
         try:
             ID = genome_id[0]
         except IndexError:
@@ -114,7 +131,7 @@ def collect_ftps(
 
 # obtain the path from a summary of the ftp directory and create the standard paths for proteomes and assemblies
         esc_count = 0
-        while True:
+        while esc_count < 10:
             try:
                 esc_count += 1
                 handle = Entrez.esummary(db=database, id=ID, report="full")
@@ -123,10 +140,12 @@ def collect_ftps(
                 esc_count = 0
                 break
             except IndexError:
-                if esc_count == 20:
-                    eprint('\n\tERROR: Failed to fulfill ftp request!', flush = True)
-                    sys.exit(69)
                 time.sleep(0.1)
+        else:
+            if esc_count == 20:
+                eprint('\tERROR: Failed to fulfill ftp request!', flush = True)
+                sys.exit(69)
+
 
         if not ftp_path:
             if 'internal_ome' in row.keys():
@@ -422,9 +441,11 @@ def main(
                     count, remove = remove 
                     )
             else:
-                failed.append(ome)
+                if 'Modify Date' in ncbi_df.keys():
+                    failed.append([ome, ncbi_df['Modify Date'][ome]])
                 continue
-        if any(exits[x] != 0 for x in {'assembly', 'gff3'}) and remove:
+        if any(exits[x] != 0 for x in {'assembly', 'gff3'}) and 'Modify Date' in ncbi_df.keys():
+            failed.append([ome, ncbi_df['Modify Date'][ome]])
             continue
         if ome in set(ncbi_df.index):
             ncbi_df.loc[ome, 'assembly_path'] = output_path + 'assembly/' + \

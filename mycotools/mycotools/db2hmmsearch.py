@@ -54,7 +54,7 @@ def runExHmm( args, hmmsearch_out, output ):
     ome = os.path.basename(hmmsearch_out).replace( '.out', '' )
     out_dict = None
     if len(data) > 100:
-        out_dict = exHmm( args, data, header = False )
+        out_dict = exHmm(data, args[0], args[1], args[2], args[3], header = False)
         out_dict = { x: [ome, out_dict[x][1]] for x in out_dict }
     else:
         print('\t' + ome + ' empty hmmsearch', flush = True)
@@ -189,7 +189,7 @@ if __name__ == '__main__':
         'Threshold': args.threshold, 'E-value': args.evalue, 'trimAl args': trimal 
     }
     start_time = intro( 'db2hmmsearch', args_dict )
-    checkExecs( deps, exit = set(deps) )
+    findExecs( deps, exit = {deps})
     db = db2df( args.input )
 
 #    main( args, db, output, cpu, previous = args.previous )
@@ -252,7 +252,8 @@ if __name__ == '__main__':
                      os.path.basename( code['stdin'][-1] ) )
     
         print( '\nExtracting hmmsearch output' , flush = True)
-        exHmm_tuples = compileextractHmmCmd( db, args, output + '/omes' )
+        exHmm_args = [args.accession, args.best, args.threshold, args.evalue]
+        exHmm_tuples = compileextractHmmCmd( db, exHmm_args, output + '/omes' )
         with mp.get_context( 'spawn' ).Pool(processes = cpu) as pool:
             hmmAligns = pool.starmap( runExHmm, exHmm_tuples )
 
