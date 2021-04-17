@@ -309,7 +309,7 @@ if __name__ == '__main__':
         os.mkdir( output_dir + 'fastas/' )
 
     for query in output_fas:
-        with open( output_dir + 'fastas/' + query + '.fa', 'w' ) as out:
+        with open( output_dir + 'fastas/' + query + '.blast.fa', 'w' ) as out:
             out.write( output_fas[query] )
 
     outro( start_time )

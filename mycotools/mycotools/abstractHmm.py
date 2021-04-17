@@ -23,11 +23,11 @@ def grabAccs( db_str ):
 def hmmExtract( accession, db_str ):
 
     hmm_search = re.search( 
-        r'HMMER\d\/f \[.*?\]\nNAME.*?\nACC   ' + accession + r'[^\/]*?\/\/', db_str, re.M
+        r'HMMER\d\/f \[.*?\].*?\n^NAME.*?\n^ACC   ' + accession + r'[\s\S]*?^\/\/', db_str, re.M
         )
     if hmm_search is None:
         hmm_search = re.search( r'HMMER\d\/f \[.*?\]\nNAME +' + accession + \
-            '\n[^\/]*?\/\/', db_str, re.M )
+            r'[\s\S]*?\/\/', db_str )
         if not hmm_search:
             eprint('\nERROR: ' + accession + ' does not exist or unexpected error\n', flush = True)
             sys.exit( 2 )

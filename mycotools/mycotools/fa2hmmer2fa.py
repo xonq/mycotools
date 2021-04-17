@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys, os, re, argparse, subprocess, datetime, multiprocessing as mp
-from mycotools.extractHmmsearch import main as exHmm
+from mycotools.extractHmmsearch import main as exHmm, grabNames
 from mycotools.abstractHmm import main as absHmm
 from mycotools.db2blast import compAcc2fa
 from mycotools.acc2fa import famain as acc2fa
@@ -31,15 +31,20 @@ def runHmmer(fasta, hmm, output, cpu = 1, binary = 'hmmsearch'):
 
 
 def runExtractHmm(
-    hmm_out, accession, top_hits, cov_threshold, evalue,
-    query = True
+    hmm_out, top_hits, cov_threshold, evalue, query = True
     ):
 
     with open(hmm_out, 'r') as raw:
         data = raw.read()
-    hmm_data = exHmm(
-        data, accession, top_hits, cov_threshold, evalue, query
-        )
+    accs = grabNames( data, query = query )
+    if len(accs) > 1:
+        hmm_data = exHmm(
+            data, True, top_hits, cov_threshold, str(evalue), query
+            )
+    else:
+        hmm_data = exHmm(
+            data, list(accs)[0], top_hits, cov_threshold, str(evalue), query
+            )
     
     return hmm_data
 
@@ -104,11 +109,13 @@ def main(
         hmm_path = runabstractHmm(
             hmm_path, accession, out_dir + accession + '.hmm'
             )
+        if os.path.isfile(accession):
+            accession = []
     else:
         print('\nExtracting accessions', flush = True)
         with open(hmm_path, 'r') as raw:
             hmm_data = raw.read()
-        accession = grabAccs(hmm_data)
+        accession = []
    
     if cpu > 1:
         hmm_cpu = cpu - 1
@@ -120,7 +127,7 @@ def main(
     
     print('\nParsing output', flush = True)
     hmm_data = runExtractHmm(
-        hmmer_out, accession, top_hits, cov_threshold, evalue, not accession_search
+        hmmer_out, top_hits, cov_threshold, evalue, not accession_search
         )
     output_res = parseHmmData(hmm_data)
 
@@ -140,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('--hmm', required = True, help = 'Input .hmm')
     parser.add_argument('-b', '--binary', required = True, help = "{'hmmsearch', 'nhmmer'}")
     parser.add_argument('-d', '--database', default = masterDB(), help = 'MycoDB. DEFAULT: master')
-    parser.add_argument('-q', '--query', help = 'Query [acc if -a] from .hmm')
+    parser.add_argument('-q', '--query', help = 'Query [acc if -a] from .hmm, or new line delimited file')
     parser.add_argument('-c', '--coverage', type = float, help = 'Decimal minimum percent hmm coverage')
     parser.add_argument('-e', '--evalue', type = int, help = 'Maximum evalue threshold 10^(-x)')
     parser.add_argument(
@@ -176,6 +183,12 @@ if __name__ == '__main__':
         'Max E-value': evalue, 'Accessions': args.accession, 'Output': out_dir, 'CPU': args.cpu
         }
     start_time = intro('fa2hmmer2fa', args_dict)
+
+#    if args.query:
+ #       if os.path.isfile(formatPath(args.query)):
+  #          accs = file2list(args.query)
+   #     else:
+    #        accs = args.query
 
     output_fas = main(
         db2df(args.database), args.binary, args.fasta, args.hmm, out_dir, args.query,
