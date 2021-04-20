@@ -46,7 +46,7 @@ def predb2db( pre_db ):
             'taxonomy': row['taxonomy'],
             'source': row['source'],
             'published': row['publication'],
-            'acquisition_date': date
+            'acquisition_date': int(date)
         } )
 
     new_db = pd.DataFrame( data_dict_list )

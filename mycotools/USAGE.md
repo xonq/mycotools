@@ -34,8 +34,8 @@
 <br /><br /><br />
 
 
-# MYCODB TOOLS
-The following are information regarding scripts that manipulate MycoDB files. To learn more about MycoDBs themselves, please refer to the master [MycoDB repository](https://gitlab.com/xonq/mycodb/-/README.md).
+# MYCOTOOLS DB
+The following are information regarding scripts that manipulate Mycotools .db files. To learn more about Mycotools .db, you may refer to the master [MycotoolsDB repository](https://gitlab.com/xonq/mycodb/-/README.md) (currently unavailable).
 
 <br /><br />
 
@@ -59,18 +59,18 @@ grep 'Psilocybe' $(mycodb)
 
 
 ## Creating modular databases
-### abstractDB.py
-The core principle behind MycoDB is modularity and curation - creating tools that modularly interface with curated databases ranging from 1 organism to all ~ 1,500 published fungi. Most scripts use the master database by default, but if you are only interested in a portion of the database, then abstract the portion you want.
+### extractDB.py
+Mycotools DB emphasizes curation, automation, scaleability, and updates - creating tools that interface with uniformized databases ranging from 1 organism to all NCBI and JGI fungi. Most scripts use the master database by default, but if you are only interested in a portion of the database, then extract the portion you want.
 
-e.g. grab a database of a taxonomic order you are interested in: `abstractDB.py -t Atheliales -c order > atheliales.db`
+e.g. grab a database of a taxonomic order you are interested in: `extractDB.py -l Atheliales -r order > atheliales.db`
 
-grab all NCBI Aspergilli accessions: `abstractDB.py -s ncbi -t aspergillus -c genus > aspergillus.db_ncbi` 
+grab all NCBI Aspergilli accessions: `extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.db_ncbi` 
 
-grab the inverse of your arguments: `abstractDB.py -s ncbi -t aspergillus -c genus -i > notAspergullis.db_notNcbi`
+grab the inverse of your arguments: `extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.db_notNcbi`
 
-grab a list of orders in a new line delimited file: `abstractDB.py -tl <TAX_FILE> -c order > taxa.db`
+grab a list of orders in a new line delimited file: `extractDB.py -ll <TAX_FILE> -r order > taxa.db`
 
-grab a list of `ome`s in a new line delimited file: `abstractDB.py ---ome <OME_FILE>`
+grab a list of `ome`s in a new line delimited file: `extractDB.py ---ome <OME_FILE>`
 
 <br /><br />
 
@@ -79,10 +79,10 @@ grab a list of `ome`s in a new line delimited file: `abstractDB.py ---ome <OME_F
 ### dbFiles.py
 Inputs a MycoDB `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
 
-Let's say you want protein data from organisms in one family. First, you should abstract a database of organisms you want:
+Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```
 mkdir pullFiles && cd pullFiles
-abstractDB.py -c family -t Atheliaceae > atheliaceae.db
+extractDB.py -r family -l Atheliaceae > atheliaceae.db
 ```
 
 Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
@@ -126,14 +126,14 @@ annotationStats.py <ANNOTATION.gff3>
 
 ## Downloading files
 ### jgiDwnld.py / ncbiDwnld.py
-These scripts` input can be obtained from the MycoDB as described below, or can be manually made as shown at the bottom of this section. Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, abstract entries in the database that are within *Aspergillus* for both JGI & NCBI:
+These scripts` input can be obtained from the MycoDB as described below, or can be manually made as shown at the bottom of this section. Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus* for both JGI & NCBI:
 ```
 mkdir dwnldFiles && cd dwnldFiles
-abstractDB.py -s jgi -c genus -t aspergillus > aspergillus.db_jgi
-abstractDB.py -s ncbi -c genus -t aspergillus > aspergillus.db_ncbi
+extractDB.py -s jgi -c genus -t aspergillus > aspergillus.db_jgi
+extractDB.py -s ncbi -c genus -t aspergillus > aspergillus.db_ncbi
 ```
 
-If there are organisms you don't want in the abstracted `.db`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory run:
+If there are organisms you don't want in the extracted `.db`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory run:
 ```
 jgiDwnld.py -i aspergillus.db_jgi -t -e
 ncbiDwnld.py -i aspergillus.db_ncbi -t

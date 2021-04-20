@@ -356,7 +356,7 @@ def main(
     gff = False, transcript = False, est = False, masked = True
     ):
 
-    pd.options.mode.chained_assignment = None  # default='warn'
+#    pd.options.mode.chained_assignment = None  # default='warn'
     if not 'genome_code' in df.columns:
         if len( df.columns ) != 1:
             eprint( '\nInvalid input. No genome_code column and more than one column.' , flush = True)
@@ -369,7 +369,6 @@ def main(
     login_attempt = 0
     while jgi_login( user, pwd ) != 0 and login_attempt < 5:
         eprint('\nJGI Login Failed. Attempt: ' + str(login_attempt), flush = True)
-        jgi_login( user, pwd )
         time.sleep( 5 )
         login_attempt += 1
         if login_attempt == 5:
@@ -493,8 +492,8 @@ if __name__ == '__main__':
         eprint( '\nERROR: You must choose at least one download option.' , flush = True)
 
     ncbi_email, ncbi_api, user, pwd = loginCheck( ncbi = False )
-    user = input( 'JGI username: ' )
-    pwd = getpass.getpass( prompt='JGI Login Password: ' )
+#    user = input( 'JGI username: ' )
+ #   pwd = getpass.getpass( prompt='JGI Login Password: ' )
 
     args_dict = {
             'JGI Table': args.input_table,
@@ -508,7 +507,14 @@ if __name__ == '__main__':
             }
 
     start_time = intro( 'Download JGI files', args_dict )
-    df = pd.read_csv( args.input_table, sep = '\t' )
+    
+    with open(args.input_table, 'r') as raw:
+        for line in raw:
+            if 'genome_code' in line.split('\t'):
+                df = pd.read_csv( args.input_table, sep = '\t', index_col = None)
+            else:
+                df = pd.read_csv(args.input_table, sep='\t', header = None)
+            break
     output = formatPath(args.output)
 
     jgi_df = main( 

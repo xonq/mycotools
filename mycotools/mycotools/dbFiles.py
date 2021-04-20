@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument( '-l', '--link', action = 'store_true', help = 'Print paths, no copy' )
     parser.add_argument( '-i', '--input', default = masterDB(), help = 'Mycotools DB DEFAULT: masterDB' )
     parser.add_argument( '-o', '--output', default = os.getcwd(), help = 'Optional output directory' )
-    parser.add_argument( '--yes', help = 'Assume yes' )
+    parser.add_argument( '--yes', action = 'store_true', help = 'Assume yes' )
     args = parser.parse_args()
 
     db_path = formatPath( args.input )
@@ -64,7 +64,7 @@ if __name__ == '__main__':
                 str( max_files ) + ' files' )
             check = input('Proceed? [y/N]: ')
             if check.lower() not in { 'y', 'yes' }:
-                print(, flush = True)
+                print(flush = True)
                 sys.exit( 1 )
     main( filetypes, envtypes, db, output_path, link = args.link )
     sys.exit( 0 )

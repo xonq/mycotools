@@ -5,6 +5,7 @@ import pandas as pd, numpy as np
 import argparse, os, time, subprocess, sys, requests, re
 from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint
 from mycotools.lib.dbtools import log_editor
+from datetime import datetime
 
 
 def prepareFolders( output_path, gff, prot, assem, transcript ):
@@ -73,8 +74,6 @@ def collect_ftps(
         accession = row[column]
         if 'biosample' in set(row.keys()):
             failure_acc = row['biosample']
-        elif 'BioSample Accession' in set(row.keys()):
-            failure_acc = row['BioSample Accession']
         else:
             failure_acc = row[column]
         if pd.isnull(row[column]):
@@ -84,14 +83,12 @@ def collect_ftps(
                 'assembly_md5': '', 'proteome_md5': '',
                 'gff3_md5': '', 'transcript_md5': ''
                 }
-            if 'Modify Date' in row.keys():
-                failed.append([failure_acc, row['Modify Date']])
+            failed.append([failure_acc, datetime.strftime(row['version'], '%Y%m%d')])
             continue
 
 #        ome = row['internal_ome']
         if index in ass_prots:
             continue
-
 
         search_term, esc_count = accession + '[' + column + ']', 0
         while esc_count < 10:
@@ -110,8 +107,7 @@ def collect_ftps(
             if 'internal_ome' in row.keys():
                 accession = row['internal_ome']
             eprint('\t' + accession + ' failed to find genome ID', flush = True)
-            if 'Modify Date' in row.keys():
-                failed.append( [failure_acc, row['Modify Date']] )
+            failed.append( [failure_acc, datetime.strftime(row['version'], '%Y%m%d')] )
             continue
         ass_prots[str(index)] = {
             'biosample': '', 'assembly': '', 'proteome': '',
@@ -151,8 +147,7 @@ def collect_ftps(
             if 'internal_ome' in row.keys():
                 accession = row['internal_ome']
             eprint('\t' + accession + ' failed to return any FTP path', flush = True)
-            if 'Modify Date' in row.keys():
-                failed.append( [failure_acc, row['Modify Date']] )
+            failed.append( [failure_acc, datetime.strftime(row['version'], '%Y%m%d')] )
             continue
 
         ass_md5, gff_md5, trans_md5, prot_md5, md5s = '', '', '', '', {}
@@ -210,6 +205,9 @@ def collect_ftps(
         if transcript in md5s:
             trans_md5 = md5s[transcript]
 
+        if any(not ass_prots[str(index)][x] for x in ['assembly', 'gff3']):
+            failed.append([row['biosample'], datetime.strftime(row['version'], '%Y%m%d')])
+
         log_editor( 
             output_path + 'ncbiDwnld.log', str(index), 
             str(index) + '\t' + accession + '\t' +  assembly + '\t' + \
@@ -243,7 +241,7 @@ def download_files( ome_prots, ome, file_types, output_dir, count, remove = Fals
     esc_count, dwnlds = 0, {}
     for file_type in file_types:
         ftp_link = ome_prots[file_type]
-        dwnlds[file_type] = None
+        dwnlds[file_type] = -1
         if file_type == 'assembly':
             file_path = output_dir + 'assembly/' + \
                 os.path.basename(ome_prots[file_type])
@@ -333,34 +331,16 @@ def download_files( ome_prots, ome, file_types, output_dir, count, remove = Fals
 
 def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False ):
 
-    if 'internal_ome' in ncbi_df.keys() and 'biosample' in ncbi_df.keys():
-        ncbi_df = ncbi_df.set_index('internal_ome')
+    failed = []
+    if 'biosample' in ncbi_df.keys():
+        ncbi_df['index'] = ncbi_df['biosample']
+        ncbi_df = ncbi_df.set_index('index')
         if not all( x in ass_prots for x in ncbi_df.index ):
             ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, 
                 column = 'biosample', api_key=api,
                 output_path = output_path, verbose = verbose
                 )
-    elif 'BioSample Accession' in ncbi_df.keys():
-        ncbi_df['index'] = ncbi_df['BioSample Accession']
-        ncbi_df = ncbi_df.set_index( 'index' )
-        ncbi_df.index = ncbi_df.index.astype(str)
-        if not all( x in ass_prots for x in ncbi_df.index ):
-            ass_prots, failed = collect_ftps( 
-                ncbi_df, ass_prots, 
-                column = 'BioSample Accession', api_key=api, 
-                output_path = output_path, verbose = verbose
-            )    
-    elif 'biosample' in ncbi_df.keys():
-        ncbi_df['index'] = ncbi_df['biosample']
-        ncbi_df = ncbi_df.set_index( 'index' )
-        ncbi_df.index = ncbi_df.index.astype(str)
-        if not all( x in ass_prots for x in ncbi_df.index ):
-            ass_prots, failed = collect_ftps( 
-            ncbi_df, ass_prots, 
-            column = 'biosample', api_key=api, 
-            output_path = output_path, verbose = verbose
-            )
     elif 'internal_ome' in ncbi_df.keys():
         ncbi_df = ncbi_df.set_index('internal_ome')
         if not all( x in ass_prots for x in ncbi_df.index ):
@@ -395,20 +375,23 @@ def main(
 
     ass_prots = compileLog(output_path, remove )
 
-    if type(ncbi_df) != pd.DataFrame:
+    if not isinstance(ncbi_df, pd.DataFrame):
         ncbi_df = pd.read_csv( ncbi_df, sep = '\t' )
-    if 'BioSample Accession' in ncbi_df:
+    if 'BioSample Accession' in ncbi_df.keys() and not 'biosample' in ncbi_df.keys():
         ncbi_df['biosample'] = ncbi_df['BioSample Accession']
-        del ncbi_df['BioSample Accession']
+    if 'Modify Date' in ncbi_df.keys() and not 'version' in ncbi_df.keys():
+        ncbi_df['version'] = pd.to_datetime(ncbi_df['Modify Date'])
+    elif 'version' not in ncbi_df.keys():
+        ncbi_df['version'] = ''
 
-    if not all(x in ass_prots for x in list(ncbi_df['biosample'])):
-        ncbi_df, ass_prots, failed = callDwnldFTPs( 
-            ncbi_df, ass_prots, api, output_path, verbose 
-            )
+    failed = []
+    ncbi_df, ass_prots, failed = callDwnldFTPs( 
+        ncbi_df, ass_prots, api, output_path, verbose 
+        )
     if remove:
         ass_prots = { 
             o: ass_prots[o] for o in ass_prots \
-            if all(ass_prots[o][p] != '' for p in ['assembly', 'gff3'])
+            if all(ass_prots[o][p] for p in ['assembly', 'gff3'])
             }
     new_df = pd.DataFrame()
 
@@ -422,45 +405,36 @@ def main(
             elif count >= 7:
                 time.sleep(1)
                 count = 0
+        if ome not in set( ncbi_df['biosample'] ):
+            continue
         eprint('\t' + str(ome), flush = True)
-        if ome not in set( ncbi_df.index ):
-            continue
-        if type(ome) is int:
-            new_ome = ass_prots[ome]['biosample']
-            if ass_prots[ome]:
-                exits, count = download_files( 
-                    ass_prots[ome], new_ome, file_types, output_path, 
-                    count, remove = remove 
-                    )
-            else:
-                continue
+        new_ome = ass_prots[ome]['biosample']
+        if ass_prots[ome]:
+            exits, count = download_files( 
+                ass_prots[ome], new_ome, file_types, output_path, 
+                count, remove = remove 
+                )
         else:
-            if ass_prots[ome]:
-                exits, count = download_files( 
-                    ass_prots[ome], ome, file_types, output_path, 
-                    count, remove = remove 
-                    )
-            else:
-                if 'Modify Date' in ncbi_df.keys():
-                    failed.append([ome, ncbi_df['Modify Date'][ome]])
-                continue
-        if any(exits[x] != 0 for x in {'assembly', 'gff3'}) and 'Modify Date' in ncbi_df.keys():
-            failed.append([ome, ncbi_df['Modify Date'][ome]])
+            check = ncbi_df[ncbi_df['biosample'] == ome]
+            db_vers = datetime.strftime(check.iloc[0]['version'], '%Y%m%d')
+            failed.append([ome, db_vers])
             continue
-        if ome in set(ncbi_df.index):
-            ncbi_df.loc[ome, 'assembly_path'] = output_path + 'assembly/' + \
-                os.path.basename(ass_prots[ome]['assembly'])
-            ncbi_df.loc[ome, 'proteome_path'] = output_path + 'proteome/' + \
-                os.path.basename(ass_prots[ome]['proteome'])
-            ncbi_df.loc[ome, 'gff3_path'] = output_path + 'gff3/' + \
-                os.path.basename(ass_prots[ome]['gff3'])
+        if any(exits[x] != 0 for x in {'assembly', 'gff3'}):
+            failed.append([ome, ncbi_df['version'][ome]])
+            continue
+        ncbi_df.loc[ome, 'assembly_path'] = output_path + 'assembly/' + \
+            os.path.basename(ass_prots[ome]['assembly'])
+        ncbi_df.loc[ome, 'proteome_path'] = output_path + 'proteome/' + \
+            os.path.basename(ass_prots[ome]['proteome'])
+        ncbi_df.loc[ome, 'gff3_path'] = output_path + 'gff3/' + \
+            os.path.basename(ass_prots[ome]['gff3'])
         new_df = new_df.append( ncbi_df.loc[ome] )
  
     new_df = new_df.reset_index()
 # won't work nice if ome isn't in the original dataframe
-    new_df = new_df.rename(columns = { 
-        'index': 'internal_ome'
-        } )
+#    new_df = new_df.rename(columns = { 
+ #       'index': 'internal_ome'
+  #      } )
 
     return new_df, failed
 

@@ -39,7 +39,7 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
         )
         print(flush = True)
         if sys.stdin.isatty():
-            hash_pwd = getpass.getpass( prompt = 'MycoDB login password: ' )
+            hash_pwd = getpass.getpass( prompt = 'MycoDB login password (stdin allowed): ' )
         else:
             hash_pwd = sys.stdin.readline().rstrip()
         key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
@@ -51,7 +51,7 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
         decrypted = fernet.decrypt(data)
         data = decrypted.decode('UTF-8').split('\n')
         if len(data) != 4:
-            eprint('INCORRECT PASSWORD. Delete ~/.mycodb to reset password', flush = True)
+            eprint('BAD PASSWORD FILE. Delete ~/.mycodb to reset.', flush = True)
             sys.exit(8)
         ncbi_email = data[0].rstrip()
         ncbi_api = data[1].rstrip()
@@ -341,9 +341,13 @@ def hit2taxonomy(
 def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'):
 
     print('\nGathering taxonomy information', flush = True)
-    tax_dicts, count, genera = {}, 0, list(set(df['genus']))
+    df['taxonomy'] = df['taxonomy'].replace( np.nan, None )
+    count = 0
+    tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
 
-    for genus in genera:
+    for genus in tax_dicts:
+        if tax_dicts[genus]:
+            continue
         print('\t' + genus, flush = True)
 # if there is no api key, sleep for a second after 3 queries
 # if there is an api key, sleep for a second after 10 queries
@@ -418,17 +422,21 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'
 
 # read taxonomy by conterting the string into a dictionary using `json.loads`
 def read_tax(taxonomy_string):
-    
-    dict_string = taxonomy_string.replace("'",'"')
-    tax_dict = json.loads(dict_string)
+   
+    if taxonomy_string: 
+        dict_string = taxonomy_string.replace("'",'"')
+        tax_dict = json.loads(dict_string)
+        return tax_dict
+    else:
+        return None
 
-    return tax_dict
 
 # assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database
 # forbid a list of taxonomic classifications you are not interested in and return a new database
 def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid={'no rank', 'superkingdom', 'subkingdom', 'genus', 'species', 'species group', 'varietas', 'forma'}):
 
     genera = set(db['genus'])
+    tax_dicts = {x: tax_dicts[x] for x in tax_dicts if tax_dicts[x]}
     for genus in tax_dicts:
         tax_dicts[genus] = {x: tax_dicts[genus][x] for x in tax_dicts[genus] if x not in forbid}
     missing = list(genera.difference(set(tax_dicts.keys())))
@@ -442,9 +450,9 @@ def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid={'no rank',
     return db
 
 
-# abstract taxonomy and return a database with just the taxonomy you are interested in
+# extract taxonomy and return a database with just the taxonomy you are interested in
 # NEED TO SIMPLIFY THE PUBLISHED STATEMENT TO SIMPLY DELETE ALL VALUES THAT ARENT 1 WHEN PUBLISHED = 1
-def abstract_tax(db, taxonomy, classification, inverse = False ):
+def extract_tax(db, taxonomy, classification, inverse = False ):
 
     if type(taxonomy) == str:
         taxonomy = [taxonomy]
@@ -476,8 +484,8 @@ def abstract_tax(db, taxonomy, classification, inverse = False ):
     return new_db
 
 
-# abstracts all omes from an `ome_list` or the inverse and returns the abstracted database
-def abstract_omes(db, ome_list, index = 'internal_ome', inverse = False):
+# extracts all omes from an `ome_list` or the inverse and returns the extracted database
+def extract_omes(db, ome_list, index = 'internal_ome', inverse = False):
 
     new_db = pd.DataFrame()
     ref_set = set()
@@ -501,7 +509,7 @@ def abstract_omes(db, ome_list, index = 'internal_ome', inverse = False):
 # imports a database reference (if provided) and a `df` and adds a `new_col` with new ome codes that do not overlap current ones
 def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
 
-    print('\nGenerating omes', flush = True)
+#    print('\nGenerating omes', flush = True)
     newdf = df
     if not new_col in set(df.keys()):
         newdf[new_col] = ''
@@ -509,7 +517,7 @@ def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
     access = '-'
     if isinstance(reference, pd.core.frame.DataFrame):
         tax_set = set(reference['internal_ome'])
-        print('\t' + str(len(tax_set)) + ' omes from reference dataset', flush = True)
+#        print('\t' + str(len(tax_set)) + ' omes from reference dataset', flush = True)
 
     for i, row in df.iterrows():
         if not pd.isnull(row['internal_ome']) and row['internal_ome']:
