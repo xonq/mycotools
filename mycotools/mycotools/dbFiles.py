@@ -34,12 +34,12 @@ if __name__ == '__main__':
     parser.add_argument( '-p', '--proteome', action = 'store_true', help = 'Grab proteomes' )
     parser.add_argument( '-g', '--gff', action = 'store_true', help = 'Grab gff`s' )
     parser.add_argument( '-l', '--link', action = 'store_true', help = 'Print paths, no copy' )
-    parser.add_argument( '-i', '--input', default = masterDB(), help = 'Mycotools DB DEFAULT: masterDB' )
-    parser.add_argument( '-o', '--output', default = os.getcwd(), help = 'Optional output directory' )
+    parser.add_argument( '-d', '--database', default = masterDB(), help = 'DEFAULT: masterDB' )
+    parser.add_argument( '-o', '--output', default = os.getcwd() )
     parser.add_argument( '--yes', action = 'store_true', help = 'Assume yes' )
     args = parser.parse_args()
 
-    db_path = formatPath( args.input )
+    db_path = formatPath( args.database )
     output_path = prep_output( formatPath( args.output ), cd = False )
     args_dict = {
         'DATABASE': db_path, 'OUTPUT': output_path,

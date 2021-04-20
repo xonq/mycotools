@@ -3,7 +3,7 @@
 import argparse, os, sys, subprocess, re, shutil, datetime, numpy as np
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
 from mycotools.lib.fastatools import dict2gff, gff2dict
-from mycotools.lib.dbtools import db2df, df2db, gen_omes, gather_taxonomy, assimilate_tax, masterDB, df2std
+from mycotools.lib.dbtools import db2df, df2db, gen_omes, masterDB, df2std
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.utils.curProteomes import curate as curProteome
@@ -201,14 +201,13 @@ def main( prepdb, refdb, rogue = False ):
                             cur_gff = re.sub(r'\.uncur$', '', row['gff3'])
                             with open(formatPath('$MYCOGFF3/' + cur_gff), 'w') as out:
                                 out.write(dict2gff(gff))
-                            predb_omes.at[i, 'gff3'] = cur_prot
-                            os.remove( formatPath('$MYCOGFF3/' + row['gff3'] ) )
+                            os.remove( formatPath('$MYCOGFF3/' + row['gff3'] ))
+                            predb_omes.at[i, 'gff3'] = cur_gff
                             cur_prot = re.sub(r'\.uncur$', '', row['proteome'])
                             with open(formatPath('$MYCOFAA/' + cur_prot), 'w') as out:
                                 out.write(dict2fasta(fa))
                             os.remove( formatPath('$MYCOFAA/' + row['proteome'] ) )
                             predb_omes.at[i, 'proteome'] = cur_prot    
-            # NEED TO MAKE ROGUE OMES A THING AND UPDATE THE CONFIG
                         except KeyboardInterrupt:
                             sys.exit(-1)
                         except:
@@ -230,10 +229,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser( 
         description = 'Takes a `predb` file (or creates one and exits), ' + \
             'curates, moves files to database path, and exports a mycotools db' )
-    parser.add_argument( '-p', '--predb', help = '`.predb` file to add data from' )
+    parser.add_argument( '-p', '--predb', help = '`.predb` file' )
     parser.add_argument( 
         '-g', '--generate', action = 'store_true', 
-        help = 'Specify to generate `.predb` file.' 
+        help = 'Generate empty `.predb`' 
         )
     parser.add_argument(
         '-r', '--rogue', action = 'store_true',
@@ -241,17 +240,13 @@ if __name__ == '__main__':
         )
     parser.add_argument( 
         '-d', '--database', default = masterDB(),
-        help = 'Existing database to reference. DEFAULT: masterdb' )
-    parser.add_argument( '-e', '--email', help = 'NCBI email to gather taxonomy information' )
-    parser.add_argument( '-k', '--key', help = 'NCBI API key' )
+        help = 'DEFAULT: masterDB' )
     args = parser.parse_args()
 
     args_dict = { 
         'Database': args.database, 
         '`.predb`': args.predb, 
         'Generate `.predb`': args.generate,
-        'Email': args.email, 
-        'API': args.key
     }
 
 
@@ -269,5 +264,5 @@ if __name__ == '__main__':
     predb = pd.read_csv(formatPath(args.predb), sep = '\t')
 
     start_time = intro( '`.predb` to `.db`', args_dict )
-    predb_omes_tax = main( args_dict, predb, refdb )    
+    predb_omes_tax, failed = main( predb, refdb, rogue = bool(args.rogue) ) 
     df2db( predb_omes_tax, 'new.db' )
