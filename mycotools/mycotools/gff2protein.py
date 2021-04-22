@@ -2,7 +2,7 @@
 
 from mycotools.lib.dbtools import db2df, masterDB
 from mycotools.lib.fastatools import fasta2dict, gff2dict, gff3Comps, dict2fasta
-from mycotools.lib.kontools import formatPath, sysStart
+from mycotools.lib.kontools import formatPath, sysStart, eprint
 from Bio.Seq import Seq
 import re, sys
 

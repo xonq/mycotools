@@ -1,76 +1,34 @@
 #! /usr/bin/env python3
 
-import argparse, subprocess, os, datetime, sys, multiprocessing as mp, pandas as pd, numpy as np
+import argparse, subprocess, os, datetime, sys, re
+import multiprocessing as mp, pandas as pd, numpy as np
 from mycotools.lib.kontools import eprint, intro, outro, formatPath, multisub, collect_files, findExecs
 from mycotools.lib.dbtools import db2df, masterDB
 from mycotools.acc2fa import famain as acc2fa
 
 
-def search4db( ome, blast_dir, extension, seq_dir ):
-
-    subject = blast_dir + ome
-    blast_file = blast_dir + ome + extension
-    if os.path.isfile( blast_file ):
-        return subject
-    else:
-        return False
-
-
-def compBlastDB( db, seq_type ):
-
-    vsearch4db = np.vectorize(search4db)
-    if seq_type == 'prot':
-        blast_dir = formatPath( '$MYCOFAA/blastdb' )
-        seq_dir = os.environ['MYCOFAA'] + '/'
-        db = db.assign( **{seq_type: vsearch4db( db['internal_ome'], blast_dir, '.psd', seq_dir ) } )
-#        db[seq_type] = db.apply(search4db, args(blast_dir, '.psd', seq_dir))
-    else:
-        blast_dir = formatPath( '$MYCOFNA/blastdb' )
-        seq_dir = os.environ['MYCOFNA'] + '/'
-
-        db = db.assign( **{seq_type: vsearch4db( db['internal_ome'], blast_dir, '.psd', seq_dir ) } )
-#        db[seq_type] = db.apply(search4db, args(blast_dir, '.nsd', seq_dir))
-
-    blast_db = db.loc[db[seq_type] != False]
-    seq_db = db.loc[db[seq_type] == False]
-
-    return blast_db, seq_db
-
-
-def compileBlastDBCmd( ome, out_dir, env_dir, blast_scaf ):
-    return blast_scaf + ['-out', out_dir + ome + '.tsv', \
-        '-db', env_dir + 'blastdb/' + ome]
 def compileBlastCmd( ome, biofile, env_dir, out_dir, blast_scaf ):
     return blast_scaf + ['-out', out_dir + ome + '.tsv', \
         '-subject', env_dir + biofile]
 
 def compBlastTups( 
-    blast_db, seq_db, blast_type, seq_type, out_dir, 
-    biotype, env_dir, query, hsps = 1, max_hits = None,
-    evalue = 10
+    seq_db, blast_type, seq_type, out_dir, 
+    biotype, env_dir, query, hsps = None, max_hits = None,
+    evalue = None
     ):
 
     blast_scaf = [
-        blast_type, '-query', query, '-max_hsps',
-        str(hsps), '-outfmt', '6', '-evalue', str(evalue)
+        blast_type, '-query', query,
+        '-outfmt', '6'
         ]
+    if evalue:
+        blast_scaf.extend(['-evalue', str(evalue)])
+    if hsps:
+        blast_scaf.extend(['-max_hsps', str(hsps)])
     if max_hits:
         blast_scaf.extend([ '-max_target_seqs', str(max_hits) ])
-#    vcomp_blast_db = np.vectorize(compileBlastDBCmd)
- #   vcomp_seq_db = np.vectorize(compileBlastCmd)
-  #  blast_db['cmd'] = vcomp_blast_db(
-   #     blast_db['internal_ome'], out_dir, env_dir, blast_scaf
-    #    )
-#    seq_db['cmd'] = vcomp_seq_db(
- #       seq_db['internal_ome'], seq_db['biotype'], env_dir,
-  #      out_dir, blast_scaf
-   #     )
 
     blast_cmds = []
-    for i, row in blast_db.iterrows():
-        blast_cmds.append( compileBlastDBCmd(
-            row['internal_ome'], out_dir, env_dir, blast_scaf
-            ) )
     for i, row in seq_db.iterrows():
         if not pd.isnull(row[biotype]):
             blast_cmds.append( compileBlastCmd(
@@ -146,33 +104,38 @@ def compAcc2fa( db, biotype, env_dir, output_res, subhit = False ):
                         accs.append(subject)
                 temp_df[0] = accs
                 if accs:
-                    acc2fa_cmds[query].append( [
-                        temp_df, env_dir + db[biotype][i], 0
-                        ] )
+                    try:
+                        acc2fa_cmds[query].append( [
+                            temp_df, env_dir + db[biotype][i], 0
+                            ] )
+                    except KeyError:
+                        eprint('\t' + i + ' not in db')
 
     return acc2fa_cmds
 
 
-def main( 
-    db, blast, query, out_dir, hsps = 1, 
-    max_hits = None, evalue = 10, bitscore = 0, 
-    pident = 0, #coverage = 0, 
-    cpus = 1 
-    ):
+def prepOutput(out_dir, query):
 
     out_dir, query = formatPath(out_dir), formatPath( query )
     if not out_dir.endswith('/'):
         out_dir += '/'
     if not os.path.isdir( out_dir ):
         os.mkdir( out_dir )
-    finished, rundb = set(), db
     report_dir = out_dir + 'reports/'
     if not os.path.isdir( report_dir ):
         os.mkdir( report_dir )
 
-    prev = False
+    return report_dir
+
+
+def ObyOprep(
+    db, report_dir, blast, query, 
+    max_hits, evalue, out_dir
+    ):
+
+    prev, finished, rundb = False, set(), db
     log_str = report_dir + '\n' + blast + '\n' + query + '\n' + \
-        str(max_hits) + '\n' + str(evalue)  
+        str(max_hits) + '\n' + str(evalue)
     log_name = out_dir + '.' + os.path.basename(out_dir[:-1]) + '.log'
     if not os.path.isfile( log_name ):
         with open( log_name, 'w' ) as out:
@@ -202,28 +165,24 @@ def main(
             }
         rundb = db.loc[~db['internal_ome'].isin(finished)]
 
-    if blast in {'tblastn', 'blastp'}:
-        seq_type = 'prot'
-        biotype = 'proteome'
-        env_dir = os.environ['MYCOFAA'] + '/'
-    elif blast in {'blastx', 'blastn'}:
-        seq_type = 'nucl'
-        biotype = 'assembly'
-        env_dir = os.environ['MYCOFNA'] + '/'
-    else:
-        eprint('\nERROR: invalid blast type: ' + blast, flush = True)
+    return rundb
+
+
+def ObyOblast(
+    rundb, blast, seq_type, report_dir, biotype,
+    env_dir, query, hsps, max_hits, evalue, cpus,
+    bitscore, pident
+    ):
 
 # NEED to add other threshold options
     if len(rundb) > 0:
-        print('\nCompiling blast databases', flush = True)
-        blast_db, seq_db = compBlastDB( rundb, seq_type )
+        print('\nBlasting', flush = True)
         blast_tups = compBlastTups(
-            blast_db, seq_db, blast, seq_type, 
+            rundb, blast, seq_type, 
             report_dir, biotype, env_dir, query, 
             hsps = hsps, max_hits = max_hits, evalue = evalue
             )
 
-        print('\nBlasting', flush = True)
         blast_outs = multisub( blast_tups, processes = cpus )
    
     parse_tups = []
@@ -237,6 +196,116 @@ def main(
     with mp.get_context( 'spawn' ).Pool( processes = cpus ) as pool:
         results = pool.starmap( parseOutput, tuple(parse_tups) )
     results_dict = {x[0]: x[1] for x in results}
+
+    return results_dict
+
+
+def checkBlastDB():
+
+    db_date = os.path.basename(masterDB())
+    blast_db = formatPath('$MYCOFAA/blastdb/' + db_date + '.00.psd')
+    if os.path.isfile(blast_db):
+        return blast_db[:-7]
+    elif os.path.isfile(blast_db[:-7] + '.psd'):
+        return blast_db[:-7]
+
+
+def dbBlast(
+    db_path, blast_type, query, 
+    evalue, hsps, cpus,
+    report_dir
+    ):
+
+    out_file = report_dir + os.path.basename(db_path)[:-3] + '.out'
+    blast_scaf = [
+        blast_type, '-query', query, '-outfmt', '6',
+        '-db', db_path, '-num_threads', str(cpus), '-out',
+        out_file, '-num_descriptions', str(135904025),
+        '-num_alignments', str(135904025)
+        ]
+
+    if evalue:
+        blast_scaf.extend(['-evalue', str(evalue)])
+    if hsps:
+        blast_scaf.extend(['-max_hsps', str(hsps)])
+
+
+    blast_call = subprocess.call(
+        blast_scaf, stdout = subprocess.PIPE,
+        stderr = subprocess.PIPE
+        )
+
+    return blast_call, out_file
+
+
+def parseDBout( file_, bitscore = 0, pident = 0, max_hits = None ):
+
+    ome_results = {}
+    with open( file_, 'r' ) as raw:
+        for line in raw:
+            data = [x for x in line.rstrip().split('\t')]
+            ome = re.search(r'(^[^_]*)', data[1])[1]
+            if int(float(data[-1])) > bitscore and int(1000*float(data[2])) > 100000 * pident:
+                if ome not in ome_results:
+                    ome_results[ome] = []
+                ome_results[ome].append(data)
+
+    if max_hits:
+        out_results = {}
+        for ome in ome_results:
+            ome_results[ome].sort(key = lambda x: int(x[-1]), reverse = True)
+            out_results[ome] = ome_results[ome][:max_hits]
+        return out_results
+
+    return ome_results
+
+
+
+def main( 
+    db, blast, query, out_dir, hsps = 1, 
+    max_hits = None, evalue = 10, bitscore = 0, 
+    pident = 0, #coverage = 0, 
+    cpus = 1, force = False
+    ):
+
+    if blast in {'tblastn', 'blastp'}:
+        seq_type = 'prot'
+        biotype = 'proteome'
+        env_dir = os.environ['MYCOFAA'] + '/'
+        blast_db = checkBlastDB()
+    elif blast in {'blastx', 'blastn'}:
+        seq_type = 'nucl'
+        biotype = 'assembly'
+        env_dir = os.environ['MYCOFNA'] + '/'
+        blast_db = None
+    else:
+        eprint('\nERROR: invalid blast type: ' + blast, flush = True)
+
+    report_dir = prepOutput(out_dir, query)
+    if blast_db and not force:
+        print('\nBlasting using MycotoolsDB blastdb')
+        blast_exit, blast_output = dbBlast(
+            blast_db, blast, query, evalue, 
+            hsps, cpus, report_dir
+            )
+        if blast_exit:
+            eprint('\nERROR: blast failed: ' + str(blast_exit))
+            sys.exit(10)
+        results_dict = parseDBout(
+            blast_output, bitscore = bitscore, 
+            pident = pident, max_hits = max_hits
+            )
+    else:
+        print('\nBlasting on an ome-by-ome basis') 
+        rundb = ObyOprep(
+            db, report_dir, blast, query, 
+            max_hits, evalue, out_dir
+            )
+        results_dict = ObyOblast(
+            rundb, blast, seq_type, report_dir, biotype,
+            env_dir, query, hsps, max_hits, evalue, cpus,
+            bitscore, pident
+            )
 
     print('\nCompiling fastas', flush = True)
     output_res = compileResults( results_dict )
@@ -259,12 +328,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser( 
         description = 'Blasts a query against a db and compiles output fastas ' + \
             'for each query. --evalue and --maxhit thresholds are applied at ' + \
-            'the BLAST step and are therefore incompatible with --previous.'
+            'the BLAST step and are therefore incompatible with --previous. Be ' +
+            'aware that db2blast.py will preferably blast against a blastdb of ' +
+            'Mycotools -omes; however, if the blastdb was not generated from ' +
+            'the current masterDB (' + os.path.basename(masterDB()) + ') then ' +
+            'db2blast.py will blast on an ome-by-ome basis. In the latter case, ' +
+            'e-value is dependent on database size, so it will threshold ' +
+            'variably for each ome. If no blastdb exists for the current masterDB ' +
+            'in ' + os.environ['MYCOFAA'] + '/blastdb/ then it is recommended to ' +
+            'use the bit score threshold as it is not dependent on database size.'
         )
     parser.add_argument( '-b', '--blast', required = True, 
         help = 'Blast type { blastn, blastp, tblastn, blastx }' )
     parser.add_argument( '-q', '--query', required = True, help = 'Query fasta' )
-    parser.add_argument( '-e', '--evalue', default = -1, type = int,
+    parser.add_argument( '-e', '--evalue', type = int,
         help = 'Negative e-value order max, e.g. 2 for 10^-2' )
     parser.add_argument( '-s', '--bitscore', default = 0,
         type = int, help = 'Bit score minimum' )
@@ -273,9 +350,10 @@ if __name__ == '__main__':
     #parser.add_argument( '-c', '--coverage', type = float, help = 'Query coverage +/-, e.g. 0.5' )
     parser.add_argument( '-m', '--maxhits', type = int, help = 'Max hits for each organism' )
     parser.add_argument( '-d', '--database', default = masterDB(), 
-        help = 'mycodb, DEFAULT: masterdb' )
+        help = 'DEFAULT: masterdb' )
     parser.add_argument( '-o', '--output', default = os.getcwd() )
     parser.add_argument( '--cpu', default = mp.cpu_count(), type = int, help = 'DEFAULT: all' )
+    parser.add_argument( '-f', '--force', action = 'store_true', help = 'Force ome-by-ome blast' )
     args = parser.parse_args()
 
     db_path = formatPath( args.database )
@@ -283,13 +361,16 @@ if __name__ == '__main__':
         cpus = mp.cpu_count()
     else:
         cpus = args.cpu
-   
-    evalue = 10**( -args.evalue)
+  
+    evalue = None 
+    if args.evalue:
+        evalue = 10**( -args.evalue)
+        
     start_args = {
         'Blast': args.blast, 'query': formatPath(args.query), 
         'database': db_path, 'output': args.output, 'max evalue': evalue,
         'min bitscore': args.bitscore, 'max hits/organism': args.maxhits, #'coverage': args.coverage, 
-        'min identity': args.identity, 'cores': cpus,
+        'min identity': args.identity, 'cores': cpus, 'force ome-by-ome': args.force
         }
 
     start_time = intro( 'db2blast', start_args )
@@ -303,7 +384,7 @@ if __name__ == '__main__':
     output_fas = main( 
         db, args.blast, args.query, output_dir, 
         bitscore = args.bitscore, pident = args.identity,
-        max_hits = args.maxhits, cpus = cpus 
+        max_hits = args.maxhits, cpus = cpus, force = args.force 
         )
     if not os.path.isdir( output_dir + 'fastas/' ):
         os.mkdir( output_dir + 'fastas/' )

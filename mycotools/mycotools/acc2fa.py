@@ -108,7 +108,7 @@ if __name__ == '__main__':
         'Outputs fasta with headers' )
     parser.add_argument( '-i', '--input', help = 'Input file with accessions' )
     parser.add_argument( '-a', '--accession', help = 'Input accession. For coordinates ' + \
-        'append [$START-$END]' )
+        'append [$START-$END] - accepts reverse coordinates for nucleotide accessions' )
     parser.add_argument( '-f', '--fasta', help = 'Fasta input' )
     parser.add_argument( '-c', '--column', default = 0, help = 'Accessions column. Must be specified if there ' \
         + 'are headers. Otherwise, the default is the first tab separated column' )

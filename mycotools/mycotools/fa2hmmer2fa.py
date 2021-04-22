@@ -39,11 +39,11 @@ def runExtractHmm(
     accs = grabNames( data, query = query )
     if len(accs) > 1:
         hmm_data = exHmm(
-            data, True, top_hits, cov_threshold, str(evalue), query
+            data, True, top_hits, cov_threshold, evalue, query
             )
     else:
         hmm_data = exHmm(
-            data, list(accs)[0], top_hits, cov_threshold, str(evalue), query
+            data, list(accs)[0], top_hits, cov_threshold, evalue, query
             )
     
     return hmm_data
@@ -119,6 +119,8 @@ def main(
    
     if cpu > 1:
         hmm_cpu = cpu - 1
+    else:
+        hmm_cpu = cpu
     hmmer_out = out_dir + 'hmmer.out'
     print('\nRunning ' + binary, flush = True)
     if runHmmer(fasta_path, hmm_path, hmmer_out, cpu = hmm_cpu, binary = binary):

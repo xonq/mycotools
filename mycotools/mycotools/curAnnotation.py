@@ -487,8 +487,15 @@ def addExons( gff ):
 
 def main( gff_path, fasta_path, prefix, fail = True ):
 
-    gff = gff2dict( gff_path )
-    assembly = fasta2dict( fasta_path )
+    if isinstance(gff_path, str):
+        gff = gff2dict( gff_path )
+    elif isinstance(gff_path, list):
+        gff = gff_path
+    if isinstance(fasta_path, str):
+        assembly = fasta2dict( fasta_path )
+    elif isinstance(fasta_path, dict):
+        assembly = fasta_path
+
     if gff_path.endswith( 'gtf' ) or re.search(gtfComps()['id'], gff[0]['attributes']) is not None:
         exonGtf = intron2exon( gff )
         exonGtfCur = curCDS( exonGtf )

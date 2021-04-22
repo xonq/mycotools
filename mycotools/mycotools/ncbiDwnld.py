@@ -2,7 +2,7 @@
 
 from Bio import Entrez
 import pandas as pd, numpy as np
-import argparse, os, time, subprocess, sys, requests, re
+import argparse, os, time, subprocess, sys, requests, re, gzip
 from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint
 from mycotools.lib.dbtools import log_editor
 from datetime import datetime
@@ -314,16 +314,12 @@ def download_files( ome_prots, ome, file_types, output_dir, count, remove = Fals
             if remove and file_type in {'assembly', 'gff3'}:
                 break
         else:
-            with open( file_path, 'r' ) as data:
-                try:
-                    if len(data.read()) < 500:
-                        eprint('\t\t' + file_type + ': ERROR, file too small', flush = True)
+            if os.stat(file_path).st_size < 150:
+                eprint('\t\t' + file_type + ': ERROR, file too small', flush = True)
 #                       print('\t' + ome + '\t' + file_type + ' empty', flush = True)
-                        dwnlds[file_type] = 420
-                        if remove and file_type in {'assembly', 'gff3'}:
-                            break
-                except UnicodeDecodeError:
-                    pass
+                dwnlds[file_type] = 420
+                if remove and file_type in {'assembly', 'gff3'}:
+                    break
         eprint('\t\t' + file_type + ': ' + os.path.basename(file_path), flush = True)
 
     return dwnlds, count

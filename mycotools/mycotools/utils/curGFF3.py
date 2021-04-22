@@ -162,7 +162,10 @@ def curGff3( gff_list, ome ):
 
 def main( gff_path, ome):
 
-    gff = gff2dict( formatPath(gff_path) )
+    if isinstance(gff_path, str):
+        gff = gff2dict( formatPath(gff_path) )
+    elif isinstance(gff_path, list):
+        gff = gff_path
     typ = acquireFormat( gff )
 
     if not typ:
