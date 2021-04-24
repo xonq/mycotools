@@ -146,7 +146,7 @@ def curGff3( gff_list, ome ):
             break
     if not prot_comp:
         eprint('\tERROR: ' + ome + ' no known protein IDs', flush = True)
-        return gff_list
+        raise GffFailed
 
     if not cur_list:
         cur_list = curGff3pass1( gff_list, prot_comp, ome )

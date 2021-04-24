@@ -4,10 +4,10 @@
 
 
 - **MYCODB TOOLS**
-	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycodb-tools)
+	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotoolsdb-tools)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
-	- [Substitute organism name for MycoDB organism code](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#ome2name.py)
+	- [Substitute organism name for MycoToolsDB organism code](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#ome2name.py)
 
 <br />
 
@@ -24,8 +24,8 @@
 
 
 - **ANALYSES**
-	- [MycoDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycodb)
-	- [MycoDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
+	- [MycoToolsDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycotoolsdb)
+	- [MycoToolsDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
 	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hiearchical-agglomerative-clustering)
 
@@ -35,14 +35,14 @@
 
 
 # MYCOTOOLS DB
-The following are information regarding scripts that manipulate Mycotools .db files. To learn more about Mycotools .db, you may refer to the master [MycotoolsDB repository](https://gitlab.com/xonq/mycodb/-/README.md) (currently unavailable).
+The following are information regarding scripts that manipulate Mycotools .db files. To learn more about Mycotools .db, you may refer to the master [MycotoolsDB repository](https://gitlab.com/xonq/mycotoolsdb/-/README.md) (currently unavailable).
 
 <br /><br />
 
 
 ## Interfacing with the master database
 ### mycodb
-`mycodb` is a standalone script that simply retrieves and prints the path of the master database, which can then be used with other shell commands. MycoDBs are labelled `YYYYmmdd.db`.
+`mycodb` is a standalone script that simply retrieves and prints the path of the master database, which can then be used with other shell commands. MycoToolsDBs are labelled `YYYYmmdd.db`.
 ```bash
 -bash-4.2$ mycodb
 /home/xonq/mycodb/mycodb/20210125.db
@@ -77,7 +77,7 @@ grab a list of `ome`s in a new line delimited file: `extractDB.py ---ome <OME_FI
 
 ## Acquiring database files
 ### dbFiles.py
-Inputs a MycoDB `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
+Inputs a MycoToolsDB `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
 
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```
@@ -98,16 +98,16 @@ dbFiles.py -i atheliaceae.db -p -l
 <br /><br />
 
 
-## Other MycoDB scripts
+## Other MycoToolsDB scripts
 ### ome2name.py
-Substitutes MycoDB organism code names (e.g. `fusgra1`) for taxonomic information (e.g. Fusarium_graminearum_var._XYZ).
+Substitutes MycoToolsDB organism code names (e.g. `fusgra1`) for taxonomic information (e.g. Fusarium_graminearum_var._XYZ).
 
 e.g. to substitute ome for genus species and strain: `ome2name.py <INPUT> oa`
 ```
 USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCODB] asvg*&
 DEFAULTS: master db, see script for default forbidden characters
 Input file to regex sub omes with their name.
-optional MycoDB, string of forbidden characters
+optional MycoToolsDB, string of forbidden characters
 "o" no ome | "g" no genus | "s" no species | "v" no strain | "a" no alternative ome
 ```
 
@@ -126,7 +126,7 @@ annotationStats.py <ANNOTATION.gff3>
 
 ## Downloading files
 ### jgiDwnld.py / ncbiDwnld.py
-These scripts` input can be obtained from the MycoDB as described below, or can be manually made as shown at the bottom of this section. Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus* for both JGI & NCBI:
+These scripts` input can be obtained from the MycoToolsDB as described below, or can be manually made as shown at the bottom of this section. Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus* for both JGI & NCBI:
 ```
 mkdir dwnldFiles && cd dwnldFiles
 extractDB.py -s jgi -c genus -t aspergillus > aspergillus.db_jgi
@@ -167,10 +167,10 @@ SAMN02744098
 
 ## Grab accessions
 ### acc2fa.py / acc2gff.py
-By default, if you are querying using a MycoDB accession then it can search the database without a standalone file.
+By default, if you are querying using a MycoToolsDB accession then it can search the database without a standalone file.
 Let's say you want to query *Panaeolus cyanescens'* PsiD and the NCBI accession is "PPQ80975.1". Find Panaelous cyanescens' ome code in the database:
 ```
-grep Panaeolus $(mycodb) | grep cyanescens | cut -f 1
+grep Panaeolus $(mycotoolsdb) | grep cyanescens | cut -f 1
 ```
 
 The first column in the output is `pancya1`, which is the ome code for this organism. Now, prepend the code to the accession and grab it from the db (you can use `>` after the commands to pipe output to a file):
@@ -221,12 +221,12 @@ fibsp.1_906343
 
 ## Curate annotation
 ### curAnnotation.py
-`curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and add an `Alias=<PREFIX>` field for MycoDB compatible accession for each entry.
+`curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and add an `Alias=<PREFIX>` field for MycoToolsDB compatible accession for each entry.
 
 e.g. `curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/results/results.aa.fa -p newname`
 
 ### curGFF3.py / curProteome.py / gff2gff3.py
-There are several scripts in the `utils` used to curate gene coordinate files and proteomes for the MycoDB. `curGFF3.py` is tested with both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycoDB compatible `gff3`, and `curProteome.py` curates NCBI or JGI proteomes.
+There are several scripts in the `utils` used to curate gene coordinate files and proteomes for the MycoToolsDB. `curGFF3.py` is tested with both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycoToolsDB compatible `gff3`, and `curProteome.py` curates NCBI or JGI proteomes.
 
 <br /><br />
 
@@ -248,9 +248,9 @@ make SVGs for all GFF3s in a new line delimited list with width set to 20:
 <br /><br /><br />
 
 # EVOLUTIONARY ANALYSIS TOOLS
-## BLAST MycoDB
+## BLAST MycoToolsDB
 ### db2blast.py
-`db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycoDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
+`db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycoToolsDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
 
 ```
 usage: db2blast.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
@@ -273,7 +273,7 @@ optional arguments:
   -m MAXHITS, --maxhits MAXHITS
                         Max hits for each organism
   -d DATABASE, --database DATABASE
-                        mycodb, DEFAULT: masterdb
+                        mycotoolsdb, DEFAULT: masterdb
   -o OUTPUT, --output OUTPUT
   -p PREVIOUS, --previous PREVIOUS
                         Previous run directory
@@ -283,7 +283,7 @@ optional arguments:
 <br /><br />
 
 
-## hmmsearch MycoDB
+## hmmsearch MycoToolsDB
 ### db2hmmsearch.py
 `db2hmmsearch.py` will compile hmmsearch results, optionally ouput fasta/hmmalign to original models/trim alignments from a profile hidden markov model. This script supports multiprocessing and uses all detected cores by default.
 
@@ -342,7 +342,7 @@ fa2tree.py -i <FASTA>.fa -t iqtree
 Hiearchical agglomerative clustering is a useful systematic approach to
 extracting groups of sequences for phylogenetic analysis. Ubiquitous genes,
 like P450s, will often yield 10,000s of results for BLAST searches against the
-MycoDB. Constructing and visualizing a tree of this magnitude just is not
+MycoToolsDB. Constructing and visualizing a tree of this magnitude just is not
 practical in many cases; it is therefore necessary to decrease the size of the 
 dataset to a workable size while relying on biological information (global
 pairwise alignments).

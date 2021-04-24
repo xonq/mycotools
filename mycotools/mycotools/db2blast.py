@@ -229,7 +229,6 @@ def dbBlast(
     if hsps:
         blast_scaf.extend(['-max_hsps', str(hsps)])
 
-
     blast_call = subprocess.call(
         blast_scaf, stdout = subprocess.PIPE,
         stderr = subprocess.PIPE
@@ -238,7 +237,7 @@ def dbBlast(
     return blast_call, out_file
 
 
-def parseDBout( file_, bitscore = 0, pident = 0, max_hits = None ):
+def parseDBout( db, file_, bitscore = 0, pident = 0, max_hits = None ):
 
     ome_results = {}
     with open( file_, 'r' ) as raw:
@@ -250,15 +249,21 @@ def parseDBout( file_, bitscore = 0, pident = 0, max_hits = None ):
                     ome_results[ome] = []
                 ome_results[ome].append(data)
 
+    x_omes = set(db['internal_ome'])
+    omes_results = {
+        x: ome_results[x] for x in ome_results if x in x_omes
+        }
+
     if max_hits:
         out_results = {}
         for ome in ome_results:
             ome_results[ome].sort(key = lambda x: int(x[-1]), reverse = True)
             out_results[ome] = ome_results[ome][:max_hits]
         return out_results
-
-    return ome_results
-
+    else:
+        for ome in ome_results:
+            ome_results[ome].sort(key = lambda x: int(x[-1]), reverse = True)
+            return ome_results
 
 
 def main( 
@@ -292,7 +297,7 @@ def main(
             eprint('\nERROR: blast failed: ' + str(blast_exit))
             sys.exit(10)
         results_dict = parseDBout(
-            blast_output, bitscore = bitscore, 
+            db, blast_output, bitscore = bitscore, 
             pident = pident, max_hits = max_hits
             )
     else:

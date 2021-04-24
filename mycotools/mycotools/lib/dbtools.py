@@ -6,6 +6,7 @@ import sys, os, time, mycotools.lib.fastatools, json, re, datetime, hashlib, get
 from mycotools.lib.kontools import collect_files, eprint, formatPath
 from Bio import Entrez
 from urllib.error import HTTPError
+from io import StringIO
 
 def getLogin( ncbi, jgi ):
 
@@ -182,16 +183,21 @@ def masterDB( path = '$MYCODB' ):
  
 # imports database, converts into df
 # returns database dataframe
-def db2df(db_path):
+def db2df(data, stdin = False):
 
-    db_path = formatPath( db_path )
-    db_df = pd.read_csv( db_path, sep='\t' )
-    if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
-        headers = [ 'internal_ome', 'genus', 'species', 'strain', 'version', 
-            'biosample', 'assembly', 'proteome', 'gff3',
-            'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-            'genome_code', 'acquisition_date' ]
-        db_df = pd.read_csv( db_path, sep = '\t', names = headers )
+    headers = [ 'internal_ome', 'genus', 'species', 'strain', 'version', 
+        'biosample', 'assembly', 'proteome', 'gff3',
+        'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
+        'genome_code', 'acquisition_date' ]
+    if not stdin:
+        data = formatPath( data )
+        db_df = pd.read_csv( data, sep='\t' )
+        if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
+            db_df = pd.read_csv( data, sep = '\t', names = headers )
+    else:
+        db_df = pd.read_csv( StringIO(data), sep='\t' )
+        if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
+            db_df = pd.read_csv( StringIO(data), sep = '\t', names = headers )
 
     return db_df
 
@@ -451,17 +457,12 @@ def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid={'no rank',
 
 
 # extract taxonomy and return a database with just the taxonomy you are interested in
-# NEED TO SIMPLIFY THE PUBLISHED STATEMENT TO SIMPLY DELETE ALL VALUES THAT ARENT 1 WHEN PUBLISHED = 1
 def extract_tax(db, taxonomy, classification, inverse = False ):
 
     if type(taxonomy) == str:
         taxonomy = [taxonomy]
 
     taxonomy = set(x.lower() for x in taxonomy)
-
-    if not classification or not taxonomy:
-        eprint('\nERROR: Abstracting via taxonomy requires both taxonomy name and classification.', flush = True)
-
     new_db = pd.DataFrame()
 
 # `genus` is a special case because it has its own column, so if it is not a genus, we need to read the taxonomy
@@ -472,14 +473,18 @@ def extract_tax(db, taxonomy, classification, inverse = False ):
             if classification in row_taxonomy:
                 if row_taxonomy[classification].lower() in taxonomy and not inverse:
                     new_db = new_db.append(row)
+                elif inverse and row_taxonomy[classification].lower() not in taxonomy:
+                    new_db = new_db.append(row)
+            elif inverse:
+               new_db = new_db.append(row)
 
 # if `classification` is `genus`, simply check if that fits the criteria in `taxonomy`
     elif classification == 'genus':
-        for i,row in db.iterrows():
-            if row['genus'].lower() in taxonomy and not inverse:
-                new_db = new_db.append(row)
-            elif row['genus'].lower() not in taxonomy and inverse:
-                new_db = new_db.append(row)
+        taxonomy = set(x[0].upper() + x[1:].lower() for x in taxonomy)
+        if not inverse:
+            new_db = db[db['genus'].isin(taxonomy)]
+        else:
+            new_db = db[~db['genus'].isin(taxonomy)]
 
     return new_db
 

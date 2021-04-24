@@ -63,7 +63,7 @@ def compileLog( output_path, remove = False ):
 def collect_ftps(
     ncbi_df, ass_prots, api_key=0,
     column='Assembly Accession', database="assembly", output_path = '',
-    verbose=True
+    verbose=True, remove = False
     ):
 
     eprint('\nAssembling NCBI ftp directories', flush = True)
@@ -205,7 +205,7 @@ def collect_ftps(
         if transcript in md5s:
             trans_md5 = md5s[transcript]
 
-        if any(not ass_prots[str(index)][x] for x in ['assembly', 'gff3']):
+        if (not assembly or not gff3) and remove:
             failed.append([row['biosample'], datetime.strftime(row['version'], '%Y%m%d')])
 
         log_editor( 
@@ -325,7 +325,7 @@ def download_files( ome_prots, ome, file_types, output_dir, count, remove = Fals
     return dwnlds, count
 
 
-def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False ):
+def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False, remove = False ):
 
     failed = []
     if 'biosample' in ncbi_df.keys():
@@ -335,13 +335,14 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False ):
             ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, 
                 column = 'biosample', api_key=api,
-                output_path = output_path, verbose = verbose
+                output_path = output_path, verbose = verbose,
+                remove = remove
                 )
     elif 'internal_ome' in ncbi_df.keys():
         ncbi_df = ncbi_df.set_index('internal_ome')
         if not all( x in ass_prots for x in ncbi_df.index ):
             ass_prots, failed = collect_ftps( 
-                ncbi_df, ass_prots, 
+                ncbi_df, ass_prots, remove = remove,
                 api_key=api, output_path = output_path, verbose = verbose
                 )
     else:
@@ -350,7 +351,7 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False ):
         ncbi_df.index = ncbi_df.index.astype(str)
         if not all( x in ass_prots for x in ncbi_df.index ):
             ass_prots, failed = collect_ftps( 
-                ncbi_df, ass_prots, 
+                ncbi_df, ass_prots, remove = remove,
                 column = ncbi_df.columns[0], api_key=api,
                 output_path = output_path, verbose = verbose
             )
@@ -382,7 +383,7 @@ def main(
 
     failed = []
     ncbi_df, ass_prots, failed = callDwnldFTPs( 
-        ncbi_df, ass_prots, api, output_path, verbose 
+        ncbi_df, ass_prots, api, output_path, verbose, remove
         )
     if remove:
         ass_prots = { 
