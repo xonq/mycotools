@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import datetime, sys, glob, os, re, subprocess, gzip, shutil
+import datetime, sys, glob, os, re, subprocess, gzip, shutil, json
 import numpy as np
 
 def eprint( *args, **kwargs ):
@@ -17,6 +17,19 @@ def vprint( toPrint, v = False, e = False , flush = True):
             eprint( toPrint, flush = True)
         else:
             print( toPrint, flush = True)
+
+
+def readJson( config_path ):
+
+    with open( config_path, 'r' ) as json_raw:
+        json_dict = json.load( json_raw )
+
+    return json_dict
+   
+
+def writeJson(json_path, obj, **kwargs):
+    with open(json_path, 'w') as json_out:
+        json.dump(obj, json_out, **kwargs)
 
 
 def gunzip( gzip_file, remove = True, spacer = '\t' ):
@@ -36,6 +49,36 @@ def gunzip( gzip_file, remove = True, spacer = '\t' ):
             if os.path.isfile( gzip_file ):
                 os.remove( new_file )
         return False
+
+
+def fmt_float(val):
+
+    val_str = str(val)
+    e = val_str.index('e')
+    if e:
+        dig = val_str[:e].replace('.','')
+        num = val_str[e + 1:]
+        if num.startswith('-'):
+            val_op = '0.'
+            for i in range(abs(int(num))-1):
+                val_op += '0'
+            val_str = val_op + dig.replace('.','')
+        else:
+            num = abs(int(num))
+            if len(dig) > num:
+                val_op = list(dig) 
+                val_op.insert('.',num+1)
+                val_str = ''.join(val_op)
+            else:
+                zeroes = num + 1 - len(dig)
+                val_op = dig
+                for i in range(zeroes):
+                    val_op += '0'
+                val_str = val_op
+
+    return val_str       
+
+
 
 
 def findExecs( deps, exit = set(), verbose = True ):

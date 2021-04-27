@@ -111,13 +111,6 @@ def genConfig(
     return config
 
 
-def readJson( config_path ):
-
-    with open( config_path, 'r' ) as json_raw:
-        json_dict = json.load( json_raw )
-
-    return json_dict
-    
 
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit` 
 def log_editor( log, ome, edit ):
@@ -352,7 +345,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'
     tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
 
     for genus in tax_dicts:
-        if tax_dicts[genus]:
+        if any(tax_dicts[genus][x] for x in tax_dicts[genus]):
             continue
         print('\t' + genus, flush = True)
 # if there is no api key, sleep for a second after 3 queries
@@ -395,13 +388,17 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'
 
 # for each lineage, if it is a part of the kingdom, `king`, use that TaxID
 # if there are multiple TaxIDs, use the first one found
-        for lineage in lineages:
-            if lineage['Rank'] == 'kingdom':
-                if lineage['ScientificName'].lower() == king:
-                    taxid = tax
-                    if len(ids) > 1:
-                        print('\t\tTax ID(s): ' + str(ids), flush = True)
-                    break
+        if king:
+            for lineage in lineages:
+                if lineage['Rank'] == 'kingdom':
+                    if lineage['ScientificName'].lower() == king:
+                        taxid = tax
+                        if len(ids) > 1:
+                            print('\t\tTax ID(s): ' + str(ids), flush = True)
+                        break
+        else:
+            for lineage in lineages:
+                taxid = tax 
        
         if taxid == 0:
             print('\t\tNo taxonomy information', flush = True)
@@ -429,9 +426,11 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'
 # read taxonomy by conterting the string into a dictionary using `json.loads`
 def read_tax(taxonomy_string):
    
+    tax_strs = ['kingdom', 'phylum', 'subphylum', 'class', 'order', 'family', 'subfamily']
     if taxonomy_string: 
         dict_string = taxonomy_string.replace("'",'"')
         tax_dict = json.loads(dict_string)
+        tax_dict = {**tax_dict, **{x: '' for x in tax_strs if x not in tax_dict}}
         return tax_dict
     else:
         return None

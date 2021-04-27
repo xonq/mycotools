@@ -4,7 +4,7 @@ from Bio import Entrez
 import pandas as pd, numpy as np
 import argparse, os, time, subprocess, sys, requests, re, gzip
 from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint
-from mycotools.lib.dbtools import log_editor
+from mycotools.lib.dbtools import log_editor, loginCheck
 from datetime import datetime
 
 
@@ -37,7 +37,7 @@ def compileLog( output_path, remove = False ):
     if not os.path.isfile( output_path + 'ncbiDwnld.log' ):
         with open( output_path + 'ncbiDwnld.log', 'w' ) as out:
             out.write('#ome\tbiosample\tassembly\tproteome\tgff3\ttranscript\t' + \
-            'assemMD5\tprotMD5\tgff3MD5\ttransMD5')
+            'assemMD5\tprotMD5\tgff3MD5\ttransMD5\tgenome_id(s)')
 
         # too risky, too many things can go wrong and then users would be in a
         # loop, but necessary for huge downloads
@@ -53,7 +53,7 @@ def compileLog( output_path, remove = False ):
                         'proteome': str(data[3]), 'gff3': str(data[4]), 
                         'transcript': str(data[5]), 'assembly_md5': str(data[6]),
                         'proteome_md5': str(data[7]), 'gff3_md5': str(data[8]),
-                        'transcript_md5': str(data[9])
+                        'transcript_md5': str(data[9]), 'genome_id': data[10].split(',')
                         }
 
     return ass_prots
@@ -81,7 +81,7 @@ def collect_ftps(
                 'biosample': failure_acc, 'assembly': '',
                 'proteome': '', 'gff3': '', 'transcript': '',
                 'assembly_md5': '', 'proteome_md5': '',
-                'gff3_md5': '', 'transcript_md5': ''
+                'gff3_md5': '', 'transcript_md5': '', 'genome_id': ''
                 }
             failed.append([failure_acc, datetime.strftime(row['version'], '%Y%m%d')])
             continue
@@ -107,13 +107,16 @@ def collect_ftps(
             if 'internal_ome' in row.keys():
                 accession = row['internal_ome']
             eprint('\t' + accession + ' failed to find genome ID', flush = True)
-            failed.append( [failure_acc, datetime.strftime(row['version'], '%Y%m%d')] )
+            try:
+                failed.append( [failure_acc, datetime.strftime(row['version'], '%Y%m%d')] )
+            except TypeError:
+                failed.append( [failure_acc, row['version']] )
             continue
         ass_prots[str(index)] = {
             'biosample': '', 'assembly': '', 'proteome': '',
             'gff3': '', 'transcript': '', 'assembly_md5': '',
             'proteome_md5': '', 'gff3_md5': '', 
-            'transcript_md5': ''
+            'transcript_md5': '', 'genome_id': genome_id
             }
 
 
@@ -212,14 +215,15 @@ def collect_ftps(
             output_path + 'ncbiDwnld.log', str(index), 
             str(index) + '\t' + accession + '\t' +  assembly + '\t' + \
             proteome + '\t' + gff3 + '\t' + transcript + '\t' + \
-            ass_md5 + '\t' + prot_md5 + '\t' + gff_md5 + '\t' + trans_md5
+            ass_md5 + '\t' + prot_md5 + '\t' + gff_md5 + '\t' + trans_md5 + \
+            '\t' + ','.join(genome_id)
             )
         ass_prots[str(index)] = {
             'assembly': assembly, 'assembly_md5': ass_md5,
             'proteome': proteome, 'proteome_md5': prot_md5,
             'gff3': gff3, 'gff3_md5': gff_md5,
             'transcript': transcript, 'transcript_md5': trans_md5,
-            'biosample': accession
+            'biosample': accession, 'genome_id': genome_id
             }
 
 # if no API key is used, we can only generate 3 queries per second, otherwise we can use 10
@@ -297,8 +301,9 @@ def download_files( ome_prots, ome, file_types, output_dir, count, remove = Fals
                 '\t' + ome_prots['transcript'] + '\t' + \
                 ome_prots['assembly_md5'] + '\t' + \
                 ome_prots['proteome_md5'] + '\t' + \
-                ome_prots['gff3_md5'] + '\t' +
-                ome_prots['transcript_md5'] )
+                ome_prots['gff3_md5'] + '\t' + \
+                ome_prots['transcript_md5'] ) + '\t' + \
+                ','.join(ome_prots['genome_id'])
             if remove and file_type in {'assembly', 'gff3'}:
                 break
             continue
@@ -360,7 +365,7 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False, remove
 
 
 def main( 
-    email = '', api = None, 
+    api = None, 
     assembly = True, proteome = True, gff3 = True, transcript = False,
     ncbi_df = False, remove = False, output_path = os.getcwd(), verbose = False
     ):
@@ -452,20 +457,14 @@ if __name__ == "__main__":
     help = 'Download gff3s')
     parser.add_argument( '-t', '--transcript', action = 'store_true', \
     help = 'Download transcripts' )
-    parser.add_argument( '-e', '--email', help = 'NCBI login email' )
-    parser.add_argument( '-k', '--key', \
-    help = 'API key to expedite interfacing with NCBI' )
     parser.add_argument( '-o', '--output', help = 'Output directory' )
     args = parser.parse_args()
 
-    if not args.email:
-        args.email = input( 'NCBI login email: ' )
-        if not args.key:
-            args.key = input( 'NCBI api key (leave blank if none: ' )
+    ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False) 
 
-    Entrez.email = args.email
-    if args.key:
-        Entrez.api_key = args.key
+    Entrez.email = ncbi_email
+    if ncbi_api:
+        Entrez.api_key = ncbi_api
 
     if not args.output:
         output = os.getcwd()
@@ -474,7 +473,7 @@ if __name__ == "__main__":
 
     args_dict = {
         'NCBI Table': args.input,
-        'email': args.email,
+        'email': ncbi_email,
         'Assemblies': args.assembly,
         'Proteomes': args.proteome,
         ".gff3's": args.gff3,

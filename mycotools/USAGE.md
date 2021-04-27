@@ -3,7 +3,7 @@
 <br />
 
 
-- **MYCODB TOOLS**
+- **MYCOTOOLSDB TOOLS**
 	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotoolsdb-tools)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
@@ -77,7 +77,7 @@ grab a list of `ome`s in a new line delimited file: `extractDB.py ---ome <OME_FI
 
 ## Acquiring database files
 ### dbFiles.py
-Inputs a MycotoolsDB `.db` file (by default uses the master database), then pulls the selected file types or prints their PATHs.
+Inputs a MycotoolsDB `.db` file (by default uses the master database), then creates symlinks of the selected file types, hard copies the files, or prints their PATHs. A symlink is simply creating a placeholder file that links to the database file... this way it does not take up additional storage space like a hard copy does. However, editing symlinks will edit the original file, so *only hard copy `--hard` if you need to edit the files*.
 
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```
@@ -87,12 +87,12 @@ extractDB.py -r family -l Atheliaceae > atheliaceae.db
 
 Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
 ```
-dbFiles.py -i atheliaceae.db -p 
+dbFiles.py -d atheliaceae.db -p 
 ```
 
 Alternatively, if you just need the paths (links) to these files, simply run:
 ```
-dbFiles.py -i atheliaceae.db -p -l
+dbFiles.py -d atheliaceae.db -p --print
 ```
 
 <br /><br />
@@ -104,7 +104,7 @@ Substitutes MycotoolsDB organism code names (e.g. `fusgra1`) for taxonomic infor
 
 e.g. to substitute ome for genus species and strain: `ome2name.py <INPUT> oa`
 ```
-USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCODB] asvg*&
+USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCOTOOLSDB] asvg*&
 DEFAULTS: master db, see script for default forbidden characters
 Input file to regex sub omes with their name.
 optional MycotoolsDB, string of forbidden characters
@@ -194,7 +194,7 @@ Inputs an accession (`-a`) or new line separated list of accessions and optional
 
 output gff and protein fasta of an accession's cluster (outputs to `<ACCESSION>_clus*`):
 ```
-grabLoci.py -o -a <MYCODB_ACCESSION>
+grabLoci.py -o -a <MYCOTOOLSDB_ACCESSION>
 ```
 
 list proximal +/- 5 genes to standard out:
