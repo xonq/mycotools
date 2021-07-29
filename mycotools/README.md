@@ -44,8 +44,8 @@ pip install mycotools
 Many of my scripts interface with [MycotoolsDBs](https://gitlab.com/xonq/MycotoolsDB/-/blob/master/README.md). If you are using the Ohio Supercomputer and have access to PAS1046, then simply append these commands to your `~/.bash_profile` in your OSC home folder.
 ```
 export MYCODB=/fs/project/PAS1046/databases/mycodb 	# database
-export MYCOFNA=$MYCODB/assembly/ 	# database assemblies
-export MYCOFAA=$MYCODB/proteome/ 	# database proteomes
+export MYCOFNA=$MYCODB/fna/ 	# database assemblies
+export MYCOFAA=$MYCODB/faa/ 	# database proteomes
 export MYCOGFF3=$MYCODB/gff3/ 		# database gff3s
 ```
 
