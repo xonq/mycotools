@@ -69,13 +69,13 @@ def parseHmmData(hmm_data):
     return output_res
 
 
-def runAcc2fa(db, biotype, output_res, cpu = 1):
+def runAcc2fa(db, biotype, output_res, subhit = True, cpu = 1):
 
     if biotype == 'assembly':
         env_dir = os.environ['MYCOFNA'] + '/'
     else:
         env_dir = os.environ['MYCOFAA'] + '/'
-    acc2fa_cmds = compAcc2fa(db, biotype, env_dir, output_res, subhit = True)
+    acc2fa_cmds = compAcc2fa(db, biotype, env_dir, output_res, subhit)
     output_fas = {}
     for query in acc2fa_cmds:
         print('\t' + query, flush = True)
@@ -96,7 +96,7 @@ def outputFas(output_fas, output_dir, fastaname):
 def main(
     db, binary, fasta_path, hmm_path, out_dir, accession, 
     top_hits = None, cov_threshold = None, evalue = None,
-    cpu = 1, accession_search = False 
+    cpu = 1, accession_search = False, subhit = True 
     ):
 
     if binary == 'nhmmer':
@@ -134,7 +134,7 @@ def main(
     output_res = parseHmmData(hmm_data)
 
     print('\nCompiling fastas', flush = True)
-    output_fas = runAcc2fa(db, biotype, output_res, cpu = cpu)
+    output_fas = runAcc2fa(db, biotype, output_res, subhit = subhit, cpu = cpu)
 
     return output_fas
 
@@ -151,6 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--database', default = masterDB(), help = 'MycoDB. DEFAULT: master')
     parser.add_argument('-q', '--query', help = 'Query [acc if -a] from .hmm, or new line delimited file')
     parser.add_argument('-c', '--coverage', type = float, help = 'Decimal minimum percent hmm coverage')
+    parser.add_argument('-w', '--whole', action = 'store_true', help = 'Extract entire hit sequence' )
     parser.add_argument('-e', '--evalue', type = int, help = 'Maximum evalue threshold 10^(-x)')
     parser.add_argument(
         '-a', '--accession', action = 'store_true', help = 'Extract accession, not query, from .hmm'
@@ -182,7 +183,7 @@ if __name__ == '__main__':
     args_dict = {
         'Fasta': formatPath(args.fasta), 'Hmm': formatPath(args.hmm), 'Binary': args.binary,
         'MycoDB': formatPath(args.database), 'Hmm Acc': args.query, 'Min Coverage': args.coverage,
-        'Max E-value': evalue, 'Accessions': args.accession, 'Output': out_dir, 'CPU': args.cpu
+        'Max E-value': evalue, 'Accessions': args.accession, 'Full Seq': args.whole, 'Output': out_dir, 'CPU': args.cpu
         }
     start_time = intro('fa2hmmer2fa', args_dict)
 
@@ -195,7 +196,7 @@ if __name__ == '__main__':
     output_fas = main(
         db2df(args.database), args.binary, args.fasta, args.hmm, out_dir, args.query,
         cov_threshold = args.coverage, evalue = args.evalue, cpu = args.cpu,
-        accession_search = args.accession
+        accession_search = args.accession, subhit = not args.whole
         )
     fastaname = re.sub(r'\.fa[^\.]*$', '', os.path.basename(os.path.abspath(args.fasta)))
     outputFas(output_fas, out_dir, fastaname)

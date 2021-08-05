@@ -4,6 +4,14 @@
 from mycotools.lib.kontools import eprint
 import re, sys
 
+aa_weights = {
+    'A': 89.1, 'R': 174.2, 'N': 132.1, 'D': 133.1, 'C': 121.2, 'E': 147.1,
+    'Q': 146.2, 'G': 75.1, 'H': 155.2, 'I': 131.2, 'L': 131.2, 'K': 146.2,
+    'M': 149.2, 'F': 165.2, 'P': 115.1, 'S': 105.1, 'T': 119.1, 'W': 204.2,
+    'Y': 181.2, 'V': 117.1
+    }
+aa_weights['X'] = sum(aa_weights.values())/len(aa_weights)
+
 # codon translation table
 translation_table = {
     'GCT':'A', 'GCC':'A', 'GCA':'A', 'GCG':'A',
@@ -39,6 +47,15 @@ rev_comp_table = {
     'h': 'd', 'v': 'b', 'W': 'W', 'S': 'S',
     'w': 'w', 's': 's'
     }
+
+
+def calc_weight(seq):
+    seq = seq.replace('*','')
+    weight = aa_weights[seq[0]]
+    for char in seq[1:]:
+        weight += aa_weights[char] - 18.01
+    return weight
+
 
 
 def reverse_complement(seq):
@@ -252,9 +269,23 @@ def grabGffAcc( gff_list, acc ):
             alias_on in x['attributes'] 
 # timed slower        if re.search(alias + r'(?:;|$)', x['attributes'])
         ]
-    
     return out_list
 
+
+def grabGffAccs(gff_list, acc_list):
+
+    aliases, ends = set(), set()
+    for acc in acc_list:
+        aliases.add('Alias=' + acc)
+        ends.add('Alias=' + acc + ';')
+    out_list = []
+    for i in gff_list:
+        if any(i['attributes'].endswith(x) for x in aliases):
+            out_list.append(i)
+        elif any(x in i['attributes'] for x in ends):
+            out_list.append(i)
+
+    return out_list
 
 def compileExon( gff ):
 	

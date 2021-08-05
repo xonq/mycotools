@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 
 from mycotools.lib.kontools import formatPath, sysStart, eprint
 from mycotools.lib.dbtools import db2df, masterDB

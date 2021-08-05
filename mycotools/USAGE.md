@@ -144,7 +144,7 @@ You will now see folders named after the file types you downloaded and the compr
 <br />
 
 
-Manually created input files - the important thing is the column has the exact appropriate header ('genome_code' or 'biosample') (substitute `-i aspergillus.db` with this file):
+You can optionally input a single biosample (NCBI) or genome code (JGI) for `-i` or alternatively, a manually created input file - the important thing is the column has the exact appropriate header ('genome_code' or 'biosample') (substitute `-i aspergillus.db` with this file):
 
 `jgiGenomeCodes.txt`
 ```

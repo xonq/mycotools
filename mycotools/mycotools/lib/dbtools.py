@@ -433,7 +433,7 @@ def read_tax(taxonomy_string):
         tax_dict = {**tax_dict, **{x: '' for x in tax_strs if x not in tax_dict}}
         return tax_dict
     else:
-        return None
+        return {}
 
 
 # assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database

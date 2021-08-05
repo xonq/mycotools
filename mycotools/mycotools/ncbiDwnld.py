@@ -3,7 +3,7 @@
 from Bio import Entrez
 import pandas as pd, numpy as np
 import argparse, os, time, subprocess, sys, requests, re, gzip
-from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint
+from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint, findExecs
 from mycotools.lib.dbtools import log_editor, loginCheck
 from datetime import datetime
 
@@ -377,8 +377,10 @@ def main(
 
     ass_prots = compileLog(output_path, remove )
 
-    if not isinstance(ncbi_df, pd.DataFrame):
+    if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
         ncbi_df = pd.read_csv( ncbi_df, sep = '\t' )
+    else:
+        ncbi_df = pd.DataFrame({'biosample': [ncbi_df]})
     if 'BioSample Accession' in ncbi_df.keys() and not 'biosample' in ncbi_df.keys():
         ncbi_df['biosample'] = ncbi_df['BioSample Accession']
     if 'Modify Date' in ncbi_df.keys() and not 'version' in ncbi_df.keys():
@@ -441,14 +443,68 @@ def main(
     return new_df, failed
 
 
+def getSRA(biosample, fastqdump = 'fastq-dump', pe = True):
+
+    handle = Entrez.esearch(db='SRA', term=biosample)
+    id = Entrez.read(handle)['IdList'][0]
+    handle = Entrez.esummary(db='SRA', id = id, report='full')
+    records = Entrez.read(handle, validate = False)
+    for record in records:
+        srr = re.search(r'Run acc="(S\w+\d+)"', record['Runs'])[1]
+        print('\t\t' + srr, flush = True)
+        if pe:
+            subprocess.call([
+                fastqdump, '--gzip', '--split-3', srr], 
+                stdout = subprocess.PIPE)
+            if os.path.isfile(srr + '_1.fastq.gz'):
+                os.rename(srr + '_1.fastq.gz', biosample + '_' + srr + '_1.fq.gz')
+                os.rename(srr + '_2.fastq.gz', biosample + '_' + srr + '_2.fq.gz')
+            else:
+                print('\t\t\tERROR: file failed', flush = True)
+        else:
+            subprocess.call([
+                fastqdump, '--gzip', srr],
+                stdout = subprocess.PIPE)
+            if os.path.isfile(srr + '.fastq.gz'):
+                os.rename(srr + '.fastq.gz', biosample + '_' + srr + '.fq.gz')
+            else:
+                print('\t\t\tERROR: file failed', flush = True)
+#        subprocess.run(['gzip', srr + '.fastq'], 
+ #           stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+
+
+def goSRA(df, output = os.getcwd() + '/', pe = True):
+
+    print()
+    sra_dir = output + 'sra/'
+    if not os.path.isdir(sra_dir):
+        os.mkdir(sra_dir)
+    os.chdir(sra_dir)
+    fastqdump = findExecs('fastq-dump', exit = set('fastq-dump'))
+    count = 0
+
+    if 'sra' in df.keys():
+        row_key = 'sra'
+    else:
+        row_key = 'biosample'
+
+    for i, row in df.iterrows():
+        print('\t' + row[row_key], flush = True)
+        getSRA(row[row_key], fastqdump[0])
+        count +=1
+        if count >= 10:
+            time.sleep(1)
+            count = 0
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser( description = \
     'Downloads assemblies, proteomes, and/or gff3s in current directory.' 
     )
     parser.add_argument( '-i', '--input', required = True, \
-    help = 'Imports tab delimited file with BioSample accessions under ' + \
-         'column "biosample" or an NCBI master tsv with curated codenames' )
+    help = 'Accession; tab delimited file with BioSample accessions under ' + \
+         'column "biosample" or "sra"; or an NCBI master tsv with curated codenames' )
     parser.add_argument( '-a', '--assembly', action = 'store_true', \
     help = 'Download assemblies')
     parser.add_argument( '-p', '--proteome', action = 'store_true', \
@@ -457,6 +513,10 @@ if __name__ == "__main__":
     help = 'Download gff3s')
     parser.add_argument( '-t', '--transcript', action = 'store_true', \
     help = 'Download transcripts' )
+    parser.add_argument( '-s', '--sra', action = 'store_true', \
+    help = 'Download SRAs only' )
+    parser.add_argument( '-pe', '--paired', action = 'store_true', \
+    help = 'Download paired-end SRAs. (REQUIRES -s)')
     parser.add_argument( '-o', '--output', help = 'Output directory' )
     args = parser.parse_args()
 
@@ -467,9 +527,9 @@ if __name__ == "__main__":
         Entrez.api_key = ncbi_api
 
     if not args.output:
-        output = os.getcwd()
+        output = os.getcwd() + '/'
     else:
-        output = args.output
+        output = formatPath(args.output)
 
     args_dict = {
         'NCBI Table': args.input,
@@ -477,19 +537,26 @@ if __name__ == "__main__":
         'Assemblies': args.assembly,
         'Proteomes': args.proteome,
         ".gff3's": args.gff3,
-        'Transcripts': args.transcript
+        'Transcripts': args.transcript,
+        'SRA': args.sra
     }
 
     start_time = intro('Download NCBI files',args_dict)
-    if not args.assembly and not args.proteome and not args.gff3:
+    if not args.assembly and not args.proteome and not args.gff3 and not args.sra:
         eprint('\nERROR: You must choose at least one download option\nExit code 37', flush = True)
         sys.exit( 37 )
 
-    new_df, failed = main( 
-        assembly = args.assembly,
-        proteome = args.proteome, gff3 = args.gff3, transcript = args.transcript,
-        ncbi_df = args.input, output_path = output, verbose = True
-        )
-    new_df.to_csv( args.input + '_dwnld', sep = '\t' )
+    if args.sra:
+        if os.path.isfile(args.input):
+            goSRA(pd.read_csv(args.input, sep = '\t'), output, pe = args.paired)
+        else:
+            goSRA(pd.DataFrame({'sra': [args.input.rstrip()]}), output, pe = args.paired)
+    else:
+        new_df, failed = main( 
+            assembly = args.assembly,
+            proteome = args.proteome, gff3 = args.gff3, transcript = args.transcript,
+            ncbi_df = args.input, output_path = output, verbose = True
+            )
+        new_df.to_csv( args.input + '_dwnld', sep = '\t' )
 
     outro(start_time)

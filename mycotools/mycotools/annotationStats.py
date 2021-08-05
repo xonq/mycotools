@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 from mycotools.lib.fastatools import gff2dict
+from mycotools.lib.kontools import formatPath
 import sys, re, os
 
 
@@ -79,13 +80,13 @@ if __name__ == '__main__':
     elif len( sys.argv ) < 2:
         print(usage, flush = True)
         sys.exit(1)
-    elif not os.path.isfile( sys.argv[1] ):
+    elif not os.path.isfile( formatPath(sys.argv[1]) ):
         print(usage, flush = True)
         sys.exit(1)
     elif len( sys.argv ) > 3:
         output = True       
 
-    exon_dict, geneStats = compileExon( sys.argv[1], output )
+    exon_dict, geneStats = compileExon( formatPath(sys.argv[1]), output )
     if output:
         out_str = 'total_len\tgenes\tmean_len\tmedian_len\n' + str(geneStats[0]) + '\t' + str(geneStats[1]) + '\t' \
             + str(geneStats[2]) + '\t' + str(geneStats[3])

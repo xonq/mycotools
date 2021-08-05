@@ -11,7 +11,7 @@ def extractHeaders( fasta_file, accessions, ome = None ):
 
     fasta = fasta2dict(fasta_file)
     out_fasta = {}
-    acc_comp = re.compile( r'(.*?)\[(\d+)\-(\d+)\]$' )
+    acc_comp = re.compile( r'([^/[]*)\[(\d+)\-(\d+)\]$' )
 
     for header in accessions:
         if '[' in header:
@@ -52,7 +52,7 @@ def dbmain( db, accs, column = None, start = None, end = None ):
 
     fasta_str = ''
     db = db.set_index( 'internal_ome' )
-    if type(accs) is not str:
+    if not isinstance(accs, str):
         omes_prep = re.findall( r'^.*?_', '\n'.join(list(accs[ column ])), re.M )
         omes = set( x[:-1] for x in omes_prep )
         accs = accs.set_index( column )

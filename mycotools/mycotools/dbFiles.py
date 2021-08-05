@@ -53,6 +53,10 @@ if __name__ == '__main__':
     parser.add_argument( '-o', '--output', default = os.getcwd() )
     args = parser.parse_args()
 
+    if not args.assembly and not args.proteome and not args.gff:
+        print('\nERROR: no file type (-a, -g, -p) selected', flush = True)
+        sys.exit(4)
+
     db_path = formatPath( args.database )
     output_path = prep_output( formatPath( args.output ), cd = False )
     args_dict = {

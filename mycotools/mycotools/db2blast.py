@@ -230,8 +230,8 @@ def dbBlast(
         blast_scaf.extend(['-max_hsps', str(hsps)])
 
     blast_call = subprocess.call(
-        blast_scaf, stdout = subprocess.PIPE,
-        stderr = subprocess.PIPE
+        blast_scaf#, stdout = subprocess.PIPE,
+    #    stderr = subprocess.PIPE
         )
 
     return blast_call, out_file
@@ -257,12 +257,12 @@ def parseDBout( db, file_, bitscore = 0, pident = 0, max_hits = None ):
     if max_hits:
         out_results = {}
         for ome in ome_results:
-            ome_results[ome].sort(key = lambda x: int(x[-1]), reverse = True)
+            ome_results[ome].sort(key = lambda x: float(x[-1]), reverse = True)
             out_results[ome] = ome_results[ome][:max_hits]
         return out_results
     else:
         for ome in ome_results:
-            ome_results[ome].sort(key = lambda x: int(x[-1]), reverse = True)
+            ome_results[ome].sort(key = lambda x: float(x[-1]), reverse = True)
             return ome_results
 
 

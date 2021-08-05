@@ -206,10 +206,10 @@ if __name__ == '__main__':
     else:
         output = args.fasta
 
-    if os.path.isfile(output + '.dist'):
-        print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' , flush = True)
-        distanceMatrix = importDist( output + '.dist' )
-    elif args.distance == 'needle':
+#    if os.path.isfile(output + '.dist'):
+ #       print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' , flush = True)
+  #      distanceMatrix = importDist( output + '.dist' )
+    if args.distance == 'needle': #elif if above lines not highlighted
         findExecs( ['needle'], exit = set('needle') )
         print( '\nCalculating needle alignments' , flush = True)
         aligns, alignCmds = set(), list()

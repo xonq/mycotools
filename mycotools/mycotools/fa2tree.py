@@ -90,12 +90,18 @@ def iqtreeRun( trimal, out_dir, hpc, verbose ):
     cmd = 'iqtree -s ' + trimal + ' -B 1000 -T AUTO'
 
     vprint('\nOutputting bash script `iqtree.sh`.\n', v = verbose, flush = True)
-    
-    with open( out_dir + '/iqtree.sh', 'w' ) as out:
-        out.write( hpc + '\n\n' + cmd )
+   
+    if not hpc:
+        run_iqtree = subprocess.call(cmd.split(' '))
+        if run_iqtree != 0:
+            eprint('\nERROR: iqtree failed\n', flush = True)
+            sys.exit(6)
+    else: 
+        with open( out_dir + '/iqtree.sh', 'w' ) as out:
+            out.write( hpc + '\n\n' + cmd )
 
 
-def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir = None, verbose = True ):
+def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir = None, verbose = True, alignment = False ):
 
     hpc = False
     if slurm:
@@ -120,8 +126,10 @@ def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir
     mafft = out_dir + '/' + fasta_name + '.mafft'
     trimal = out_dir + '/' + fasta_name + '.trimal'
 
-    if not os.path.isfile( mafft ):
+    if not os.path.isfile( mafft ) and not alignment:
         mafft = mafftRun( os.path.abspath(fasta_path), out_dir, hpc, verbose )
+    elif alignment:
+        mafft = fasta_path
     else:
         vprint('\nAlignment exists ...', v = verbose, flush = True)
     if not os.path.isfile( trimal ):
@@ -142,16 +150,16 @@ def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir
             vprint('\nStart pipeline via `qsub <STARTSTEP>.sh` in ' + out_dir + '\n',
                 v = verbose)
 
-   
-
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( 
         description = 'Takes in a multifasta or directory of multifastas, ' + \
         ' aligns, trims, and runs treebuilding: {`fasttree`, `iqtree`, `raxml` (future)}.' )
-    parser.add_argument( '-i', '--input', required = True, \
+    parser.add_argument( '-f', '--fasta', \
         help = 'Fasta or directory of fastas' )
+    parser.add_argument( '-a', '--alignment', \
+        help = 'Alignment or directory of alignments (need fasta file extension)' )
     parser.add_argument( '-t', '--tree', default = 'fasttree', \
         help = 'Tree-building software. { fasttree, iqtree }' )
     parser.add_argument( '-p', '--pbs', action = 'store_true', \
@@ -164,10 +172,14 @@ if __name__ == '__main__':
 
     output = formatPath( args.output, isdir = True )
     args_dict = {
-        'Input': args.input, 'Tree': args.tree, 'Torque': args.pbs,
+        'Input': args.fasta, 'Tree': args.tree, 'Torque': args.pbs,
         'Slurm': args.slurm, 'HPC project': args.project, 'Output': output
         }
     start_time = intro( 'Fasta2Tree', args_dict )
+
+    if not args.fasta and not args.alignment:
+        eprint('\nERROR: no input', flush = True)
+        sys.exit(7)
 
     if args.tree not in { 'fasttree', 'iqtree' }:
         eprint('\nERROR: invalid tree software: ' + args.tree , flush = True)
@@ -175,17 +187,23 @@ if __name__ == '__main__':
 
     findExecs( [args.tree, 'mafft', 'trimal'] )
 
-    if os.path.isfile(args.input):
+    if args.fasta:
+        input_check = formatPath(args.fasta)
+        alignment = False
+    else:
+        input_check = formatPath(args.alignment)
+        alignment = True
+    if os.path.isfile(input_check):
         main( 
-            args.input, args.tree, slurm = args.slurm, 
+            input_check, args.tree, slurm = args.slurm, 
             pbs = args.pbs, project = args.project,
-            output_dir = output, verbose = True
+            output_dir = output, verbose = True, alignment = alignment
             )
-    elif os.path.isdir(args.input):
-        fas = collect_files( args.input, 'fa' )
-        fas.extend( collect_files( args.input, 'fasta' ) )
-        fas.extend( collect_files( args.input, 'fna' ) )
-        fas.extend( collect_files( args.input, 'fsa' ) )
+    elif os.path.isdir(input_check):
+        fas = collect_files( input_check, 'fa' )
+        fas.extend( collect_files( input_check, 'fasta' ) )
+        fas.extend( collect_files( input_check, 'fna' ) )
+        fas.extend( collect_files( input_check, 'fsa' ) )
         if not fas:
             eprint('\nERROR: no {.fa, .fasta, .fna, .fsa} detected', flush = True)
             sys.exit(2)
@@ -193,7 +211,7 @@ if __name__ == '__main__':
         for fa in fas:
             print(fa, flush = True)
             main(
-                fa, args.tree, slurm = args.slurm, pbs = args.pbs,
+                fa, args.tree, slurm = args.slurm, pbs = args.pbs, alignment = alignment,
                 project = args.project, output_dir = output, verbose = False
                 )
     else:

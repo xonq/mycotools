@@ -56,25 +56,38 @@ def retrieveXML( ome, output ):
     return xml_cmd
 
 
-def checkMatches( match1, match2, xml_data, file_type):
+def checkMatches( match1, match2, match3, match4, xml_data, file_type):
 
     findall, preexisting = False, None
     matches = match1.search(xml_data)
     if matches is None or 'get_tape_file' in matches[0]:
         matches = match2.search(xml_data)
         if matches is None or 'get_tape_file' in matches[0]:
-            matches = match1.findall(xml_data)
-            matches = [ x for x in matches if 'get_tape_file' not in x ]
-            findall = True
-            if matches:
-                matches = match2.findall(xml_data)
-            if len(matches) > 1:
-                matches = matches[1]
-            else:
-                if file_type != 'gff3':
-                    print('\t\tERROR: no ' + file_type + ' detected.', flush = True)
-                matches = None
-                preexisting = True
+            if match3:
+                matches = match3.search(xml_data)
+                if matches is None or 'get_tape_file' in matches[0]:
+                    if match4:
+                        matches = match4.search(xml_data)
+            if matches is None or 'get_tape_file' in matches[0]:
+                matches = match1.findall(xml_data)
+                matches = [ x for x in matches if 'get_tape_file' not in x ]
+                findall = True
+                if not matches: # changed from if to if not 20210624
+                    matches = match2.findall(xml_data)
+                    matches = [ x for x in matches if 'get_tape_file' not in x ]
+                    if not matches and match3:
+                        matches = match3.findall(xml_data)
+                        matches = [ x for x in matches if 'get_tape_file' not in x ]
+                        if not matches and match4:
+                            matches = match4.findall(xml_data)
+                            matches = [x for x in matches if 'get_tape_file' not in x]
+                if len(matches) > 1:
+                    matches = matches[1]
+                else:
+                    if file_type != 'gff3':
+                        print('\t\tERROR: no ' + file_type + ' detected.', flush = True)
+                    matches = None
+                    preexisting = True
 
     return matches, preexisting, findall
 
@@ -105,13 +118,12 @@ def JGIdwnld( ome, file_type, output, masked = True ):
 
 
     prefix = 'https://genome.jgi.doe.gov'
-
     with open( output + '/xml/' + ome + '.xml', 'r') as xml:
         data = xml.read()
 
-
     gffMatch1 = re.compile(r'filename\="([^ ]+\_GeneCatalog_genes_\d+\.gff\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
     gffMatch2 = re.compile(r'filename\="([^ ]+\_GeneCatalog_genes_\d+\.gff\.gz)".*?url\="([^ ]+)"')
+    match3, match4 = None, None
     if file_type == 'gff':
         match1 = gffMatch1
         match2 = gffMatch2
@@ -119,17 +131,24 @@ def JGIdwnld( ome, file_type, output, masked = True ):
         if masked:
             match1 = re.compile(r'filename\="(' + ome + r'\_AssemblyScaffolds_Repeatmasked\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
             match2 = re.compile(r'filename\="(' + ome + r'\_AssemblyScaffolds_Repeatmasked\.fasta\.gz)".*?url\="([^ ]+)"')
+            match3 = re.compile(r'filename\="([^ ]+?maskedAssembly\.gz)".*? url="([^ ]*?maskedAssembly.gz)".*? md5\="([\w\d]+)"')
         else:
             match1 = re.compile(r'filename\="(' + ome + r'\_AssemblyScaffolds\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
             match2 = re.compile(r'filename\="(' + ome + r'\_AssemblyScaffolds\.fasta\.gz)".*?url\="([^ ]+)"')
+            match3 = re.compile(r'filename\="([^ ]+?AssembledScaffolds.*?\.gz)".*? url="(.*?AssembledScaffolds[^ ]*?\.gz)".*? md5\="([\w\d]+)"')
+            match4 = re.compile(r'filename\="([^ ]+?AssembledScaffolds.*?\.gz)".*? url="(.*?AssembledScaffolds[^ ]*?\.gz)"')
 
     elif file_type == 'proteome':
         match1 = re.compile(r'filename\="([^ ]+\_GeneCatalog_proteins_\d+\.aa\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
         match2 = re.compile(r'filename\="([^ ]+\_GeneCatalog_proteins_\d+\.aa\.fasta\.gz)".*?url\="([^ ]+)"')
+        match3 = re.compile(r'filename\="([^ ]+?\.FilteredModels[^ ]+\.proteins\.[^ ]*?\.gz)".*? url\="([^ ]*?)".*? md5\="([\w\d]+)"')
+        match4 = re.compile(r'filename\="([^ ]+?\.FilteredModels[^ ]+\.proteins\.[^ ]*?\.gz)".*? url\="([^ ]*?)"')
 
     elif file_type == 'gff3':
         match1 = re.compile(r'filename\="([^ ]+\_GeneCatalog\_\d+\.gff3\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
         match2 = re.compile(r'filename\="([^ ]+\_GeneCatalog\_\d+\.gff3\.gz)".*?url\="([^ ]+)"')
+        match3 = re.compile(r'filename\="([^ ]+?\.FilteredModels3\.gff3\.gz)".*?url\="([^ ]*?)".*?md5\="([\d\w]+)"')
+        match4 = re.compile(r'filename\="([^ ]+?\.FilteredModels3\.gff3\.gz)".*?url\="([^ ]*?)"')
 
     elif file_type == 'transcript':
         match1 = re.compile(r'filename\="([^ ]+_GeneCatalog_transcripts_\d+\.nt\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
@@ -144,10 +163,10 @@ def JGIdwnld( ome, file_type, output, masked = True ):
         match2 = re.compile(r'filename\="([^ ]+\_EST_\d+_cluster_consensi\.fasta\.gz)".*?url\="([^ ]+)"')
 
     check = 1
-    matches, preexisting, findall = checkMatches( match1, match2, data, file_type )
+    matches, preexisting, findall = checkMatches( match1, match2, match3, match4, data, file_type )
     if not matches and file_type == 'gff3':
         file_type = 'gff'
-        matches, preexisting, findall = checkMatches( gffMatch1, gffMatch2, data, file_type )
+        matches, preexisting, findall = checkMatches( gffMatch1, gffMatch2, match3, match4, data, file_type )
     if matches:
 
         md5 = 420
@@ -465,7 +484,7 @@ if __name__ == '__main__':
         "Imports table/database with JGI `genome_code` column and downloads assembly, proteome, gff, " + \
         'and/or gff3. This script supports rerunning/continuing previous runs in the same directory. ' + \
         'JGI has stringent, nondefined ping limits, so file downloads are limited to 1 per minute.' )
-    parser.add_argument( '-i', '--input_table', required = True, help = 'Database/table with `genome_code` column of JGI ome codes' )
+    parser.add_argument( '-i', '--input', required = True, help = 'Genome code or table with `genome_code` column of JGI ome codes' )
     parser.add_argument( '-a', '--assembly', default = False, action = 'store_true', \
         help = 'Download assemblies.' )
     parser.add_argument( '-p', '--proteome', default = False, action = 'store_true', \
@@ -496,7 +515,7 @@ if __name__ == '__main__':
  #   pwd = getpass.getpass( prompt='JGI Login Password: ' )
 
     args_dict = {
-            'JGI Table': args.input_table,
+            'JGI Table': args.input,
             'Assemblies': args.assembly,
             'RepeatMasked': not args.nonmasked,
             'Proteomes': args.proteome,
@@ -507,21 +526,25 @@ if __name__ == '__main__':
             }
 
     start_time = intro( 'Download JGI files', args_dict )
-    
-    with open(args.input_table, 'r') as raw:
-        for line in raw:
-            if 'genome_code' in line.split('\t'):
-                df = pd.read_csv( args.input_table, sep = '\t', index_col = None)
-            else:
-                df = pd.read_csv(args.input_table, sep='\t', header = None)
-            break
+   
+    if os.path.isfile(args.input): 
+        with open(args.input, 'r') as raw:
+            for line in raw:
+                if 'genome_code' in line.rstrip().split('\t'):
+                    df = pd.read_csv( args.input, sep = '\t', index_col = None)
+                else:
+                    df = pd.read_csv(args.input, sep='\t', header = None)
+                break
+    else:
+        df = pd.DataFrame({'genome_code': [args.input]})
+
     output = formatPath(args.output)
 
     jgi_df = main( 
         df, output, user, pwd, args.assembly, args.proteome, 
         args.gff3, args.gff, args.transcript, args.est, not args.nonmasked
         )
-    df.to_csv( os.path.normpath(args.input_table) + '_jgiDwnld', sep = '\t', index = False )
+    df.to_csv( os.path.normpath(args.input) + '_jgiDwnld', sep = '\t', index = False )
 
     outro( start_time )
 

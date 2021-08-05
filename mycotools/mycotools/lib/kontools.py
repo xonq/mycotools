@@ -9,6 +9,14 @@ def eprint( *args, **kwargs ):
     print(*args, file = sys.stderr, **kwargs)
 
 
+def fprint(out_str, log):
+    with open(log, 'a') as out:
+        out.write(args)
+
+def zprint(out_str, log = None, flush = True):
+    fprint(out_str, log)
+    print(out_str, flush = flush)
+
 def vprint( toPrint, v = False, e = False , flush = True):
     '''Boolean print option to stdout or stderr (e)'''
 
@@ -51,11 +59,11 @@ def gunzip( gzip_file, remove = True, spacer = '\t' ):
         return False
 
 
-def fmt_float(val):
+def fmt_float(val, sig_dig = None):
 
     val_str = str(val)
-    e = val_str.index('e')
-    if e:
+    try:
+        e = val_str.index('e')
         dig = val_str[:e].replace('.','')
         num = val_str[e + 1:]
         if num.startswith('-'):
@@ -75,8 +83,66 @@ def fmt_float(val):
                 for i in range(zeroes):
                     val_op += '0'
                 val_str = val_op
+    except ValueError:
+        val_str = str(val)
 
-    return val_str       
+    if sig_dig:
+        if len(val_str.replace('.','')) > sig_dig:
+            try:
+                per_i = val_str.index('.')
+            except ValueError:
+                per_i = None
+            val_list = list(val_str)
+            if per_i:
+                if sig_dig > per_i:
+                    i = val_list[sig_dig]
+                    post = int(val_list[sig_dig+1])
+                    if post >= 5:
+                        val_list.insert(sig_dig, int(i) + 1)
+                        val_list.pop(sig_dig + 1)
+                    val_str = ''.join(str(v) for v in val_list[:sig_dig + 1])
+                else:
+                    i = val_list[sig_dig - 1]
+                    try:
+                        post = val_list[sig_dig]
+                    except IndexError:
+                        post = 0
+                    if post == '.':
+                        post = val_list[sig_dig + 1]
+                    elif i == '.':
+                        i = val_list[sig_dig]
+                        try:
+                            post = val_list[sig_dig + 1]
+                        except IndexError:
+                            post = 0
+                    if int(post) >= 5:
+                        val_list.insert(sig_dig, int(i) + 1)
+                        val_list.pop(sig_dig + 1)
+                    val_list = val_list[:sig_dig]
+                    while len(val_str) > len(val_list):
+                        val_list.append('0')
+                    val_str = ''.join(str(v) for v in val_list[:sig_dig+3])
+            else:
+                i = val_list[sig_dig + 1]
+                post = int(val_list[sig_dig + 2])
+                if post == '.':
+                    post = int(val_list[sig_dig + 3])
+                elif i == '.':
+                    i = val_list[sig_dig + 2]
+                    try:
+                        post = val_list[sig_dig + 3]
+                    except IndexError:
+                        post = 0
+                if int(post) >= 5:
+                    val_list.insert(sig_dig + 1, int(i) + 1)
+                    val_list.pop(sig_dig + 2)
+                val_list = val_list[:sig_dig + 2]
+                while len(val_str) > len(val_list):
+                    val_list.append('0')
+                val_str = ''.join(str(v) for v in val_list[:sig_dig + 1])
+                
+
+    return val_str
 
 
 
@@ -89,6 +155,7 @@ def findExecs( deps, exit = set(), verbose = True ):
     '''
 
     vprint('\nDependency check:', v = verbose, e = True, flush = True)
+    checks = []
     if type(deps) is str:
         deps = [deps]
     for dep in deps:
@@ -98,6 +165,10 @@ def findExecs( deps, exit = set(), verbose = True ):
         if not check and dep in exit:
             eprint('\nERROR: ' + dep + ' not in PATH', flush = True)
             sys.exit(300)
+        else:
+            checks.append(check)
+
+    return checks
 
 
 def findEnvs( envs, exit = set(), verbose = True ):
@@ -227,14 +298,21 @@ def dictSplit( Dict, factor ):
 
     list_dict = []
     keys_list = np.array_split( list(Dict.keys()), factor )
-    
-    for keys in keys_list:
-        list_dict.append( {} )
-        for key in keys:
-            list_dict[-1][key] = Dict[key]
+
+    try:    
+        for keys in keys_list:
+            list_dict.append( {} )
+            for key in keys:
+                list_dict[-1][key] = Dict[key]
+    except TypeError:
+        list_dict = []
+        for keys in keys_list:
+            list_dict.append( {} )
+            for key in keys:
+                list_dict[-1][tuple(key)] = Dict[tuple(key)]
 
     return list_dict
-    
+
 
 def sysStart( args, usage, min_len, dirs = [], files = [] ):
 
@@ -276,18 +354,12 @@ def intro( script_name, args_dict, credit='', log = False, stdout = True):
         out_str += '\n' + '{:<30}'.format(arg.upper() + ':') + \
             str(args_dict[ arg ])
 
-    if stdout:
-        eprint( out_str, flush = True )
     if log:
-        out_file = os.path.abspath( log ) + '/' + date + '.log'
-        count = 0
-        while os.path.exists( out_file ):
-            count += 1
-            out_file = os.path.abspath( log ) + '/' + date + '_' + \
-                str(count) + '.log'
-
-        with open(out_file, 'w') as out:
-            out.write( out_str )
+        zprint(out_str, log)
+    elif stdout:
+        print(out_str, flush = True)
+    else:
+        eprint( out_str, flush = True )
 
     return start_time
 
@@ -298,12 +370,20 @@ def outro( start_time, log = False, stdout = True ):
     Outputs: prints execution time and exits with 0 status
     '''
 
-    if stdout:
-        end_time = datetime.datetime.now()
-        duration = end_time - start_time
-        dur_min = duration.seconds/60
-        eprint('\nExecution finished:', str(end_time) + '\t' + \
-            '\n\t{:.2}'.format(dur_min), 'minutes\n', flush = True)
+    
+    end_time = datetime.datetime.now()
+    duration = end_time - start_time
+    dur_min = duration.seconds/60
+    out_str = '\nExecution finished: ' + str(end_time) + '\t' + \
+            '\n\t{:.2}'.format(dur_min) + ' minutes\n'
+
+    if log:
+        zprint(out_str, log)
+    elif not stdout:
+        eprint(out_str, flush = True)
+    else:
+        print(out_str, flush = True)
+
     sys.exit(0)
 
 
@@ -356,7 +436,7 @@ def checkDep( dep_list = [], var_list = [], exempt = set() ):
         sys.exit( 135 )
 
 
-def file2list( file_, sep = '\n', col = None):
+def file2list( file_, types = '', sep = '\n', col = None, compress = False):
     '''
     Inputs: `file_` path, separator string, column integer index
     Outputs: reads file and returns a list given arguments
@@ -366,27 +446,33 @@ def file2list( file_, sep = '\n', col = None):
     simply split by the separator and grab the only entry.
     '''
 
-    if sep not in ['\n', '\t', ',', ' ']:
-        eprint('\nERROR: invalid delimiter.', flush = True)
-        return None
-
-    with open(file_, 'r') as raw_data:
-        data = raw_data.read() + '\n'
+    if not compress:
+        with open(file_, 'r') as raw_data:
+            data = raw_data.read() + '\n'
+    else:
+        with gzip.open(file_, 'rt') as raw_data:
+            data = raw_data.read() + '\n'
 
     if col:
-        if sep == '\n':
-            eprint('\nERROR: cannot split columns by lines', flush = True)
-            return None
         check = data.split('\n')
         check_col = check[0].split(sep).index( col )
-        data_list = [ 
+        data1_list = [ 
             x[check_col].rstrip() for x in [ y.split(sep) for y in check[1:] ] if len(x) >= check_col + 1 
         ]
+    elif types:
+        data_list = data.split(sep = sep)
+        if types == 'int':
+            try:
+                data1_list = [int(x.rstrip()) for x in data_list if x]
+            except ValueError:
+                data1_list = [int(float(x.rstrip())) for x in data_list if x]
+        elif types == 'float':
+            data_list = [float(x.rstrip()) for x in data_list if x]
     else:
         data_list = data.split( sep = sep )
-        data_list = [ x.rstrip() for x in data_list if x != '' ]
+        data1_list = [ x.rstrip() for x in data_list if x ]
 
-    return data_list
+    return data1_list
 
 
 def multisub( args_lists, processes = 1, shell = False ):
