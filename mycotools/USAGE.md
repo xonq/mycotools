@@ -143,8 +143,7 @@ You will now see folders named after the file types you downloaded and the compr
 
 <br />
 
-
-You can optionally input a single biosample (NCBI) or genome code (JGI) for `-i` or alternatively, a manually created input file - the important thing is the column has the exact appropriate header ('genome_code' or 'biosample') (substitute `-i aspergillus.db` with this file):
+You can optionally input a single biosample (NCBI) or genome code (JGI) for `-i` or alternatively, a manually created input file if your data is not included in the MycotoolsDB - the important thing is the column has the exact appropriate header ('genome_code' or 'biosample') (substitute `-i aspergillus.db` with this file):
 
 `jgiGenomeCodes.txt`
 ```
@@ -161,6 +160,10 @@ SAMN15352002
 SAMN06205226
 SAMN02744098
 ```
+
+<br />
+
+You can download NCBI SRA's by acquiring NCBI's SRA tools, making sure `fastq-dump` is included in your PATH, and then running `ncbiDwnld.py --sra -i <REFERENCE>`. You can create a file with SRA ID's or BioProject, etc. Basically any query that is unique and sufficient to acquire the SRRs of interest. For paired-end reads, append `-pe` to the command.
 
 <br /><br />
 
