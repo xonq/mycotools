@@ -126,24 +126,26 @@ annotationStats.py <ANNOTATION.gff3>
 
 ## Downloading files
 ### jgiDwnld.py / ncbiDwnld.py
-These scripts` input can be obtained from the MycotoolsDB as described below, or can be manually made as shown at the bottom of this section. Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus* for both JGI & NCBI:
+These scripts input a MycotoolsDB or can be manually made as shown at the bottom of this section. 
+
+Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```
 mkdir dwnldFiles && cd dwnldFiles
-extractDB.py -s jgi -c genus -t aspergillus > aspergillus.db_jgi
-extractDB.py -s ncbi -c genus -t aspergillus > aspergillus.db_ncbi
+extractDB.py -c genus -t aspergillus > aspergillus.db_ncbi
 ```
 
-If there are organisms you don't want in the extracted `.db`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory run:
+If there are organisms you don't want in the extracted `.db`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
 ```
 jgiDwnld.py -i aspergillus.db_jgi -t -e
 ncbiDwnld.py -i aspergillus.db_ncbi -t
 ```
 
-You will now see folders named after the file types you downloaded and the compressed files stored within. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. Don't submit these as a job, you are required to enter a password for `jgiDwnld.py`, and if the command stops you can simply rerun in the same directory and it should take-off where you left it/where it failed.
+These scripts populate with compressed files. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. 
+To submit as a job (not recommended), you must create an encrypted MycotoolsDB passkey using `updateDB.py` and pass the password to stdin to these scripts.
 
 <br />
 
-You can optionally input a single biosample (NCBI) or genome code (JGI) for `-i` or alternatively, a manually created input file if your data is not included in the MycotoolsDB - the important thing is the column has the exact appropriate header ('genome_code' or 'biosample') (substitute `-i aspergillus.db` with this file):
+These scripts can input biosamples (NCBI) or genome codes (JGI). The column must have the appropriate header ('genome_code' or 'biosample') (substitute `-i aspergillus.db` with this file):
 
 `jgiGenomeCodes.txt`
 ```
@@ -163,7 +165,13 @@ SAMN02744098
 
 <br />
 
-You can download NCBI SRA's by acquiring NCBI's SRA tools, making sure `fastq-dump` is included in your PATH, and then running `ncbiDwnld.py --sra -i <REFERENCE>`. You can create a file with SRA ID's or BioProject, etc. Basically any query that is unique and sufficient to acquire the SRRs of interest. For paired-end reads, append `-pe` to the command.
+You can download NCBI SRA's by acquiring NCBI's SRA tools, making sure `fastq-dump` is included in your PATH, and then running:
+
+```
+ncbiDwnld.py --sra -i <REFERENCE>
+```
+
+You can create a file with SRA ID's or BioProject, etc. Basically any query that is unique and sufficient to acquire the SRRs of interest. For paired-end reads, append `-pe` to the command.
 
 <br /><br />
 

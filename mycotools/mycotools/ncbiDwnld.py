@@ -446,31 +446,30 @@ def main(
 def getSRA(biosample, fastqdump = 'fastq-dump', pe = True):
 
     handle = Entrez.esearch(db='SRA', term=biosample)
-    id = Entrez.read(handle)['IdList'][0]
-    handle = Entrez.esummary(db='SRA', id = id, report='full')
-    records = Entrez.read(handle, validate = False)
-    for record in records:
-        srr = re.search(r'Run acc="(S\w+\d+)"', record['Runs'])[1]
-        print('\t\t' + srr, flush = True)
-        if pe:
-            subprocess.call([
-                fastqdump, '--gzip', '--split-3', srr], 
-                stdout = subprocess.PIPE)
-            if os.path.isfile(srr + '_1.fastq.gz'):
-                os.rename(srr + '_1.fastq.gz', biosample + '_' + srr + '_1.fq.gz')
-                os.rename(srr + '_2.fastq.gz', biosample + '_' + srr + '_2.fq.gz')
+    ids = Entrez.read(handle)['IdList']
+    for id in ids:
+        handle = Entrez.esummary(db='SRA', id = id, report='full')
+        records = Entrez.read(handle, validate = False)
+        for record in records:
+            srr = re.search(r'Run acc="(S\w+\d+)"', record['Runs'])[1]
+            print('\t\t' + srr, flush = True)
+            if pe:
+                subprocess.call([
+                    fastqdump, '--gzip', '--split-3', srr], 
+                    stdout = subprocess.PIPE)
+                if os.path.isfile(srr + '_1.fastq.gz'):
+                    os.rename(srr + '_1.fastq.gz', biosample + '_' + srr + '_1.fq.gz')
+                    os.rename(srr + '_2.fastq.gz', biosample + '_' + srr + '_2.fq.gz')
+                else:
+                    print('\t\t\tERROR: file failed', flush = True)
             else:
-                print('\t\t\tERROR: file failed', flush = True)
-        else:
-            subprocess.call([
-                fastqdump, '--gzip', srr],
-                stdout = subprocess.PIPE)
-            if os.path.isfile(srr + '.fastq.gz'):
-                os.rename(srr + '.fastq.gz', biosample + '_' + srr + '.fq.gz')
-            else:
-                print('\t\t\tERROR: file failed', flush = True)
-#        subprocess.run(['gzip', srr + '.fastq'], 
- #           stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+                subprocess.call([
+                    fastqdump, '--gzip', srr],
+                    stdout = subprocess.PIPE)
+                if os.path.isfile(srr + '.fastq.gz'):
+                    os.rename(srr + '.fastq.gz', biosample + '_' + srr + '.fq.gz')
+                else:
+                    print('\t\t\tERROR: file failed', flush = True)
 
 
 def goSRA(df, output = os.getcwd() + '/', pe = True):
