@@ -90,7 +90,7 @@ def collect_ftps(
         if index in ass_prots:
             continue
 
-        search_term, esc_count = accession + '[' + column + ']', 0
+        search_term, esc_count = accession + '[' + str(column) + ']', 0
         while esc_count < 10:
             try:
                 handle = Entrez.esearch(db=database, term=search_term)
@@ -296,14 +296,14 @@ def download_files( ome_prots, ome, file_types, output_dir, count, remove = Fals
             dwnlds[file_type] = 69
             ome_prots[file_type] = ''
             log_editor( output_dir + 'ncbiDwnld.log', str(ome), str(ome) + \
-                '\t' + ome_prots['biosample'] + '\t' + ome_prots['assembly'] + \
-                '\t' + ome_prots['proteome'] + '\t' + ome_prots['gff3'] + \
-                '\t' + ome_prots['transcript'] + '\t' + \
-                ome_prots['assembly_md5'] + '\t' + \
-                ome_prots['proteome_md5'] + '\t' + \
-                ome_prots['gff3_md5'] + '\t' + \
-                ome_prots['transcript_md5'] ) + '\t' + \
-                ','.join(ome_prots['genome_id'])
+                '\t' + str(ome_prots['biosample']) + '\t' + str(ome_prots['assembly']) + \
+                '\t' + str(ome_prots['proteome']) + '\t' + str(ome_prots['gff3']) + \
+                '\t' + str(ome_prots['transcript']) + '\t' + \
+                str(ome_prots['assembly_md5']) + '\t' + \
+                str(ome_prots['proteome_md5']) + '\t' + \
+                str(ome_prots['gff3_md5']) + '\t' + \
+                str(ome_prots['transcript_md5']) + '\t' + \
+                str(','.join([str(x) for x in ome_prots['genome_id']])))
             if remove and file_type in {'assembly', 'gff3'}:
                 break
             continue
@@ -351,15 +351,19 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False, remove
                 api_key=api, output_path = output_path, verbose = verbose
                 )
     else:
-        if len( ncbi_df.columns ) > 1:
-            ncbi_df = ncbi_df.set_index( indices[1] )
+  #  elif len(ncbi_df.index) > 1:
+        ncbi_df['index'] = ncbi_df[ncbi_df.columns[0]]
+        ncbi_df['biosample'] = ncbi_df[ncbi_df.columns[0]]
+        ncbi_df = ncbi_df.set_index('index')
         ncbi_df.index = ncbi_df.index.astype(str)
         if not all( x in ass_prots for x in list(ncbi_df.index) ):
             ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, remove = remove,
                 column = ncbi_df.columns[0], api_key=api,
                 output_path = output_path, verbose = verbose
-            )
+                )
+#    else:
+ #       print(ncbi_df)
 
     return ncbi_df, ass_prots, failed
 
@@ -381,6 +385,10 @@ def main(
         ncbi_df = pd.read_csv( ncbi_df, sep = '\t' )
     elif not isinstance(ncbi_df, pd.DataFrame):
         ncbi_df = pd.DataFrame({'biosample': [ncbi_df]})
+    if len(ncbi_df.index) == 0:
+        ncbi_df = pd.DataFrame(
+            {i: [v] for i, v in enumerate(list(ncbi_df.keys()))}
+            )
     if 'BioSample Accession' in ncbi_df.keys() and not 'biosample' in ncbi_df.keys():
         ncbi_df['biosample'] = ncbi_df['BioSample Accession']
     if 'Modify Date' in ncbi_df.keys() and not 'version' in ncbi_df.keys():
@@ -423,9 +431,15 @@ def main(
             db_vers = datetime.strftime(check.iloc[0]['version'], '%Y%m%d')
             failed.append([ome, db_vers])
             continue
-        if any(exits[x] != 0 for x in {'assembly', 'gff3'}):
-            failed.append([ome, ncbi_df['version'][ome]])
-            continue
+        if 'assembly' in exits:
+            if exits['assembly'] != 0:
+#        if any(exits[x] != 0 for x in {'assembly', 'gff3'}):
+                failed.append([ome, ncbi_df['version'][ome]])
+                continue
+        if 'gff3' in exits:
+            if exits['gff3'] != 0:
+                 failed.append([ome, ncbi_df['version'][ome]])
+                 continue
         ncbi_df.loc[ome, 'assembly_path'] = output_path + 'assembly/' + \
             os.path.basename(ass_prots[ome]['assembly'])
         ncbi_df.loc[ome, 'proteome_path'] = output_path + 'proteome/' + \
