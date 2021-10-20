@@ -42,7 +42,7 @@ The following are information regarding scripts that manipulate Mycotools .db fi
 
 ## Interfacing with the master database
 ### mycodb
-`mycodb` is a standalone script that simply retrieves and prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.db`.
+`mycodb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.db`.
 ```bash
 -bash-4.2$ mycodb
 /home/xonq/mycodb/mycodb/20210125.db
