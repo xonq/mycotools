@@ -512,20 +512,14 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser( description = \
-    'Downloads assemblies, proteomes, and/or gff3s in current directory.' 
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument( '-i', '--input', required = True, \
-    help = 'Accession; tab delimited file with BioSample accessions under ' + \
-         'column "biosample" or "sra"; or an NCBI master tsv with curated codenames' )
-    parser.add_argument( '-a', '--assembly', action = 'store_true', \
-    help = 'Download assemblies')
-    parser.add_argument( '-p', '--proteome', action = 'store_true', \
-    help = 'Download proteomes')
-    parser.add_argument( '-g', '--gff3', action = 'store_true', \
-    help = 'Download gff3s')
-    parser.add_argument( '-t', '--transcript', action = 'store_true', \
-    help = 'Download transcripts' )
+    help = 'Standalone accession; tab delimited file with accessions under ' + \
+         'column "biosample" or "sra"; or tsv directly downloaded from NCBI' )
+    parser.add_argument( '-a', '--assembly', action = 'store_true')
+    parser.add_argument( '-p', '--proteome', action = 'store_true')
+    parser.add_argument( '-g', '--gff3', action = 'store_true')
+    parser.add_argument( '-t', '--transcript', action = 'store_true')
     parser.add_argument( '-s', '--sra', action = 'store_true', \
     help = 'Download SRAs only' )
     parser.add_argument( '-pe', '--paired', action = 'store_true', \
