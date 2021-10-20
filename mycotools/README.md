@@ -37,6 +37,11 @@ With your environment activated
 pip install mycotools
 ```
 
+To upgrade to the latest version (sometimes needs to be run twice):
+```
+pip install mycotools --upgrade
+```
+
 <br />
 
 ## 3) Install MycotoolsDB 
