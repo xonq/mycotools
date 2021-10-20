@@ -475,7 +475,7 @@ def file2list( file_, types = '', sep = '\n', col = None, compress = False):
     return data1_list
 
 
-def multisub( args_lists, processes = 1, shell = False ):
+def multisub( args_lists, processes = 1, shell = False, stdout = None, rm = False ):
     '''
     Inputs: list of arguments, integer of processes, subprocess `shell` bool
     Outputs: launches and monitors subprocesses and returns list of exit 
@@ -497,35 +497,91 @@ def multisub( args_lists, processes = 1, shell = False ):
     running, outputs = [ ], []
     if processes <= 0:
         processes = 1
-    while len( args_lists ) != 0:
-        while len( running ) < processes and len( args_lists ) != 0:
-            cmd = args_lists[ 0 ]
-            run_temp = subprocess.Popen( cmd, stdout = subprocess.DEVNULL, \
-                stderr = subprocess.DEVNULL, shell = shell )
-            running.append( [run_temp, cmd ] )
-            del args_lists[ 0 ]
 
-        if len( args_lists ) > 0:
-            for index in range( len( running ) ):
-                handle = running[ index ]
-                handle[0].poll()
-                returncode = handle[0].returncode
-                if returncode is not None:
-                    outputs.append( {
-                        'stdin': handle[1], 'code': returncode
-                        } )
-                    del running[ index ]
-                    break
+    if not stdout:
+        while args_lists:
+            while len( running ) < processes and args_lists:
+                cmd = args_lists[ 0 ]
+                run_temp = subprocess.Popen( cmd, stdout = subprocess.DEVNULL, \
+                    stderr = subprocess.DEVNULL, shell = shell )
+                running.append( [run_temp, cmd ] )
+                del args_lists[ 0 ]
 
-        else:
-            while len( running ) > 0:
-                handle = running[ 0 ]
-                handle[0].poll()
-                returncode = handle[0].returncode
-                if returncode is not None:
-                    outputs.append( {
-                        'stdin': handle[1], 'code': returncode
-                        } )
-                    del running[ 0 ]
+            if len( args_lists ) > 0:
+                for index, handle in enumerate(running):
+                    handle[0].poll()
+                    returncode = handle[0].returncode
+                    if returncode is not None:
+                        outputs.append( {
+                            'stdin': handle[1], 'code': returncode
+                            } )
+                        del running[ index ]
+                        break
+
+            else:
+                while len( running ) > 0:
+                    handle = running[ 0 ]
+                    handle[0].poll()
+                    returncode = handle[0].returncode
+                    if returncode is not None:
+                        outputs.append( {
+                            'stdin': handle[1], 'code': returncode
+                            } )
+                        del running[ 0 ]
+
+    else:
+        count, outs = 0, []
+        while args_lists:
+            while len( running ) < processes and args_lists:
+                cmd = args_lists[ 0 ][0]
+                running.append([
+                    cmd, args_lists[0][1], 
+                    open(args_lists[0][1], 'wb')
+                    ])
+                run_temp = subprocess.Popen( cmd, stdout = running[-1][2], \
+                    stderr = subprocess.DEVNULL, shell = shell )
+                running[-1].append(run_temp)
+                if rm:
+                    running[-1].append(args_lists[0][2])
+                del args_lists[ 0 ]
+
+            if len( args_lists ) > 0:
+                for index, handle in enumerate(running):
+                    handle[3].poll()
+                    returncode = handle[3].returncode
+                    if returncode is not None:
+#                        output = handle[0].stdout
+ #                       with open(handle[2], 'wb') as out:
+  #                          for line in output:
+   #                             out.write(line)
+                        if rm:
+                            os.remove(handle[4])
+                        handle[2].close()
+                        outputs.append( {
+                            'stdin': handle[0], 'code': returncode,
+                            'output': handle[1]
+                            } )
+                        del running[ index ]
+                        break
+
+            else:
+                while len( running ) > 0:
+                    handle = running[ 0 ]
+                    handle[3].poll()
+                    returncode = handle[3].returncode
+                    if returncode is not None:
+#                        output = handle[0].stdout
+ #                       with open(handle[2], 'wb') as out:
+  #                          for line in output:
+   #                             out.write(line)
+                        handle[2].close()
+                        if rm:
+                            os.remove(handle[4])
+    #                        handle[2] = handle[2][0]
+                        outputs.append( {
+                            'stdin': handle[0], 'code': returncode,
+                            'output': handle[1]
+                            } )
+                        del running[ 0 ]
 
     return outputs  

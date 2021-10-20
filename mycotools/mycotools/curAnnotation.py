@@ -4,7 +4,7 @@ import sys, re, os, copy, argparse
 from mycotools.lib.fastatools import gff2dict, dict2gff, fasta2dict, dict2fasta, \
     gtfComps, gff3Comps, gff2Comps
 from mycotools.lib.kontools import collect_files, eprint, formatPath
-from mycotools.gff2protein import main as gff2proteome
+from mycotools.gff2seq import aamain as gff2proteome
 
 
 def grabOutput( output_pref ):

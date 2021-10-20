@@ -2,13 +2,13 @@
 
 import sys, os, re, argparse, subprocess, datetime, multiprocessing as mp
 from mycotools.extractHmmsearch import main as exHmm, grabNames
-from mycotools.abstractHmm import main as absHmm
+from mycotools.extractHmmAcc import main as absHmm
 from mycotools.db2blast import compAcc2fa
 from mycotools.acc2fa import famain as acc2fa
 from mycotools.lib.kontools import intro, outro, findExecs, eprint, formatPath
 from mycotools.lib.dbtools import db2df, masterDB
 
-def runabstractHmm(hmm, accession, output):
+def runextractHmmAcc(hmm, accession, output):
 
     with open(hmm, 'r') as raw:
         hmm_data = raw.read()
@@ -106,7 +106,7 @@ def main(
 
     if accession:
         print('\nExtracting ' + accession, flush = True)
-        hmm_path = runabstractHmm(
+        hmm_path = runextractHmmAcc(
             hmm_path, accession, out_dir + accession + '.hmm'
             )
         if os.path.isfile(accession):

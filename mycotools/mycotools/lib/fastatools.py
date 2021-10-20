@@ -154,16 +154,17 @@ def dict2fasta(fasta_dict, description = True):
     fasta_string = ''
     if description:
         for gene in fasta_dict:
-            fasta_string += '>' + gene
+            fasta_string += '>' + gene.rstrip()
             if 'description' in fasta_dict[gene]:
-                fasta_string += ' ' + fasta_dict[gene]['description'] + '\n'
+                fasta_string += (' ' + fasta_dict[gene]['description']).rstrip() + '\n'
             else:
                 fasta_string += '\n'
-            fasta_string += fasta_dict[gene]['sequence'] + '\n'
+            fasta_string += fasta_dict[gene]['sequence'].rstrip() + '\n'
 
     else:
         for gene in fasta_dict:
-            fasta_string += '>' + gene + '\n' + fasta_dict[ gene ][ 'sequence' ] + '\n'
+            fasta_string += '>' + gene.rstrip() + '\n' + \
+            fasta_dict[ gene ][ 'sequence' ].rstrip() + '\n'
 
     return fasta_string.rstrip()
 
@@ -211,7 +212,7 @@ def dict2gff( gff_dict ):
 
     gff_str = ''
     for line in gff_dict:
-        add_str = '\t'.join( str(x) for x in line.values() )
+        add_str = '\t'.join( str(line[x]) for x in line )
         gff_str += add_str + '\n'
 
     return gff_str.rstrip()

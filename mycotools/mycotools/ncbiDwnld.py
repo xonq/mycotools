@@ -336,7 +336,7 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False, remove
     if 'biosample' in ncbi_df.keys():
         ncbi_df['index'] = ncbi_df['biosample']
         ncbi_df = ncbi_df.set_index('index')
-        if not all( x in ass_prots for x in ncbi_df.index ):
+        if not all( x in ass_prots for x in list(ncbi_df.index) ):
             ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, 
                 column = 'biosample', api_key=api,
@@ -345,7 +345,7 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False, remove
                 )
     elif 'internal_ome' in ncbi_df.keys():
         ncbi_df = ncbi_df.set_index('internal_ome')
-        if not all( x in ass_prots for x in ncbi_df.index ):
+        if not all( x in ass_prots for x in list(ncbi_df.index) ):
             ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, remove = remove,
                 api_key=api, output_path = output_path, verbose = verbose
@@ -354,7 +354,7 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False, remove
         if len( ncbi_df.columns ) > 1:
             ncbi_df = ncbi_df.set_index( indices[1] )
         ncbi_df.index = ncbi_df.index.astype(str)
-        if not all( x in ass_prots for x in ncbi_df.index ):
+        if not all( x in ass_prots for x in list(ncbi_df.index) ):
             ass_prots, failed = collect_ftps( 
                 ncbi_df, ass_prots, remove = remove,
                 column = ncbi_df.columns[0], api_key=api,
@@ -379,7 +379,7 @@ def main(
 
     if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
         ncbi_df = pd.read_csv( ncbi_df, sep = '\t' )
-    else:
+    elif not isinstance(ncbi_df, pd.DataFrame):
         ncbi_df = pd.DataFrame({'biosample': [ncbi_df]})
     if 'BioSample Accession' in ncbi_df.keys() and not 'biosample' in ncbi_df.keys():
         ncbi_df['biosample'] = ncbi_df['BioSample Accession']
@@ -541,7 +541,7 @@ if __name__ == "__main__":
     }
 
     start_time = intro('Download NCBI files',args_dict)
-    if not args.assembly and not args.proteome and not args.gff3 and not args.sra:
+    if not args.assembly and not args.proteome and not args.gff3 and not args.sra and not args.transcript:
         eprint('\nERROR: You must choose at least one download option\nExit code 37', flush = True)
         sys.exit( 37 )
 

@@ -167,9 +167,6 @@ def scipyaggd( distMat, maxDist, method = 'single' ):
     return clusters, tree
 
 
-
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( 

@@ -7,7 +7,7 @@ from mycotools.lib.dbtools import db2df, df2db, gen_omes, masterDB, df2std, logi
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.utils.curProteomes import curate as curProteome
-from mycotools.gff2protein import main as gff2prot
+from mycotools.gff2seq import aamain as gff2prot
 from mycotools.curAnnotation import main as curRogue
 from Bio import Entrez
 import pandas as pd

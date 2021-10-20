@@ -4,7 +4,7 @@ from mycotools.lib.kontools import intro, outro, collect_files, multisub, findEx
 from mycotools.lib.dbtools import db2df
 from mycotools.extractHmmsearch import main as exHmm
 from mycotools.acc2fa import main as acc2fa
-from mycotools.abstractHmm import grabAccs, main as absHmm
+from mycotools.extractHmmAcc import grabAccs, main as absHmm
 import pandas as pd, re, os, sys, multiprocessing as mp
 import argparse, subprocess
 if sys.version_info[0] < 3:

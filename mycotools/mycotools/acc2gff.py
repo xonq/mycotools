@@ -32,7 +32,7 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
         mp_cmds = []
         for ome in omes:
             if type(df) is not str:
-                accessions = [ x for x in df[ column ] if x.startswith( ome + '_' ) ]
+                accessions = [ x.rstrip() for x in df[ column ] if x.startswith( ome + '_' ) ]
             else:
                 accessions = [ df ]
             if not pd.isnull( db['gff3'][ome] ):
@@ -115,7 +115,9 @@ if __name__ == '__main__':
     else:
         out_str = ''
         for ome in gff_strs:
-            out_str += dict2gff(gff_strs[ome])
+#            print(ome, gff_strs[ome])
+#            out_str += dict2gff(gff_strs[ome])
+            out_str += gff_strs[ome] + '\n'
             with open( input_file + '.gff3', 'w' ) as out:
                 out.write( out_str )
 
