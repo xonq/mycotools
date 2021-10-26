@@ -4,7 +4,7 @@ Takes a database as argument 1 and an output for the .tsv as argument 2.
 Calculates basic genome statistics.
 '''
 
-import sys, os, pandas as pd, multiprocessing as mp
+import sys, os, pandas as pd, multiprocessing as mp, copy
 from mycotools.lib.dbtools import db2df, log_editor
 from mycotools.lib.biotools import fa2dict
 from mycotools.lib.kontools import formatPath, eprint
@@ -95,15 +95,15 @@ def n50l50( sortedContigs ):
         out['mask%-1000bp'] = maskCount1000 / int( total1000) * 100
         
     except KeyError:
-        out = False
+        out = {}
 
 
     return out
 
-def mngr(assembly_path, ome = None):
+def mngr(assembly_path, ome):
     sortedContigs = sortContigs(assembly_path)
     calcs = n50l50(sortedContigs)
-    return ome, calcs
+    return ome, tuple([(x, calcs[x]) for x in calcs])
 
 def main():
 
@@ -129,22 +129,23 @@ def main():
 
         cmds = []
         for i, row in db.iterrows():
-            print('\t' + row['internal_ome'], flush = True)
             if not pd.isnull(row['assembly']):
-                cmds.append((formatPath('$MYCOFNA/' + row['assembly']), row['internal_ome']))
+                cmds.append((formatPath('$MYCOFNA/' + row['assembly']), copy.deepcopy(row['internal_ome'])))
         with mp.Pool(processes=os.cpu_count()) as pool:
             results = pool.starmap(mngr, cmds)
         for res in results:
             ome, calcs = res[0], res[1]
             if calcs:
+                calcs = {x[0]: x[1] for x in calcs}
+               
                 log_editor( log_path, ome, ome + '\t' + str(calcs['n50-1000bp']) + '\t' + \
                     str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
                     str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
                     str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
                     '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
-                    '\t' + str(calcs['gc-1000bp'])) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp'])
+                    '\t' + str(calcs['gc-1000bp']) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp']))
             else:
-                eprint('\t\tERROR:\t' + row['internal_ome'], flush = True)
+                eprint('\t\tERROR:\t' + ome, flush = True)
 
     else:
 
