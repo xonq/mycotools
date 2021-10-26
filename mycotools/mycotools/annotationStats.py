@@ -104,9 +104,9 @@ if __name__ == '__main__':
         else:
             output_file = sys.argv[2]
         with open(output_file, 'w') as write:
-            write.write('#gene2gene_length\ttgenes\tmean_length\tmedian_length\n')
+            write.write('#ome\tgene2gene_length\tgenes\tmean_length\tmedian_length\n')
             for ome in out:
-                write.write('\t'.join([str(x) for x in out[ome].values()]) + '\n')
+                write.write(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]) + '\n')
     else:
         ome, geneStats = compileExon( formatPath(sys.argv[1]), output )
         if output:

@@ -26,6 +26,8 @@ def checkdir(dir_, unzip = False, to = None, rm = False):
         return True
     elif os.path.isfile(formatPath(dir_) + '.tar.gz'):
         if unzip:
+            if dir_.endswith('/'):
+                dir_ = dir_[:-1]
             untardir(dir_ + '.tar.gz', rm = rm, to = to)
             return True
     return False

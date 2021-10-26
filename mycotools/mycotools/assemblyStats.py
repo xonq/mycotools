@@ -4,9 +4,10 @@ Takes a database as argument 1 and an output for the .tsv as argument 2.
 Calculates basic genome statistics.
 '''
 
-import sys, os, pandas as pd
+import sys, os, pandas as pd, multiprocessing as mp
 from mycotools.lib.dbtools import db2df, log_editor
 from mycotools.lib.biotools import fa2dict
+from mycotools.lib.kontools import formatPath, eprint
 
 
 def calcMask( contig_list ):
@@ -99,6 +100,10 @@ def n50l50( sortedContigs ):
 
     return out
 
+def mngr(assembly_path, ome = None):
+    sortedContigs = sortContigs(assembly_path)
+    calcs = n50l50(sortedContigs)
+    return ome, calcs
 
 def main():
 
@@ -115,38 +120,31 @@ def main():
         else:
             log_path = sys.argv[2]
         db = db2df( sys.argv[1] )
-        ome_set = set()
 
         if not os.path.isfile( log_path ):
             head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
                 '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
             with open( log_path, 'w' ) as log_open:
                 log_open.write( head )
-        else:
-            with open( log_path, 'r' ) as log_read:
-                for line in log_read:
-                    if line.startswith('#'):
-                        continue
-                    data = line.split( '\t' )
-                    ome_set.add( data[0] )
-                    
 
+        cmds = []
         for i, row in db.iterrows():
-            if row['internal_ome'] in ome_set:
-                continue
             print('\t' + row['internal_ome'], flush = True)
             if not pd.isnull(row['assembly']):
-                sortedContigs = sortContigs( os.environ['MYCOFNA'] + '/' + row['assembly'] )
-                calcs = n50l50( sortedContigs )
-                if calcs:
-                    log_editor( log_path, row['internal_ome'], row['internal_ome'] + '\t' + str(calcs['n50-1000bp']) + '\t' + \
-                        str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
-                        str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
-                        str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
-                        '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
-                        '\t' + str(calcs['gc-1000bp'])) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp'])
-                else:
-                    eprint('\t\tERROR:\t' + row['internal_ome'], flush = True)
+                cmds.append((formatPath('$MYCOFNA/' + row['assembly']), row['internal_ome']))
+        with mp.Pool(processes=os.cpu_count()) as pool:
+            results = pool.starmap(mngr, cmds)
+        for res in results:
+            ome, calcs = res[0], res[1]
+            if calcs:
+                log_editor( log_path, ome, ome + '\t' + str(calcs['n50-1000bp']) + '\t' + \
+                    str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
+                    str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
+                    str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
+                    '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
+                    '\t' + str(calcs['gc-1000bp'])) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp'])
+            else:
+                eprint('\t\tERROR:\t' + row['internal_ome'], flush = True)
 
     else:
 
