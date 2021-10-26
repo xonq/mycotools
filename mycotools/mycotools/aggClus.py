@@ -4,7 +4,7 @@ from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
 #from sklearn.cluster import AgglomerativeClustering
 from mycotools.lib.kontools import multisub, findExecs, formatPath
-from mycotools.lib.fastatools import fasta2dict, dict2fasta
+from mycotools.lib.biotools import fa2dict, dict2fa
 import string, argparse, os, sys, itertools, tempfile, re, random, pandas as pd, subprocess
 
 sys.setrecursionlimit(1000000)
@@ -12,7 +12,7 @@ sys.setrecursionlimit(1000000)
 def splitFasta( fa_path, output ):
 
     fastas = []
-    fa = fasta2dict( fa_path )
+    fa = fa2dict( fa_path )
     for header in fa:
         with open( output + '/' + header + '.fa', 'w' ) as out:
             out.write( '>' + header + '\n' + fa[header]['sequence'] + '\n' )

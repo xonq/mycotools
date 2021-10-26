@@ -1,8 +1,11 @@
 #! /usr/bin/env python3
 
+#NEED TO FORCE PROTEOME GENERATION AS A METHOD OF COMPATIBILITY CHECKING BEFORE INTEGRATION
+#NEED TO CUR INTRONS TO EXONS FOR NCBI
+
 import argparse, os, sys, subprocess, re, shutil, datetime, numpy as np
 from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
-from mycotools.lib.fastatools import dict2gff, gff2dict, fasta2dict, dict2fasta
+from mycotools.lib.biotools import list2gff, gff2list, fa2dict, dict2fa
 from mycotools.lib.dbtools import db2df, df2db, gen_omes, masterDB, df2std, loginCheck, gather_taxonomy, assimilate_tax
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
@@ -174,7 +177,7 @@ def main( prepdb, refdb ):
                         new_gff = curGFF3(formatPath('$MYCOGFF3/' + new_path), row['internal_ome'])
                         cur_gff = re.sub(r'\.uncur$', '', new_path)
                         with open( formatPath('$MYCOGFF3/' + cur_gff), 'w' ) as out:
-                            out.write( dict2gff(new_gff) )
+                            out.write( list2gff(new_gff) )
                         predb_omes.loc[i, 'gff3'] = cur_gff
                         os.remove(formatPath('$MYCOGFF3/' + new_path))
                     except KeyboardInterrupt:
@@ -188,20 +191,20 @@ def main( prepdb, refdb ):
                         to_del.append(i)
                         continue
                 else:
-                    gff, fa = gff2dict(formatPath('$MYCOGFF3/' + new_path)), None
+                    gff, fa = gff2list(formatPath('$MYCOGFF3/' + new_path)), None
                     aliases, old_ome = checkGff3(gff, row['internal_ome'])
                     if old_ome != row['internal_ome']:
                         with open(formatPath('$MYCOGFF3/' + new_path), 'r') as raw:
                             data = raw.read()
                         with open(formatPath('$MYCOGFF3/' + new_path), 'w') as out:
                             out.write(re.sub(old_ome, row['internal_ome'], data))
-                        gff = gff2dict(formatPath('$MYCOGFF3/' + new_path))
+                        gff = gff2list(formatPath('$MYCOGFF3/' + new_path))
                     if aliases:
                         if not pd.isnull(row['proteome']) and row['proteome']:
-                            fa = fasta2dict(formatPath(row['proteome']))
+                            fa = fa2dict(formatPath(row['proteome']))
                             acc_check = checkProt(fa, aliases)
                         else:
-                            assembly = fasta2dict(formatPath('$MYCOFNA/' + row['assembly']))
+                            assembly = fa2dict(formatPath('$MYCOFNA/' + row['assembly']))
                             fa = gff2prot(gff, assembly)
                             acc_check = checkProt(fa, aliases)
                         if acc_check:
@@ -218,10 +221,10 @@ def main( prepdb, refdb ):
                             predb_omes.at[i, 'gff3'] = row['internal_ome'] + '.gff3'
                             if old_ome == row['internal_ome']:
                                 with open(formatPath('$MYCOFAA/' + row['internal_ome']) + '.aa.fa', 'w') as out:
-                                    out.write(dict2fasta(fa))
+                                    out.write(dict2fa(fa))
                             else:
                                  with open(formatPath('$MYCOFAA/' + row['internal_ome']) + '.aa.fa', 'w') as out:
-                                     out.write(re.sub(old_ome, row['internal_ome'], dict2fasta(fa)))
+                                     out.write(re.sub(old_ome, row['internal_ome'], dict2fa(fa)))
                             predb_omes.at[i, 'proteome'] = row['internal_ome'] + '.aa.fa'
                             proteome = True
                     else:
@@ -233,12 +236,12 @@ def main( prepdb, refdb ):
                                 )
                             cur_gff = re.sub(r'\.uncur$', '', row['gff3'])
                             with open(formatPath('$MYCOGFF3/' + cur_gff), 'w') as out:
-                                out.write(dict2gff(gff))
+                                out.write(list2gff(gff))
                             os.remove( formatPath('$MYCOGFF3/' + row['gff3'] ))
                             predb_omes.at[i, 'gff3'] = cur_gff
                             cur_prot = re.sub(r'\.uncur$', '', row['proteome'])
                             with open(formatPath('$MYCOFAA/' + cur_prot), 'w') as out:
-                                out.write(dict2fasta(fa))
+                                out.write(dict2fa(fa))
                             os.remove( formatPath('$MYCOFAA/' + row['proteome'] ) )
                             predb_omes.at[i, 'proteome'] = cur_prot    
                             proteome = True
@@ -279,11 +282,11 @@ def main( prepdb, refdb ):
             new_path = os.environ['MYCOGFF3'] + '/' + row['internal_ome'] + '.gff3'
             try:
                 new_gff3 = gff2gff3(
-                    gff2dict(gff_path), 
+                    gff2list(gff_path), 
                     row['internal_ome'], row['genome_code'], verbose = False
                     )
                 with open( new_path, 'w' ) as out:
-                    out.write( dict2gff(new_gff3) )
+                    out.write( list2gff(new_gff3) )
                 predb_omes.at[i, 'gff3'] = os.path.basename(new_path)
             except KeyboardInterrupt:
                 sys.exit(-1)
@@ -311,11 +314,11 @@ def main( prepdb, refdb ):
         elif not proteome:
             prot_path = formatPath('$MYCOFAA/' + row['internal_ome'])
             if not pd.isnull(row['gff3']) and row['gff3']:
-                gff = gff2dict(formatPath('$MYCOGFF3/' + row['internal_ome']))
-                assembly = fasta2dict(formatPath('$MYCOFNA/' + row['internal_ome']))
+                gff = gff2list(formatPath('$MYCOGFF3/' + row['internal_ome']))
+                assembly = fa2dict(formatPath('$MYCOFNA/' + row['internal_ome']))
                 fa = gff2prot(gff, assembly)
                 with open(formatPath('$MYCOFAA/' + row['internal_ome'] + '.aa.fa', 'w'), 'w') as out:
-                    out.write(dict2fasta(fa))
+                    out.write(dict2fa(fa))
                 predb_omes.at[i, 'proteome'] = row['internal_ome'] + '.aa.fa'
    
  

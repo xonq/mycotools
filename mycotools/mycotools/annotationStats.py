@@ -1,13 +1,13 @@
 #! /usr/bin/env python3
 
-from mycotools.lib.fastatools import gff2dict
-from mycotools.lib.kontools import formatPath
+from mycotools.lib.biotools import gff2list
+from mycotools.lib.kontools import formatPath, eprint
 import sys, re, os
 
 
-def compileExon( gff_path, output ):
+def compileExon( gff_path, output, ome = None ):
     '''
-    Inputs: `gff_path` and `output` (converted to boolean)
+    Inputs: `gff_path` or mycotoolsDB file
     Outputs: summary annotation statistics
     Import the gff, find the first exon, and test which protein regular
     expression pattern to use. For each line in the gff, if it is an exon grab
@@ -19,7 +19,7 @@ def compileExon( gff_path, output ):
     statistics.
     '''
 
-    gff = gff2dict( gff_path )
+    gff = gff2list( gff_path )
     exon_dict = {}
 
     for index in range(len(gff)):
@@ -47,33 +47,36 @@ def compileExon( gff_path, output ):
         len_list.append( exon_dict[prot][-1] - exon_dict[prot][0] )
 
     len_list.sort()
-    if len( len_list ) % 2 == 0:
-        median = len_list[int(len(len_list)/2 - 1)]
-    else:
-        median = (len_list[round(len(len_list)/2 - 1)] + len_list[round(len(len_list)/2 - 2)])/2
+    try:
+        if len( len_list ) % 2 == 0:
+            median = len_list[int(len(len_list)/2 - 1)]
+        else:
+            median = (len_list[round(len(len_list)/2 - 1)] + len_list[round(len(len_list)/2 - 2)])/2
+    except IndexError:
+        eprint('ERROR: ' + os.path.basename(gff_path) + ' - no exons detected. Skipping', flush = True)
+        return None
 
+    if any( line for line in gff if line['type'] == 'intron' ):
+        eprint('ERROR: ' + os.path.basename(gff_path) + ' - introns detected. Convert to exons. Skipping', flush = True)
+        return None
 
     if not output:
         print( '{:<25}'.format('GENE LENGTH:') + str(total) , flush = True)
         print( '{:<25}'.format('GENES:') + str(len(exon_dict)), flush = True)
         print( '{:<25}'.format('MEAN GENE LENGTH:') + str(total/len(exon_dict)), flush = True)
         print( '{:<25}'.format('MEDIAN GENE LENGTH:') + str(median), flush = True)
-        geneStats = None
-    else:
-        geneStats = [ total, len(exon_dict), total/len(exon_dict), median ]
+    geneStats = {
+        'total_len': total, 'genes': len(exon_dict), 
+        'mean_len': total/len(exon_dict), 'median_len': median 
+        }
 
-    if any( line for line in gff if line['type'] == 'intron' ):
-        print('WARNING: OrthoFiller outputs do not have exons and will be skipped.\n' + \
-            'Curate OrthoFiller with `curAnnotation.py`')
-
-
-    return exon_dict, geneStats
+    return ome, geneStats
 
 
 if __name__ == '__main__':
 
     output = False
-    usage = '\nUSAGE: `gff`/`gtf`/`gff3`, optional output file\n'
+    usage = '\nUSAGE: `gff`/`gtf`/`gff3` OR mycotoolsDB, optional output file\n'
     if '-h ' in sys.argv or '--help' in sys.argv or '-h' == sys.argv[-1]:
         print(usage, flush = True)
         sys.exit(1)
@@ -86,9 +89,29 @@ if __name__ == '__main__':
     elif len( sys.argv ) > 3:
         output = True       
 
-    exon_dict, geneStats = compileExon( formatPath(sys.argv[1]), output )
-    if output:
-        out_str = 'total_len\tgenes\tmean_len\tmedian_len\n' + str(geneStats[0]) + '\t' + str(geneStats[1]) + '\t' \
-            + str(geneStats[2]) + '\t' + str(geneStats[3])
+    if formatPath(sys.argv[1])[-4:] not in {'.gtf', '.gff', 'gff3'}:
+        from mycotools.lib.dbtools import db2df
+        import multiprocessing as mp
+        db = db2df(formatPath(sys.argv[1]))
+        cmds = []
+        for i, row in db.iterrows():
+            cmds.append((formatPath('$MYCOGFF3/' + row['gff3']), True, row['internal_ome']))
+        with mp.Pool(processes = os.cpu_count()) as pool:
+            res = pool.starmap(compileExon, cmds)
+        out = {x[0]: x[1] for x in res if x}
+        if len(sys.argv) < 3:
+            output_file = os.path.basename(formatPath(sys.argv[1])) + '.annStats.tsv'
+        else:
+            output_file = sys.argv[2]
+        with open(output_file, 'w') as write:
+            write.write('#gene2gene_length\ttgenes\tmean_length\tmedian_length\n')
+            for ome in out:
+                write.write('\t'.join([str(x) for x in out[ome].values()]) + '\n')
+    else:
+        ome, geneStats = compileExon( formatPath(sys.argv[1]), output )
+        if output:
+            out_str = 'total_len\tgenes\tmean_len\tmedian_len\n' + str(geneStats['total_len']) + \
+                '\t' + str(geneStats['genes']) + '\t' \
+                + str(geneStats['mean_len']) + '\t' + str(geneStats['median_len'])
 
     sys.exit(0)    

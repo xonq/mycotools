@@ -60,7 +60,7 @@ grep 'Psilocybe' $(mycodb)
 
 ## Creating modular databases
 ### extractDB.py
-Mycotools DB emphasizes curation, automation, scaleability, and updates - creating tools that interface with uniformized databases ranging from 1 organism to all NCBI and JGI fungi. Most scripts use the master database by default, but if you are only interested in a portion of the database, then extract the portion you want.
+If you are only interested in a subset of lineages in the master mycotoolsDB, then extract the portion you want, run `extractDB.py -h` to see all options:
 
 e.g. grab a database of a taxonomic order you are interested in: `extractDB.py -l Atheliales -r order > atheliales.db`
 
@@ -120,6 +120,13 @@ optional MycotoolsDB, string of forbidden characters
 assemblyStats.py <ASSEMBLY.fa>
 annotationStats.py <ANNOTATION.gff3>
 ```
+
+To obtain a table of organisms' annotation statistics, [create a mycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
+```
+assemblyStats.py <MYCOTOOLSDB.db>
+annotationStats.py <MYCOTOOLSDB.db>
+```
+
 
 <br /><br />
 

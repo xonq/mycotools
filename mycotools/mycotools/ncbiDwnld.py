@@ -370,7 +370,7 @@ def callDwnldFTPs( ncbi_df, ass_prots, api, output_path, verbose = False, remove
 
 def main( 
     api = None, 
-    assembly = True, proteome = True, gff3 = True, transcript = False,
+    assembly = True, proteome = False, gff3 = True, transcript = False,
     ncbi_df = False, remove = False, output_path = os.getcwd(), verbose = False
     ):
 

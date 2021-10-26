@@ -1,7 +1,9 @@
 #! /usr/bin/env python3
 
+# NEED TO DEFAULT CHEKC FOR INTRONS FOR PREDB2DB
+
 import sys, re, os, copy, argparse
-from mycotools.lib.fastatools import gff2dict, dict2gff, fasta2dict, dict2fasta, \
+from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gtfComps, gff3Comps, gff2Comps
 from mycotools.lib.kontools import collect_files, eprint, formatPath
 from mycotools.gff2seq import aamain as gff2proteome
@@ -28,7 +30,7 @@ def grabOutput( output_pref ):
             print( '\nERROR: multiple eligible complete output detected' , flush = True)
         sys.exit( 3 )
 
-    return gff2dict( gtf[0] ), fasta2dict( proteome[0] )
+    return gff2list( gtf[0] ), fa2dict( proteome[0] )
 
 
 def intron2exon( gff ):
@@ -301,7 +303,8 @@ def addGenes( gtf, safe = True ):
         if gene not in gene_dict_prep:
             gene_dict_prep[ gene ] = { 
                 'start_codon': [], 'stop_codon': [], 'exon': [],
-                'strand': str(entry['strand']), 'contig': contig
+                'strand': str(entry['strand']), 'contig': contig,
+                'rna': None
                 }
             if contig not in contigs:
                 contigs[contig] = {}
@@ -314,6 +317,8 @@ def addGenes( gtf, safe = True ):
             gene_dict_prep[gene][entry['type']].extend(
                 [int(entry['start']), int(entry['end'])]
                 )
+        elif entry['type'] in {'mRNA', 'tRNA', 'rRNA'}:
+            gene_dict_prep[gene]['rna'] = entry['type']
    
     flagged, failed = [], []
     if safe:
@@ -349,9 +354,12 @@ def addGenes( gtf, safe = True ):
             else:
                 new_entry['start'] = gene_dict[gene]['stop_codon'][0]
                 new_entry['end'] = gene_dict[gene]['start_codon'][1]
-            new2 = copy.deepcopy( new_entry )
-            new2['type'] = 'mRNA'
-            insert_list.extend( [[index, dict(new2)], [index, dict(new_entry)]] )
+            if gene_dict_prep[gene]['rna']:
+                new2 = copy.deepcopy( new_entry )
+                new2['type'] = gene_dict_prep[gene]['rna']
+                insert_list.extend( [[index, dict(new2)], [index, dict(new_entry)]] )
+            else:
+                insert_list.extend([[index, dict(new_entry)]])
             check.add( gene )
 
     insert_list.sort( key = lambda x: x[0], reverse = True )
@@ -384,9 +392,10 @@ def curate( gff, prefix, failed = set() ):
         geneComp = re.compile(comps['id'])
 
     # geneComp = comps['id']
-    temp_exon_dict = {}
+    #acquire the start and end coordinates for all entries with the same gene attribute
+    temp_exon_dict, rna_info = {}, {}
     for line in gff:
-        if line['type'] in { 'exon', 'start_codon', 'stop_codon', 'mRNA', 'CDS' }:
+        if line['type'] in {'exon', 'start_codon', 'stop_codon', 'mRNA', 'CDS', 'tRNA', 'rRNA'}:
             if line['seqid'] not in temp_exon_dict:
                 temp_exon_dict[ line['seqid'] ] = {}
             prot = geneComp.search( line['attributes'] )[1]
@@ -395,11 +404,13 @@ def curate( gff, prefix, failed = set() ):
                 prot = protsub.sub( '', prot )
             if prot not in temp_exon_dict[ line['seqid'] ]:
                 temp_exon_dict[ line['seqid'] ][ prot ] = []
+            if line['type'] in {'mRNA', 'tRNA', 'rRNA'}:
+                rna_info[prot] = line['type']
             temp_exon_dict[ line['seqid'] ][ prot ].extend( [ int( line['start'] ), int( line['end'] ) ] )
-
     exon_dict = {}
     for key, value in sorted( temp_exon_dict.items() ):
         exon_dict[ key ] = value
+
 
     count = 1
     change_dict = {}
@@ -427,7 +438,7 @@ def curate( gff, prefix, failed = set() ):
         prot = change_dict[ prot ]
         if entry['type'] == 'gene':
             entry['attributes'] = 'ID=' + prot + ';Alias=' + prot
-        elif entry['type'] == 'mRNA':
+        elif entry['type'] in {'mRNA', 'tRNA', 'rRNA'}:
             count = 1
             transProt = prot + '-T' + str( count )
             while transProt in trans_set:
@@ -450,6 +461,10 @@ def curate( gff, prefix, failed = set() ):
             entry['attributes'] = 'ID=' + transProt + '.cds' + str(cds) + \
                 ';Parent=' + transProt + ';' + 'Alias=' + prot 
             cdsCheck[transProt] += 1
+        if int(entry['end']) < int(entry['start']):
+            start = copy.deepcopy(entry['end'])
+            end = copy.deepcopy(entry['start'])
+            entry['start'], entry['end'] = start, end
         newGff.append( entry )
 
     translation_str = ''
@@ -488,11 +503,11 @@ def addExons( gff ):
 def main( gff_path, fasta_path, prefix, fail = True ):
 
     if isinstance(gff_path, str):
-        gff = gff2dict( gff_path )
+        gff = gff2list( gff_path )
     elif isinstance(gff_path, list):
         gff = gff_path
     if isinstance(fasta_path, str):
-        assembly = fasta2dict( fasta_path )
+        assembly = fa2dict( fasta_path )
     elif isinstance(fasta_path, dict):
         assembly = fasta_path
 
@@ -542,9 +557,9 @@ if __name__ == '__main__':
         )
 
     with open( output + '.aa.fa', 'w' ) as out:
-        out.write( dict2fasta( fa ) )
+        out.write( dict2fa( fa ) )
     with open( output + '.gff3', 'w' ) as out:
-        out.write( dict2gff( gff ) + '\n' )
+        out.write( list2gff( gff ) + '\n' )
     with open( output + '.transitions', 'w' ) as out:
         out.write( trans_str )
     if failed:

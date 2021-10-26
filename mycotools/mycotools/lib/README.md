@@ -1,1 +1,1 @@
-Default python libraries necessary for MycoTools
+Default python libraries for Mycotools and MycotoolsDB

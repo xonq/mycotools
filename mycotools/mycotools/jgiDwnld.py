@@ -371,7 +371,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
 
 
 def main( 
-    df, output, user, pwd, assembly = True, proteome = True, gff3 = True, 
+    df, output, user, pwd, assembly = True, proteome = False, gff3 = True, 
     gff = False, transcript = False, est = False, masked = True
     ):
 

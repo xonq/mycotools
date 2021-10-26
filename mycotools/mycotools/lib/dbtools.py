@@ -2,7 +2,7 @@
 
 import pandas as pd, pandas
 import numpy as np
-import sys, os, time, mycotools.lib.fastatools, json, re, datetime, hashlib, getpass, base64
+import sys, os, time, mycotools.lib.biotools, json, re, datetime, hashlib, getpass, base64
 from mycotools.lib.kontools import collect_files, eprint, formatPath
 from Bio import Entrez
 from urllib.error import HTTPError

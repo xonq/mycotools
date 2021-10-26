@@ -2,7 +2,7 @@
 
 import pandas as pd, multiprocessing as mp
 import os, sys, argparse, re
-from mycotools.lib.fastatools import gff2dict, dict2gff, grabGffAcc, grabGffAccs
+from mycotools.lib.biotools import gff2list, list2gff, grabGffAcc, grabGffAccs
 from mycotools.lib.dbtools import db2df, masterDB
 from mycotools.lib.kontools import formatPath
 
@@ -18,7 +18,7 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
         else:
             accession = [df]
         for acc in accessions:
-            gff_strs[acc] = grabGffAcc( gff2dict(gff), acc )
+            gff_strs[acc] = grabGffAcc( gff2list(gff), acc )
     else:
         db = db.set_index( 'internal_ome' )
         if type(df) is not str:
@@ -40,7 +40,7 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
                 if not os.path.isfile( gff ):
                     print( '\t' + ome + ' invalid gff3' , flush = True)
                     continue
-                gff_list = gff2dict( gff )
+                gff_list = gff2list( gff )
                 mp_cmds.append([gff_list, accessions])
 #                for acc in accessions:
  #                   mp_cmds.append( [gff_list, acc] )
@@ -49,9 +49,9 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
 
         with mp.get_context('spawn').Pool( processes = cpu ) as pool:
             mp_strs = pool.starmap( grabGffAccs, mp_cmds )
-#                    gff_str += dict2gff( grabGffAcc( gff_list, acc, tag = tag ) ) + '\n'
+#                    gff_str += list2gff( grabGffAcc( gff_list, acc, tag = tag ) ) + '\n'
         for mp_str in mp_strs:
-            gff_str = dict2gff( mp_str ) + '\n'
+            gff_str = list2gff( mp_str ) + '\n'
             ome = re.search(r';Alias=([^_]*)', mp_str[0]['attributes'])[1]
             gff_strs[ome] =  gff_str.rstrip()
 
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         out_str = ''
         for ome in gff_strs:
 #            print(ome, gff_strs[ome])
-#            out_str += dict2gff(gff_strs[ome])
+#            out_str += list2gff(gff_strs[ome])
             out_str += gff_strs[ome] + '\n'
             with open( input_file + '.gff3', 'w' ) as out:
                 out.write( out_str )

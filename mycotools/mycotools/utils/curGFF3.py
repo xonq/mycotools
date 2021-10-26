@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 from mycotools.lib.kontools import formatPath, sysStart, eprint
-from mycotools.lib.fastatools import gff2dict, dict2gff, gff3Comps
+from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
 import re, sys, os
 
 
@@ -163,7 +163,7 @@ def curGff3( gff_list, ome ):
 def main( gff_path, ome):
 
     if isinstance(gff_path, str):
-        gff = gff2dict( formatPath(gff_path) )
+        gff = gff2list( formatPath(gff_path) )
     elif isinstance(gff_path, list):
         gff = gff_path
     typ = acquireFormat( gff )
@@ -181,5 +181,5 @@ if __name__ == '__main__':
     usage = 'Imports gene coordinates file gff3, ome, and curates headers'
     sysStart( sys.argv, usage, 3, files = [sys.argv[1]] )
     cur_gff = main( formatPath(sys.argv[1]), sys.argv[2] )
-    print( dict2gff( cur_gff ) , flush = True)
+    print( list2gff( cur_gff ) , flush = True)
     sys.exit( 0 )

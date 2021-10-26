@@ -69,8 +69,8 @@ def masterDB( path = '$MYCODB' ):
 if __name__ == '__main__':
 
     description = 'MycotoolsDB utility' + \
-        '\nDEFAULT: print MycotoolsDB file path and exit\n' + \
-        '\n-i [DBPATH]\t--init [DBPATH]\tAdd MycotoolsDB to PATH and initialize'
+        '\n\nDEFAULT: print MycotoolsDB file path and exit' + \
+        '\n[-i DBPATH]\t[--init DBPATH]\tAdd MycotoolsDB to PATH and initialize'
     set_argv = set(sys.argv)
     if '-h' in set_argv or '--help' in set_argv:
         print('\n' + description + '\n', flush = True)

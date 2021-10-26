@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 
-from mycotools.lib.fastatools import fasta2dict
+from mycotools.lib.biotools import fa2dict
 import os, sys
 
 def protStats( fa_path, output ):
 
-    fa = fasta2dict(fa_path)
+    fa = fa2dict(fa_path)
     prot_lens = []
     total = 0
 

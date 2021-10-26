@@ -2,14 +2,14 @@
 
 import pandas as pd
 import os, sys, argparse, re
-from mycotools.lib.fastatools import fasta2dict, dict2fasta, reverse_complement
+from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
 from mycotools.lib.dbtools import db2df, masterDB
 from mycotools.lib.kontools import formatPath, eprint
 
 
 def extractHeaders( fasta_file, accessions, ome = None ):
 
-    fasta = fasta2dict(fasta_file)
+    fasta = fa2dict(fasta_file)
     out_fasta = {}
     acc_comp = re.compile( r'([^/[]*)\[(\d+)\-(\d+)\]$' )
 
@@ -64,14 +64,14 @@ def dbmain( db, accs, column = None, start = None, end = None ):
                     for x in accessions
                     ]
             fasta = os.environ['MYCOFAA'] + '/' + db['proteome'][ome]
-            fasta_str += dict2fasta(extractHeaders( fasta, accessions )) + '\n'
+            fasta_str += dict2fa(extractHeaders( fasta, accessions )) + '\n'
     else:
         omes_prep = re.search( r'(^.*?)_', accs )
         if omes_prep is None:
             eprint('\nERROR: invalid accession for database search', flush = True)
             sys.exit( 5 )
         fasta = os.environ['MYCOFAA'] + '/' + db['proteome'][omes_prep[1]]
-        fasta_str += dict2fasta(extractHeaders( fasta, [accs] ))
+        fasta_str += dict2fa(extractHeaders( fasta, [accs] ))
 
     return fasta_str
 
@@ -87,9 +87,9 @@ def famain( accs, fa, column = None, ome = None, start = None, end = None ):
                 x + '[' + accs[start][x] + '-' + accs[end][x] + ']' \
                 for x in accessions
                 ]
-        fasta_str += dict2fasta(extractHeaders( fa, accessions, ome )) + '\n'
+        fasta_str += dict2fa(extractHeaders( fa, accessions, ome )) + '\n'
     else:
-        fasta_str += dict2fasta(extractHeaders( fa, [accs], ome ))
+        fasta_str += dict2fa(extractHeaders( fa, [accs], ome ))
         
     return fasta_str.rstrip()
 

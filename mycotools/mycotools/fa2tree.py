@@ -2,7 +2,7 @@
 
 import os, re, sys, subprocess, argparse
 from mycotools.lib.kontools import eprint, vprint, collect_files, formatPath, intro, outro, findExecs
-from mycotools.lib.fastatools import fasta2dict
+from mycotools.lib.biotools import fa2dict
 
 
 def mafftRun( fasta, out_dir, hpc, verbose = True ):

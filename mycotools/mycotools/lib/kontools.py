@@ -1,7 +1,35 @@
 #! /usr/bin/env python3
 
-import datetime, sys, glob, os, re, subprocess, gzip, shutil, json
+import datetime, sys, glob, os, re, subprocess, gzip, shutil, json, tarfile
 import numpy as np
+
+
+def tardir(dir_, rm = True):
+    
+    if not os.path.isdir(formatPath(dir_)):
+        return False
+    with tarfile.open(formatPath(dir_)[:-1] + '.tar.gz', 'w:gz') as tar:
+        tar.add(dir_, arcname = os.path.basename(formatPath(dir_)[:-1]))
+    shutil.rmtree(dir_)
+
+def untardir(dir_, rm = False, to = None):
+    if not to:
+        to = os.path.dirname(dir_[:-1])
+    tar = tarfile.TarFile.open(dir_)
+    tar.extractall(path = to)
+    tar.close()
+    if rm:
+        os.remove(dir_)
+
+def checkdir(dir_, unzip = False, to = None, rm = False):
+    if os.path.isdir(dir_):
+        return True
+    elif os.path.isfile(formatPath(dir_) + '.tar.gz'):
+        if unzip:
+            untardir(dir_ + '.tar.gz', rm = rm, to = to)
+            return True
+    return False
+
 
 def eprint( *args, **kwargs ):
     '''Prints to stderr'''

@@ -6,7 +6,7 @@ Calculates basic genome statistics.
 
 import sys, os, pandas as pd
 from mycotools.lib.dbtools import db2df, log_editor
-from mycotools.lib.fastatools import fasta2dict
+from mycotools.lib.biotools import fa2dict
 
 
 def calcMask( contig_list ):
@@ -25,7 +25,7 @@ def sortContigs( assembly_path ):
        Sorts the list in descending order by length'''
 
     contigList = []
-    assembly = fasta2dict( assembly_path )
+    assembly = fa2dict( assembly_path )
     for contig in assembly:
         contigList.append( {
             'len': len(assembly[contig]['sequence']), 
@@ -102,19 +102,19 @@ def n50l50( sortedContigs ):
 
 def main():
 
-    usage = '\nUSAGE: assembly statistics\tinput `.db` / assembly and `output.tsv` if using database\n'
+    usage = '\nUSAGE: assembly statistics\tAssembly `fasta` or mycotoolsDB, optional output file if using database\n'
     if len(sys.argv) < 2:
         print( usage , flush = True)
         sys.exit( 1 )
 
     stats = {}
 
-    if sys.argv[1].endswith( 'db' ):
+    if formatPath(sys.argv[1])[-4:] not in {'gff3', '.gtf', '.gff'}:
         if len( sys.argv ) < 3:
-            print( usage , flush = True)
-            sys.exit( 2 ) 
+            log_path = formatPath(sys.argv[1]) + '.assStats.tsv'
+        else:
+            log_path = sys.argv[2]
         db = db2df( sys.argv[1] )
-        log_path = sys.argv[2]
         ome_set = set()
 
         if not os.path.isfile( log_path ):
