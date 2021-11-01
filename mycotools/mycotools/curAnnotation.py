@@ -411,7 +411,6 @@ def curate( gff, prefix, failed = set() ):
     for key, value in sorted( temp_exon_dict.items() ):
         exon_dict[ key ] = value
 
-
     count = 1
     change_dict = {}
     for seq in exon_dict:
@@ -419,15 +418,17 @@ def curate( gff, prefix, failed = set() ):
             exon_dict[ seq ][ prot ].sort()
         exon_dict[ seq ] = dict(sorted( exon_dict[ seq ].items(), key = lambda e: e[1][0] ))
         for prot in exon_dict[ seq ]:
-            new_prot = re.sub( r'-T\d+$', '', prot )
+            new_prot = re.sub( r'-T.+', '', prot )
             if new_prot not in change_dict:
                 change_dict[ new_prot ] = prefix + '_' + str(count)
             count += 1
 
+    crudesortGff = sortGFF(gff, re.compile(comps['id']))
+
     newGff, trans_set, exonCheck, cdsCheck, failed = [], set(), {}, {}, set( x[0] for x in failed )
     transComp = re.compile( r'transcript_id "(.*?)"\;' )
     # transComp = comps['transcript']
-    for entry in gff:
+    for entry in crudesortGff:
         prot = geneComp.search( entry['attributes'] )
         trans = transComp.search( entry['attributes'] )
         prot = prot[1]
@@ -436,9 +437,7 @@ def curate( gff, prefix, failed = set() ):
         if comps['ver'] == 'gff3':
             prot = protsub.sub('', prot)
         prot = change_dict[ prot ]
-        if entry['type'] == 'gene':
-            entry['attributes'] = 'ID=' + prot + ';Alias=' + prot
-        elif entry['type'] in {'mRNA', 'tRNA', 'rRNA'}:
+        if entry['type'] in {'mRNA', 'tRNA', 'rRNA'}:
             count = 1
             transProt = prot + '-T' + str( count )
             while transProt in trans_set:
@@ -461,6 +460,9 @@ def curate( gff, prefix, failed = set() ):
             entry['attributes'] = 'ID=' + transProt + '.cds' + str(cds) + \
                 ';Parent=' + transProt + ';' + 'Alias=' + prot 
             cdsCheck[transProt] += 1
+        else: #if entry['type'] == 'gene':
+            entry['attributes'] = 'ID=' + prot + ';Alias=' + prot
+
         if int(entry['end']) < int(entry['start']):
             start = copy.deepcopy(entry['end'])
             end = copy.deepcopy(entry['start'])
@@ -471,11 +473,43 @@ def curate( gff, prefix, failed = set() ):
     for entry in change_dict:
         translation_str += entry + '\t' + change_dict[ entry ] + '\n'
 
-    newGff = sorted( newGff, key = lambda x: \
-        int( re.search( r'ID=.*?\_(\d+)', x['attributes'])[1] ))
-
     return newGff, translation_str
 
+
+def sortGene(sorting_group):
+
+    out_group = []
+    for entryType in ['gene', 'mrna', 'trna', 'rrna', 'exon', 'cds']:
+        todel = []
+        for i, entry in enumerate(sorting_group):
+            if entry['type'].lower() == entryType:
+                out_group.append(entry)
+                todel.append(i)
+        for i in reversed(todel):
+            sorting_group.pop(i)
+
+    for entry in sorting_group:
+        out_group.append(entry)
+
+    return out_group 
+
+
+def sortGFF(unsorted_gff, idComp):
+
+    sorting_groups, oldGene = {}, None
+    for i, entry in enumerate(unsorted_gff):
+        gene = idComp.search(entry['attributes'])[1]
+        gene = re.sub(r'(.*?_\d+).*', r'\1', gene)
+        if gene not in sorting_groups:
+            sorting_groups[gene] = []
+        sorting_groups[gene].append(entry)
+
+    sortedGff = []
+    for gene in sorting_groups:
+        sortedGff.extend(sortGene(sorting_groups[gene]))
+
+    return sortedGff
+        
 
 def addExons( gff ):
 
@@ -490,7 +524,7 @@ def addExons( gff ):
                 if entry['type'] == 'exon':
                     exonCheck[prot] = [True, i, None]
             
-    for prot in exonCheck:
+    for prot in reversed(exonCheck):
         if not exonCheck[prot][0]:
             newEntry = copy.deepcopy(exonCheck[prot][2])
             newEntry['attributes'] = newEntry['attributes'].replace('.cds;', '.exon1;')
@@ -517,13 +551,17 @@ def main( gff_path, fasta_path, prefix, fail = True ):
         exonGtfCurGenes, failed, flagged = addGenes( exonGtfCur, safe = fail )
         preGff = removeStartStop( exonGtfCurGenes )
         gffUncur, trans_str = curate( preGff, prefix, failed ) 
-        gff = addExons( gffUncur )
+        unsortedGff = addExons( gffUncur )
     else:
-        gff, trans_str = curate( 
+        unsortedGff, trans_str = curate( 
             gff, prefix
             ) 
         failed, flagged = None, None
-  
+
+    id_comp = re.compile(gff3Comps()['id'])
+    crude_sort = sorted( unsortedGff, key = lambda x: \
+        int( re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1] ))
+    gff = sortGFF(crude_sort, id_comp)
     fa = gff2proteome( gff, assembly )
  
     return gff, fa, trans_str, failed, flagged
