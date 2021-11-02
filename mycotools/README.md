@@ -8,7 +8,7 @@ If Mycotools contribute to your analysis, please cite this git repository (gitla
 
 # UPDATE
 ```
-pip install mycotools --upgrade
+(mycotools) -$ pip install mycotools --upgrade
 ```
 
 <br />
