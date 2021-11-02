@@ -44,13 +44,13 @@ The following are information regarding scripts that manipulate Mycotools .db fi
 ### mycodb
 `mycodb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.db`.
 ```bash
--bash-4.2$ mycodb
+(mycotools) -$ mycodb
 /home/xonq/mycodb/mycodb/20210125.db
 ```
 
 If you want to use the path of the master database you can use basic bash functionality to work with the output, 
 e.g. to open in a text editor or to grep the file:
-```
+```bash
 vim $(mycodb)
 grep 'Psilocybe' $(mycodb)
 ```
@@ -62,15 +62,30 @@ grep 'Psilocybe' $(mycodb)
 ### extractDB.py
 If you are only interested in a subset of lineages in the master mycotoolsDB, then extract the portion you want, run `extractDB.py -h` to see all options:
 
-e.g. grab a database of a taxonomic order you are interested in: `extractDB.py -l Atheliales -r order > atheliales.db`
+e.g. grab a database of a taxonomic order: 
+```bash
+(mycotools -$ extractDB.py -l Atheliales -r order > atheliales.db
+```
 
-grab all NCBI Aspergilli accessions: `extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.db_ncbi` 
+grab all NCBI Aspergilli accessions: 
+```bash
+(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.db_ncbi
+``` 
 
-grab the inverse of your arguments: `extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.db_notNcbi`
+grab the inverse of your arguments: 
+```bash
+(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.db_notNcbi
+```
 
-grab a list of orders in a new line delimited file: `extractDB.py -ll <TAX_FILE> -r order > taxa.db`
+grab a list of orders from a file:
+```bash
+(mycotools) -$ extractDB.py -ll <TAX_FILE> -r order > taxa.db
+```
 
-grab a list of `ome`s in a new line delimited file: `extractDB.py ---ome <OME_FILE>`
+grab a list of `ome`s in a new line delimited file: 
+```bash
+(mycotools) -$ extractDB.py ---ome <OME_FILE>
+```
 
 <br /><br />
 
@@ -80,19 +95,19 @@ grab a list of `ome`s in a new line delimited file: `extractDB.py ---ome <OME_FI
 Inputs a MycotoolsDB `.db` file (by default uses the master database), then creates symlinks of the selected file types, hard copies the files, or prints their PATHs. A symlink is simply creating a placeholder file that links to the database file... this way it does not take up additional storage space like a hard copy does. However, editing symlinks will edit the original file, so *only hard copy `--hard` if you need to edit the files*.
 
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
-```
-mkdir pullFiles && cd pullFiles
+```bash
+(mycotools) -$ mkdir pullFiles && cd pullFiles
 extractDB.py -r family -l Atheliaceae > atheliaceae.db
 ```
 
 Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
-```
-dbFiles.py -d atheliaceae.db -p 
+```bash
+(mycotools) -$ dbFiles.py -d atheliaceae.db -p 
 ```
 
 Alternatively, if you just need the paths (links) to these files, simply run:
-```
-dbFiles.py -d atheliaceae.db -p --print
+```bash
+(mycotools) -$ dbFiles.py -d atheliaceae.db -p --print
 ```
 
 <br /><br />
@@ -103,7 +118,8 @@ dbFiles.py -d atheliaceae.db -p --print
 Substitutes MycotoolsDB organism code names (e.g. `fusgra1`) for taxonomic information (e.g. Fusarium_graminearum_var._XYZ).
 
 e.g. to substitute ome for genus species and strain: `ome2name.py <INPUT> oa`
-```
+```bash
+(mycotools) -$ ome2name.py -h
 USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCOTOOLSDB] asvg*&
 DEFAULTS: master db, see script for default forbidden characters
 Input file to regex sub omes with their name.
@@ -116,15 +132,15 @@ optional MycotoolsDB, string of forbidden characters
 # SEQUENCE DATA TOOLS
 ## Sequence data statistics
 ### assemblyStats.py / annotationStats.py
-```
-assemblyStats.py <ASSEMBLY.fa>
-annotationStats.py <ANNOTATION.gff3>
+```bash
+(mycotools) -$ assemblyStats.py <ASSEMBLY.fa>
+(mycotools) -$ annotationStats.py <ANNOTATION.gff3>
 ```
 
 To obtain a table of organisms' annotation statistics, [create a mycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
-```
-assemblyStats.py <MYCOTOOLSDB.db>
-annotationStats.py <MYCOTOOLSDB.db>
+```bash
+(mycotools) -$ assemblyStats.py <MYCOTOOLSDB.db>
+(mycotools) -$ annotationStats.py <MYCOTOOLSDB.db>
 ```
 
 
@@ -136,15 +152,15 @@ annotationStats.py <MYCOTOOLSDB.db>
 These scripts input a MycotoolsDB or can be manually made as shown at the bottom of this section. 
 
 Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
-```
-mkdir dwnldFiles && cd dwnldFiles
-extractDB.py -c genus -t aspergillus > aspergillus.db_ncbi
+```bash
+(mycotools) -$ mkdir dwnldFiles && cd dwnldFiles
+(mycotools) -$ extractDB.py -c genus -t aspergillus > aspergillus.db_ncbi
 ```
 
 If there are organisms you don't want in the extracted `.db`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
-```
-jgiDwnld.py -i aspergillus.db_jgi -t -e
-ncbiDwnld.py -i aspergillus.db_ncbi -t
+```bash
+(mycotools) -$ jgiDwnld.py -i aspergillus.db_jgi -t -e
+(mycotools) -$ ncbiDwnld.py -i aspergillus.db_ncbi -t
 ```
 
 These scripts populate with compressed files. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. 
@@ -174,8 +190,8 @@ SAMN02744098
 
 You can download NCBI SRA's by acquiring NCBI's SRA tools, making sure `fastq-dump` is included in your PATH, and then running:
 
-```
-ncbiDwnld.py --sra -i <REFERENCE>
+```bash
+(mycotools) -$ ncbiDwnld.py --sra -i <REFERENCE>
 ```
 
 You can create a file with SRA ID's or BioProject, etc. Basically any query that is unique and sufficient to acquire the SRRs of interest. For paired-end reads, append `-pe` to the command.
@@ -187,37 +203,37 @@ You can create a file with SRA ID's or BioProject, etc. Basically any query that
 ### acc2fa.py / acc2gff.py
 By default, if you are querying using a MycotoolsDB accession then it can search the database without a standalone file.
 Let's say you want to query *Panaeolus cyanescens'* PsiD and the NCBI accession is "PPQ80975.1". Find Panaelous cyanescens' ome code in the database:
-```
-grep Panaeolus $(mycotoolsdb) | grep cyanescens | cut -f 1
+```bash
+(mycotools) -$ grep Panaeolus $(mycodb) | grep cyanescens | cut -f 1
 ```
 
 The first column in the output is `pancya1`, which is the ome code for this organism. Now, prepend the code to the accession and grab it from the db (you can use `>` after the commands to pipe output to a file):
-```
-acc2gff.py -a pancya1_PPQ80975.1
-acc2fa.py -a pancya1_PPQ80975.1
+```bash
+(mycotools) -$ acc2gff.py -a pancya1_PPQ80975.1
+(mycotools) -$ acc2fa.py -a pancya1_PPQ80975.1
 ```
 
 If you have a list of accessions, create an input file with the accessions separated by new lines then run:
-```
-acc2gff.py -i <INPUTFILE>
-acc2fa.py -i <INPUTFILE>
+```bash
+(mycotools) -$ acc2gff.py -i <INPUTFILE>
+(mycotools) -$ acc2fa.py -i <INPUTFILE>
 ```
 
 <br /><br />
 
 
-## Grab clusters
+## Grab loci
 ### grabLoci.py
 Inputs an accession (`-a`) or new line separated list of accessions and optional genes +/- (`-p`, default 10). Outputs gene accessions or a gff and protein fasta of the clusters.
 
 output gff and protein fasta of an accession's cluster (outputs to `<ACCESSION>_clus*`):
-```
-grabLoci.py -o -a <MYCOTOOLSDB_ACCESSION>
+```bash
+(mycotools) -$ grabLoci.py -o -a <MYCOTOOLSDB_ACCESSION>
 ```
 
 list proximal +/- 5 genes to standard out:
 ```bash
-(mycotools) -bash-4.2$ grabLoci.py -a fibsp.1_906341 -p 5
+(mycotools) -$ grabLoci.py -a fibsp.1_906341 -p 5
 
 fibsp.1_906341 cluster +/- 5
 fibsp.1_880711
@@ -231,8 +247,6 @@ fibsp.1_846242
 fibsp.1_138
 fibsp.1_942299
 fibsp.1_906343
-
-(mycotools) -bash4.2$
 ```
 
 <br /><br />
@@ -241,7 +255,8 @@ fibsp.1_906343
 ### curAnnotation.py
 `curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and add an `Alias=<PREFIX>` field for MycotoolsDB compatible accession for each entry.
 
-e.g. `curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/results/results.aa.fa -p newname`
+```bash
+(mycotools) -$ curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/results/results.aa.fa -p newname`
 
 ### curGFF3.py / curProteome.py / gff2gff3.py
 There are several scripts in the `utils` used to curate gene coordinate files and proteomes for the MycotoolsDB. `curGFF3.py` is tested with both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB compatible `gff3`, and `curProteome.py` curates NCBI or JGI proteomes.
@@ -260,7 +275,9 @@ e.g. make an SVG from a GFF3: `gff2svg.py -g <MY.gff3>`
 
 make SVGs for all GFF3s in a new line delimited list with width set to 20:
 
-`gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20`
+```
+(mycotools) -$ gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
+```
 
 
 <br /><br /><br />
