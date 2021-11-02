@@ -72,23 +72,23 @@ def main(
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser( description = 'Imports MycotoolsDB and ' + \
-       'extracts database from parameters. E.g.\t`extractDB.py ' + \
+    parser = argparse.ArgumentParser( description = \
+       'Extracts a MycotoolsDB from arguments. E.g.\t`extractDB.py ' + \
        '-l Atheliaceae -r family`' )
+    parser.add_argument( '-d', '--database', default = masterDB(), help = 'DEFAULT: masterdb' )
     parser.add_argument( '-l', '--lineage' )
-    parser.add_argument( '-r', '--rank', help = "Lineage(s)' taxonomic rank" )
+    parser.add_argument( '-r', '--rank', help = "Taxonomy rank" )
     parser.add_argument( '-s', '--source', help = 'Data source' )
     parser.add_argument( '-n', '--nonpublished', action = 'store_true', help = 'Include ' + \
         'restricted-use' )
     parser.add_argument( '-u', '--unique', action = 'store_true', help = 'Unique species' )
     parser.add_argument( '--unique_strains', action = 'store_true' )
-    parser.add_argument( '-ol', '--ome', help = "New-line delimited omes file" )
-    parser.add_argument( '-ll', '--lineage_list', help = 'New-line delimited lineage file' )
     parser.add_argument( '-i', '--inverse', action = 'store_true', help = 'Inverse arguments' )
-    parser.add_argument( '--headers', action = 'store_true', help = 'Column headers' )
-    parser.add_argument( '-d', '--database', default = masterDB(), help = 'DEFAULT: masterdb' )
-    parser.add_argument( '-o', '--output', help = "Output path, calls --headers" )
-    parser.add_argument( '--stdin', action = 'store_true', help = "Pipe MycotoolsDB from stdin" )
+    parser.add_argument( '--headers', action = 'store_true', help = 'Include header')
+    parser.add_argument( '-o', '--output' )
+    parser.add_argument( '-', '--stdin', action = 'store_true', help = "Pipe MycotoolsDB from stdin" )
+    parser.add_argument( '-ol', '--ome', help = "File w/list of omes" )
+    parser.add_argument( '-ll', '--lineages', help = 'File w/list of lineages (same rank)' )
     args = parser.parse_args()
     db_path = formatPath( args.database )
 

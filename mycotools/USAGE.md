@@ -87,6 +87,35 @@ grab a list of `ome`s in a new line delimited file:
 (mycotools) -$ extractDB.py ---ome <OME_FILE>
 ```
 
+```bash
+(mycotools) -$ extractDB.py --help
+usage: extractDB.py [-h] [-d DATABASE] [-l LINEAGE] [-r RANK] [-s SOURCE] [-n]
+                    [-u] [--unique_strains] [-i] [--headers] [-o OUTPUT] [-]
+                    [-ol OME] [-ll LINEAGES]
+
+Extracts a MycotoolsDB from arguments. E.g. `extractDB.py -l Atheliaceae -r
+family`
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d DATABASE, --database DATABASE
+                        DEFAULT: masterdb
+  -l LINEAGE, --lineage LINEAGE
+  -r RANK, --rank RANK  Taxonomy rank
+  -s SOURCE, --source SOURCE
+                        Data source
+  -n, --nonpublished    Include restricted-use
+  -u, --unique          Unique species
+  --unique_strains
+  -i, --inverse         Inverse arguments
+  --headers             Include header
+  -o OUTPUT, --output OUTPUT
+  -, --stdin            Pipe MycotoolsDB from stdin
+  -ol OME, --ome OME    File w/list of omes
+  -ll LINEAGES, --lineages LINEAGES
+                        File w/list of lineages (same rank)
+```
+
 <br /><br />
 
 
