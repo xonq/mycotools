@@ -51,8 +51,8 @@ The following are information regarding scripts that manipulate Mycotools .db fi
 If you want to use the path of the master database you can use basic bash functionality to work with the output, 
 e.g. to open in a text editor or to grep the file:
 ```bash
-vim $(mycodb)
-grep 'Psilocybe' $(mycodb)
+(mycotools) -$ vim $(mycodb)
+(mycotools) -$ grep 'Psilocybe' $(mycodb)
 ```
 
 <br /><br />
@@ -64,7 +64,7 @@ If you are only interested in a subset of lineages in the master mycotoolsDB, th
 
 e.g. grab a database of a taxonomic order: 
 ```bash
-(mycotools -$ extractDB.py -l Atheliales -r order > atheliales.db
+(mycotools) -$ extractDB.py -l Atheliales -r order > atheliales.db
 ```
 
 grab all NCBI Aspergilli accessions: 
@@ -97,7 +97,7 @@ Inputs a MycotoolsDB `.db` file (by default uses the master database), then crea
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```bash
 (mycotools) -$ mkdir pullFiles && cd pullFiles
-extractDB.py -r family -l Atheliaceae > atheliaceae.db
+(mycotools) -$ extractDB.py -r family -l Atheliaceae > atheliaceae.db
 ```
 
 Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
@@ -256,7 +256,8 @@ fibsp.1_906343
 `curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and add an `Alias=<PREFIX>` field for MycotoolsDB compatible accession for each entry.
 
 ```bash
-(mycotools) -$ curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/results/results.aa.fa -p newname`
+(mycotools) -$ curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ORTHOFILLER>/results/results.aa.fa -p newname
+```
 
 ### curGFF3.py / curProteome.py / gff2gff3.py
 There are several scripts in the `utils` used to curate gene coordinate files and proteomes for the MycotoolsDB. `curGFF3.py` is tested with both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB compatible `gff3`, and `curProteome.py` curates NCBI or JGI proteomes.
