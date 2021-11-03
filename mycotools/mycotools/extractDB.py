@@ -93,7 +93,7 @@ if __name__ == '__main__':
     db_path = formatPath( args.database )
 
 
-    if (args.lineage or args.lineage_list) and not args.rank:
+    if (args.lineage or args.lineages) and not args.rank:
         print('\nERROR: need rank for lineage(s)', flush = True)
         sys.exit(5)
 
@@ -105,7 +105,7 @@ if __name__ == '__main__':
                        
             if args.lineage:
                 tag += '_' + args.lineage
-            if args.lineage_list:
+            if args.lineages:
                 tag += '_taxonomy'
             if args.source:
                 tag += args.source.lower()
@@ -117,7 +117,7 @@ if __name__ == '__main__':
         'database': db_path,
         'output': output,
         'lineage': args.lineage,
-        'lineage_list': args.lineage_list,
+        'lineages list': args.lineages,
         'rank': args.rank,
         'ome_list': args.ome,
         'Source': args.source,
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     else:
        db = db2df( db_path )
     new_db = main( 
-        db, rank = args.rank, lineage = args.lineage, lineage_list = args.lineage_list,
+        db, rank = args.rank, lineage = args.lineage, lineage_list = args.lineages,
         ome_list = args.ome, source = args.source, unique_species = args.unique, 
         nonpublished = args.nonpublished, inverse = args.inverse, unique_strains = args.unique_strains
         )

@@ -172,6 +172,8 @@ To obtain a table of organisms' annotation statistics, [create a mycotoolsDB](ht
 (mycotools) -$ annotationStats.py <MYCOTOOLSDB.db>
 ```
 
+If you want to route the output to a file, simply redirect output by appending ` > <OUTPUTFILE>` to the command, or add an output file as the second argument
+
 
 <br /><br />
 
@@ -264,7 +266,7 @@ list proximal +/- 5 genes to standard out:
 ```bash
 (mycotools) -$ grabLoci.py -a fibsp.1_906341 -p 5
 
-fibsp.1_906341 cluster +/- 5
+fibsp.1_906341 locus +/- 5
 fibsp.1_880711
 fibsp.1_846234
 fibsp.1_809145
@@ -305,7 +307,7 @@ e.g. make an SVG from a GFF3: `gff2svg.py -g <MY.gff3>`
 
 make SVGs for all GFF3s in a new line delimited list with width set to 20:
 
-```
+```bash
 (mycotools) -$ gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
 ```
 
@@ -317,7 +319,8 @@ make SVGs for all GFF3s in a new line delimited list with width set to 20:
 ### db2blast.py
 `db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycotoolsDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
 
-```
+```bash
+(mycotools) -$ db2blast.py --help
 usage: db2blast.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
                    [-o OUTPUT] [-p PREVIOUS] [--cpu CPU]
 
@@ -355,7 +358,8 @@ optional arguments:
 e.g.: `db2hmmsearch.py -d profile.hmm` will run the master database referencing the inputted hmmdb. 
 
 `db2hmmsearch.py -d profile.hmm -b 1 -t 75` takes the best hit from hits with 25 - 100% query coverage
-```
+```bash
+(mycotools) -$ db2hmmsearch.py --help
 Runs `hmmsearch` v each proteome in a `.db`. For each query, extracts results
 and optionally outputs a compiled fasta, hmmalignment and/or trimmed
 alignment.
@@ -395,8 +399,8 @@ optional arguments:
 `fa2tree.py` will input a fasta file or directory of fasta files, trim, and generate a tree either via job submission (`slurm` or `torque`) or immediate execution. 
 
 e.g. Construct a tree from a fasta
-```
-fa2tree.py -i <FASTA>.fa -t iqtree
+```bash
+(mycotools) -$ fa2tree.py -i <FASTA>.fa -t iqtree
 ```
 
 <br /><br />
@@ -423,6 +427,6 @@ license are sufficient for distance matrix calculation even on large datasets.
 
 e.g. Calculate a distance matrix and cluster from a fasta with a minimum
 identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
-```
-aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
+```bash
+(mycotools) -$ aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
 ```

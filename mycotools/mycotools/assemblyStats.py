@@ -115,17 +115,17 @@ def main():
     stats = {}
 
     if formatPath(sys.argv[1])[-4:] not in {'gff3', '.gtf', '.gff'}:
-        if len( sys.argv ) < 3:
-            log_path = formatPath(sys.argv[1]) + '.assStats.tsv'
-        else:
-            log_path = sys.argv[2]
-        db = db2df( sys.argv[1] )
+        log_path = None
+        head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
+            '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
 
-        if not os.path.isfile( log_path ):
-            head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
-                '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
-            with open( log_path, 'w' ) as log_open:
-                log_open.write( head )
+        if len(sys.argv) > 2:
+            log_path = sys.argv[2]
+            if not os.path.isfile( log_path ):
+                with open( log_path, 'w' ) as log_open:
+                    log_open.write( head )
+
+        db = db2df(sys.argv[1])
 
         cmds = []
         for i, row in db.iterrows():
@@ -133,19 +133,36 @@ def main():
                 cmds.append((formatPath('$MYCOFNA/' + row['assembly']), copy.deepcopy(row['internal_ome'])))
         with mp.Pool(processes=os.cpu_count()) as pool:
             results = pool.starmap(mngr, cmds)
-        for res in results:
-            ome, calcs = res[0], res[1]
-            if calcs:
-                calcs = {x[0]: x[1] for x in calcs}
+
+        if log_path:
+            for res in results:
+                ome, calcs = res[0], res[1]
+                if calcs:
+                    calcs = {x[0]: x[1] for x in calcs}
                
-                log_editor( log_path, ome, ome + '\t' + str(calcs['n50-1000bp']) + '\t' + \
-                    str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
-                    str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
-                    str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
-                    '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
-                    '\t' + str(calcs['gc-1000bp']) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp']))
-            else:
-                eprint('\t\tERROR:\t' + ome, flush = True)
+                    log_editor( log_path, ome, ome + '\t' + str(calcs['n50-1000bp']) + '\t' + \
+                        str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
+                        str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
+                        str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
+                        '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
+                        '\t' + str(calcs['gc-1000bp']) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp']))
+                else:
+                    eprint('\t\tERROR:\t' + ome, flush = True)
+        else:
+            print(head, flush = True)
+            for res in results:
+                ome, calcs = res[0], res[1]
+                if calcs:
+                    calcs = {x[0]: x[1] for x in calcs}
+                    print(ome + '\t' + str(calcs['n50-1000bp']) + '\t' + \
+                        str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
+                        str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
+                        str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
+                        '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
+                        '\t' + str(calcs['gc-1000bp']) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp']))
+                else:
+                    eprint('\t\tERROR:\t' + ome, flush = True)
+
 
     else:
 
@@ -154,7 +171,7 @@ def main():
         if calculations:
             stats[ os.path.basename( os.path.abspath( sys.argv[1] )) ] = n50l50( sortedContigs )
         else:
-            print('\tERROR:\t' + sys.argv[1] , flush = True)
+            eprint('\tERROR:\t' + sys.argv[1] , flush = True)
 
         
         for stat in stats:

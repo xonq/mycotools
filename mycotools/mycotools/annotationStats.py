@@ -100,17 +100,20 @@ if __name__ == '__main__':
             res = pool.starmap(compileExon, cmds)
         out = {x[0]: x[1] for x in res if x}
         if len(sys.argv) < 3:
-            output_file = os.path.basename(formatPath(sys.argv[1])) + '.annStats.tsv'
+#            output_file = os.path.basename(formatPath(sys.argv[1])) + '.annStats.tsv'
+            print('#ome\ttotal_length\tgenes\tmean_length\tmedian_length', flush = True)
+            for ome in out:
+                print(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]), flush = True)
         else:
             output_file = sys.argv[2]
-        with open(output_file, 'w') as write:
-            write.write('#ome\tgene2gene_length\tgenes\tmean_length\tmedian_length\n')
-            for ome in out:
-                write.write(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]) + '\n')
+            with open(output_file, 'w') as write:
+                write.write('#ome\ttotal_length\tgenes\tmean_length\tmedian_length\n')
+                for ome in out:
+                    write.write(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]) + '\n')
     else:
         ome, geneStats = compileExon( formatPath(sys.argv[1]), output )
         if output:
-            out_str = 'total_len\tgenes\tmean_len\tmedian_len\n' + str(geneStats['total_len']) + \
+            out_str = 'total_length\tgenes\tmean_length\tmedian_length\n' + str(geneStats['total_len']) + \
                 '\t' + str(geneStats['genes']) + '\t' \
                 + str(geneStats['mean_len']) + '\t' + str(geneStats['median_len'])
 
