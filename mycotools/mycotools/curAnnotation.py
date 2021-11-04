@@ -55,9 +55,12 @@ def intron2exon( gff ):
     to the `new_gff`. Then add genes with new exons.
     '''
 
-    new_gff, gene_info = [], {}
+    gff1, gene_info = [], {}
     gene_comp = re.compile( r'gene_id \"(.*?)\"' )
     for entry in gff:
+        if int(entry['start']) > int(entry['end']):
+            start, end = copy.deepcopy(entry['start']), copy.deepcopy(entry['end'])
+            entry['start'], entry['end'] = end, start
         gene = gene_comp.search( entry['attributes'] )[1]
         if gene not in gene_info:
             gene_info[ gene ] = { 
@@ -71,7 +74,8 @@ def intron2exon( gff ):
             gene_info[ gene ][ entry['type'] ].append( 
                 [int(entry['start']), int(entry['end'])] 
             )
-        gene_info[gene]['raw'].append( dict(entry) )
+        gene_info[gene]['raw'].append(entry)
+        gff1.append(entry)
 
     intron_genes = { 
         gene: gene_info[gene] for gene in gene_info if len(gene_info[gene]['intron']) > 0 
@@ -79,19 +83,19 @@ def intron2exon( gff ):
     exon_coords = {}
     for gene in intron_genes:
         exon_coords[ gene ] = []
-        if intron_genes[gene]['start_codon'][0][0] > intron_genes[gene]['start_codon'][0][1]:
-            intron_genes[gene]['start_codon'] = [
-                [
-                    intron_genes[gene]['start_codon'][0][1], 
-                    intron_genes[gene]['start_codon'][0][0]
-                ]
-            ] 
-            intron_genes[gene]['stop_codon'] = [
-                [
-                    intron_genes[gene]['stop_codon'][0][1], 
-                    intron_genes[gene]['stop_codon'][0][0]
-                ]
-            ]
+#        if intron_genes[gene]['start_codon'][0][0] > intron_genes[gene]['start_codon'][0][1]:
+ #           intron_genes[gene]['start_codon'] = [
+  #              [
+   #                 intron_genes[gene]['start_codon'][0][1], 
+    #                intron_genes[gene]['start_codon'][0][0]
+     #           ]
+      #      ] 
+       #     intron_genes[gene]['stop_codon'] = [
+        #        [
+         #           intron_genes[gene]['stop_codon'][0][1], 
+          #          intron_genes[gene]['stop_codon'][0][0]
+           #     ]
+            #]
         intron_genes[gene]['intron'].sort( key = lambda x: x[0] )
     
         if intron_genes[gene]['strand'] == '+':
@@ -108,10 +112,11 @@ def intron2exon( gff ):
                 exon_coords[gene].append([intron[1] + 1])
             exon_coords[gene][-1].append( intron_genes[gene]['start_codon'][0][0] )
 
-    for entry in gff:
+    gff2 = []
+    for entry in gff1:
         gene = gene_comp.search( entry['attributes'] )[1]
         if gene not in exon_coords:
-            new_gff.append( dict(entry) )
+            gff2.append(entry)
     for gene in exon_coords:
         add_data = [ 
             entry for entry in intron_genes[gene]['raw'] if entry['type'] != 'intron' 
@@ -125,9 +130,9 @@ def intron2exon( gff ):
             new_entry['score'] = '.'
             new_entry['phase'] = '.'
             add_data.append( new_entry )
-        new_gff.extend( add_data )
+        gff2.extend( add_data )
 
-    return new_gff
+    return gff2
 
 
 def curCDS( gff ):
@@ -135,55 +140,76 @@ def curCDS( gff ):
     new_gff, info_dict = [], {}
     gene_compile = re.compile( r'gene_id \"(.*?)\"' )
     for entry in gff:
-        if entry['source'] != 'AUGUSTUS':
+#        if entry['source'] != 'AUGUSTUS':
 #or entry['strand'] == '+':
-            new_gff.append(dict(entry))
-            continue
+ #           new_gff.append(entry)
+  #          continue
         if not gene_compile.search(entry['attributes']):
             gene_compile = re.compile( r'ID=(.*?);' )
         gene = gene_compile.search(entry['attributes'])[1]
         gene = re.sub( r'\-T\d+.*$', '', gene )
+
         if gene not in info_dict:
-            info_dict[gene] = { 'start_codon': [], 'raw': [] }
+            info_dict[gene] = { 'start_codon': [], 'stop_codon': [], 'raw': [] }
         if entry['type'] == 'gene':
-            info_dict[gene]['start_codon'].extend([int(entry['end']) - 2, int(entry['end'])])
-        elif entry['type'] == 'start_codon':
-            info_dict[gene][entry['type']].extend([int(entry['start']), int(entry['end'])])
+#            info_dict[gene]['start_codon'].extend(sorted([int(entry['end']) - 2, int(entry['end'])]))
+            info_dict[gene]['start_codon'].extend(sorted([int(entry['end']), int(entry['end'])]))
+
+        elif entry['type'] in {'start_codon', 'stop_codon'}:
+            info_dict[gene][entry['type']].extend(sorted([int(entry['start']), int(entry['end'])]))
         info_dict[gene]['raw'].append(copy.deepcopy(entry))
 
     for gene in info_dict:
-        ready, ready1 = False, False
+
+        if not info_dict[gene]['start_codon']:
+            new_gff.extend(info_dict[gene]['raw'])
+            continue
+#        ready, ready1 = False, False
         cop = False
-        info_dict[gene]['start_codon'].sort()
-        new = int(info_dict[gene]['start_codon'][1])
-        old = int(info_dict[gene]['start_codon'][0])
-        for index in range(len(info_dict[gene]['raw'])):
-            entry = info_dict[gene]['raw'][index]
-            if entry['type'] == 'CDS' or entry['type'] == 'exon':
-                if int(entry['end']) == old:
-                    info_dict[gene]['raw'][index]['end'] = new
-                    if ready:
-                        ready1 = True
-                        break
-                    ready = True
+#        info_dict[gene]['start_codon'].sort()
+ #       info_dict[gene]['stop_codon'].sort()
+#        end0 = int(info_dict[gene]['start_codon'][1])
+        start0 = int(info_dict[gene]['start_codon'][0])
+        end1 = int(info_dict[gene]['stop_codon'][1])
+        if start0 > end1:
+            start0 = int(info_dict[gene]['stop_codon'][0])
+            end1 = int(info_dict[gene]['start_codon'][1])
+ #       start1 = int(info_dict[gene]['stop_codon'][0])
+        for index, entry in enumerate(info_dict[gene]['raw']):
+            if entry['type'] == 'exon':
+                cop = False
+                break
+            elif entry['type'] == 'CDS': # or entry['type'] == 'exon':
+                if (int(entry['end']) == end1 and int(entry['start']) == start0):
+                    cop = copy.deepcopy(entry)
+                    cop['type'] = 'exon'
+                    cop['attributes'] = cop['attributes'].replace('cds', 'exon')
+        new_gff.extend(info_dict[gene]['raw'])
+        if cop:
+            new_gff.append(cop)
+                    
+#                    info_dict[gene]['raw'][index]['end'] = new
+ #                   if ready:
+  #                      ready1 = True
+   #                     break
+    #                ready = True
 #don't need once fixed also don't need the readies
-                    cop = copy.deepcopy(info_dict[gene]['raw'][index])
+#                    cop = copy.deepcopy(info_dict[gene]['raw'][index])
 # don't need once fixed
-                elif int(entry['end']) == new and entry['strand'] == '+':
-                    if ready:
-                        ready1 = True
-                        break
-                    ready = True
-                    cop = copy.deepcopy(info_dict[gene]['raw'][index])
+ #               elif int(entry['end']) == new and entry['strand'] == '+':
+  #                  if ready:
+   #                     ready1 = True
+    #                    break
+     #               ready = True
+      #              cop = copy.deepcopy(info_dict[gene]['raw'][index])
 
 # fixes 1 exon from intron2exon script - needs to be removed once fixed
-        if not ready1:
-            if cop and cop['type'] == 'CDS':
-                cop['type'], cop['score'], cop['phase'] = 'exon', '.', '.'
-                cop['attributes'] = cop['attributes'].replace('cds', 'exon')
-                info_dict[gene]['raw'].append(cop)
+       # if not ready1:
+        #    if cop and cop['type'] == 'CDS':
+         #       cop['type'], cop['score'], cop['phase'] = 'exon', '.', '.'
+          #      cop['attributes'] = cop['attributes'].replace('cds', 'exon')
+           #     info_dict[gene]['raw'].append(cop)
 
-        new_gff.extend( info_dict[gene]['raw'] )
 
     return new_gff
 
@@ -299,22 +325,23 @@ def addGenes( gtf, safe = True ):
 #    gene_compile = re.compile( r'gene_id "(.*?)";')
     for entry in gtf:
         gene = gene_compile.search( entry['attributes'] )[1]
+
         contig = entry['seqid']
         if gene not in gene_dict_prep:
             gene_dict_prep[ gene ] = { 
                 'start_codon': [], 'stop_codon': [], 'exon': [],
                 'strand': str(entry['strand']), 'contig': contig,
-                'rna': None
+                'rna': None, 'cds': []
                 }
             if contig not in contigs:
                 contigs[contig] = {}
             contigs[contig][gene] = []
 
-        if entry['type'] in gene_dict_prep[gene]:
+        if entry['type'].lower() in gene_dict_prep[gene]:
             contigs[contig][gene].extend( 
                 [int(entry['start']), int(entry['end'])]
                 )
-            gene_dict_prep[gene][entry['type']].extend(
+            gene_dict_prep[gene][entry['type'].lower()].extend(
                 [int(entry['start']), int(entry['end'])]
                 )
         elif entry['type'] in {'mRNA', 'tRNA', 'rRNA'}:
@@ -326,10 +353,8 @@ def addGenes( gtf, safe = True ):
     else:
         gene_dict, failed = liberalRemoval( gene_dict_prep, contigs )
 
-
     check, insert_list = set(), []
-    for index in range(len(gtf)):
-        entry = dict(gtf[index])
+    for index, entry in enumerate(gtf):
         gene = gene_compile.search( entry['attributes'] )[1]
         if gene not in check and gene in gene_dict:
             new_entry = dict(entry)
@@ -357,9 +382,15 @@ def addGenes( gtf, safe = True ):
             if gene_dict_prep[gene]['rna']:
                 new2 = copy.deepcopy( new_entry )
                 new2['type'] = gene_dict_prep[gene]['rna']
-                insert_list.extend( [[index, dict(new2)], [index, dict(new_entry)]] )
+                insert_list.extend( [[index, new2], [index, new_entry]] )
+            elif not gene_dict_prep[gene]['cds']:
+                new2 = copy.deepcopy(new_entry)
+                new2['type'] = 'tRNA' # assume tRNA, but not valid to discredit rRNA
+                insert_list.extend([[index, new2], [index, new_entry]])
             else:
-                insert_list.extend([[index, dict(new_entry)]])
+                new2 = copy.deepcopy(new_entry)
+                new2['type'] = 'mRNA'
+                insert_list.extend([[index, new2], [index, dict(new_entry)]])
             check.add( gene )
 
     insert_list.sort( key = lambda x: x[0], reverse = True )
