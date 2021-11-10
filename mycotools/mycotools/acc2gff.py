@@ -18,7 +18,7 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
         else:
             accessions = [df]
         for acc in accessions:
-            gff_strs[acc] = grabGffAcc( gff2list(gff), acc )
+            gff_strs[acc] = list2gff(grabGffAcc( gff2list(gff), acc ))
     else:
         db = db.set_index( 'internal_ome' )
         if not isinstance(df, str):
