@@ -177,13 +177,13 @@ def mycotools_main(gff_path, accession, plusminus = 10):
 if __name__ == '__main__':
 
     mp.set_start_method('spawn')
-    parser = argparse.ArgumentParser( description = 'Abstracts clusters from accession(s)' )
-    parser.add_argument( '-i', '--input', help = 'New line delimitted file of accessions' )
-    parser.add_argument( '-a', '--accession', help = 'Input accession' )
+    parser = argparse.ArgumentParser( description = 'Extracts loci from accession(s)' )
+    parser.add_argument( '-i', '--input', help = 'File of accessions' )
+    parser.add_argument( '-a', '--accession' )
     parser.add_argument( '-p', '--plusminus', default = 10, type = int,
         help = 'Genes +/- from accession. DEFAULT: 10' )
     parser.add_argument( '-o', '--output', action = 'store_true',
-        help = 'Output cluster fasta(s) and gff(s)' )
+        help = 'Output locus fasta(s) and gff(s)' )
     parser.add_argument( '-g', '--gff', help = 'Input GFF file' )
     parser.add_argument( '-f', '--faa', help = 'Input protein fasta file' )
     parser.add_argument( '-s', '--sep', help = 'Separator for input file.', default = '\n')
@@ -247,7 +247,7 @@ if __name__ == '__main__':
                             out.write( prot_str )
     else:
         for accession in out_indices:
-            print('\n' + accession + ' cluster +/- ' + str(args.plusminus), flush = True)
+            print('\n' + accession + ' locus +/- ' + str(args.plusminus), flush = True)
             for hit in out_indices[accession]:
                 for index in out_indices[accession][ hit ]:
                     print( index , flush = True)

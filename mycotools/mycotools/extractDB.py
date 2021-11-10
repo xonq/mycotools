@@ -2,7 +2,7 @@
 
 import pandas as pd, numpy as np
 import argparse, os, sys
-from mycotools.lib.kontools import file2list, intro, outro, formatPath
+from mycotools.lib.kontools import file2list, intro, outro, formatPath, eprint
 from mycotools.lib.dbtools import db2df, df2db, extract_tax, extract_omes, masterDB
 
 def main( 
@@ -94,8 +94,10 @@ if __name__ == '__main__':
 
 
     if (args.lineage or args.lineages) and not args.rank:
-        print('\nERROR: need rank for lineage(s)', flush = True)
+        eprint('\nERROR: need rank for lineage(s)', flush = True)
         sys.exit(5)
+    elif args.lineage or args.lineages:
+        eprint("\nWARNING: extracting taxonomy is subject to taxonomic error and errors in NCBI's hiearchy\n")
 
     output = 'stdout'
     if args.output:
@@ -126,7 +128,7 @@ if __name__ == '__main__':
         'inverse': args.inverse,
         'headers': bool(args.headers)
     }
-    start_time = intro( 'Abstract Database', args_dict, stdout = args.output )
+#    start_time = intro( 'Abstract Database', args_dict, stdout = args.output )
 
     if args.stdin:
         data = ''
@@ -146,4 +148,5 @@ if __name__ == '__main__':
     else:
         df2db( new_db, sys.stdout, header = bool(args.headers) )
 
-    outro( start_time, stdout = args.output )
+ #   outro( start_time, stdout = args.output )
+    sys.exit(0)

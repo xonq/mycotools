@@ -13,15 +13,15 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
 
     gff_strs = {}
     if gff: 
-        if type(df) is not str:
+        if not isinstance(df, str):
             accessions = list(df[column])
         else:
-            accession = [df]
+            accessions = [df]
         for acc in accessions:
             gff_strs[acc] = grabGffAcc( gff2list(gff), acc )
     else:
         db = db.set_index( 'internal_ome' )
-        if type(df) is not str:
+        if not isinstance(df, str):
             omes_prep = re.findall( r'^.*?_', '\n'.join(list(df[ column ])), re.M )
             omes = set( x[:-1] for x in omes_prep )
         else:
@@ -31,7 +31,7 @@ def main( df, column = None, db = None, gff = None, cpu = 1 ):
 
         mp_cmds = []
         for ome in omes:
-            if type(df) is not str:
+            if not isinstance(df, str):
                 accessions = [ x.rstrip() for x in df[ column ] if x.startswith( ome + '_' ) ]
             else:
                 accessions = [ df ]
@@ -64,11 +64,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser( 
         description = 'Inputs gff or database and new line delimitted file of accessions.'
         )
-    parser.add_argument( '-i', '--input', help = 'Input file with accessions' )
-    parser.add_argument( '-a', '--accession', help = 'Input accession' )
-    parser.add_argument( '-g', '--gff', help = '`gff3` reference' )
-    parser.add_argument( '-c', '--column', default = 0, help = 'Column to abstract from. Must be specified if there ' \
-        + 'are headers. Otherwise, the default is the first tab separated column.' )
+    parser.add_argument( '-a', '--accession' )
+    parser.add_argument( '-i', '--input', help = 'File with accessions' )
+    parser.add_argument( '-g', '--gff', help = 'Input GFF3' )
+    parser.add_argument( '-c', '--column', default = 0, help = 'Column from `-i`, default is first' )
     parser.add_argument( '-o', '--ome', action = 'store_true', help = 'Output files by ome code' )
     parser.add_argument( '-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master' )
     parser.add_argument( '--cpu', type = int, default = mp.cpu_count(), \

@@ -114,7 +114,7 @@ def main():
 
     stats = {}
 
-    if formatPath(sys.argv[1])[-4:] not in {'gff3', '.gtf', '.gff'}:
+    if formatPath(sys.argv[1]).endswith('.db'):
         log_path = None
         head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
             '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
@@ -173,7 +173,6 @@ def main():
         else:
             eprint('\tERROR:\t' + sys.argv[1] , flush = True)
 
-        
         for stat in stats:
             if stats[stat]['shortest_contig'] >= 1000:
                 stats[stat] = { 

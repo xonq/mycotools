@@ -621,6 +621,10 @@ if __name__ == '__main__':
     else:
         output = args.prefix
 
+    if '_' in args.prefix:
+        eprint('\nERROR: "_" not allowed in prefix\n', flush = True)
+        sys.exit(1)
+
     gff, fa, trans_str, failed, flagged = main(
         formatPath(args.gff), formatPath(args.fasta), args.prefix, args.fail
         )
