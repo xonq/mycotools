@@ -200,13 +200,13 @@ def main( prepdb, refdb ):
                             out.write(re.sub(old_ome, row['internal_ome'], data))
                         gff = gff2list(formatPath('$MYCOGFF3/' + new_path))
                     if aliases:
-                        if not pd.isnull(row['proteome']) and row['proteome']:
-                            fa = fa2dict(formatPath(row['proteome']))
-                            acc_check = checkProt(fa, aliases)
-                        else:
-                            assembly = fa2dict(formatPath('$MYCOFNA/' + row['assembly']))
-                            fa = gff2prot(gff, assembly)
-                            acc_check = checkProt(fa, aliases)
+#                        if not pd.isnull(row['proteome']) and row['proteome']:
+ #                           fa = fa2dict(formatPath(row['proteome']))
+  #                          acc_check = checkProt(fa, aliases)
+  #                      else:
+                        assembly = fa2dict(formatPath('$MYCOFNA/' + row['assembly']))
+                        fa = gff2prot(gff, assembly)
+                        acc_check = checkProt(fa, aliases)
                         if acc_check:
                             eprint('\t' + row['internal_ome'] + ' discrepant curation', flush = True)
                             failed.append([row['genome_code'], row['version']])
@@ -314,8 +314,8 @@ def main( prepdb, refdb ):
         elif not proteome:
             prot_path = formatPath('$MYCOFAA/' + row['internal_ome'])
             if not pd.isnull(row['gff3']) and row['gff3']:
-                gff = gff2list(formatPath('$MYCOGFF3/' + row['internal_ome']))
-                assembly = fa2dict(formatPath('$MYCOFNA/' + row['internal_ome']))
+                gff = gff2list(formatPath('$MYCOGFF3/' + row['internal_ome'] + '.gff3'))
+                assembly = fa2dict(formatPath('$MYCOFNA/' + row['internal_ome'] + '.fa'))
                 fa = gff2prot(gff, assembly)
                 with open(formatPath('$MYCOFAA/' + row['internal_ome'] + '.aa.fa', 'w'), 'w') as out:
                     out.write(dict2fa(fa))

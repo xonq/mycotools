@@ -554,7 +554,8 @@ def addExons( gff ):
                     exonCheck[ prot ] = [False, i, entry]
                 if entry['type'] == 'exon':
                     exonCheck[prot] = [True, i, None]
-            
+           
+    prots = reversed(list(exonCheck.keys())) 
     for prot in reversed(exonCheck):
         if not exonCheck[prot][0]:
             newEntry = copy.deepcopy(exonCheck[prot][2])

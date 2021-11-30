@@ -1,12 +1,136 @@
 #! /usr/bin/env python3
 
-import pandas as pd, pandas
+#NEED TO CREATE STANDALONE DB CLASS
 import numpy as np
 import sys, os, time, mycotools.lib.biotools, json, re, datetime, hashlib, getpass, base64
 from mycotools.lib.kontools import collect_files, eprint, formatPath
 from Bio import Entrez
 from urllib.error import HTTPError
 from io import StringIO
+
+
+class mtdb(dict):
+    '''
+    MycotoolsDB (mtdb) class. Designed to support high throughput "pandas-like"
+    interface without the overhead of pandas.
+    '''
+    def __init__(self, db = None, index = None):
+        self.columns = ['internal_ome', 'genus', 'species', 'strain', 'version', 
+            'biosample', 'assembly', 'proteome', 'gff3',
+            'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
+            'genome_code', 'acquisition_date']
+        if not db:
+            super().__init__({x: {} for x in self.columns})
+        elif isinstance(db, dict):
+            if not index:
+                if all(isinstance(db[x], list) for x in self.columns):
+                    super().__init__(db)
+                    self.index = None
+            else:
+                if set(db[list(db.keys())[0]].keys()).union({index}) \
+                    == set(self.columns):
+                    super().__init__(db)
+        else:
+            super().__init__(mtdb.db2df(self, db))
+        self.index = index
+
+
+    def db2df(self, db_path):
+        df = {x: [] for x in self.columns}
+        with open(formatPath(db_path), 'r') as raw:
+            for line in raw:
+                if not line.startswith('#'):
+                    data = line.rstrip().split('\t')
+                    ome = data[0]
+                    for i, d in enumerate(data):
+                        df[self.columns[i]].append(d)
+                    df['taxonomy'][-1] = read_tax(
+                        df['taxonomy'][-1]
+                        )
+        return df
+
+
+    def df2db(self, db_path):
+        output = self.set_index('internal_ome') # does this work if its not an inplace change
+        with open(db_path, 'w') as out:
+            for ome in output:
+                output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
+                out.write(
+                    ome + '\t' + \
+                    '\t'.join([str(output[ome][x]) for x in output[ome]]) + '\n'
+                    )
+
+
+    def set_index(self, column = 'internal_ome', inplace = False):
+        data, retry, error, df = {}, bool(column), False, self
+        while retry:
+            oldCol = set()
+            try:
+                df.columns.pop(df.columns.index(column))
+            except IndexError:
+                df = df.reset_index() #will this actually reset the index
+                df.columns.pop(df.columns.index(column))
+            for i, v in enumerate(df[column]):
+                data[v] = {}
+                for head in df.columns:
+                    try:
+                        data[v][head] = df[head][i]
+                    except KeyError: # if an index exists
+                        if error:
+                            eprint('\nERROR: invalid column', flush = True)
+                            return self
+                        df = df.reset_index()
+                        error = True
+                        break
+            retry = False
+        if not column:
+            firstRow = self[list(self.keys())[0]]
+            otherCol = list(set(self.columns).intersection(
+                set(firstRow.keys())
+                ))
+            data = {x: [] for x in self.columns}
+            for key in self:
+                data[self.index].append(key)
+                for col in otherCol:
+                    data[col].append(self[key][col])
+#        if inplace: #not sure how to make this work yet without outputting double col
+ #           self.__init__(data, column)
+  #      else:
+        return mtdb(data, column)
+
+
+    def reset_index(self):
+        if self.index:
+            data = {x: [] for x in self.columns}
+            data[self.index] = list(self.keys())
+            otherCol = set(self.columns).difference({self.index})
+            for key in self:
+                for otherCol in self[key]:
+                    data[otherCol].append(self[key][otherCol])
+            return mtdb(data, None)
+        return self
+              
+                
+
+
+
+#    def __new__(cls, db = None):
+
+ #       columns = ['internal_ome', 'genus', 'species', 'strain', 'version', 
+  #          'biosample', 'assembly', 'proteome', 'gff3',
+   #         'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
+    #        'genome_code', 'acquisition_date']
+
+#        if not db:
+ #           cls.df = {x: {} for x in columns}
+  #      elif isinstance(db, dict):
+   #         if all(isinstance(db[x], dict) for x in columns):
+    #            cls.df = db
+     #   else:
+      #      cls.df = mtdb.db2df(db, columns)
+#
+ #       return mtdb(cls.df)
+
 
 def getLogin( ncbi, jgi ):
 
@@ -129,24 +253,24 @@ def log_editor( log, ome, edit ):
         towrite.write(new_data)
 
 
-def readLog( log, headers = '', sep = '\t' ):
+def readLog( log, columns = '', sep = '\t' ):
 
     log_dict = {}
     with open( log, 'r' ) as raw:
         data = raw.read()
     dataLines = [ x.split( sep ) for x in data.split( '\n' ) ]
 
-    if type( headers ) is str:
+    if type( columns ) is str:
         if dataLines[0][0].startswith( '#' ):
             dataLines[0][0] = re.sub( r'^\#+', '', dataLines[0][0] )
-        headers = [ head for head in dataLines[0] ]
+        columns = [ head for head in dataLines[0] ]
         del dataLines[0]
-    elif type( headers ) is int:
+    elif type( columns ) is int:
         x = 0
-        headers = [ x + 1 for y in dataLines[0] ]
+        columns = [ x + 1 for y in dataLines[0] ]
 
     for line in dataLines:
-        log_dict[ line[0] ] = { headers[ x ]: line[ x ] for x in range( 1, len( line ) ) }
+        log_dict[ line[0] ] = { columns[ x ]: line[ x ] for x in range( 1, len( line ) ) }
 
     return log_dict
 
@@ -177,8 +301,9 @@ def masterDB( path = '$MYCODB' ):
 # imports database, converts into df
 # returns database dataframe
 def db2df(data, stdin = False):
+    import pandas as pd, pandas
 
-    headers = [ 'internal_ome', 'genus', 'species', 'strain', 'version', 
+    columns = [ 'internal_ome', 'genus', 'species', 'strain', 'version', 
         'biosample', 'assembly', 'proteome', 'gff3',
         'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
         'genome_code', 'acquisition_date' ]
@@ -186,11 +311,11 @@ def db2df(data, stdin = False):
         data = formatPath( data )
         db_df = pd.read_csv( data, sep='\t' )
         if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
-            db_df = pd.read_csv( data, sep = '\t', names = headers )
+            db_df = pd.read_csv( data, sep = '\t', names = columns )
     else:
         db_df = pd.read_csv( StringIO(data), sep='\t' )
         if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
-            db_df = pd.read_csv( StringIO(data), sep = '\t', names = headers )
+            db_df = pd.read_csv( StringIO(data), sep = '\t', names = columns )
 
     return db_df
 
@@ -224,6 +349,7 @@ def df2std( df ):
 # exports as database file into `db_path`. If rescue is set to 1, save in home folder if output doesn't exist
 # if rescue is set to 0, do not output database if output dir does not exit
 def df2db(df, db_path, header = False, overwrite = False, std_col = True, rescue = True):
+    import pandas as pd, pandas
 
     df = df.set_index('internal_ome')
     df = df.sort_index()
@@ -457,6 +583,7 @@ def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid={'no rank',
 
 # extract taxonomy and return a database with just the taxonomy you are interested in
 def extract_tax(db, taxonomy, classification, inverse = False ):
+    import pandas as pd, pandas
 
     if type(taxonomy) == str:
         taxonomy = [taxonomy]
@@ -490,6 +617,7 @@ def extract_tax(db, taxonomy, classification, inverse = False ):
 
 # extracts all omes from an `ome_list` or the inverse and returns the extracted database
 def extract_omes(db, ome_list, index = 'internal_ome', inverse = False):
+    import pandas as pd, pandas
 
     new_db = pd.DataFrame()
     ref_set = set()
@@ -512,6 +640,7 @@ def extract_omes(db, ome_list, index = 'internal_ome', inverse = False):
 
 # imports a database reference (if provided) and a `df` and adds a `new_col` with new ome codes that do not overlap current ones
 def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
+    import pandas as pd, pandas
 
 #    print('\nGenerating omes', flush = True)
     newdf = df
