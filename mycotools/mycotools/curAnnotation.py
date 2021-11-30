@@ -556,7 +556,7 @@ def addExons( gff ):
                     exonCheck[prot] = [True, i, None]
            
     prots = reversed(list(exonCheck.keys())) 
-    for prot in reversed(exonCheck):
+    for prot in reversed(prots):
         if not exonCheck[prot][0]:
             newEntry = copy.deepcopy(exonCheck[prot][2])
             newEntry['attributes'] = newEntry['attributes'].replace('.cds;', '.exon1;')
