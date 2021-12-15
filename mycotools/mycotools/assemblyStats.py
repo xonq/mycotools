@@ -4,8 +4,8 @@ Takes a database as argument 1 and an output for the .tsv as argument 2.
 Calculates basic genome statistics.
 '''
 
-import sys, os, pandas as pd, multiprocessing as mp, copy
-from mycotools.lib.dbtools import db2df, log_editor
+import sys, os, multiprocessing as mp, copy
+from mycotools.lib.dbtools import mtdb
 from mycotools.lib.biotools import fa2dict
 from mycotools.lib.kontools import formatPath, eprint
 
@@ -105,73 +105,77 @@ def mngr(assembly_path, ome):
     calcs = n50l50(sortedContigs)
     return ome, tuple([(x, calcs[x]) for x in calcs])
 
-def main():
 
-    usage = '\nUSAGE: assembly statistics\tAssembly `fasta` or mycotoolsDB, optional output file if using database\n'
-    if len(sys.argv) < 2:
-        print( usage , flush = True)
-        sys.exit( 1 )
+def main(in_path, log_path = None, cpus = 1):
 
     stats = {}
 
-    if formatPath(sys.argv[1]).endswith('.db'):
+    if in_path.endswith('.db'):
         log_path = None
         head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
             '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
 
-        if len(sys.argv) > 2:
-            log_path = sys.argv[2]
+        prevOmes = {}
+        if log_path:
             if not os.path.isfile( log_path ):
                 with open( log_path, 'w' ) as log_open:
                     log_open.write( head )
+            else:
+                with open(log_path, 'r') as raw:
+                    for line in raw:
+                        omeI = line.index('\t')
+                        ome = line[:omeI]
+                        prevOmes[ome] = line[omeI+1:].rstrip()
 
-        db = db2df(sys.argv[1])
+        db = mtdb(in_path).set_index()
 
         cmds = []
-        for i, row in db.iterrows():
-            if not pd.isnull(row['assembly']):
-                cmds.append((formatPath('$MYCOFNA/' + row['assembly']), copy.deepcopy(row['internal_ome'])))
-        with mp.Pool(processes=os.cpu_count()) as pool:
+        for ome in db:
+            row = db[ome]
+            if row['assembly']:
+                cmds.append((formatPath('$MYCOFNA/' + row['assembly']), ome))
+        with mp.Pool(processes=cpus) as pool:
             results = pool.starmap(mngr, cmds)
 
+        calcs = {}
+        for res in results:
+            if res[1]:
+                calcs[res[0]] = res[1]
+            else:
+                eprint('\t\tERROR:\t' + ome, flush = True)
+
+        calcs = {
+            k: v for k,v in \
+            sorted(
+                {**calcs, **prevOmes}.items(), 
+                key = lambda x: x[0]
+                )
+            }
+
         if log_path:
-            for res in results:
-                ome, calcs = res[0], res[1]
-                if calcs:
-                    calcs = {x[0]: x[1] for x in calcs}
-               
-                    log_editor( log_path, ome, ome + '\t' + str(calcs['n50-1000bp']) + '\t' + \
-                        str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
-                        str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
-                        str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
-                        '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
-                        '\t' + str(calcs['gc-1000bp']) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp']))
-                else:
-                    eprint('\t\tERROR:\t' + ome, flush = True)
+            with open(log_path, 'w') as logWrite:
+                logWrite.write(head + '\n')
+                for ome in calcs:
+                    data = calcs[ome]
+                    logWrite.write(
+                        ome + '\t' + '\t'.join([str(x[1]) for
+                        x in data]) + '\n'
+                        )
         else:
             print(head, flush = True)
-            for res in results:
-                ome, calcs = res[0], res[1]
-                if calcs:
-                    calcs = {x[0]: x[1] for x in calcs}
-                    print(ome + '\t' + str(calcs['n50-1000bp']) + '\t' + \
-                        str(calcs['l50-1000bp']) + '\t' + str(calcs['l50%-1000bp']) + '\t' + str(calcs['n50']) + '\t' + \
-                        str(calcs['l50']) + '\t' + str(calcs['l50%']) + '\t' + str(calcs['largest_contig']) + '\t' + \
-                        str(calcs['shortest_contig']) + '\t' + str(calcs['contigs']) + '\t' + str(calcs['contigs-1000bp']) + \
-                        '\t' + str(calcs['assembly_len']) + '\t' + str(calcs['assembly_len-1000bp']) + '\t' + str(calcs['gc']) + \
-                        '\t' + str(calcs['gc-1000bp']) + '\t' + str(calcs['mask%']) + '\t' + str(calcs['mask%-1000bp']))
-                else:
-                    eprint('\t\tERROR:\t' + ome, flush = True)
-
+            for ome in calcs:
+                data = calcs[ome]
+                print(
+                    ome + '\t' + '\t'.join([str(x[1]) for x in data])
+                    )
 
     else:
-
-        sortedContigs = sortContigs( sys.argv[1] )
+        sortedContigs = sortContigs(in_path)
         calculations = n50l50( sortedContigs )
         if calculations:
-            stats[ os.path.basename( os.path.abspath( sys.argv[1] )) ] = n50l50( sortedContigs )
+            stats[ os.path.basename( os.path.abspath(in_path)) ] = n50l50( sortedContigs )
         else:
-            eprint('\tERROR:\t' + sys.argv[1] , flush = True)
+            eprint('\tERROR:\t' + in_path, flush = True)
 
         for stat in stats:
             if stats[stat]['shortest_contig'] >= 1000:
@@ -181,11 +185,23 @@ def main():
             for info in stats[stat]:
                 print( '{:<25}'.format( info.upper() + ':' ) + str( stats[stat][info] ) , flush = True)
             
-#        out_df = pd.DataFrame.from_dict( stats, orient = 'index')
- #       out_df.to_csv( sys.argv[2], sep ='\t' )
-
-    sys.exit(0)
 
 if __name__ == '__main__':
-    main()
+    usage = '\nUSAGE: assembly statistics\nAssembly `fasta` or mycotoolsDB, optional output file if using database\n'
+    if {'-h', '--help'}.intersection(set(sys.argv)):
+        print(usage, flush = True)
+        sys.exit(1)
+    if len(sys.argv) < 2:
+        print( usage , flush = True)
+        sys.exit( 1 )
+
+    in_path = formatPath(sys.argv[1])
+    if len(sys.argv) > 2:
+        log_path = formatPath(sys.argv[2])
+    else:
+        log_path = None
+
+    main(in_path, log_path, os.cpu_count())
+
+    sys.exit(0)
 

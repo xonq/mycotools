@@ -2,7 +2,8 @@
 
 #NEED TO CREATE STANDALONE DB CLASS
 import numpy as np
-import sys, os, time, mycotools.lib.biotools, json, re, datetime, hashlib, getpass, base64
+import copy, sys, os, time, mycotools.lib.biotools, \
+    json, re, datetime, hashlib, getpass, base64
 from mycotools.lib.kontools import collect_files, eprint, formatPath
 from Bio import Entrez
 from urllib.error import HTTPError
@@ -20,7 +21,10 @@ class mtdb(dict):
             'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
             'genome_code', 'acquisition_date']
         if not db:
-            super().__init__({x: {} for x in self.columns})
+            if not index:
+                super().__init__({x: {} for x in self.columns})
+            else:
+                super().__init__()
         elif isinstance(db, dict):
             if not index:
                 if all(isinstance(db[x], list) for x in self.columns):
@@ -50,19 +54,27 @@ class mtdb(dict):
         return df
 
 
-    def df2db(self, db_path):
-        output = self.set_index('internal_ome') # does this work if its not an inplace change
-        with open(db_path, 'w') as out:
+    def df2db(self, db_path = None):
+        df = copy.deepcopy(self).reset_index()
+        output = df.set_index('internal_ome') # does this work if its not an inplace change
+        if not db_path:
+            with open(db_path, 'w') as out:
+                for ome in output:
+                    output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
+                    out.write(
+                        ome + '\t' + \
+                        '\t'.join([str(output[ome][x]) for x in output[ome]]) + '\n'
+                        )
+        else:
             for ome in output:
-                output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
-                out.write(
-                    ome + '\t' + \
-                    '\t'.join([str(output[ome][x]) for x in output[ome]]) + '\n'
-                    )
+                 output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
+                 print(ome + '\t' + \
+                     '\t'.join([str(output[ome][x]) for x in output[ome]]), flush = True
+                     )
 
 
     def set_index(self, column = 'internal_ome', inplace = False):
-        data, retry, error, df = {}, bool(column), False, self
+        data, retry, error, df = {}, bool(column), False, copy.deepcopy(self)
         while retry:
             oldCol = set()
             try:
@@ -70,6 +82,12 @@ class mtdb(dict):
             except IndexError:
                 df = df.reset_index() #will this actually reset the index
                 df.columns.pop(df.columns.index(column))
+            try:
+                df[column]
+            except KeyError:
+                df = df.reset_index()
+            if len(df[column]) == 0:
+                return mtdb({}, index = column)
             for i, v in enumerate(df[column]):
                 data[v] = {}
                 for head in df.columns:
@@ -83,55 +101,35 @@ class mtdb(dict):
                         error = True
                         break
             retry = False
-        if not column:
-            firstRow = self[list(self.keys())[0]]
-            otherCol = list(set(self.columns).intersection(
-                set(firstRow.keys())
-                ))
-            data = {x: [] for x in self.columns}
-            for key in self:
-                data[self.index].append(key)
-                for col in otherCol:
-                    data[col].append(self[key][col])
+#        if not column:
+ #           firstRow = self[list(self.keys())[0]]
+  #          otherCol = list(set(self.columns).intersection(
+   #             set(firstRow.keys())
+    #            ))
+     #       data = {x: [] for x in self.columns}
+      #      for key in self:
+       #         data[self.index].append(key)
+        #        for col in otherCol:
+         #           data[col].append(self[key][col])
 #        if inplace: #not sure how to make this work yet without outputting double col
  #           self.__init__(data, column)
   #      else:
         return mtdb(data, column)
 
-
     def reset_index(self):
-        if self.index:
-            data = {x: [] for x in self.columns}
-            data[self.index] = list(self.keys())
-            otherCol = set(self.columns).difference({self.index})
-            for key in self:
-                for otherCol in self[key]:
-                    data[otherCol].append(self[key][otherCol])
-            return mtdb(data, None)
+        df = copy.deepcopy(self)
+        if df.index:
+            data = {x: [] for x in mtdb().columns}
+            data[df.index] = list(df.keys())
+            otherCol = set(df.columns).difference({df.index})
+            for key in df:
+                for otherCol in df[key]:
+                    data[otherCol].append(df[key][otherCol])
+            return mtdb(data, index = None)
+        self.index = None
         return self
               
                 
-
-
-
-#    def __new__(cls, db = None):
-
- #       columns = ['internal_ome', 'genus', 'species', 'strain', 'version', 
-  #          'biosample', 'assembly', 'proteome', 'gff3',
-   #         'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-    #        'genome_code', 'acquisition_date']
-
-#        if not db:
- #           cls.df = {x: {} for x in columns}
-  #      elif isinstance(db, dict):
-   #         if all(isinstance(db[x], dict) for x in columns):
-    #            cls.df = db
-     #   else:
-      #      cls.df = mtdb.db2df(db, columns)
-#
- #       return mtdb(cls.df)
-
-
 def getLogin( ncbi, jgi ):
 
     ncbi_email, ncbi_api, jgi_email, jgi_pwd = None, None, None, None
@@ -554,8 +552,11 @@ def read_tax(taxonomy_string):
    
     tax_strs = ['kingdom', 'phylum', 'subphylum', 'class', 'order', 'family', 'subfamily']
     if taxonomy_string: 
-        dict_string = taxonomy_string.replace("'",'"')
-        tax_dict = json.loads(dict_string)
+        if isinstance(taxonomy_string, str):
+            dict_string = taxonomy_string.replace("'",'"')
+            tax_dict = json.loads(dict_string)
+        else:
+            tax_dict = taxonomy_string
         tax_dict = {**tax_dict, **{x: '' for x in tax_strs if x not in tax_dict}}
         return tax_dict
     else:
@@ -583,36 +584,41 @@ def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid={'no rank',
 
 # extract taxonomy and return a database with just the taxonomy you are interested in
 def extract_tax(db, taxonomy, classification, inverse = False ):
-    import pandas as pd, pandas
+#    import pandas as pd, pandas
 
-    if type(taxonomy) == str:
+    if isinstance(taxonomy, str):
         taxonomy = [taxonomy]
 
     taxonomy = set(x.lower() for x in taxonomy)
-    new_db = pd.DataFrame()
+#    new_db = pd.DataFrame()
+    new_db = mtdb().set_index()
+    db = db.set_index()
 
 # `genus` is a special case because it has its own column, so if it is not a genus, we need to read the taxonomy
 # once it is read, we can parse the taxonomy dictionary via the inputted `classification` (taxonomic classification)
     if classification != 'genus':
-        for i,row in db.iterrows():
-            row_taxonomy = read_tax(row['taxonomy'])
-            if classification in row_taxonomy:
-                if row_taxonomy[classification].lower() in taxonomy and not inverse:
-                    new_db = new_db.append(row)
-                elif inverse and row_taxonomy[classification].lower() not in taxonomy:
-                    new_db = new_db.append(row)
+        for ome in db:
+            db[ome]['taxonomy'] = read_tax(db[ome]['taxonomy'])
+            if classification in db[ome]['taxonomy']:
+                if db[ome]['taxonomy'][classification].lower() in taxonomy and not inverse:
+                    new_db[ome] = db[ome]
+                elif inverse and db[ome]['taxonomy'][classification].lower() not in taxonomy:
+                    new_db[ome] = db[ome]
             elif inverse:
-               new_db = new_db.append(row)
+               new_db[ome] = db[ome]
 
 # if `classification` is `genus`, simply check if that fits the criteria in `taxonomy`
     elif classification == 'genus':
+        db = db.set_index('genus')
         taxonomy = set(x[0].upper() + x[1:].lower() for x in taxonomy)
         if not inverse:
-            new_db = db[db['genus'].isin(taxonomy)]
+            new_db = mtdb({x: db[x] for x in db if x in taxonomy}, index =
+                'genus')
         else:
-            new_db = db[~db['genus'].isin(taxonomy)]
+            new_db = mtdb({x: db[x] for x in db if x not in taxonomy}, index =
+                'genus')
 
-    return new_db
+    return new_db.reset_index()
 
 
 # extracts all omes from an `ome_list` or the inverse and returns the extracted database

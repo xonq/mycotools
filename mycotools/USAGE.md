@@ -23,11 +23,17 @@
 <br />
 
 
-- **ANALYSES**
+- **EVOLUTIONARY ANALYSES**
 	- [MycotoolsDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycotoolsdb)
 	- [MycotoolsDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
-	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
+	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#tree-building)
 	- [Hiearchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hiearchical-agglomerative-clustering)
+
+<br />
+
+- **MYCOTOOLS PIPELINES**
+    - [Phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-pipelines)
+
 
 ---
 
@@ -394,14 +400,26 @@ optional arguments:
 <br /><br />
 
 
-## Phylogenetic Analysis
+## Tree Building
 ### fa2tree.py
-`fa2tree.py` will input a fasta file or directory of fasta files, trim, and generate a tree either via job submission (`slurm` or `torque`) or immediate execution. 
+`fa2tree.py` will input a fasta file or directory of fasta files, trim, and
+generate trees either via job submission (`slurm` or `torque`) or immediate execution. 
+Note you will need to have `mafft`, `trimal`, and the tree software you are
+using (`fasttree`/`iqtree`) installed. If these are not installed, install them
+into your mycotools conda environment via `conda install mafft trimal iqtree`
 
 e.g. Construct a tree from a fasta
 ```bash
-(mycotools) -$ fa2tree.py -i <FASTA>.fa -t iqtree
+(mycotools) -$ fa2tree.py -i <FASTA>.fa -t fasttree
 ```
+
+Prepare for slurm job submission
+```bash
+(mycotools) -$ fa2tree.py -i <FASTA> -t iqtree -s -A PAS1046
+```
+https://github.com/rambaut/figtree/releases
+Begin the tree pipeline by navigating into the folder and running `bash
+mafft.sh` (execute immediately) or `sbatch mafft.sh` (job submission).
 
 <br /><br />
 
@@ -430,3 +448,120 @@ identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 ```bash
 (mycotools) -$ aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
 ```
+
+
+<br /><br /><br />
+
+
+# Mycotools Pipelines
+## Phylogenetic analysis
+
+The goal of many phylogenetic analyses is to construct a robust phylogeny 
+of a gene family with a focus on a specific node containing homologs of
+interest. 
+
+A key component of robust phylogenetic reconstruction is
+adequately sampling homologous genes within a gene family. MycotoolsDB 
+enables adequate sampling by providing a nearly comprehensive database of 
+available fungal genomic data. However, there are two problems with 
+increased sampling: 1) the alignment used to generate large phylogenies 
+loses resolution for some nodes because the alignment is created from 
+many sequences and 2) computational complexity increases with sample size. 
+For some genes, such as ITS, one can usually assume that the gene family is 
+strictly vertically inherited, so the dataset can be cut down to closely 
+related organisms. For most other genes, it is not valid to assume the gene family
+is vertically conserved. Therefore, it is important to systematically truncate 
+the dataset into a smaller group of gene homologs. This is accomplished by
+iteratively constructing phylogenies, identifying loose groups of homologs,
+truncating the data to these homologs, and repeating until a manageable tree is
+obtained. On its own, this analysis requires elaborate integration of multiple 
+independent softwares, but Mycotools takes care of the bulk of this work.
+
+<br />
+
+### Example 1:
+
+Most often, a phylogenetic analysis starts with a single gene of interest, and
+one wants to obtain the gene family of closely related genes. This is
+accomplished through BLAST. Step 1 is to BLAST a gene protein sequence with an
+e-value threshold of 10<sup>-2</sup> across the database. 
+
+1. extract a database of published sequences, or use other arguments to extract
+other organisms of interest
+
+```bash
+extractDB.py > pubFungi.db
+```
+
+<br />
+
+2. obtain gene homologs using `db2blast.py`
+
+```bash
+(mycotools) -$ db2blast.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pubFungi.db
+```
+
+<br />
+
+3. `db2blast.py` created a directory with fasta results. obtain the number of
+genes recovered from the analysis:
+
+```bash
+(mycotools -$ grep '>' <RESULTS.fasta> | wc -l
+```
+
+<br />
+
+4a. If there are fewer than 10,000 sequences you can proceed directly to tree
+building. Otherwise, proceed to the `b` steps. If the sample size is too large
+to finish the analysis, specify `fasttree` below; however, if this is the final 
+tree, use `iqtree`.
+
+```bash
+(mycotools) -$ fa2tree.py -f <BLASTRESULTS.fasta> -t <TREESOFTWARE> -s -A
+<PROJECT>
+```
+
+<br />
+
+5a. `fa2tree.py` created a directory, now submit the job
+
+```bash
+(mycotools) -$ sbatch <TREEDIRECTORY>/mafft.sh
+```
+
+<br />
+
+6a. Download the tree (`*.contree` for iqtree, `*.fasttre` for fasttree). Open
+the tree in [figtree](https://github.com/rambaut/figtree/releases). If the
+dataset is too big, identify a highly supported node (no less than 95, ideally
+100), containing your sequences of interest. Change to tip mode at the top of
+the program, click on the node, and copy the sequences highlighted into a plain
+text file. Then, restart the phylogenetic reconstruction by obtaining the
+sequences using `acc2fa.py` and restarting 4a with the output fasta.
+
+```bash
+(mycotools) -$ acc2fa.py -i <FILEWITHACCESSIONS>
+```
+
+<br />
+
+4b. If there are greater than 10,000 sequences, trees - even fasttrees can be
+intractable at this quantity. Therefore, try hierarchical agglomerative
+clustering. Adjust the % identity for both arguments as needed. You may need to
+submit this as a job
+
+```bash
+(mycotools) -$ aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
+```
+
+<br />
+
+5b. Open the `.clus` file to obtain the cluster with your sequence of interest,
+copy those sequences into a blank file, then use `acc2fa.py` as described in
+step 6a. If the clusters are too small/big, open the `.newick` output in figtree to 
+select the clade of interest as described in step 6a.
+
+<br />
+
+6b. Repeat the analysis at step 4a until a final phylogeny is obtained.

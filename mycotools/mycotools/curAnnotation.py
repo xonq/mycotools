@@ -153,14 +153,13 @@ def curCDS( gff ):
             info_dict[gene] = { 'start_codon': [], 'stop_codon': [], 'raw': [] }
         if entry['type'] == 'gene':
 #            info_dict[gene]['start_codon'].extend(sorted([int(entry['end']) - 2, int(entry['end'])]))
-            info_dict[gene]['start_codon'].extend(sorted([int(entry['end']), int(entry['end'])]))
-
+            info_dict[gene]['start_codon'].extend(sorted([int(entry['end']), int(entry['start'])]))
+            info_dict[gene]['stop_codon'].extend(sorted([int(entry['end']), int(entry['start'])]))
         elif entry['type'] in {'start_codon', 'stop_codon'}:
             info_dict[gene][entry['type']].extend(sorted([int(entry['start']), int(entry['end'])]))
         info_dict[gene]['raw'].append(copy.deepcopy(entry))
 
     for gene in info_dict:
-
         if not info_dict[gene]['start_codon']:
             new_gff.extend(info_dict[gene]['raw'])
             continue
@@ -169,8 +168,11 @@ def curCDS( gff ):
 #        info_dict[gene]['start_codon'].sort()
  #       info_dict[gene]['stop_codon'].sort()
 #        end0 = int(info_dict[gene]['start_codon'][1])
-        start0 = int(info_dict[gene]['start_codon'][0])
-        end1 = int(info_dict[gene]['stop_codon'][1])
+        try:
+            start0 = int(info_dict[gene]['start_codon'][0])
+            end1 = int(info_dict[gene]['stop_codon'][1])
+        except IndexError: # need to flag here
+            continue
         if start0 > end1:
             start0 = int(info_dict[gene]['stop_codon'][0])
             end1 = int(info_dict[gene]['start_codon'][1])

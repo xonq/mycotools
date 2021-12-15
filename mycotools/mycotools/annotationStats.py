@@ -73,6 +73,53 @@ def compileExon( gff_path, output, ome = None ):
     return ome, geneStats
 
 
+def main(in_path, log_path = None, cpus = 1):
+
+    if in_path[-4:] not in {'.gtf', '.gff', 'gff3'}:
+        from mycotools.lib.dbtools import mtdb
+        import multiprocessing as mp
+        db = mtdb(in_path).set_index()
+
+        prevOmes = {}
+        if log_path:
+             with open(log_path, 'r') as raw:
+                 for line in raw:
+                     omeI = line.index('\t')
+                     ome = line[:omeI]
+                     prevOmes[ome] = line[omeI+1:].rstrip()
+
+        cmds = []
+        for ome in db:
+            if ome not in prevOmes:
+                row = db[ome]
+                cmds.append((formatPath('$MYCOGFF3/' + row['gff3']), True, ome))
+        with mp.Pool(processes = cpus) as pool:
+            res = pool.starmap(compileExon, cmds)
+        outPrep = {x[0]: x[1] for x in res if x}
+        out = {
+            k: v for k, v in \
+            sorted({**outPrep, **prevOmes}.items(), key = lambda x: x[0])
+            }
+
+
+        if not log_path:
+#            output_file = os.path.basename(formatPath(sys.argv[1])) + '.annStats.tsv'
+            print('#ome\ttotal_length\tgenes\tmean_length\tmedian_length', flush = True)
+            for ome in out:
+                print(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]), flush = True)
+        else:
+            with open(log_path, 'w') as write:
+                write.write('#ome\ttotal_length\tgenes\tmean_length\tmedian_length\n')
+                for ome in out:
+                    write.write(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]) + '\n')
+    else:
+        ome, geneStats = compileExon(in_path, log_path)
+        if log_path:
+            out_str = 'total_length\tgenes\tmean_length\tmedian_length\n' + str(geneStats['total_len']) + \
+                '\t' + str(geneStats['genes']) + '\t' \
+                + str(geneStats['mean_len']) + '\t' + str(geneStats['median_len'])
+
+
 if __name__ == '__main__':
 
     output = False
@@ -87,34 +134,11 @@ if __name__ == '__main__':
         print(usage, flush = True)
         sys.exit(1)
     elif len( sys.argv ) > 3:
-        output = True       
-
-    if formatPath(sys.argv[1])[-4:] not in {'.gtf', '.gff', 'gff3'}:
-        from mycotools.lib.dbtools import db2df
-        import multiprocessing as mp
-        db = db2df(formatPath(sys.argv[1]))
-        cmds = []
-        for i, row in db.iterrows():
-            cmds.append((formatPath('$MYCOGFF3/' + row['gff3']), True, row['internal_ome']))
-        with mp.Pool(processes = os.cpu_count()) as pool:
-            res = pool.starmap(compileExon, cmds)
-        out = {x[0]: x[1] for x in res if x}
-        if len(sys.argv) < 3:
-#            output_file = os.path.basename(formatPath(sys.argv[1])) + '.annStats.tsv'
-            print('#ome\ttotal_length\tgenes\tmean_length\tmedian_length', flush = True)
-            for ome in out:
-                print(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]), flush = True)
-        else:
-            output_file = sys.argv[2]
-            with open(output_file, 'w') as write:
-                write.write('#ome\ttotal_length\tgenes\tmean_length\tmedian_length\n')
-                for ome in out:
-                    write.write(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]) + '\n')
+        log_path = formatPath(sys.argv[2])
     else:
-        ome, geneStats = compileExon( formatPath(sys.argv[1]), output )
-        if output:
-            out_str = 'total_length\tgenes\tmean_length\tmedian_length\n' + str(geneStats['total_len']) + \
-                '\t' + str(geneStats['genes']) + '\t' \
-                + str(geneStats['mean_len']) + '\t' + str(geneStats['median_len'])
+        log_path = None
 
-    sys.exit(0)    
+    in_path = formatPath(sys.argv[1])
+    main(in_path, log_path, os.cpu_count())
+
+    sys.exit(0)

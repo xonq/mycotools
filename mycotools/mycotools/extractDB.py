@@ -3,7 +3,7 @@
 import pandas as pd, numpy as np
 import argparse, os, sys
 from mycotools.lib.kontools import file2list, intro, outro, formatPath, eprint
-from mycotools.lib.dbtools import db2df, df2db, extract_tax, extract_omes, masterDB
+from mycotools.lib.dbtools import mtdb, extract_tax, extract_omes, masterDB
 
 def main( 
     db, rank = False, unique_species = False, lineage_list = False,
@@ -30,7 +30,7 @@ def main(
             sys.exit( 15 )
 
         if rank:
-            new_db = pd.DataFrame()
+            new_db = mtdb()
             new_db = new_db.append( 
                 extract_tax( 
                     db, taxonomy_list, 
@@ -59,13 +59,18 @@ def main(
         new_db = new_db[new_db['source'] != source]
 
     # if you want publications, then just pull those out 
+    new_db = new_db.set_index()
     if not nonpublished:
-        for i, row in new_db.iterrows():
-            if pd.isnull(row['published']) or not row['published']:
-                new_db.at[i, 'published'] = 0
-                new_db = new_db.drop(i)
-            else:
-                new_db.at[i, 'published'] = row['published']
+        todel = []
+        for ome in new_db:
+            if not new_db[ome]['published']:
+#                new_db.at[i, 'published'] = 0
+#                new_db = new_db.drop(i)
+                todel.append(ome)
+ #           else:
+#                new_db['published'][i] = .at[i, 'published'] = row['published']
+        for v in todel:
+            del new_db[v]
 
     return new_db
 
@@ -135,9 +140,9 @@ if __name__ == '__main__':
         for line in sys.stdin:
             data += line.rstrip() + '\n'
         data = data.rstrip()
-        db = db2df(data, stdin=True)
+        db = mtdb(data, stdin=True)
     else:
-       db = db2df( db_path )
+       db = mtdb( db_path )
     new_db = main( 
         db, rank = args.rank, lineage = args.lineage, lineage_list = args.lineages,
         ome_list = args.ome, source = args.source, unique_species = args.unique, 
@@ -146,7 +151,7 @@ if __name__ == '__main__':
     if args.output:
         df2db( new_db, output )
     else:
-        df2db( new_db, sys.stdout, header = bool(args.headers) )
+        new_db.df2db( sys.stdout ) #, header = bool(args.headers) )
 
  #   outro( start_time, stdout = args.output )
     sys.exit(0)
