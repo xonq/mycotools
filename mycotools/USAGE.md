@@ -456,23 +456,20 @@ identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 # Mycotools Pipelines
 ## Phylogenetic analysis
 
-The goal of many phylogenetic analyses is to construct a robust phylogeny 
-of a gene family with a focus on a specific node containing homologs of
-interest. 
-
 A key component of robust phylogenetic reconstruction is
-adequately sampling homologous genes within a gene family. MycotoolsDB 
-enables adequate sampling by providing a nearly comprehensive database of 
-available fungal genomic data. However, there are two problems with 
-increased sampling: 1) the alignment used to generate large phylogenies 
-loses resolution for some nodes because the alignment is created from 
-many sequences and 2) computational complexity increases with sample size. 
+adequately sampling. MycotoolsDB enables adequate sampling by 
+providing a near-comprehensive database of available fungal genomic data. 
+Despite the benefits of increased sampling, there are two prominent problems: 
+1) the alignment used to generate large phylogenies 
+loses resolution because it is derived from many sequences and 
+2) computational complexity increases with sample size. 
 For some genes, such as ITS, one can usually assume that the gene family is 
 strictly vertically inherited, so the dataset can be cut down to closely 
 related organisms. For most other genes, it is not valid to assume the gene family
-is vertically conserved. Therefore, it is important to systematically truncate 
-the dataset into a smaller group of gene homologs. This is accomplished by
-iteratively constructing phylogenies, identifying loose groups of homologs,
+is vertically conserved because horizontal transfer is a prominent form of gene 
+evolution in Fungi. Therefore, it is important to systematically truncate 
+the dataset into a manageable set of gene homologs. This is accomplished by
+iteratively constructing phylogenies, identifying gene family homologs,
 truncating the data to these homologs, and repeating until a manageable tree is
 obtained. On its own, this analysis requires elaborate integration of multiple 
 independent softwares, but Mycotools takes care of the bulk of this work.
@@ -481,10 +478,9 @@ independent softwares, but Mycotools takes care of the bulk of this work.
 
 ### Example 1:
 
-Most often, a phylogenetic analysis starts with a single gene of interest, and
-one wants to obtain the gene family of closely related genes. This is
-accomplished through BLAST. Step 1 is to BLAST a gene protein sequence with an
-e-value threshold of 10<sup>-2</sup> across the database. 
+A phylogenetic analysis often starts with a single gene of interest. The first step
+is to obtain the gene family of closely related genes by BLASTing a gene protein sequence 
+across the mycotoolsDB. 
 
 1. extract a database of published sequences, or use other arguments to extract
 other organisms of interest
@@ -495,7 +491,7 @@ extractDB.py > pubFungi.db
 
 <br />
 
-2. obtain gene homologs using `db2blast.py`
+2. obtain gene homologs using `db2blast.py` with an e-value threshold of 10<sup>-2</sup>:
 
 ```bash
 (mycotools) -$ db2blast.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pubFungi.db
@@ -515,7 +511,7 @@ genes recovered from the analysis:
 4a. If there are fewer than 10,000 sequences you can proceed directly to tree
 building. Otherwise, proceed to the `b` steps. If the sample size is too large
 to finish the analysis, specify `fasttree` below; however, if this is the final 
-tree, use `iqtree`.
+tree, or if the dataset is small enough, use `iqtree` because it is more robust:
 
 ```bash
 (mycotools) -$ fa2tree.py -f <BLASTRESULTS.fasta> -t <TREESOFTWARE> -s -A
