@@ -106,9 +106,9 @@ def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir
     hpc = False
     if slurm:
         vprint('\nHPC mode, preparing submission scripts (Slurm)\n', v = verbose, flush = True)
-        hpc = '#!/bin/bash\n#SBATCH --time=10:00:00\n#SBATCH --nodes=1\n' + \
+        hpc = '#!/bin/bash\n#SBATCH --time=24:00:00\n#SBATCH --nodes=1\n' + \
             '#SBATCH --ntasks-per-node=4\n#SBATCH -A ' + project + '\n' + \
-            '#SBATCH --mem=40000'
+            '#SBATCH --mem=60000'
 #            '\n\nsource activate ' + source
     elif pbs:
         vprint('\nHPC mode, preparing submission scripts (PBS)\n', v = verbose, flush = True)

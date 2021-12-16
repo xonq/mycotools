@@ -317,7 +317,7 @@ def main( prepdb, refdb ):
                 gff = gff2list(formatPath('$MYCOGFF3/' + row['internal_ome'] + '.gff3'))
                 assembly = fa2dict(formatPath('$MYCOFNA/' + row['internal_ome'] + '.fa'))
                 fa = gff2prot(gff, assembly)
-                with open(formatPath('$MYCOFAA/' + row['internal_ome'] + '.aa.fa', 'w'), 'w') as out:
+                with open(formatPath('$MYCOFAA/' + row['internal_ome'] + '.aa.fa'), 'w') as out:
                     out.write(dict2fa(fa))
                 predb_omes.at[i, 'proteome'] = row['internal_ome'] + '.aa.fa'
    

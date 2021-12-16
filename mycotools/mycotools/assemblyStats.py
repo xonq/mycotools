@@ -111,7 +111,6 @@ def main(in_path, log_path = None, cpus = 1):
     stats = {}
 
     if in_path.endswith('.db'):
-        log_path = None
         head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
             '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
 
@@ -123,16 +122,17 @@ def main(in_path, log_path = None, cpus = 1):
             else:
                 with open(log_path, 'r') as raw:
                     for line in raw:
-                        omeI = line.index('\t')
-                        ome = line[:omeI]
-                        prevOmes[ome] = line[omeI+1:].rstrip()
+                        if not line.startswith('#'):
+                            omeI = line.index('\t')
+                            ome = line[:omeI]
+                            prevOmes[ome] = line[omeI+1:].rstrip()
 
         db = mtdb(in_path).set_index()
 
         cmds = []
         for ome in db:
             row = db[ome]
-            if row['assembly']:
+            if row['assembly'] and ome not in prevOmes:
                 cmds.append((formatPath('$MYCOFNA/' + row['assembly']), ome))
         with mp.Pool(processes=cpus) as pool:
             results = pool.starmap(mngr, cmds)
@@ -140,7 +140,7 @@ def main(in_path, log_path = None, cpus = 1):
         calcs = {}
         for res in results:
             if res[1]:
-                calcs[res[0]] = res[1]
+                calcs[res[0]] = '\t'.join([str(x[1]) for x in res[1]])
             else:
                 eprint('\t\tERROR:\t' + ome, flush = True)
 
@@ -158,15 +158,14 @@ def main(in_path, log_path = None, cpus = 1):
                 for ome in calcs:
                     data = calcs[ome]
                     logWrite.write(
-                        ome + '\t' + '\t'.join([str(x[1]) for
-                        x in data]) + '\n'
+                        ome + '\t' + data + '\n'
                         )
         else:
             print(head, flush = True)
             for ome in calcs:
                 data = calcs[ome]
                 print(
-                    ome + '\t' + '\t'.join([str(x[1]) for x in data])
+                    ome + '\t' + data, flush = True
                     )
 
     else:

@@ -81,12 +81,13 @@ def main(in_path, log_path = None, cpus = 1):
         db = mtdb(in_path).set_index()
 
         prevOmes = {}
-        if log_path:
+        if log_path and os.path.isfile(log_path):
              with open(log_path, 'r') as raw:
                  for line in raw:
-                     omeI = line.index('\t')
-                     ome = line[:omeI]
-                     prevOmes[ome] = line[omeI+1:].rstrip()
+                     if not line.startswith('#'):
+                         omeI = line.index('\t')
+                         ome = line[:omeI]
+                         prevOmes[ome] = line[omeI+1:].rstrip()
 
         cmds = []
         for ome in db:
@@ -95,7 +96,11 @@ def main(in_path, log_path = None, cpus = 1):
                 cmds.append((formatPath('$MYCOGFF3/' + row['gff3']), True, ome))
         with mp.Pool(processes = cpus) as pool:
             res = pool.starmap(compileExon, cmds)
-        outPrep = {x[0]: x[1] for x in res if x}
+
+        outPrep = {}
+        for result in res:
+            if result:
+                outPrep[result[0]] = '\t'.join([str(x) for x in result[1].values()])
         out = {
             k: v for k, v in \
             sorted({**outPrep, **prevOmes}.items(), key = lambda x: x[0])
@@ -106,12 +111,12 @@ def main(in_path, log_path = None, cpus = 1):
 #            output_file = os.path.basename(formatPath(sys.argv[1])) + '.annStats.tsv'
             print('#ome\ttotal_length\tgenes\tmean_length\tmedian_length', flush = True)
             for ome in out:
-                print(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]), flush = True)
+                print(ome + '\t' + out[ome], flush = True)
         else:
             with open(log_path, 'w') as write:
                 write.write('#ome\ttotal_length\tgenes\tmean_length\tmedian_length\n')
                 for ome in out:
-                    write.write(ome + '\t' + '\t'.join([str(x) for x in out[ome].values()]) + '\n')
+                    write.write(ome + '\t' + out[ome] + '\n')
     else:
         ome, geneStats = compileExon(in_path, log_path)
         if log_path:
@@ -133,7 +138,7 @@ if __name__ == '__main__':
     elif not os.path.isfile( formatPath(sys.argv[1]) ):
         print(usage, flush = True)
         sys.exit(1)
-    elif len( sys.argv ) > 3:
+    elif len( sys.argv ) > 2:
         log_path = formatPath(sys.argv[2])
     else:
         log_path = None
