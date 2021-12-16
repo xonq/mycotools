@@ -459,20 +459,24 @@ identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 A key component of robust phylogenetic reconstruction is
 adequately sampling. MycotoolsDB enables adequate sampling by 
 providing a near-comprehensive database of available fungal genomic data. 
-Despite the benefits of increased sampling, there are two prominent problems: 
-1) the alignment used to generate large phylogenies 
-loses resolution because it is derived from many sequences and 
-2) computational complexity increases with sample size. 
-For some genes, such as ITS, one can usually assume that the gene family is 
+Despite the benefits of increased sampling, there are two prominent problems: 1) large alignments
+lose resolution because they must consider many sequences and 2) computational 
+complexity increases with sample size. 
+For a small set of genes, such as ITS, one can usually assume that the gene family is 
 strictly vertically inherited, so the dataset can be cut down to closely 
 related organisms. For most other genes, it is not valid to assume the gene family
-is vertically conserved because horizontal transfer is a prominent form of gene 
-evolution in Fungi. Therefore, it is important to systematically truncate 
+is vertically conserved because horizontal transfer is a prominent modality of gene 
+evolution in Fungi. 
+
+It is thus both important to adequately sample and systematically truncate 
 the dataset into a manageable set of gene homologs. This is accomplished by
 iteratively constructing phylogenies, identifying gene family homologs,
 truncating the data to these homologs, and repeating until a manageable tree is
 obtained. On its own, this analysis requires elaborate integration of multiple 
 independent softwares, but Mycotools takes care of the bulk of this work.
+
+You will need several programs for this analysis, so activate your Mycotools conda environment
+and run `conda install iqtree mafft trimal blast -c bioconda` 
 
 <br />
 
