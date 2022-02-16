@@ -151,7 +151,7 @@ if __name__ == '__main__':
     if args.output:
         df2db( new_db, output )
     else:
-        new_db.df2db( sys.stdout ) #, header = bool(args.headers) )
+        new_db.df2db( sys.stdout,  headers = bool(args.headers) )
 
  #   outro( start_time, stdout = args.output )
     sys.exit(0)

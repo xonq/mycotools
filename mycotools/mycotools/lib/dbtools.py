@@ -54,11 +54,18 @@ class mtdb(dict):
         return df
 
 
-    def df2db(self, db_path = None):
+    def df2db(self, db_path = None, headers = False):
         df = copy.deepcopy(self).reset_index()
         output = df.set_index('internal_ome') # does this work if its not an inplace change
         if not db_path:
             with open(db_path, 'w') as out:
+                if headers:
+                    out.write('\t'.join([
+                        'internal_ome', 'genus', 'species', 'strain', 'version', 
+                        'biosample', 'assembly', 'proteome', 'gff3',
+                        'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
+                        'genome_code', 'acquisition_date' 
+                        ]) + '\n')
                 for ome in output:
                     output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                     out.write(
@@ -66,6 +73,15 @@ class mtdb(dict):
                         '\t'.join([str(output[ome][x]) for x in output[ome]]) + '\n'
                         )
         else:
+            if headers:
+                print(
+                    '\t'.join([
+                    'internal_ome', 'genus', 'species', 'strain', 'version', 
+                    'biosample', 'assembly', 'proteome', 'gff3',
+                    'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
+                    'genome_code', 'acquisition_date' 
+                    ]), flush = True
+                    )
             for ome in output:
                  output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                  print(ome + '\t' + \
