@@ -132,7 +132,7 @@ if __name__ == '__main__':
         'nonpublished': args.nonpublished,
         'inverse': args.inverse,
         'headers': bool(args.headers)
-    }
+    	}
 #    start_time = intro( 'Abstract Database', args_dict, stdout = args.output )
 
     if args.stdin:

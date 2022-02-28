@@ -31,9 +31,14 @@ class mtdb(dict):
                     super().__init__(db)
                     self.index = None
             else:
-                if set(db[list(db.keys())[0]].keys()).union({index}) \
-                    == set(self.columns):
-                    super().__init__(db)
+                try:
+                    if set(db[list(db.keys())[0]].keys()).union({index}) \
+                        == set(self.columns):
+                        super().__init__(db)
+                except AttributeError:
+                    if set(db[list(db.keys())[0]][0]).union({index}) \
+                        == set(self.columns):
+                        super().__init__(db)
         else:
             super().__init__(mtdb.db2df(self, db))
         self.index = index
@@ -104,18 +109,28 @@ class mtdb(dict):
                 df = df.reset_index()
             if len(df[column]) == 0:
                 return mtdb({}, index = column)
-            for i, v in enumerate(df[column]):
-                data[v] = {}
-                for head in df.columns:
-                    try:
+            if column in \
+                {'genome_code', 'internal_ome', 'biosample', 'assembly', 'gff3', 'proteome'}: # if it's unique
+                for i, v in enumerate(df[column]):
+                    data[v] = {}
+                    for head in df.columns:
                         data[v][head] = df[head][i]
-                    except KeyError: # if an index exists
-                        if error:
-                            eprint('\nERROR: invalid column', flush = True)
-                            return self
-                        df = df.reset_index()
-                        error = True
-                        break
+            else:
+                for i, v in enumerate(df[column]):
+                    if v not in data:
+                        data[v] = []
+                    data[v].append({})
+                    for head in df.columns:
+                        try:
+                            data[v][-1][head] = df[head][i]
+                        except KeyError: # if an index exists
+                            if error:
+                                eprint('\nERROR: invalid column', flush = True)
+                                return self
+                            df = df.reset_index()
+                            error = True
+                            break
+
             retry = False
 #        if not column:
  #           firstRow = self[list(self.keys())[0]]
@@ -137,10 +152,16 @@ class mtdb(dict):
         if df.index:
             data = {x: [] for x in mtdb().columns}
             data[df.index] = list(df.keys())
-            otherCol = set(df.columns).difference({df.index})
-            for key in df:
-                for otherCol in df[key]:
-                    data[otherCol].append(df[key][otherCol])
+#            otherCol = set(df.columns).difference({df.index})
+            if df.index in {'genome_code', 'internal_ome', 'biosample', 'assembly', 'gff3', 'proteome'}:
+                for key in df:
+                    for otherCol in df[key]:
+                        data[otherCol].append(df[key][otherCol])
+            else:
+                for key in df:
+                    for v in df[key]:
+                        for otherCol in v:
+                            data[otherCol].append(v[otherCol])
             return mtdb(data, index = None)
         self.index = None
         return self
