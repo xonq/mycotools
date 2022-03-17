@@ -4,6 +4,8 @@
 
 
 - **MYCOTOOLSDB TOOLS**
+	- [Initializing MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#initialization)
+	- [Updating MycotoolsDB(https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#updating]
 	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-db)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
@@ -45,6 +47,24 @@ The following are information regarding scripts that manipulate Mycotools .db fi
 
 <br /><br />
 
+## Initialization
+### updateDB.py
+To initialize a curated database of all NCBI and MycoCosm (JGI) genomes, run the following
+
+```bash
+(mycotools) -$ updateDB.py -i <INIT DIRECTORY>
+```
+
+<br /><br />
+
+## Updating
+To update MycotoolsDB:
+
+```bash
+(mycotools) -$ updateDB.py -u
+```
+
+<br /><br />
 
 ## Interfacing with the master database
 ### mycodb
