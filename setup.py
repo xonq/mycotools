@@ -5,7 +5,7 @@ with open( "README.md", "r" ) as fh:
 
 setuptools.setup(
     name = "mycotools",
-    version = "0.9b26",
+    version = "0.9b27",
     author = "xonq",
     author_email = "konkelzach@protonmail.com",
     description = "A compilation of bioinformatic and computation biology inspired " + \

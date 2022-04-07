@@ -45,8 +45,15 @@ def main(
 
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif ome_list:
-        omes = file2list( formatPath(ome_list) )
-        new_db = extract_omes( db, omes, inverse = inverse )
+        omes = set(file2list( formatPath(ome_list) ))
+        db = db.set_index('internal_ome')
+        new_db = mtdb()
+        new_db = new_db.set_index()
+        for i in db:
+            if i in omes:
+                new_db[i] = db[i]
+        new_db = new_db.reset_index() 
+#        new_db = extract_omes( db, omes, inverse = inverse )
 
     # if none of these are specified then create a `new_db` variable to work for later
     else:

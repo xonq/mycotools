@@ -673,7 +673,7 @@ def extract_omes(db, ome_list, index = 'internal_ome', inverse = False):
             if row[index] not in ome_set:
                 ref_set.add( row[index].lower() )
 
-    db = db.set_index(index, drop = False)
+    db = db.set_index(index)
     for i,row in db.iterrows():
         if row[index].lower() in ref_set:
             new_db = new_db.append(row)

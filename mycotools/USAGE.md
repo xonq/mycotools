@@ -18,7 +18,8 @@
 	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
-	- [Grabbing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-clusters)
+	- [GFF to sequence](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#gene-coordinates-to-sequences)
+	- [Grabbing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-loci)
 	- [Visualizing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#visualizing-loci)
 	- [Curating annotation](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#curate-annotation)
 
@@ -274,6 +275,32 @@ If you have a list of accessions, create an input file with the accessions separ
 ```bash
 (mycotools) -$ acc2gff.py -i <INPUTFILE>
 (mycotools) -$ acc2fa.py -i <INPUTFILE>
+```
+
+<br /><br />
+
+## Gene coordinates to sequences
+### gff2seq.py
+`gff2seq.py` will extract the nucleotide or amino acid sequences associated with a gene coordinates `gff` file. Users can optionally input a flanking nucleotide plus/minus to extract from 
+the flanks of the provided `gff`. `gff2seq.py` will extract flanks independently for each sequence ID (column 1) within the `gff`. Coding or noncoding regions can be specified.
+
+e.g. extract nucleotide sequences and 1 kilobase flanks and noncoding regions within the following genes:
+
+```bash
+(mycotools) -$ gff2seq.py -g <.GFF3> -a <.FNA> -nc -pm 1000 -n
+```
+
+```
+optional arguments:
+  -h, --help            show this help message and exit
+  -g GFF, --gff GFF
+  -n, --nucleotide
+  -p, --protein
+  -a ASSEMBLY, --assembly ASSEMBLY
+  -nc, --noncoding      -n only
+  -pm PLUSMINUS, --plusminus PLUSMINUS
+                        -n only
+  -af, --all_flanks     -n and -nc only
 ```
 
 <br /><br />

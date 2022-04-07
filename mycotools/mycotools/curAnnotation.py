@@ -78,24 +78,12 @@ def intron2exon( gff ):
         gff1.append(entry)
 
     intron_genes = { 
-        gene: gene_info[gene] for gene in gene_info if len(gene_info[gene]['intron']) > 0 
+        gene: gene_info[gene] for gene in gene_info if gene_info[gene]['intron']
         }
     exon_coords = {}
     for gene in intron_genes:
+#        if intron_genes[gene]['intron']:
         exon_coords[ gene ] = []
-#        if intron_genes[gene]['start_codon'][0][0] > intron_genes[gene]['start_codon'][0][1]:
- #           intron_genes[gene]['start_codon'] = [
-  #              [
-   #                 intron_genes[gene]['start_codon'][0][1], 
-    #                intron_genes[gene]['start_codon'][0][0]
-     #           ]
-      #      ] 
-       #     intron_genes[gene]['stop_codon'] = [
-        #        [
-         #           intron_genes[gene]['stop_codon'][0][1], 
-          #          intron_genes[gene]['stop_codon'][0][0]
-           #     ]
-            #]
         intron_genes[gene]['intron'].sort( key = lambda x: x[0] )
     
         if intron_genes[gene]['strand'] == '+':
@@ -110,7 +98,16 @@ def intron2exon( gff ):
             for intron in intron_genes[gene]['intron']:
                 exon_coords[gene][-1].append( intron[0] - 1 )
                 exon_coords[gene].append([intron[1] + 1])
-            exon_coords[gene][-1].append( intron_genes[gene]['start_codon'][0][0] )
+            exon_coords[gene][-1].append( intron_genes[gene]['start_codon'][0][1] )
+#        elif intron_genes[gene]['start_codon']:
+ #           if intron_genes[gene]['strand'] == '+':
+  #              exon_coords[gene] = [[
+   #                 intron_genes[gene]['start_codon'][0][0], intron_genes[gene]['stop_codon'][0][1]
+    #                ]]
+     #       else:
+      #          exon_coords[gene] = [[
+       #             intron_genes[gene]['stop_codon'][0][0], intron_genes[gene]['start_codon'][0][1]
+        #            ]]
 
     gff2 = []
     for entry in gff1:
@@ -189,6 +186,7 @@ def curCDS( gff ):
         new_gff.extend(info_dict[gene]['raw'])
         if cop:
             new_gff.append(cop)
+
                     
 #                    info_dict[gene]['raw'][index]['end'] = new
  #                   if ready:
@@ -399,6 +397,7 @@ def addGenes( gtf, safe = True ):
     for insert in insert_list:
         gtf.insert( insert[0], insert[1] )
 
+
     return gtf, failed, flagged
 
 
@@ -527,19 +526,43 @@ def sortGene(sorting_group):
     return out_group 
 
 
+def sortContig(contigData):
+
+    coordinates = {}
+    for gene in contigData:
+        t_coords = []
+        for entry in contigData[gene]:
+            t_coords.extend([int(entry['start']), int(entry['end'])])
+        coordinates[gene] = min(t_coords)
+    coordinates = {
+        k: v for k, v in sorted(coordinates.items(), key = lambda item: item[1])
+        }
+    outContig = []
+    for gene in coordinates:
+        outContig.extend(contigData[gene])
+
+    return outContig
+
+
 def sortGFF(unsorted_gff, idComp):
 
     sorting_groups, oldGene = {}, None
     for i, entry in enumerate(unsorted_gff):
+        seqid = entry['seqid']
+        if seqid not in sorting_groups:
+            sorting_groups[seqid] = {}
         gene = idComp.search(entry['attributes'])[1]
         gene = re.sub(r'(.*?_\d+).*', r'\1', gene)
-        if gene not in sorting_groups:
-            sorting_groups[gene] = []
-        sorting_groups[gene].append(entry)
+        if gene not in sorting_groups[seqid]:
+            sorting_groups[seqid][gene] = []
+        sorting_groups[seqid][gene].append(entry)
 
     sortedGff = []
-    for gene in sorting_groups:
-        sortedGff.extend(sortGene(sorting_groups[gene]))
+    for seqid in sorting_groups:
+        contigData = {}
+        for gene in sorting_groups[seqid]:
+            contigData[gene] = sortGene(sorting_groups[seqid][gene])
+        sortedGff.extend(sortContig(contigData))
 
     return sortedGff
         
@@ -601,6 +624,16 @@ def main( gff_path, fasta_path, prefix, fail = True ):
     return gff, fa, trans_str, failed, flagged
 
 
+def sortMain(gff, prefix):
+
+    id_comp = re.compile(gff3Comps()['id'])
+    crude_sort = sorted( gff, key = lambda x: \
+        int( re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1] ))
+    gff = sortGFF(crude_sort, id_comp)
+
+    return gff
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( description = 'Curates Funannotate or ' + \
@@ -608,9 +641,11 @@ if __name__ == '__main__':
         '#### is the is the index from ordered accessions. If you are planning' + \
         ' on using OrthoFiller, you may want to wait to not mix accessions.' )
     parser.add_argument( '-g', '--gff', required = True, help = '.gtf, .gff/.gff3' )
-    parser.add_argument( '-f', '--fasta', required = True, help = 'Assembly fasta' )
+    parser.add_argument( '-f', '--fasta', help = 'Assembly fasta' )
     parser.add_argument( '-p', '--prefix', required = True,
         help = 'Accession prefix' )
+    parser.add_argument( '-s', '--sort', action = 'store_true',
+        help = 'Only sort compatible gff3' )
     parser.add_argument( '-o', '--output', help = 'Output directory' )
     parser.add_argument( '--fail', default = True, action = 'store_false',
         help = 'Fail genes without start or stop codons.' )
@@ -623,6 +658,15 @@ if __name__ == '__main__':
         output += args.prefix
     else:
         output = args.prefix
+
+    if args.sort:
+        gff = sortMain(gff2list(formatPath(args.gff)), args.prefix)
+        with open( output + '.gff3', 'w' ) as out:
+            out.write( list2gff( gff ) + '\n' )
+        sys.exit(0)
+    elif not args.fasta:
+        eprint('\nERROR: assembly (`-f`) required for curation\n', flush = True)
+        sys.exit(2)
 
     if '_' in args.prefix:
         eprint('\nERROR: "_" not allowed in prefix\n', flush = True)
