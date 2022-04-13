@@ -18,6 +18,7 @@
 	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
+        - [Extract fasta coordinates](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#fasta-coordinates)
 	- [GFF to sequence](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#gene-coordinates-to-sequences)
 	- [Grabbing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-loci)
 	- [Visualizing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#visualizing-loci)
@@ -278,11 +279,31 @@ If you have a list of accessions, create an input file with the accessions separ
 ```
 
 <br /><br />
+## Fasta coordinates
+### coords2fa.py
+
+```bash
+(mycotools) -bash-4.2$ coords2fa.py -h
+
+Input nucleotide fasta/tsv input, extract coordinates
+coords2fa.py <FA> <SEQID> <START_COORD> <END_COORD> <STRAND_SENSE>
+Extract full sequence from sense strand: coords2fa.py test.fna scaffold_20 0 -1
+Extract coordinates from antisense strand: coords2fa.py test.fna scaffold_20 69 420 -
+
+
+Bulk extraction tab delimitted row format:
+fasta   sequence_id     start_coordinate        end_coordinate  strand_sense
+
+coords2fa.py coords.tsv
+```
+
+<br /><br />
 
 ## Gene coordinates to sequences
 ### gff2seq.py
 `gff2seq.py` will extract the nucleotide or amino acid sequences associated with a gene coordinates `gff` file. Users can optionally input a flanking nucleotide plus/minus to extract from 
-the flanks of the provided `gff`. `gff2seq.py` will extract flanks independently for each sequence ID (column 1) within the `gff`. Coding or noncoding regions can be specified.
+the flanks of the provided `gff`. `gff2seq.py` will extract flanks independently for each sequence ID (column 1) within the `gff`. Coding or noncoding regions can be specified. If `--intergenic` is called then only the first and last gene for each fasta
+sequence are considered.
 
 e.g. extract nucleotide sequences and 1 kilobase flanks and noncoding regions within the following genes:
 
@@ -297,6 +318,7 @@ optional arguments:
   -n, --nucleotide
   -p, --protein
   -a ASSEMBLY, --assembly ASSEMBLY
+  -i --intergenic	-n only
   -nc, --noncoding      -n only
   -pm PLUSMINUS, --plusminus PLUSMINUS
                         -n only
