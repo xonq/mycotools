@@ -326,9 +326,10 @@ def ntNegNoncode(rev_seq, negtig_dict, plusminus = 0):
     return genes_fa_dict
 
 
-def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, plusminus = 0 ):
+def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, fullRegion = False, plusminus = 0 ):
     
-
+    if fullRegion:
+        flanks, coding = True, False
     contig_dict, contig_info, genes_fa_dict, geneOrder = {}, {}, {}, {}
     cdss = grabCDS( sortMain(gff_dicts) )
     for cds in cdss:
@@ -404,6 +405,7 @@ def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, plusminus = 0 )
             for seqid in contig_info:
                 startGene, startStrand = contig_info[seqid][0][0], contig_info[seqid][0][1],
                 endGene, endStrand = contig_info[seqid][1][0], contig_info[seqid][1][1]
+                      
                 if startGene == endGene:
                     if startStrand == '+':
                         startFlanks[seqid] = posPlusMinus(
@@ -419,6 +421,26 @@ def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, plusminus = 0 )
                             )
                         del neg_dict[seqid][startGene]
                     continue
+
+                elif fullRegion:
+                    region = []
+                    if startStrand == '+':
+                        region.append(min(pos_dict[seqid][startGene]))
+                    else:
+                        region.append(min(neg_dict[seqid][startGene]))
+                    if endStrand == '+':
+                        region.append(max(pos_dict[seqid][endGene]))
+                    else:
+                        region.append(max(neg_dict[seqid][endGene]))
+                    name = startGene + '-' + endGene
+                    genes_fa_dict[name + '_sense'] = posPlusMinus(
+                        region, plusminus, assem_dict[seqid]['sequence']
+                        )
+                    rev_comp = str(Seq(assem_dict[seqid]['sequence']).reverse_complement())
+                    genes_fa_dict[name + '_antisense'] = negPlusMinus(
+                        region, len(rev_comp), plusminus, rev_comp
+                        )
+
                 
                 if startStrand == '+':
                     startFlanks[seqid] = posPlusMinus(
@@ -462,7 +484,7 @@ def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, plusminus = 0 )
                         **ntNeg(rev_comp, neg_dict[contig]),
                         **contig_fa_dict[contig]
                         }
-        else:
+        elif not fullRegion:
             for contig in contig_fa_dict:
                 if contig in pos_dict:
                     contig_fa_dict[contig] = { 
@@ -475,14 +497,14 @@ def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, plusminus = 0 )
                         **ntNegNoncode(rev_comp, neg_dict[contig]),
                         **contig_fa_dict[contig]
                         }
-
-    for contig in geneOrder:
-        if contig in startFlanks:
-            genes_fa_dict[geneOrder[contig][0]] = startFlanks[contig]
-        for gene in geneOrder[contig][1:-1]:
-            genes_fa_dict[gene] = contig_fa_dict[contig][gene]
-        if contig in endFlanks:
-            genes_fa_dict[geneOrder[contig][-1]] = endFlanks[contig]
+    if not fullRegion:
+        for contig in geneOrder:
+            if contig in startFlanks:
+                genes_fa_dict[geneOrder[contig][0]] = startFlanks[contig]
+            for gene in geneOrder[contig][1:-1]:
+                genes_fa_dict[gene] = contig_fa_dict[contig][gene]
+            if contig in endFlanks:
+                genes_fa_dict[geneOrder[contig][-1]] = endFlanks[contig]
     
     return genes_fa_dict
 
@@ -518,6 +540,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--nucleotide', action = 'store_true')
     parser.add_argument('-p', '--protein', action = 'store_true')
     parser.add_argument('-a', '--assembly')
+    parser.add_argument('-i', '--intergenic', action = 'store_true', help = '-n only')
     parser.add_argument('-nc', '--noncoding', action = 'store_true', help = '-n only')
     parser.add_argument('-pm', '--plusminus', default = 0, type = int, help = '-n only')
     parser.add_argument('-af', '--all_flanks', action = 'store_true', help = '-n and -nc only')
@@ -550,7 +573,7 @@ if __name__ == '__main__':
     else:
         for ome in assembly_dicts:
             print(dict2fa(
-                ntmain(gff_dicts[ome], assembly_dicts[ome], not args.noncoding, not args.all_flanks, args.plusminus)
+                ntmain(gff_dicts[ome], assembly_dicts[ome], not args.noncoding, not args.all_flanks, args.intergenic, args.plusminus)
                 ), flush = True)
 
     sys.exit(0)
