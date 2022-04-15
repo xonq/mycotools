@@ -19,7 +19,7 @@ def extractCoords(fa_dict, seqid, coord_start = 0, coord_end = -1, sense = '+', 
             'sequence': str(Seq(fa_dict[seqid]['sequence'][coord_start:coord_end]).reverse_complement()),
             'description': ''
             }
-    if coord_end > len(fa_dict[seqid]):
+    if coord_end > len(fa_dict[seqid]['sequence']):
         error = '\nNOTICE: end coordinate beyond contig edge: ' + fa_name + ' ' + seqid + ' ' + str(coord_end)
 
     return new_fa, error

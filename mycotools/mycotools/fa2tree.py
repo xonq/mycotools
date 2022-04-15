@@ -22,54 +22,45 @@ def mafftRun( fasta, out_dir, hpc, verbose = True ):
     else:
         with open( out_dir + '/mafft.sh', 'w' ) as out:
             if '#PBS' in hpc:
-                out.write( hpc + '\n\n' + cmd + '\ncd ' + out_dir + '\nqsub trimal.sh')
+                out.write( hpc + '\n\n' + cmd + '\ncd ' + out_dir + '\nqsub clipkit.sh')
             else:
-                 out.write( hpc + '\n\n' + cmd + '\ncd ' + out_dir + '\nsbatch trimal.sh')
+                 out.write( hpc + '\n\n' + cmd + '\ncd ' + out_dir + '\nsbatch clipkit.sh')
                
         
     return out_dir + '/' + name + '.mafft'
 
 
-def trimalRun( mafft, out_dir, hpc, tree, verbose ):
+def trimRun( mafft, out_dir, hpc, tree, verbose ):
 
-#    name1 = os.path.basename( os.path.abspath(mafft.replace('mafft', 'prelim_trimal')))
-    name2 = os.path.basename(os.path.abspath(re.sub( r'\.mafft$', '.trimal', mafft)))
-#    cmd1 = 'trimal -in ' + mafft + ' -automated1 -out ' + out_dir + '/' + name1
-    cmd2 = 'trimal -in ' + mafft + ' -out ' + out_dir + '/' + name2 + ' -gappyout'
+    name2 = os.path.basename(os.path.abspath(re.sub( r'\.mafft$', '.clipkit', mafft)))
+    cmd = ['clipkit', mafft, '--output', out_dir + '/' + name2]
 
     if not hpc:
-#        if not os.path.isfile( out_dir + '/' + name1 ):
- #           vprint('\nTrimming step 1/2', v = verbose, flush = True)
-  #          run_trimal1 = subprocess.call( cmd1, shell = True, stdout = subprocess.PIPE )
-   #         if run_trimal1 != 0:
-    #            os.remove( out_dir + '/' + name1 )
-     #           eprint( '\nERROR: preliminary `trimal` failed\n' , flush = True)
-      #          sys.exit( 3 )
 
-        vprint('\nTrimming step 2/2', v = verbose, flush = True)
-        run_trimal2 = subprocess.call( cmd2, shell = True, stdout = subprocess.PIPE )
-        if run_trimal2 != 0:
-            eprint( '\nERROR: `trimal` failed\n' , flush = True)
+        vprint('\nTrimming', v = verbose, flush = True)
+        run_clipkit = subprocess.call( cmd, shell = True, stdout = subprocess.PIPE )
+        if run_clipkit != 0:
+            eprint( '\nERROR: `clipkit` failed\n' , flush = True)
             os.remove( out_dir + '/' + name2 )
             sys.exit( 4 )
 
     else:
-        with open( out_dir + '/trimal.sh', 'w' ) as out:
+        with open( out_dir + '/clipkit.sh', 'w' ) as out:
             if '#PBS' in hpc:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    cmd2 + '\n\ncd ' + out_dir + '\nqsub ' + tree + '.sh' )
+                    cmd + '\n\ncd ' + out_dir + '\nqsub ' + tree + '.sh' )
             else:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    cmd2 + '\n\ncd ' + out_dir + '\nsbatch ' + tree + '.sh' )
+                    cmd + '\n\ncd ' + out_dir + '\nsbatch ' + tree + '.sh' )
     
     return out_dir + '/' + name2
 
 
-def fasttreeRun( trimal, out_dir, hpc, verbose ):
+def fasttreeRun( clipkit, out_dir, hpc, verbose ):
 
 
-    name = os.path.basename(os.path.abspath(trimal + '.fast.tre'))
-    cmd = 'fasttree -lg ' + trimal + ' > ' + out_dir + '/' + name
+    name = os.path.basename(os.path.abspath(clipkit + '.fast.tre'))
+    cmd = 'fasttree -lg ' + clipkit + ' > ' + out_dir + '/' + name
 
     if not hpc:
         vprint('\nMaking fasttree ...', v = verbose, flush = True)
@@ -85,9 +76,9 @@ def fasttreeRun( trimal, out_dir, hpc, verbose ):
     return name
 
 
-def iqtreeRun( trimal, out_dir, hpc, verbose ):
+def iqtreeRun( clipkit_file, out_dir, hpc, verbose ):
 
-    cmd = 'iqtree -s ' + trimal + ' -B 1000 -T AUTO'
+    cmd = 'iqtree -s ' + clipkit_file + ' -B 1000 -T AUTO'
 
     vprint('\nOutputting bash script `iqtree.sh`.\n', v = verbose, flush = True)
    
@@ -124,7 +115,7 @@ def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir
 
     fasta_name = os.path.basename( os.path.abspath(fasta_path))
     mafft = out_dir + '/' + fasta_name + '.mafft'
-    trimal = out_dir + '/' + fasta_name + '.trimal'
+    clipkit = out_dir + '/' + fasta_name + '.clipkit'
 
     if not os.path.isfile( mafft ) and not alignment:
         mafft = mafftRun( os.path.abspath(fasta_path), out_dir, hpc, verbose )
@@ -132,15 +123,15 @@ def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir
         mafft = fasta_path
     else:
         vprint('\nAlignment exists ...', v = verbose, flush = True)
-    if not os.path.isfile( trimal ):
-        trimal = trimalRun( mafft, out_dir, hpc, tree, verbose )
+    if not os.path.isfile( clipkit ):
+        clipkitOut = trimRun( mafft, out_dir, hpc, tree, verbose )
     else:
         vprint('\nTrim exists ...', v = verbose , flush = True)
 
     if tree == 'fasttree':
-        fasttreeRun( trimal , out_dir, hpc, verbose )
+        fasttreeRun( clipkitOut , out_dir, hpc, verbose )
     elif tree == 'iqtree':
-        iqtreeRun( trimal, out_dir, hpc, verbose )
+        iqtreeRun( clipkitOut, out_dir, hpc, verbose )
 
     if hpc:
         if slurm:
@@ -185,7 +176,7 @@ if __name__ == '__main__':
         eprint('\nERROR: invalid tree software: ' + args.tree , flush = True)
         sys.exit(1)
 
-    findExecs( [args.tree, 'mafft', 'trimal'] )
+    findExecs( [args.tree, 'mafft', 'clipkit'] )
 
     if args.fasta:
         input_check = formatPath(args.fasta)
