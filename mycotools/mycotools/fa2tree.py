@@ -56,29 +56,11 @@ def trimRun( mafft, out_dir, hpc, tree, verbose ):
     return out_dir + '/' + name2
 
 
-def fasttreeRun( clipkit, out_dir, hpc, verbose ):
+def iqtreeRun( clipkit_file, out_dir, hpc, verbose, fast = False ):
 
-
-    name = os.path.basename(os.path.abspath(clipkit + '.fast.tre'))
-    cmd = 'fasttree -lg ' + clipkit + ' > ' + out_dir + '/' + name
-
-    if not hpc:
-        vprint('\nMaking fasttree ...', v = verbose, flush = True)
-        run_fasttree = subprocess.call( cmd, shell = True, stdout = subprocess.PIPE )
-        if run_fasttree != 0:
-            eprint( '\nERROR: `fasttree` failed\n' , flush = True)
-            os.remove( out_dir + '/' + name )
-            sys.exit( 5 )
-    else:
-        with open( out_dir + '/fasttree.sh', 'w' ) as out:
-            out.write( hpc + '\n\n' + cmd )
-
-    return name
-
-
-def iqtreeRun( clipkit_file, out_dir, hpc, verbose ):
-
-    cmd = 'iqtree -s ' + clipkit_file + ' -B 1000 -T AUTO'
+    cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-T', 'AUTO']
+    if fast:
+        cmd.append('--fast')
 
     vprint('\nOutputting bash script `iqtree.sh`.\n', v = verbose, flush = True)
    
@@ -92,7 +74,10 @@ def iqtreeRun( clipkit_file, out_dir, hpc, verbose ):
             out.write( hpc + '\n\n' + cmd )
 
 
-def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir = None, verbose = True, alignment = False ):
+def main( 
+    fasta_path, slurm = False, pbs = False, fast = False, project = '', 
+    output_dir = None, verbose = True, alignment = False 
+    ):
 
     hpc = False
     if slurm:
@@ -128,10 +113,7 @@ def main( fasta_path, tree, slurm = False, pbs = False, project = '', output_dir
     else:
         vprint('\nTrim exists ...', v = verbose , flush = True)
 
-    if tree == 'fasttree':
-        fasttreeRun( clipkitOut , out_dir, hpc, verbose )
-    elif tree == 'iqtree':
-        iqtreeRun( clipkitOut, out_dir, hpc, verbose )
+    iqtreeRun( clipkitOut, out_dir, hpc, verbose, args.fast )
 
     if hpc:
         if slurm:
@@ -146,13 +128,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( 
         description = 'Takes in a multifasta or directory of multifastas, ' + \
-        ' aligns, trims, and runs treebuilding: {`fasttree`, `iqtree`, `raxml` (future)}.' )
+        ' aligns (mafft), trims (clipkit), and infers phylogeny (iqtree).'
+        )
     parser.add_argument( '-f', '--fasta', \
         help = 'Fasta or directory of fastas' )
     parser.add_argument( '-a', '--alignment', \
         help = 'Alignment or directory of alignments (need fasta file extension)' )
-    parser.add_argument( '-t', '--tree', default = 'fasttree', \
-        help = 'Tree-building software. { fasttree, iqtree }' )
+    parser.add_argument( '--fast', action = 'store_true', \
+        help = 'Run IQTree fast option' )
     parser.add_argument( '-p', '--pbs', action = 'store_true', \
         help = 'Submit ALL steps to Torque.' )
     parser.add_argument( '-s', '--slurm', action = 'store_true', \
@@ -163,8 +146,8 @@ if __name__ == '__main__':
 
     output = formatPath( args.output, isdir = True )
     args_dict = {
-        'Input': args.fasta, 'Tree': args.tree, 'Torque': args.pbs,
-        'Slurm': args.slurm, 'HPC project': args.project, 'Output': output
+        'Fasta': args.fasta, 'Alignment': args.alignment, 'Fast': args.fast,
+        'Torque': args.pbs, 'Slurm': args.slurm, 'HPC project': args.project, 'Output': output
         }
     start_time = intro( 'Fasta2Tree', args_dict )
 
@@ -176,7 +159,7 @@ if __name__ == '__main__':
         eprint('\nERROR: invalid tree software: ' + args.tree , flush = True)
         sys.exit(1)
 
-    findExecs( [args.tree, 'mafft', 'clipkit'] )
+    findExecs( ['iqtree', 'mafft', 'clipkit'] )
 
     if args.fasta:
         input_check = formatPath(args.fasta)
@@ -202,7 +185,7 @@ if __name__ == '__main__':
         for fa in fas:
             print(fa, flush = True)
             main(
-                fa, args.tree, slurm = args.slurm, pbs = args.pbs, alignment = alignment,
+                fa, slurm = args.slurm, pbs = args.pbs, alignment = alignment, fast = args.fast,
                 project = args.project, output_dir = output, verbose = False
                 )
     else:

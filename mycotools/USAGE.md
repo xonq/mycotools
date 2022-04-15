@@ -473,22 +473,30 @@ optional arguments:
 ### fa2tree.py
 `fa2tree.py` will input a fasta file or directory of fasta files, trim, and
 generate trees either via job submission (`slurm` or `torque`) or immediate execution. 
-Note you will need to have `mafft`, `trimal`, and the tree software you are
-using (`fasttree`/`iqtree`) installed. If these are not installed, install them
-into your mycotools conda environment via `conda install mafft trimal iqtree`
+Note you will need `mafft`, `clipkit`, and `iqtree` installed. 
+If these are not installed, install them into your mycotools conda environment via 
+`conda install mafft iqtree` and `pip install clipkit`.
 
-e.g. Construct a tree from a fasta
+Information on a complete [phylogenetic pipeline](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-pipelines) is elaborated below.
+
+<br />
+
+e.g. Swiftly construct a tree from a fasta
 ```bash
-(mycotools) -$ fa2tree.py -i <FASTA>.fa -t fasttree
+(mycotools) -$ fa2tree.py -i <FASTA>.fa --fast
 ```
 
-Prepare for slurm job submission
+Prepare a robust tree for slurm job submission
 ```bash
-(mycotools) -$ fa2tree.py -i <FASTA> -t iqtree -s -A PAS1046
+(mycotools) -$ fa2tree.py -i <FASTA> -s -A PAS1046
 ```
-https://github.com/rambaut/figtree/releases
+
 Begin the tree pipeline by navigating into the folder and running `bash
-mafft.sh` (execute immediately) or `sbatch mafft.sh` (job submission).
+mafft.sh` (execute immediately) or `sbatch mafft.sh` (job submission). If you
+run out of memory, then add increased memory/cores to the job submission script(s).
+
+Most often, the final file you want is `*.contree`.
+View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 
 <br /><br />
 
@@ -581,13 +589,12 @@ genes recovered from the analysis:
 
 <br />
 
-4a. If there are fewer than 10,000 sequences you can proceed directly to tree
+4a. If there are fewer than 10,000 sequences you can proceed directly to robust tree
 building. Otherwise, proceed to the `b` steps. If the sample size is too large
-to finish the analysis, specify `fasttree` below; however, if this is the final 
-tree, or if the dataset is small enough, use `iqtree` because it is more robust:
+to finish the analysis, specify `--fast` below. 
 
 ```bash
-(mycotools) -$ fa2tree.py -f <BLASTRESULTS.fasta> -t <TREESOFTWARE> -s -A
+(mycotools) -$ fa2tree.py -f <BLASTRESULTS.fasta> -s -A
 <PROJECT>
 ```
 
@@ -601,7 +608,7 @@ tree, or if the dataset is small enough, use `iqtree` because it is more robust:
 
 <br />
 
-6a. Download the tree (`*.contree` for iqtree, `*.fasttre` for fasttree). Open
+6a. Download the tree (usually `*.contree` for iqtree). Open
 the tree in [figtree](https://github.com/rambaut/figtree/releases). If the
 dataset is too big, identify a highly supported node (no less than 95, ideally
 100), containing your sequences of interest. Change to tip mode at the top of
