@@ -60,6 +60,8 @@ def iqtreeRun( clipkit_file, out_dir, hpc, verbose, fast = False ):
 
     cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-T', 'AUTO']
     if fast:
+        del cmd[4]
+        del cmd[3]
         cmd.append('--fast')
 
     vprint('\nOutputting bash script `iqtree.sh`.\n', v = verbose, flush = True)
