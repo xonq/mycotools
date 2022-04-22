@@ -504,26 +504,31 @@ View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 ## Hierarchical agglomerative clustering
 ### aggClus.py
 Hierarchical agglomerative clustering is a useful systematic approach to
-extracting groups of sequences for phylogenetic analysis. Ubiquitous genes,
-like P450s, will often yield 10,000s of results for BLAST searches against the
-MycotoolsDB. Constructing and visualizing a tree of this magnitude just is not
-practical in many cases; it is therefore necessary to decrease the size of the 
-dataset to a workable size while relying on biological information (global
-pairwise alignments).
+clustering groups of sequences for phylogenetic analysis via percent identity.
+Some gene families (e.g. P450s) yield 10,000s of results for BLAST searches against the
+MycotoolsDB. `aggClus.py` allows the user to truncate these sets without constructing a
+phylogeny using a minimum percent identity cutoff. `aggClus.py` optionally implements
+an automated iterative approach to obtaining a cluster of minimum - maximum size
+with the gene of interest.
 
 `aggClus.py` will either take a `fasta` and generate a distance matrix using 
 `usearch calc_distmx` by default or the % identity of `needle` alignments.
 Then, cluster sequences via hierarchical agglomerative clustering and output a
 `.clus` file of cluster assignments and `.newick` dendrogram. 
 
-Currently, using `needle` takes quite long, so it is recommended to acquire a
+Currently, using `needle` is slow, so it is recommended to acquire a
 free license for `usearch` and use that instead. The limitations of the free
 license are sufficient for distance matrix calculation even on large datasets. 
 
 e.g. Calculate a distance matrix and cluster from a fasta with a minimum
 identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 ```bash
-(mycotools) -$ aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
+(mycotools) -$ aggClus.py -f <FASTA>.fa -m 0.2 -x 0.7
+```
+
+Iteratively cluster until a cluster size of 50-200 genes is achieved:
+```bash
+(mycotools) -$ aggClus.py -f <FASTA> -m 0.2 -x 0.7 --iterative --minseq 50 --maxseq 200
 ```
 
 
@@ -553,7 +558,7 @@ obtained. On its own, this analysis requires elaborate integration of multiple
 independent softwares, but Mycotools takes care of the bulk of this work.
 
 You will need several programs for this analysis, so activate your Mycotools conda environment
-and run `conda install iqtree mafft trimal blast -c bioconda` 
+and run `conda install iqtree mafft blast -c bioconda` and `pip install clipkit`
 
 <br />
 

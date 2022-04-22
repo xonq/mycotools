@@ -167,6 +167,53 @@ def scipyaggd( distMat, maxDist, method = 'single' ):
     return clusters, tree
 
 
+def needleMain(fasta, min_id, cpus = 1):
+    findExecs( ['needle'], exit = set('needle') )
+    print( '\nCalculating needle alignments' , flush = True)
+    aligns, alignCmds = set(), list()
+    tmpdir = tempfile.gettempdir() + '/aggTmpZK' 
+    tmpdir += ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    if not os.path.isdir( tmpdir ):
+        os.mkdir( tmpdir )
+    if not os.path.isdir( tmpdir + '/fastas' ):
+        os.mkdir( tmpdir + '/fastas' )
+    if not os.path.isdir( tmpdir + '/aligns' ):
+        os.mkdir( tmpdir + '/aligns' )
+    print('\tSTEP 1/3: Preparing data. ' + tmpdir + ' will be removed upon completion', flush = True)
+    fastas = splitFasta( fasta, tmpdir + '/fastas' )
+    for fa1 in fastas:
+        for fa2 in fastas:
+            if fa1 != fa2: 
+                out = prepAlign( [ fa1, fa2 ], tmpdir + '/aligns' )
+                if out[0] not in aligns:
+                    aligns.add( out[0] )
+                    alignCmds.append( out[1] )
+    print('\tSTEP 2/3: Aligning sequences. Using ' + str(cpus) + ' cores', flush = True)
+    codes = multisub( list(alignCmds), processes = cpus )
+    print('\tSTEP 3/3: Generating distance matrix', flush = True)
+    distanceMatrix, outMatrix = createDist( aligns, min_id )
+    dist_out = ''
+    for i, row in outMatrix.iterrows():
+        for column in outMatrix.columns:
+            if str(column) != str(i) and outMatrix.at[i, column] < 1:
+                dist_out += str(i) + '\t' + str(column) + '\t' + \
+                    str(outMatrix.at[i, column]) + '\n'
+    with open( output + '.dist', 'w' ) as out:
+        out.write( dist_out )
+    subprocess.call( ['rm', '-rf', tmpdir], stdout = subprocess.PIPE, stderr = \
+        subprocess.PIPE )
+
+    return distanceMatrix
+
+def usearchMain(fasta, min_id):
+    findExecs( ['usearch'], exit = set('usearch') )
+    print('\nCalculating usearch alignments', flush = True)
+    runUsearch(fasta, output + '.dist', str(1 - min_id))
+    distanceMatrix = importDist( output + '.dist' )
+    return distanceMatrix
+
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( 
@@ -180,12 +227,20 @@ if __name__ == '__main__':
         )
     parser.add_argument( '-o', '--output', help = 'e.g. "~/name" will output name.clus, etc' )
     parser.add_argument( '-m', '--min_id', help = 'Minimum identity'
-        + ' for alignment, written as decimal', type = float )
-    parser.add_argument( '-x', '--max_dist', required = True, help = 'Maximum distance'
-        + ' for clustering (1 - minimum identity), written as decimal', type = float)
+        + ' for alignment. DEFAULT 0.3', type = float, default = 0.3 )
+    parser.add_argument( '-x', '--max_dist', help = 'Maximum distance'
+        + ' for clustering (1 - minimum identity). DEFAULT: 0.6', type = float, default = 0.6)
     parser.add_argument( '-l', '--linkage', default = 'single', help = "Linkage criterion:" \
         + " 'complete' (maximum distance), 'average', 'weighted', 'centroid', or 'single'" \
         + " (minimum distance) DEFAULT: 'single' (minimum)" )
+    parser.add_argument('--iterative', help = 'Gene to iteratively cluster for. Requires ' \
+        + ' --minseq.')
+    parser.add_argument('--minseq', type = int, help = 'Iteratively adjust -m and -x until a cluster ' \
+        + ' of minimum sequences is obtained. Requires --iterative. DEFAULT: 100', default = 100)
+    parser.add_argument('--maxseq', type = int, help = 'Maximum sequences for iterative clustering. ' \
+        + 'Requires --iterative. DEFAULT 1000', default = 1000)
+    parser.add_argument('--interval', type = float, help = '-m and -x adjustment for each iteration. ' \
+        + 'Requires --iterative. DEFAULT: 0.05', default = 0.05)
     parser.add_argument( '-c', '--cpus', default = 1, type = int, \
         help = 'Cores for alignment during distance matrix construction' )
     args = parser.parse_args()
@@ -198,57 +253,64 @@ if __name__ == '__main__':
         eprint('\nERROR: Invalid alignment method', flush = True)
         sys.exit( 2 )
 
+    fastaPath = formatPath(args.fasta)
+    fa = fa2dict(fastaPath)
+    if args.iterative:
+        focalGene = args.iterative
+        if len(fa) < args.minseq:
+            eprint('\nERROR: minimum sequences is greater than fasta input', flush = True)
+            sys.exit(5)
+        elif focalGene not in fa:
+            eprint('\nERROR: ' + focalGene + ' not in ' + fastaPath, flush = True)
+            sys.exit(6)
+
     if args.output:
         output = args.output
     else:
-        output = args.fasta
+        output = os.getcwd() + os.path.basename(fastaPath)
 
 #    if os.path.isfile(output + '.dist'):
  #       print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' , flush = True)
   #      distanceMatrix = importDist( output + '.dist' )
-    if args.distance == 'needle': #elif if above lines not highlighted
-        findExecs( ['needle'], exit = set('needle') )
-        print( '\nCalculating needle alignments' , flush = True)
-        aligns, alignCmds = set(), list()
-        tmpdir = tempfile.gettempdir() + '/aggTmpZK' 
-        tmpdir += ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        if not os.path.isdir( tmpdir ):
-            os.mkdir( tmpdir )
-        if not os.path.isdir( tmpdir + '/fastas' ):
-            os.mkdir( tmpdir + '/fastas' )
-        if not os.path.isdir( tmpdir + '/aligns' ):
-            os.mkdir( tmpdir + '/aligns' )
-        print('\tSTEP 1/3: Preparing data. ' + tmpdir + ' will be removed upon completion', flush = True)
-        fastas = splitFasta( args.fasta, tmpdir + '/fastas' )
-        for fa1 in fastas:
-            for fa2 in fastas:
-                if fa1 != fa2: 
-                    out = prepAlign( [ fa1, fa2 ], tmpdir + '/aligns' )
-                    if out[0] not in aligns:
-                        aligns.add( out[0] )
-                        alignCmds.append( out[1] )
-        print('\tSTEP 2/3: Aligning sequences. Using ' + str(args.cpus) + ' cores', flush = True)
-        codes = multisub( list(alignCmds), processes = args.cpus )
-        print('\tSTEP 3/3: Generating distance matrix', flush = True)
-        distanceMatrix, outMatrix = createDist( aligns, min_id )
-        dist_out = ''
-        for i, row in outMatrix.iterrows():
-            for column in outMatrix.columns:
-                if str(column) != str(i) and outMatrix.at[i, column] < 1:
-                    dist_out += str(i) + '\t' + str(column) + '\t' + \
-                        str(outMatrix.at[i, column]) + '\n'
-        with open( output + '.dist', 'w' ) as out:
-            out.write( dist_out )
-        subprocess.call( ['rm', '-rf', tmpdir], stdout = subprocess.PIPE, stderr = \
-            subprocess.PIPE )
-    elif args.distance == 'usearch':
-        findExecs( ['usearch'], exit = set('usearch') )
-        print('\nCalculating usearch alignments', flush = True)
-        runUsearch(args.fasta, output + '.dist', str(1 - args.min_id))
-        distanceMatrix = importDist( output + '.dist' )
+    attempt = 0
+    while True:
+        attempt += 1
+        if args.distance == 'needle': #elif if above lines not highlighted
+            distanceMatrix = needleMain(fastaPath, args.min_id, cpus = 1)
+        elif args.distance == 'usearch':
+            distanceMatrix = usearchMain(fastaPath, args.min_id)
+        print('\nClustering\n', flush = True)
+        clusters, tree = scipyaggd(distanceMatrix, float(args.max_dist), args.linkage)
+        if args.iterative:
+            cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
+            for gene, index in enumerate(clusters.items()):
+                if index not in cluster_dict:
+                    cluster_dict[index] = []
+                cluster_dict[index].append(gene)
+            focalLen = len(cluster_dict[clusters[focalGene]])
+            print('\tITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True)
+            print('\t\tMinimum identity: ' + str(args.min_id) + '; Maximum Distance ' + str(args.max_dist), flush = True)
+            attempt += 1
+            args.min_id += args.interval
+            args.max_dist -= args.interval
+            if focalLen >= args.minseq:
+                if args.maxseq:
+                    if focalLen <= args.maxseq:
+                        print('\t\tSUCCESS!', flush = True)
+                        break
+                else:
+                    print('\t\tSUCCESS!', flush = True)
+                    break
+            elif args.min_id >= 1:
+                eprint('\nWARNING: Minimum identity maximized, FAILED to achieve minimum sequences', flush = True)
+                break
+            elif args.max_dist <= 0:
+                eprint('\nWARNING: Maximum distance minimized, FAILED to achieve minimum sequences', flush = True)
+                break
+        else:
+            break
+            
 
-    print('\nClustering\n', flush = True)
-    clusters, tree = scipyaggd(distanceMatrix, float(args.max_dist), args.linkage)
     newick = getNewick(tree, "", tree.dist, list(distanceMatrix.index))
 
     #clusters = scikitaggd( distanceMatrix, float(args.max_dist), args.linkage )

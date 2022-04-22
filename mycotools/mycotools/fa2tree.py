@@ -30,7 +30,7 @@ def mafftRun( fasta, out_dir, hpc, verbose = True ):
     return out_dir + '/' + name + '.mafft'
 
 
-def trimRun( mafft, out_dir, hpc, tree, verbose ):
+def trimRun( mafft, out_dir, hpc, verbose ):
 
     name2 = os.path.basename(os.path.abspath(re.sub( r'\.mafft$', '.clipkit', mafft)))
     cmd = ['clipkit', mafft, '--output', out_dir + '/' + name2]
@@ -48,10 +48,10 @@ def trimRun( mafft, out_dir, hpc, tree, verbose ):
         with open( out_dir + '/clipkit.sh', 'w' ) as out:
             if '#PBS' in hpc:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    cmd + '\n\ncd ' + out_dir + '\nqsub ' + tree + '.sh' )
+                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nqsub iqtree.sh' )
             else:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    cmd + '\n\ncd ' + out_dir + '\nsbatch ' + tree + '.sh' )
+                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nsbatch iqtree.sh' )
     
     return out_dir + '/' + name2
 
@@ -73,7 +73,7 @@ def iqtreeRun( clipkit_file, out_dir, hpc, verbose, fast = False ):
             sys.exit(6)
     else: 
         with open( out_dir + '/iqtree.sh', 'w' ) as out:
-            out.write( hpc + '\n\n' + cmd )
+            out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) )
 
 
 def main( 
@@ -111,7 +111,7 @@ def main(
     else:
         vprint('\nAlignment exists ...', v = verbose, flush = True)
     if not os.path.isfile( clipkit ):
-        clipkitOut = trimRun( mafft, out_dir, hpc, tree, verbose )
+        clipkitOut = trimRun( mafft, out_dir, hpc, verbose )
     else:
         vprint('\nTrim exists ...', v = verbose , flush = True)
 
@@ -157,10 +157,6 @@ if __name__ == '__main__':
         eprint('\nERROR: no input', flush = True)
         sys.exit(7)
 
-    if args.tree not in { 'fasttree', 'iqtree' }:
-        eprint('\nERROR: invalid tree software: ' + args.tree , flush = True)
-        sys.exit(1)
-
     findExecs( ['iqtree', 'mafft', 'clipkit'] )
 
     if args.fasta:
@@ -171,7 +167,7 @@ if __name__ == '__main__':
         alignment = True
     if os.path.isfile(input_check):
         main( 
-            input_check, args.tree, slurm = args.slurm, 
+            input_check, slurm = args.slurm, 
             pbs = args.pbs, project = args.project,
             output_dir = output, verbose = True, alignment = alignment
             )
