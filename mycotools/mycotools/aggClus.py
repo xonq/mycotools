@@ -283,7 +283,7 @@ if __name__ == '__main__':
         clusters, tree = scipyaggd(distanceMatrix, float(args.max_dist), args.linkage)
         if args.iterative:
             cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
-            for gene, index in enumerate(clusters.items()):
+            for gene, index in clusters.items():
                 if index not in cluster_dict:
                     cluster_dict[index] = []
                 cluster_dict[index].append(gene)
