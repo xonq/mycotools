@@ -528,7 +528,7 @@ identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 
 Iteratively cluster until a cluster size of 50-200 genes is achieved:
 ```bash
-(mycotools) -$ aggClus.py -f <FASTA> -m 0.2 -x 0.7 --iterative --minseq 50 --maxseq 200
+(mycotools) -$ aggClus.py -f <FASTA> -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
 ```
 
 
