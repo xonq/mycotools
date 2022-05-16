@@ -20,7 +20,10 @@ from mycotools.acc2loci import main as acc2loci
 from mycotools.gff2svg import main as gff2svg
 from mycotools.db2search import main as db2search
 from mycotools.utils.og2mycodb import mycodbOGs, extractOGs
-from ete3 import Tree, faces, TreeStyle
+try:
+    from ete3 import Tree, faces, TreeStyle
+except ImportError:
+    raise ImportError('Install ete3 into your conda environment via `conda install ete3`')
 import argparse, re, sys, os, datetime, multiprocessing as mp
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
