@@ -37,7 +37,8 @@
 <br />
 
 - **MYCOTOOLS PIPELINES**
-    - [Phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-pipelines)
+	- [Phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
+	- [Cluster Reconstruction and Phylogenetic Analysis (CRAP)](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crap.py)
 
 
 ---
@@ -665,3 +666,67 @@ select the clade of interest as described in step 6a.
 <br />
 
 6b. Repeat the analysis at step 4a until a final phylogeny is obtained.
+
+
+<br /><br />
+
+
+## Cluster Reconstrunction and Phylogenetic Analysis (CRAP)
+### crap.py
+CRAP (originally created by Jason Slot) is a simple, elegant pipeline for
+studying the evolution of a gene cluster on a gene-by-gene basis. CRAP 
+will input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
+or orthogroup-based approach to find homologs in the MycotoolsDB, construct 
+phylogenies of each query sequence, and map locus synteny diagrams onto the 
+leaves of the phylogenies.
+
+`crap.py` can operate on a query of MycotoolsDB accessions or a standalone
+multifasta input of external accessions. Following homolog acquisition,
+`crap.py` will submit each set of hits for tree building or agglomerative
+clustering if the number of sequences exceeds the inputted maximum (`-m`).
+
+By default, `crap.py` will construct trees using 1000 bootstrap iterations
+of IQTree with the ModelFinder module. Alternatively `-f` can be specified
+for `fasttree`.
+
+To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
+```bash
+(mycotools) -bash-4.2$ crap.py -i <QUERYGENES> -d <MYCOTOOLSDB2search> -s blastp --fast --bitscore 40 --cpu 12
+```
+
+`crap.py` can reoutput (`-r`) using overwritten tree files. This allows the
+user to root the trees and reupload.
+
+<br />
+
+```bash
+(mycotools) -bash-4.2$ crap.py -h
+usage: crap.py [-h] -i INPUT [-d DATABASE] [-s SEARCH] [-og ORTHOGROUPS] [-p PLUSMINUS] [-m MAXIMUM] [-f] [--interval INTERVAL]
+               [-b BITSCORE] [-g GFF] [-r] [-o OUTPUT] [-c CPU] [-v]
+
+Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        Fasta or white-space delimited file/string of cluster genes
+  -d DATABASE, --database DATABASE
+  -s SEARCH, --search SEARCH
+                        Search binary {mmseqs, blastp} for search-based CRAP
+  -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
+                        MycotoolsDB Orthogroup tag for OG searches. DEFAULT: P for phylum
+  -p PLUSMINUS, --plusminus PLUSMINUS
+                        Genes up-/downstream to analyze from loci. DEFAULT: 7
+  -m MAXIMUM, --maximum MAXIMUM
+                        Max sequences for trees/min for aggClus.py. DEFAULT: 250
+  -f, --fast            Fasttree
+  --interval INTERVAL   Agglomerative clustering identity/distance interval. DEFAULT: 0.05
+  -b BITSCORE, --bitscore BITSCORE
+                        Bitscore minimum for search algorithm. DEFAULT: 30
+  -g GFF, --gff GFF     GFF for non-mycotools input. Requires -s and a fasta for -i
+  -r, --reoutput        Reoutput - permits replacing tree file, e.g. w/a rooted version
+  -o OUTPUT, --output OUTPUT
+                        Output base dir
+  -c CPU, --cpu CPU
+  -v, --verbose
+```
