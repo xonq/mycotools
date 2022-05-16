@@ -33,7 +33,7 @@ def grabOutput( output_pref ):
     return gff2list( gtf[0] ), fa2dict( proteome[0] )
 
 
-def intron2exon( gff ):
+def intron2exon( gff, gene_comp = re.compile( r'gene_id \"(.*?)\"' ) ):
     '''
     Inputs: gff_dict
     Outputs: gff_dict with introns converted to exons
@@ -56,7 +56,6 @@ def intron2exon( gff ):
     '''
 
     gff1, gene_info = [], {}
-    gene_comp = re.compile( r'gene_id \"(.*?)\"' )
     for entry in gff:
         if int(entry['start']) > int(entry['end']):
             start, end = copy.deepcopy(entry['start']), copy.deepcopy(entry['end'])
@@ -591,16 +590,12 @@ def addExons( gff ):
     return gff
 
 
-def main( gff_path, fasta_path, prefix, fail = True ):
+def main( gff_path, prefix, fail = True ):
 
     if isinstance(gff_path, str):
         gff = gff2list( gff_path )
     elif isinstance(gff_path, list):
         gff = gff_path
-    if isinstance(fasta_path, str):
-        assembly = fa2dict( fasta_path )
-    elif isinstance(fasta_path, dict):
-        assembly = fasta_path
 
     if gff_path.endswith( 'gtf' ) or re.search(gtfComps()['id'], gff[0]['attributes']) is not None:
         exonGtf = intron2exon( gff )
@@ -619,9 +614,8 @@ def main( gff_path, fasta_path, prefix, fail = True ):
     crude_sort = sorted( unsortedGff, key = lambda x: \
         int( re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1] ))
     gff = sortGFF(crude_sort, id_comp)
-    fa = gff2proteome( gff, assembly )
  
-    return gff, fa, trans_str, failed, flagged
+    return gff, trans_str, failed, flagged
 
 
 def sortMain(gff, prefix):
@@ -641,7 +635,10 @@ if __name__ == '__main__':
         '#### is the is the index from ordered accessions. If you are planning' + \
         ' on using OrthoFiller, you may want to wait to not mix accessions.' )
     parser.add_argument( '-g', '--gff', required = True, help = '.gtf, .gff/.gff3' )
-    parser.add_argument( '-f', '--fasta', help = 'Assembly fasta' )
+    parser.add_argument( 
+        '-a', '--assembly', 
+        help = 'Assembly fasta for proteome export' 
+        )
     parser.add_argument( '-p', '--prefix', required = True,
         help = 'Accession prefix' )
     parser.add_argument( '-s', '--sort', action = 'store_true',
@@ -672,12 +669,15 @@ if __name__ == '__main__':
         eprint('\nERROR: "_" not allowed in prefix\n', flush = True)
         sys.exit(1)
 
-    gff, fa, trans_str, failed, flagged = main(
-        formatPath(args.gff), formatPath(args.fasta), args.prefix, args.fail
+    gff, trans_str, failed, flagged = main(
+        formatPath(args.gff), args.prefix, args.fail
         )
+    if args.fasta:
+        fna = fasta2dict(formatPath(args.fasta))
+        faa = gff2proteome( gff, fna )
+        with open( output + '.aa.fa', 'w' ) as out:
+            out.write( dict2fa( faa ) )
 
-    with open( output + '.aa.fa', 'w' ) as out:
-        out.write( dict2fa( fa ) )
     with open( output + '.gff3', 'w' ) as out:
         out.write( list2gff( gff ) + '\n' )
     with open( output + '.transitions', 'w' ) as out:

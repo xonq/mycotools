@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 
-import pandas as pd
+#import pandas as pd
 import os, sys, argparse, re
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
-from mycotools.lib.dbtools import db2df, masterDB
+from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import formatPath, eprint
 
 
@@ -48,58 +48,37 @@ def extractHeaders( fasta_file, accessions, ome = None ):
     return out_fasta
    
 
-def dbmain( db, accs, column = None, start = None, end = None ):
+def dbmain( db, accs ):
 
-    fasta_str = ''
+    fa_dict = {}
     db = db.set_index( 'internal_ome' )
-    if not isinstance(accs, str):
-        omes_prep = re.findall( r'^.*?_', '\n'.join(list(accs[ column ])), re.M )
-        omes = set( x[:-1] for x in omes_prep )
-        accs = accs.set_index( column )
-        for ome in list(omes):
-            accessions = [ x for x in accs.index if x.startswith( ome + '_' ) ]
-            if start:
-                accessions = [
-                    x + '[' + accs[start][x] + '-' + accs[end][x] + ']' \
-                    for x in accessions
-                    ]
-            fasta = os.environ['MYCOFAA'] + '/' + db['proteome'][ome]
-            fasta_str += dict2fa(extractHeaders( fasta, accessions )) + '\n'
-    else:
-        omes_prep = re.search( r'(^.*?)_', accs )
-        if omes_prep is None:
-            eprint('\nERROR: invalid accession for database search', flush = True)
-            sys.exit( 5 )
-        fasta = os.environ['MYCOFAA'] + '/' + db['proteome'][omes_prep[1]]
-        fasta_str += dict2fa(extractHeaders( fasta, [accs] ))
+    omes = set([x[:x.find('_')] for x in accs])
+    for ome in omes:
+        accessions = [x for x in accs if x.startswith(ome + '_')]
+        fasta = os.environ['MYCOFAA'] + '/' + db[ome]['proteome']
+        fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
+        fasta = formatPath('$MYCOFAA/' + ome + '.aa.fa')
+        fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
+#            fasta_str += dict2fa(extractHeaders( fasta, accessions )) + '\n'
+#        fasta_str += dict2fa(extractHeaders( fasta, [accs] ))
 
-    return fasta_str
+    return fa_dict
 
 
-def famain( accs, fa, column = None, ome = None, start = None, end = None ):
+def famain( accs, fa, ome = None ):
 
-    fasta_str = ''
-    if type(accs) is not str:
-        accs = accs.set_index( column )
-        accessions = list(accs.index)
-        if start:
-            accessions = [
-                x + '[' + accs[start][x] + '-' + accs[end][x] + ']' \
-                for x in accessions
-                ]
-        fasta_str += dict2fa(extractHeaders( fa, accessions, ome )) + '\n'
-    else:
-        fasta_str += dict2fa(extractHeaders( fa, [accs], ome ))
+    fa_dict = {}
+    fa_dict = {**fa_dict, **extractHeaders( fa, accs, ome )}
         
-    return fasta_str.rstrip()
+    return fa_dict
 
 
-def main( accs_str_or_df, column = None, db = None, fa = None, start = None, end = None ):
+#def main( accs_str_or_df, column = None, db = None, fa = None, start = None, end = None ):
 
-    if db and not fa:
-        return dbmain(db, accs_str_or_df, column = column, start = start, end = end)
-    elif not db and fa:
-        return famain(accs_str_or_df, fa, column, start, end)
+ #   if db and not fa:
+  #      return dbmain(db, accs_str_or_df, column = column, start = start, end = end)
+   # elif not db and fa:
+    #    return famain(accs_str_or_df, fa, column, start, end)
 
 
 if __name__ == '__main__':
@@ -110,41 +89,43 @@ if __name__ == '__main__':
     parser.add_argument( '-a', '--accession', help = 'Input accession. For coordinates ' + \
         'append [$START-$END] - accepts reverse coordinates for nucleotide accessions' )
     parser.add_argument( '-f', '--fasta', help = 'Fasta input' )
-    parser.add_argument( '-c', '--column', default = 0, help = 'Accessions column. Must be specified if there ' \
-        + 'are headers. Otherwise, the default is the first tab separated column' )
-    parser.add_argument( '-s', '--start', help = 'Start index column. Will subtract 1 from this (python is ' \
-        + 'a 0 based language)' )
-    parser.add_argument( '-e', '--end', help = 'End index column' )
+    parser.add_argument( '-c', '--column', default = 1, help = 'Accessions column (1 indexed). DEFAULT: 1', type = int )
+    parser.add_argument( '-s', '--start', help = 'Start index column (1 indexed)', type = int )
+    parser.add_argument( '-e', '--end', help = 'End index column (1 indexed)', type = int )
     parser.add_argument( '-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master' )
     args = parser.parse_args()
 
     if args.input:
         input_file = formatPath( args.input )
-        if args.column == 0:
-            df = pd.read_csv(input_file, sep = '\t', header = None)
+        if args.start:
+            with open(input_file, 'r') as raw:
+                accs = []
+                for line in raw:
+                    if not line.startswith('#'):
+                        d = line.rstrip().split('\t')
+                        accs.append([
+                            d[args.column-1] + '[' + d[args.start-1] + '-' + d[args.end-1] + ']'
+                            ])
         else:
-            df = pd.read_csv(input_file, sep = '\t')
-
+            with open(input_file, 'r') as raw:
+                accs = [x.rstrip().split('\t')[args.column-1] for x in raw]
+    else:
+        accs = [args.accession]
+       
     db_path = formatPath( args.database )
-
     if not args.fasta:
-        db = db2df( formatPath(args.database) )
-        if args.accession:
-            fasta_str = dbmain( db, args.accession )
-        else:
-            fasta_str = dbmain( db, df, column = args.column, start = args.start, end = args.end )
-
+        db = mtdb( formatPath(args.database) )
+        fa_dict = dbmain( db, accs )
+        fasta_str = dict2fa(fa_dict)
     else:
         fa_path = formatPath( args.fasta )
-        if args.accession:
-            fasta_str = famain( args.accession, fa_path )
-        else:
-            fasta_str = famain( df, fa_path, column = args.column, start = args.start, end = args.end )
+        fa_dict = famain( accs, fa_path )
+        fasta_str = dict2fa(fa_dict)
 
-    if not args.accession:
-        with open( input_file + '.fa', 'w' ) as out:
-            out.write( fasta_str )
-    else:
-        print( fasta_str.rstrip() , flush = True)
+#    if not args.accession:
+ #       with open( input_file + '.fa', 'w' ) as out:
+  #          out.write( fasta_str )
+   # else:
+    print( fasta_str.rstrip() , flush = True)
 
     sys.exit( 0 )

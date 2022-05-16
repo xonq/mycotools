@@ -2,27 +2,15 @@
 
 from mycotools.lib.kontools import eprint, formatPath, file2list
 from mycotools.lib.dbtools import masterDB, db2df
-from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, grabGffAcc
+from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, grabGffAcc, gff3Comps
 import sys, os, re, argparse, pandas as pd, multiprocessing as mp
 
 
-def grabFiles( accession, db ):
-
-    ome = re.search( r'(.*?)_', accession )
-    if ome is not None:
-        ome = ome[1]
-        if not pd.isnull( db.at[ome, 'gff3'] ):
-            gff = formatPath( '$MYCOGFF3/' + db.at[ome, 'gff3'] )
-        else:
-            print( 'ERROR: ' + ome + ' gff not detected' , flush = True)
-        if not pd.isnull( db.at[ome, 'proteome'] ):
-            prot = formatPath( '$MYCOFAA/' + db.at[ome, 'proteome'] )
-        else:
-            prot = None
-    else:
-        print( 'ERROR: ' + accession + ' ome not detected' , flush = True)
-        gff, prot = None, None
-        
+def grabFiles( ome ):
+    gff = formatPath( '$MYCOGFF3/' + ome + '.gff3' )
+    if not os.path.isfile(gff):
+        print( 'ERROR: ' + ome + ' gff not detected' , flush = True)
+    prot = formatPath( '$MYCOFAA/' + ome + '.aa.fa' )
     return gff, prot
 
 
@@ -51,10 +39,10 @@ def prepFaaOutput( hit_list, proteome_path ):
     return dict2fa( clus_fa )
 
 
-def compileCDS( gff_dict ):
+def compileCDS( gff_list ):
 
     gene = False
-    for entry in gff_dict:
+    for entry in gff_list:
         if entry['type'] == 'CDS':
             break
         else:
@@ -75,14 +63,14 @@ def compileCDS( gff_dict ):
 
     if gene:
         mRNA_dict = {}
-        for entry in [ x for x in gff_dict if x['type'] == 'mRNA' ]:
+        for entry in [ x for x in gff_list if x['type'] == 'mRNA' ]:
             gene = re.search( r'Alias=([^;]*)', entry['attributes'] )[1]
             mRNA = re.search( r'ID=([^;]*)', entry['attributes'] )[1]
             mRNA_dict[mRNA] = gene
 
 
     cds_dict = {}
-    for entry in gff_dict:
+    for entry in gff_list:
         if entry['type'] == 'CDS':
             if entry['seqid'] not in cds_dict:
                 cds_dict[ entry['seqid'] ] = {}
@@ -101,15 +89,15 @@ def compileCDS( gff_dict ):
     return cds_dict
 
 
-def compileCDS_mycotools(gff_dict, ome):
+def compileCDS_mycotools(gff_list):
     '''
-    Inputs the gff_dict and organism ome code. Compiles CDS entries for loci parsing and outputs:
+    Inputs the gff_list and organism ome code. Compiles CDS entries for loci parsing and outputs:
     cds_dict = {contig: {protein: [[CDSstart, CDSstop]] } }
     Sorts the cds_dict for each protein from smallest to largest
     '''
 
     cds_dict, fail = {}, False
-    for entry in gff_dict:
+    for entry in gff_list:
         if entry['type'] == 'CDS':
             if entry['seqid'] not in cds_dict:
                 cds_dict[entry['seqid']] = {}
@@ -124,7 +112,7 @@ def compileCDS_mycotools(gff_dict, ome):
             elif not prot:
                 print(entry['attributes'], prot_prep_i0, prot_prep_i1)
                 if not fail:
-                    print('\tWARNING: ' + ome + ' has proteins in gff with no Alias', flush = True)
+                    print('\tWARNING: proteins in gff with no Alias', flush = True)
                 fail = True
                 continue
             cds_dict[entry['seqid']][prot].extend([int(entry['start']), int(entry['end'])])
@@ -139,9 +127,8 @@ def compileCDS_mycotools(gff_dict, ome):
 
 def prepOutput( cds_dict, accession, plusminus ):
 
-    out_index = {}
+    out_index = []
     for seqid in cds_dict:
-        out_index[ seqid ] = []
         if accession in set(cds_dict[ seqid ]):
             index = cds_dict[ seqid ].index( accession )
             if index - plusminus < 0:
@@ -150,28 +137,66 @@ def prepOutput( cds_dict, accession, plusminus ):
                 lower = int(index - plusminus)
             upper = int( index + plusminus ) + 1
             for index in cds_dict[ seqid ][ lower:upper ]:
-                out_index[ seqid ].append( index )
+                out_index.append( index )
             break    
 
     return out_index
 
 
-def main( gff_dict, accession, plusminus = 10 ):
+def main( gff_list, accessions, plusminus = 10, mycotools = False, geneGff = False ):
 
-    cds_dict = compileCDS( gff_dict )
-    out_index = prepOutput( cds_dict, accession, plusminus )
- 
-    return out_index
+    out_indices = {}
+    if mycotools:
+        cds_dict = compileCDS_mycotools(gff_list)
+    else:
+        cds_dict = compileCDS( gff_list )
+    for accession in accessions:
+        out_indices[accession] = prepOutput( cds_dict, accession, plusminus )
 
-def mycotools_main(gff_path, accession, plusminus = 10):
+    out_indices = {k: v for k, v in out_indices.items() if v}
+    if geneGff:
+        geneGffs_prep = {acc: {} for acc in out_indices}
+        gene_sets = {acc: set(genes) for acc, genes in out_indices.items()}
+        for entry in gff_list:
+            if 'RNA' in entry['type']:
+                try:
+                    gene = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+                    for acc, genes in gene_sets.items():
+                        if gene in genes:
+                            geneGffs_prep[acc][gene] = entry
+#                            break # if one gene is in multiple loci it needs to show up
+                except TypeError: # no alias
+                    pass
 
-    if gff_path:
-        gff = gff2list( gff_path )
-        ome = os.path.basename(gff_path).replace('.gff3','')
-        cds_dict = compileCDS_mycotools(gff, ome)
-        accession_list = prepOutput(cds_dict, accession, plusminus)
+        geneGffs = {}
+        for acc in out_indices:
+            geneGffs[acc] = []
+            for gene in out_indices[acc]:
+                geneGffs[acc].append(geneGffs_prep[acc][gene])
+        return out_indices, geneGffs
+    return out_indices
 
-    return accession_list, accession
+
+def mycotools_main(db, accessions, plusminus = 10, cpus = 1):
+
+    acc_dict = {}
+    for acc in accessions:
+        ome = acc[:acc.find('_')]
+        if ome not in acc_dict:
+            acc_dict[ome] = []
+        acc_dict[ome].append(acc)
+
+    cmds = [
+        [gff2list(grabFiles(ome)[0]), accs, args.plusminus, True] for ome, accs in acc_dict.items()
+        ]
+    with mp.get_context('spawn').Pool(processes = cpu) as pool:
+        acc_res = pool.starmap(main, cmds)
+
+    out_indices = {}
+    for res in acc_res:
+        out_indices = {**out_indices, **res}
+
+    return out_indices
 
 
 if __name__ == '__main__':
@@ -210,17 +235,13 @@ if __name__ == '__main__':
 #        if not args.faa:
  #           print('\nERROR: no proteome', flush = True)
   #          sys.exit( 3 )
-        for accession in accessions:
-            out_indices[accession] = main( gff, accession, args.plusminus )
+        out_indices = main( gff, accession, args.plusminus )
     else:
         db = db2df( formatPath( masterDB() ) ).set_index('internal_ome')
-        cmds = []
-        for accession in accessions:
-            cmds.append([grabFiles(accession,db)[0], accession, args.plusminus])
-        with mp.get_context('spawn').Pool(processes = cpu) as pool:
-            acc_res = pool.starmap(mycotools_main, cmds)
-        for i in acc_res:
-            out_indices[i[1]] = i[0] 
+        out_indices = mycotools_main(db, accessions, plusminus = 10, cpus = args.cpus)
+
+#        for i in acc_res:
+ #           out_indices[i[1]] = i[0] 
 
     if args.output:
         for accession in out_indices:
@@ -247,10 +268,10 @@ if __name__ == '__main__':
                             out.write( prot_str )
     else:
         for accession in out_indices:
-            print('\n' + accession + ' locus +/- ' + str(args.plusminus), flush = True)
+#            print('\n' + accession + ' locus +/- ' + str(args.plusminus), flush = True)
             for hit in out_indices[accession]:
                 for index in out_indices[accession][ hit ]:
                     print( index , flush = True)
-        print(flush = True)
+            print(flush = True)
  
     sys.exit( 0 )

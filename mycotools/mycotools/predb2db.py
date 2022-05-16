@@ -1,402 +1,327 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 
-#NEED TO FORCE PROTEOME GENERATION AS A METHOD OF COMPATIBILITY CHECKING BEFORE INTEGRATION
-#NEED TO CUR INTRONS TO EXONS FOR NCBI
-
-import argparse, os, sys, subprocess, re, shutil, datetime, numpy as np
-from mycotools.lib.kontools import outro, intro, eprint, gunzip, formatPath
-from mycotools.lib.biotools import list2gff, gff2list, fa2dict, dict2fa
-from mycotools.lib.dbtools import db2df, df2db, gen_omes, masterDB, df2std, loginCheck, gather_taxonomy, assimilate_tax
+import sys, os, re, shutil, multiprocessing as mp
+from mycotools.lib.kontools import gunzip, mkOutput, formatPath, eprint, vprint
+from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
+    gff3Comps, gff2Comps
+from mycotools.lib.dbtools import mtdb, masterDB, loginCheck
+from mycotools.curAnnotation import main as curRogue
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
-from mycotools.utils.curProteomes import curate as curProteome
-from mycotools.gff2seq import aamain as gff2prot
-from mycotools.curAnnotation import main as curRogue
-from Bio import Entrez
-import pandas as pd
+from mycotools.gff2seq import aamain as gff2seq
 
+predbHeaders = [
+    'genomeCode', 'genus', 'species', 'strain',
+    'version', 'biosample',
+    'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
+    'useRestriction (yes/no)', 'publication'
+    ]
 
-def fixVerDate(db):
-
-    db['version'] = db['version'].astype(str)
-    db['version'] = db['version'].replace('-','').replace(' 00:00:00','')
-
-    return db
-
-
-def checkGff3(gff_dict, ome):
-
-    mrna = [x for x in gff_dict if x['type'].lower() == 'mrna']
-    if mrna:
-        try:
-            aliases = [re.search(r'Alias=([^;]+)', x['attributes'])[1] for x in mrna]
-            if not all(x.startswith(ome) for x in aliases):
-                old_ome = re.search(r'([^_]*)', aliases[0])[1]
-                return set(aliases), old_ome
-            else:
-                return set(aliases), ome
-        except IndexError:
-            pass
-
-
-def checkProt(fa_dict, aliases):
-
-    fa_accs = list(fa_dict.keys())
-    return set(fa_accs).difference(aliases)
-
-    
-def predb2db( pre_db ):
-
-    start_time = datetime.datetime.now()
-    date = start_time.strftime('%Y%m%d')
-    keys = [
-        'genome_code', 'genus', 'biosample', 'strain',
-        'proteome_path', 'jgi_gff2_path', 'publication',
-        'gff3_path', 'assembly_path', 'source', 'internal_ome',
-        'version', 'taxonomy'
+def prepOutput(base_dir):
+    out_dir = mkOutput(base_dir, 'predb2db')
+    wrk_dir = out_dir + 'working/'
+    dirs = [
+        out_dir, wrk_dir, wrk_dir + 'gff/', wrk_dir + 'fna/', wrk_dir + 'faa/'
         ]
-    data_dict_list = []
-    for key in keys:
-        if key not in pre_db.columns:
-            pre_db[key] = ''
-    for i, row in pre_db.iterrows():
-        if pd.isnull( row['species'] ):
-            row['species'] = 'sp.'
-        data_dict_list.append( {
-            'internal_ome': row['internal_ome'],
-            'genome_code': row['genome_code'],
-            'genus': row['genus'],
-            'biosample': row['biosample'],
-            'strain': row['strain'],
-            'version': row['version'],
-            'ecology': '',
-            'eco_conf': '',
-            'species': row['species'],
-            'proteome': row['proteome_path'],
-            'gff': row['jgi_gff2_path'],
-            'gff3': row['gff3_path'],
-            'assembly': row['assembly_path'],
-            'taxonomy': row['taxonomy'],
-            'source': row['source'],
-            'published': row['publication'],
-            'acquisition_date': int(date)
-        } )
+    for dir_ in dirs:
+        if not os.path.isdir(dir_):
+            os.mkdir(dir_)
+    return dirs[:2]
 
-    new_db = pd.DataFrame( data_dict_list )
-
-    return new_db
-
-
-def copyFile( old_path, new_path, ome, typ ):
+def copyFile( old_path, new_path ):
 
     try:
         shutil.copy( old_path, new_path )
         return True
     except:
-        eprint('\t' + ome + '\tcopy ' + typ + ' failed' , flush = True)
-        return False
+        raise IOError
 
 
-def moveBioFile( old_path, ome, typ, env, uncur = '' ):
+def moveBioFile( old_path, ome, typ, wrk_dir, suffix = '' ):
 
     if old_path.endswith('.gz'):
         if not os.path.isfile(old_path[:-3]):
             temp_path = gunzip(old_path)
             if temp_path:
-                new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
+                new_path = wrk_dir + ome + '.' + typ +  suffix
             else:
-                return False
+                raise IOError
         else:
-            new_path = os.environ[env] + '/' + ome + '.' + typ + uncur
+            new_path = wrk_dir + ome + '.' + typ + suffix
             temp_path = old_path[:-3]
-        if not copyFile(formatPath(temp_path), new_path, ome, typ):
-            return False
+        copyFile(formatPath(temp_path), new_path)
     else:
-        new_path = os.environ[env] + '/' + ome + '.' + typ +  uncur
+        new_path = wrk_dir + ome + '.' + typ +  suffix
         if not os.path.isfile(new_path) and os.path.isfile(old_path):
-            if not copyFile(formatPath(old_path), new_path, ome, typ):
-                return False
+            copyFile(formatPath(old_path), new_path)
         elif not os.path.isfile(new_path):
-            return False
-        else: 
-            if not copyFile(formatPath(old_path), new_path, ome, typ):
-                return False
-
-    return os.path.basename(new_path)
-
-
-def main( prepdb, refdb ):
-
-    failed, to_del = [], []
-    predb = predb2db( prepdb )
-   # if 'internal_ome' not in predb.columns:
-    predb_omes = gen_omes( predb, reference = refdb )
-# this is a copout. there will be rare occassions of duplicate updates at the same time
-# in those cases, the same internal_ome will be upgraded twice. therefore, to fix this
-# I will have to identify those dual updates. At present, this will be mitigated through
-# a second update
-    predb_omes = predb_omes.drop_duplicates('internal_ome')
-#    else:
- #       predb_omes = predb
-  #      predb_omes['internal_ome'] = predb['internal_ome']
-
-    for key in ['assembly', 'proteome', 'gff', 'gff3']:
-        if key not in predb_omes.columns:
-            predb_omes[key] = np.nan
-
-    ## need to multiprocess here
-    print('\nCopying to database', flush = True)
-    for i, row in predb_omes.iterrows():
-        gff3, proteome = False, False
-        if not pd.isnull( row['assembly'] ) and row['assembly']:
-            new_path = moveBioFile( row['assembly'], row['internal_ome'], 'fa', 'MYCOFNA' )
-            if new_path:
-                predb_omes.at[i, 'assembly'] = new_path
-            else:
-                if row['source'] == 'ncbi':
-                    failed.append([row['biosample'], row['version']])
-                else:
-                    failed.append([row['genome_code'], row['version']])
-                to_del.append(i)
-                continue
+            raise IOError
         else:
-            eprint('\t' + row['internal_ome'] + ' no assembly, removing entry', flush = True)
-            if row['source'] == 'ncbi':
-                failed.append([row['biosample'], row['version']])
-            else:
-                failed.append([row['genome_code'], row['version']])
-            to_del.append(i)
-            continue
+            copyFile(formatPath(old_path), new_path)
 
-        if not pd.isnull(row['gff3']) and row['gff3']:
-            new_path = moveBioFile( row['gff3'], row['internal_ome'], 'gff3', 'MYCOGFF3', uncur = '.uncur' )
-            predb_omes.at[i, 'gff3'] = new_path
-            if new_path:
-                if row['source'].lower() in {'ncbi', 'jgi'}:
-                    try:
-                        new_gff = curGFF3(formatPath('$MYCOGFF3/' + new_path), row['internal_ome'])
-                        cur_gff = re.sub(r'\.uncur$', '', new_path)
-                        with open( formatPath('$MYCOGFF3/' + cur_gff), 'w' ) as out:
-                            out.write( list2gff(new_gff) )
-                        predb_omes.loc[i, 'gff3'] = cur_gff
-                        os.remove(formatPath('$MYCOGFF3/' + new_path))
-                    except KeyboardInterrupt:
-                        sys.exit(-1)
-                    except:
-                        eprint('\t' + row['internal_ome'] + ' gff3 failed curation', flush = True)
-                        if row['source'].lower() == 'ncbi':
-                            failed.append([row['biosample'], row['version']])
-                        else:
-                            failed.append([row['genome_code'], row['version']])
-                        to_del.append(i)
-                        continue
-                else:
-                    gff, fa = gff2list(formatPath('$MYCOGFF3/' + new_path)), None
-                    aliases, old_ome = checkGff3(gff, row['internal_ome'])
-                    if old_ome != row['internal_ome']:
-                        with open(formatPath('$MYCOGFF3/' + new_path), 'r') as raw:
-                            data = raw.read()
-                        with open(formatPath('$MYCOGFF3/' + new_path), 'w') as out:
-                            out.write(re.sub(old_ome, row['internal_ome'], data))
-                        gff = gff2list(formatPath('$MYCOGFF3/' + new_path))
-                    if aliases:
-#                        if not pd.isnull(row['proteome']) and row['proteome']:
- #                           fa = fa2dict(formatPath(row['proteome']))
-  #                          acc_check = checkProt(fa, aliases)
-  #                      else:
-                        assembly = fa2dict(formatPath('$MYCOFNA/' + row['assembly']))
-                        fa = gff2prot(gff, assembly)
-                        acc_check = checkProt(fa, aliases)
-                        if acc_check:
-                            eprint('\t' + row['internal_ome'] + ' discrepant curation', flush = True)
-                            failed.append([row['genome_code'], row['version']])
-                            os.remove(formatPath('$MYCOGFF3/' + new_path))
-                            predb_omes.at[i, 'gff3'] = None
-                            predb_omes.at[i, 'proteome'] = None
-                        else:
-                            os.rename(
-                                formatPath('$MYCOGFF3/' + new_path), 
-                                formatPath('$MYCOGFF3/' + row['internal_ome'] + '.gff3')
-                                )
-                            predb_omes.at[i, 'gff3'] = row['internal_ome'] + '.gff3'
-                            if old_ome == row['internal_ome']:
-                                with open(formatPath('$MYCOFAA/' + row['internal_ome']) + '.aa.fa', 'w') as out:
-                                    out.write(dict2fa(fa))
-                            else:
-                                 with open(formatPath('$MYCOFAA/' + row['internal_ome']) + '.aa.fa', 'w') as out:
-                                     out.write(re.sub(old_ome, row['internal_ome'], dict2fa(fa)))
-                            predb_omes.at[i, 'proteome'] = row['internal_ome'] + '.aa.fa'
-                            proteome = True
-                    else:
-                        try:
-                            gff, fa, trans_str, rog_failed, flagged = curRogue(
-                                os.environ['MYCOGFF3'] + '/' + row['gff3'],
-                                os.environ['MYCOFNA'] + '/' + row['assembly'],
-                                row['internal_ome']
-                                )
-                            cur_gff = re.sub(r'\.uncur$', '', row['gff3'])
-                            with open(formatPath('$MYCOGFF3/' + cur_gff), 'w') as out:
-                                out.write(list2gff(gff))
-                            os.remove( formatPath('$MYCOGFF3/' + row['gff3'] ))
-                            predb_omes.at[i, 'gff3'] = cur_gff
-                            cur_prot = re.sub(r'\.uncur$', '', row['proteome'])
-                            with open(formatPath('$MYCOFAA/' + cur_prot), 'w') as out:
-                                out.write(dict2fa(fa))
-                            os.remove( formatPath('$MYCOFAA/' + row['proteome'] ) )
-                            predb_omes.at[i, 'proteome'] = cur_prot    
-                            proteome = True
-                        except KeyboardInterrupt:
-                           sys.exit(-1)
-                        except:
-                            eprint('\t' + row['internal_ome'] + ' rogue curation failed. ' +
-                                'Manually curate', flush = True)
-                            failed.append([row['genome_code'], row['version']])
-                            to_del.append(i)
-                            continue
+    return new_path
+
+
+def genPredb():
+    example = [
+        'Fibsp1', 'Fibularhizoctonia', 'psychrophila', 'CBS',
+        '1.0', 'n', '<PATH/TO/ASSEMBLY>', '<PATH/TO/GFF3>', 'jgi',
+        'no', '2018'
+        ]
+    eprint('INSTRUCTIONS: fill in each column with the relevant information and ' + \
+        'separate each column by a tab. The predb can be filled in ' + \
+        'via spreadsheet software and exported as a tab delimited `.tsv`. ' + \
+        'Alternatively, use a plain text editor and separate by tabs. ' + \
+        'De novo annotations produced by Funannotate/Orthofiller must be ' + \
+        'filled in as "new" for the genomeSource column. The row below is an ' + \
+        'example', flush = True)
+    outputStr = '#' + '\t'.join(predbHeaders)
+    outputStr += '\n#' + '\t'.join(example) + '\n'
+
+    return outputStr
+
+def readPredb(predb_path, spacer = '\t'):
+
+    predb = {}
+    with open(predb_path, 'r') as raw:
+        for line in raw:
+            if line.startswith('#'):
+                predb = {x: [] for x in line.rstrip().split('\t')[1:]}
+                headers = list(data.keys())
             else:
-                if row['source'] == 'ncbi':
-                    failed.append([row['biosample'], row['version']])
-                else:
-                    failed.append([row['genome_code'], row['version']])
-                to_del.append(i)
-                continue
+                entry = line.split('\t')
+                if len(entry) != len(data):
+                    eprint(spacer + 'ERROR: all columns must have an entry.', flush = True)
+                    sys.exit(3)
+                (predb[headers[i]].append(v.rstrip()) for i,v in enumerate(entry)) 
+
+    try:
+        predb['genome_code'] = predb['genomeCode']
+        del predb['genomeCode']
+    except KeyError:
+        if not 'genome_code' in predb and not 'genomeCode' in predb:
+            predb['genome_code'] = ['' for x in predb['genus']]
+    try:
+        predb['source'] = predb['genomeSource (ncbi/jgi/new)']
+        del predb['genomeSource (ncbi/jgi/new)']
+    except KeyError:
+        if not 'genomeSource' in predb and not 'source' in predb:
+            raise KeyError
+    try:
+        predb['restriction'] = predb['useRestriction (yes/no)']
+        del predb['useRestriction (yes/no)']
+        if any(x.lower() not in {'y', 'n', 'yes', 'no', ''} for x in predb['restriction']):
+            eprint(spacer + 'ERROR: useRestriction entries must be in {y, n, yes, no}', flush = True)
+            sys.exit(4)
+    except KeyError:
+        if not 'restriction' in predb and 'publication' not in predb:
+            raise KeyError
+        elif 'publication' in predb:
+            predb['restriction'] = [bool(x) for x in predb['publication']]
+
+    if any(x.lower() not in {'jgi', 'ncbi', 'new'} \
+        for x in predb['source']):
+        eprint(spacer + 'ERROR: genoemSource entries must be in {jgi, ncbi, new}', flush = True)
+        sys.exit(5)
+    for i, path in enumerate(predb['assemblyPath']):
+        predb['assemblyPath'][i] = formatPath(predb['assemblyPath'][i])
+        predb['gffPath'][i] = formatPath(predb['gffPath'][i])
+        if predb['restriction'][i].lower() in {'y', 'yes'}:
+            predb['restriction'][i] = True
+        if not predb['species'][i]:
+            predb['species'][i] = 'sp.'
+        for col in predb.keys():
+            if predb[col][i].lower() in {'n', 'no'}:
+                predb[col][i] = ''
+    return predb
+
+def predb2mtdb(predb):
+    infdb = mtdb()
+    for i, code in enumerate(predb['genus']):
+        if predb['publication'][i]:
+            toAdd = {
+                'genome_code': predb['genome_code'][i],
+                'genus': predb['genus'][i],
+                'species': predb['species'][i],
+                'strain': predb['strain'][i],
+                'version': predb['version'][i],
+                'biosample': predb['biosample'][i],
+                'assembly': predb['assemblyPath'][i],
+                'gff3': predb['gffPath'][i],
+                'source': predb['source'][i],
+                'published': predb['publication'][i]
+                }
         else:
-            if row['source'] == 'ncbi':
-                failed.append([row['biosample'], row['version']])
-            else:
-                failed.append([row['genome_code'], row['version']])
-            to_del.append(i)
-            continue       
+            toAdd = {
+                'genome_code': predb['genome_code'][i],
+                'genus': predb['genus'][i],
+                'species': predb['species'][i],
+                'strain': predb['strain'][i],
+                'version': predb['version'][i],
+                'biosample': predb['biosample'][i],
+                'assembly': predb['assemblyPath'][i],
+                'gff3': predb['gffPath'][i],
+                'source': predb['source'][i],
+                'published': not predb['restriction'][i]
+                }
+#        if predb['publication'][i]:
+ #           toAdd['published'] = predb['publication'][i]
+        infdb = infdb.append(toAdd)
+    return infdb
 
-        if not pd.isnull(row['gff']) and row['gff']:
-            if row['gff'].endswith('.gz'):
-                if os.path.isfile(row['gff'][:-3]):
-                    gff_path = row['gff'][:-3]
-                else:
-                    gff_path = gunzip(row['gff'])
-                    if not gff_path:
-                        eprint('\t' + row['internal_ome'] + ' gff2 gunzip failed', flush = True)
-                        continue
-            else:
-                gff_path = formatPath(row['gff'])
-            new_path = os.environ['MYCOGFF3'] + '/' + row['internal_ome'] + '.gff3'
-            try:
-                new_gff3 = gff2gff3(
-                    gff2list(gff_path), 
-                    row['internal_ome'], row['genome_code'], verbose = False
-                    )
-                with open( new_path, 'w' ) as out:
-                    out.write( list2gff(new_gff3) )
-                predb_omes.at[i, 'gff3'] = os.path.basename(new_path)
-            except KeyboardInterrupt:
-                sys.exit(-1)
-            except:
-                predb_omes.at[i, 'gff3'] = None
+def genOmes(newdb, refdb = None, ome_col = 'internal_ome'):
 
-        if not pd.isnull( row['proteome'] ) and row['proteome'] and not proteome:
-            new_path = moveBioFile( row['proteome'], row['internal_ome'], 'aa.fa', 'MYCOFAA', uncur = '.uncur' )
-            if new_path:
-                predb_omes.at[i, 'proteome'] = new_path
-                if row['source'].lower() in {'ncbi', 'jgi'}:
-                    try:
-                        new_prot = curProteome(formatPath('$MYCOFAA/' + new_path), row['internal_ome'])
-                        cur_prot = re.sub(r'\.uncur$', '', new_path)
-                        with open( formatPath('$MYCOFAA/' + cur_prot), 'w' ) as out:
-                            out.write( new_prot )
-                        predb_omes.loc[i, 'proteome'] = cur_prot
-                        os.remove(formatPath('$MYCOFAA/' + new_path))
-                    except KeyboardInterrupt:
-                        sys.exit(-1)
-                    except:
-                        eprint('\t' + row['internal_ome'] + ' proteome failed curation', flush = True)
+    tax_set = set(refdb['internal_ome'])
+    for i, ome in enumerate(newdb['internal_ome']):
+        if not ome:
+            name = newdb['genus'][i][:3].lower() + newdb['species'][i][:3].lower()
+            name = re.sub(r'\(|\)|\[|\]|\$|\#|\@| |\||\+|\=|\%|\^|\&|\*|\'|\"|\!|\~|\`|\,|\<|\>|\?|\;|\:|\\|\{|\}', '', name)
+            name.replace('(', '')
+            name.replace(')', '')
+            while len(name) < 6:
+                name += '.'
+            numbers = [
+                int(re.search(r'.*?(\d+$)', x)[1]) for x in list(tax_set) if x.startswith(name)
+                ]
+            numbers.sort(reverse = True)
+            if numbers:
+                number = numbers[0] + 1
             else:
-                predb_omes.at[i, 'proteome'] = None
-        elif not proteome:
-            prot_path = formatPath('$MYCOFAA/' + row['internal_ome'])
-            if not pd.isnull(row['gff3']) and row['gff3']:
-                gff = gff2list(formatPath('$MYCOGFF3/' + row['internal_ome'] + '.gff3'))
-                assembly = fa2dict(formatPath('$MYCOFNA/' + row['internal_ome'] + '.fa'))
-                fa = gff2prot(gff, assembly)
-                with open(formatPath('$MYCOFAA/' + row['internal_ome'] + '.aa.fa'), 'w') as out:
-                    out.write(dict2fa(fa))
-                predb_omes.at[i, 'proteome'] = row['internal_ome'] + '.aa.fa'
-   
- 
-    to_del.sort(reverse = True)        
-    for i in to_del:
-        predb_omes = predb_omes.drop(i)
-    del predb_omes['gff']
-   
-    db = df2std(predb_omes)
-    db = fixVerDate(db)
+                number = 1
+            newOme = name + str(number)
+            tax_set.add(newOme)
+            newdb['internal_ome'][i] = newOme
 
-    return db, failed
+    return newdb
+
+def curMngr(ome, fna_path, gff_path, wrk_dir, source, genomeCode):
+
+    try:
+        newFNA_path = moveBioFile( fna_path, ome, 'fa', wrk_dir + 'fna/' )
+    except IOError:
+        return ome, False, 'assembly'
+    try:
+        newGFF_path = moveBioFile(gff_path, ome, 'gff3', wrk_dir + 'gff/', suffix = '.uncur')
+    except IOError:
+        return ome, False, 'gff3'
+
+    gff = gff2list(newGFF_path)
+    cur_path = re.sub(r'\.uncur$', '', newGFF_path)
+
+    curGFF_path = gffMngr(ome, gff, cur_path, source, genomeCode)
+    faa = gff2seq(gff, fa2dict(newFNA_path))
+    faa_path = wrk_dir + 'faa/' + ome + '.aa.fa'
+    with open(faa_path, 'w') as out:
+        out.write(dict2fa(faa))
+
+    return ome, newFNA_path, curGFF_path, faa_path
+
+
+def gffMngr(ome, gff, cur_path, source, genomeCode):
+
+    gffVer, alias = None, False
+    for entry in gff:
+        if re.search(gff3Comps()['id'], entry['attributes']):
+            gffVer = 3
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])
+            break
+        elif re.search(gff2Comps()['id'], entry['attributes']):
+            gffVer = 2
+            break
+
+    if gffVer == 3:
+        if source == 'new':
+            if alias: #already curated
+                aliasOme = alias[1]
+                for entry in gff:
+                    alias0 = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+                    aliasNum = alias0[alias0.find('_') + 1:]
+                    newAlias = ome + '_' + aliasNum
+                    entry['attributes'] = re.sub(
+                        gff3Comps()['Alias'], 'Alias='+ newAlias,
+                        entry['attributes']
+                        )
+            else:
+                gff, trans_str, failed, flagged = curRogue(gff, ome)
+        else:
+            gff = curGFF3(gff, ome)
+    else:
+        gff = gff2gff3(gff, ome, genomeCode, verbose = False)
+
+    with open(cur_path, 'w') as out:
+        out.write(list2gff(gff))
+
+    return cur_path 
+
+def add2failed(row):
+    if row['source'] == 'ncbi':
+        return [row['biosample'], row['version']]
+    else:
+        return [row['genome_code'], row['version']]
+
+def main(
+    predb, refdb, wrk_dir, 
+    verbose = False, spacer = '\t', cpus = 1
+    ):
+
+    failed = []
+
+    infdb = predb2mtdb(predb)
+    omedb = genOmes(infdb, refdb, ome_col = 'internal_ome')
+    
+    curCmds = []
+    omedb = omedb.set_index('internal_ome')
+    for ome, row in omedb.items():
+        curCmds.append([
+            ome, row['assembly'], row['gff3'], 
+            wrk_dir, row['source'], row['genome_code']
+            ])
+    with mp.Pool(processes = cpus) as pool:
+        curData = pool.starmap(curMngr, curCmds)
+
+    for data in curData:
+        if not data[1]:
+            eprint(spacer + data[0] + ' failed ' + data[2], flush = True)
+            failed.append(add2failed(omedb[data[0]]))
+            del omedb[data[0]]
+        else:
+            ome, fnaPath, gffPath, faaPath = data
+            omedb[ome]['assembly'] = fnaPath
+            omedb[ome]['gff3'] = gffPath
+            omedb[ome]['proteome'] = faaPath
+
+    return omedb.reset_index(), failed
 
 
 if __name__ == '__main__':
+    usage = 'Generate a predb file:\npredb2db.py\n\nCreate a mycotoolsdb ' + \
+    'from a predb file:\npredb2db.py <PREDBFILE>\n\nCreate a mycotoolsdb ' + \
+    'referencing an alternative master database:\npredb2db.py <PREDBFILE> ' + \
+    '<REFERENCEDB>'
 
-    parser = argparse.ArgumentParser( 
-        description = 'Takes a .predb file (or creates one and exits), ' + 
-            'curates, moves files to database path, and updates masterDB. ' +  
-             'NOTE: "ncbi" & "jgi" should only be specified as the genome source ' + 
-             'ONLY if the gff retains the original source format. Mycotools can only ' +
-             'curate these gff formats and Funannotate and/or OrthoFiller outputs.'
-        )
-    parser.add_argument( '-p', '--predb' )
-    parser.add_argument( 
-        '-g', '--generate', action = 'store_true', 
-        help = 'Generate .predb' 
-        )
-    parser.add_argument( 
-        '-d', '--database', default = masterDB(),
-        help = 'DEFAULT: masterDB' )
-    args = parser.parse_args()
-
-    args_dict = { 
-        'Database': args.database, 
-        'Predatabase': args.predb, 
-        'Generate .predb': args.generate,
-    }
-
-
-
-    if args.generate:
-        data = 'genome_code\tgenus\tspecies\tstrain\tproteome_path' + \
-                    '\tgff3_path\tjgi_gff2_path\tassembly_path\tsource\tpublication\n'
-        with open('template.predb', 'w') as file2write:
-            file2write.write(data)
+    if any(x in {'-h', '--help', '-help'} for x in sys.argv):
+        print('\n' + usage + '\n', flush = True)
+        sys.exit(1)
+    elif len(sys.argv) == 1:
+        print(genPredb())
         sys.exit(0)
-    elif not args.predb or not args.database:
-        eprint('\nERROR: Need a `predb` and reference `db` file.\nExit code 3.', flush = True)
-        sys.exit( 3 )
+    elif len(sys.argv) == 3:
+        refDB = mtdb(formatPath(sys.argv[2]))
+    else:
+        refDB = mtdb(masterDB())
 
-    refdb = db2df( formatPath(args.database) )
-    predb = pd.read_csv(formatPath(args.predb), sep = '\t')
-
-    start_time = intro( '`.predb` to `.db`', args_dict )
-
+    from Bio import Entrez
     ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False)
     Entrez.email = ncbi_email
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
-    predb_omes_tax, failed = main( predb, refdb ) 
-    date = start_time.strftime('%Y%m%d')
-    if failed:
-        eprint('\nERROR: failures in predb2db - updates not transferred to masterDB')
-        sys.exit(79)
+    predb = readPredb(formatPath(sys.argv[1]), spacer = '\t')
+    out_dir, wrk_dir = prepOutput(os.path.dirname(formatPath(sys.argv[1])))
+    omedb, failed = main(predb, refDB, wrk_dir)
 
-    tax_dicts = gather_taxonomy(predb_omes_tax, api_key = ncbi_api)
-    new_db = assimilate_tax(predb_omes_tax, tax_dicts)
-
-    if formatPath(args.database) != masterDB():
-        df2db( new_db, 'new.db' )
-        eprint('\nUpdate outputted to new.db due to -d, manually update')
-    else:
-        update_path = os.environ['MYCODB'] + '/../log/' + date + '/'
-        if not os.path.isdir(update_path):
-            os.mkdir(update_path)
-        os.rename(masterDB(), update_path + os.path.basename(masterDB()))
-        df2db(pd.concat([new_db, refdb]), os.environ['MYCODB'] + '/' + date + '.db')
-
-    outro(start_time)
+    from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
+    tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
+    outdb = assimilate_tax(omedb, tax_dicts)
+    outdb.df2db(out_dir + 'predb2db.db')
+    sys.exit(0)

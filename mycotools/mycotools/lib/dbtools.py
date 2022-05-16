@@ -22,7 +22,7 @@ class mtdb(dict):
             'genome_code', 'acquisition_date']
         if not db:
             if not index:
-                super().__init__({x: {} for x in self.columns})
+                super().__init__({x: [] for x in self.columns})
             else:
                 super().__init__()
         elif isinstance(db, dict):
@@ -43,6 +43,28 @@ class mtdb(dict):
             super().__init__(mtdb.db2df(self, db))
         self.index = index
 
+    def pd2mtdb(df): # legacy integration
+        df.fillna('')
+        db = mtdb({
+            'internal_ome': list(df['internal_ome']),
+            'genus': list(df['genus']),
+            'species': list(df['species']),
+            'strain': list(df['strain']),
+            'version': list(df['version']),
+            'biosample': list(df['biosample']),
+            'assembly': list(df['assembly']),
+            'proteome': list(df['proteome']),
+            'gff3': list(df['gff3']),
+            'taxonomy': list(df['taxonomy']),
+            'ecology': list(df['ecology']),
+            'eco_conf': list(df['eco_conf']),
+            'source': list(df['source']),
+            'published': list(df['published']),
+            'genome_code': list(df['genome_code']),
+            'acquisition_date': list(df['acquisition_date'])
+            })
+        return db
+        
 
     def db2df(self, db_path):
         df = {x: [] for x in self.columns}
@@ -60,9 +82,10 @@ class mtdb(dict):
 
 
     def df2db(self, db_path = None, headers = False):
-        df = copy.deepcopy(self).reset_index()
-        output = df.set_index('internal_ome') # does this work if its not an inplace change
-        if not db_path:
+        df = copy.copy(self)
+        df = df.reset_index()
+        output = self.set_index('internal_ome') # does this work if its not an inplace change
+        if db_path:
             with open(db_path, 'w') as out:
                 if headers:
                     out.write('\t'.join([
@@ -95,7 +118,9 @@ class mtdb(dict):
 
 
     def set_index(self, column = 'internal_ome', inplace = False):
-        data, retry, error, df = {}, bool(column), False, copy.deepcopy(self)
+        data, retry, error, df = {}, bool(column), False, copy.copy(self)
+        if not column:
+            return df.reset_index()
         while retry:
             oldCol = set()
             try:
@@ -132,27 +157,13 @@ class mtdb(dict):
                             break
 
             retry = False
-#        if not column:
- #           firstRow = self[list(self.keys())[0]]
-  #          otherCol = list(set(self.columns).intersection(
-   #             set(firstRow.keys())
-    #            ))
-     #       data = {x: [] for x in self.columns}
-      #      for key in self:
-       #         data[self.index].append(key)
-        #        for col in otherCol:
-         #           data[col].append(self[key][col])
-#        if inplace: #not sure how to make this work yet without outputting double col
- #           self.__init__(data, column)
-  #      else:
         return mtdb(data, column)
 
     def reset_index(self):
-        df = copy.deepcopy(self)
+        df = copy.copy(self)
         if df.index:
             data = {x: [] for x in mtdb().columns}
             data[df.index] = list(df.keys())
-#            otherCol = set(df.columns).difference({df.index})
             if df.index in {'genome_code', 'internal_ome', 'biosample', 'assembly', 'gff3', 'proteome'}:
                 for key in df:
                     for otherCol in df[key]:
@@ -163,8 +174,20 @@ class mtdb(dict):
                         for otherCol in v:
                             data[otherCol].append(v[otherCol])
             return mtdb(data, index = None)
-        self.index = None
-        return self
+        else:
+            return df
+
+    def append(self, info = {}):
+#        if any(x not in set(self.columns) for x in info):
+ #           raise KeyError('Invalid keys: ' + str(set(info.keys()).difference(set(self.columns))))
+        index = self.index
+        df = copy.copy(self)
+        df = df.reset_index()
+        info = {**info, **{k: None for k in set(self.columns).difference(set(info.keys()))}}
+        for key in self.columns:
+            df[key].append(info[key])
+        return df.set_index(index)
+        
               
                 
 def getLogin( ncbi, jgi ):
@@ -500,10 +523,15 @@ def hit2taxonomy(
 # if `api_key` is set to `1`, it assumes the `Entrez.api` method has been called already
 def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'):
 
-    print('\nGathering taxonomy information', flush = True)
-    df['taxonomy'] = df['taxonomy'].replace( np.nan, None )
+    print('\nAssimilating taxonomy', flush = True)
+    if isinstance(df, mtdb):
+        df = df.set_index('internal_ome')
+        tax_dicts = {v['genus']: read_tax(v['taxonomy']) for k, v in df.items()}
+    else:
+        df['taxonomy'] = df['taxonomy'].replace( np.nan, None )
+        tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
+
     count = 0
-    tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
 
     for genus in tax_dicts:
         if any(tax_dicts[genus][x] for x in tax_dicts[genus]):
@@ -612,9 +640,14 @@ def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid={'no rank',
     
     for miss in missing:
         tax_dicts[miss] = {}
-    db['taxonomy'] = db.apply(
-        lambda x: tax_dicts[x['genus']], axis = 1
-        )
+    if isinstance(db, mtdb):
+        for i, genus in enumerate(db['genus']):
+            db['taxonomy'][i] = tax_dicts[genus]
+        return mtdb(db)
+    else:
+        db['taxonomy'] = db.apply(
+            lambda x: tax_dicts[x['genus']], axis = 1
+            )
 
     return db
 

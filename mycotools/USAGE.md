@@ -9,6 +9,7 @@
 	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-db)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
+	- [Adding local genomes to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#adding-local-genomes)
 	- [Substitute organism name for MycotoolsDB organism code](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#ome2name.py)
 
 <br />
@@ -165,6 +166,24 @@ Then, run `dbFiles.py` to copy the protein fastas into the current directory (ca
 Alternatively, if you just need the paths (links) to these files, simply run:
 ```bash
 (mycotools) -$ dbFiles.py -d atheliaceae.db -p --print
+```
+
+<br /><br />
+
+## Adding local genomes
+### predb2db.py
+To add in-house annotations predb2db.py will input your genome and metadata, curate, and prepare a database file to add to the database. The manager of the database (Zach for Ohio Supercomputer) will then take your database and add it to the master.
+
+First, generate a predb spreadsheet:
+```bash
+(mycotools) -$ predb2db.py > predb.tsv
+```
+
+The resulting `predb.tsv` can be filled in via spreadsheet software and exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and separate by tabs. De novo annotations produced by Funannotate/Orthofiller must be filled in as "new" for the genomeSource column. If using a plain-text editor, export with UTF-8 formatting and account for blank entries with a tab.
+
+Finally, generate a mycotoolsDB file from your predb, and notify your database manager that it is ready for integration:
+```bash
+(mycotools) -$ predb2db.py <PREDB.TSV>
 ```
 
 <br /><br />
@@ -391,12 +410,12 @@ make SVGs for all GFF3s in a new line delimited list with width set to 20:
 
 # EVOLUTIONARY ANALYSIS TOOLS
 ## BLAST MycotoolsDB
-### db2blast.py
-`db2blast.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycotoolsDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
+### db2search.py
+`db2search.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycotoolsDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
 
 ```bash
-(mycotools) -$ db2blast.py --help
-usage: db2blast.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
+(mycotools) -$ db2search.py --help
+usage: db2search.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
                    [-o OUTPUT] [-p PREVIOUS] [--cpu CPU]
 
 Blasts a query against a db and compiles output fastas for each query.
@@ -427,14 +446,14 @@ optional arguments:
 
 
 ## hmmsearch MycotoolsDB
-### db2hmmsearch.py
-`db2hmmsearch.py` will compile hmmsearch results, optionally ouput fasta/hmmalign to original models/trim alignments from a profile hidden markov model. This script supports multiprocessing and uses all detected cores by default.
+### db2hmm.py
+`db2hmm.py` will compile hmmsearch results, optionally ouput fasta/hmmalign to original models/trim alignments from a profile hidden markov model. This script supports multiprocessing and uses all detected cores by default.
 
-e.g.: `db2hmmsearch.py -d profile.hmm` will run the master database referencing the inputted hmmdb. 
+e.g.: `db2hmm.py -d profile.hmm` will run the master database referencing the inputted hmmdb. 
 
-`db2hmmsearch.py -d profile.hmm -b 1 -t 75` takes the best hit from hits with 25 - 100% query coverage
+`db2hmm.py -d profile.hmm -b 1 -t 75` takes the best hit from hits with 25 - 100% query coverage
 ```bash
-(mycotools) -$ db2hmmsearch.py --help
+(mycotools) -$ db2hmm.py --help
 Runs `hmmsearch` v each proteome in a `.db`. For each query, extracts results
 and optionally outputs a compiled fasta, hmmalignment and/or trimmed
 alignment.
@@ -448,7 +467,7 @@ optional arguments:
   -o OUTPUT, --output OUTPUT
                         User-specified output directory
   -p PREVIOUS, --previous PREVIOUS
-                        Previous db2hmmsearch dir. Be wary of incomplete
+                        Previous db2hmm dir. Be wary of incomplete
                         outputs from interrupted runs
   -c CPU, --cpu CPU     Processors to use. Default = All
   -f, --fasta           Compile fastas for each query
@@ -577,15 +596,15 @@ extractDB.py > pubFungi.db
 
 <br />
 
-2. obtain gene homologs using `db2blast.py` with an e-value threshold of 10<sup>-2</sup>:
+2. obtain gene homologs using `db2search.py` with an e-value threshold of 10<sup>-2</sup>:
 
 ```bash
-(mycotools) -$ db2blast.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pubFungi.db
+(mycotools) -$ db2search.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pubFungi.db
 ```
 
 <br />
 
-3. `db2blast.py` created a directory with fasta results. obtain the number of
+3. `db2search.py` created a directory with fasta results. obtain the number of
 genes recovered from the analysis:
 
 ```bash

@@ -4,7 +4,7 @@ from Bio import Entrez
 import pandas as pd, numpy as np
 import argparse, os, time, subprocess, sys, requests, re, gzip
 from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint, findExecs
-from mycotools.lib.dbtools import log_editor, loginCheck
+from mycotools.lib.dbtools import log_editor, loginCheck, db2df
 from datetime import datetime
 
 
@@ -382,7 +382,10 @@ def main(
     ass_prots = compileLog(output_path, remove )
 
     if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
-        ncbi_df = pd.read_csv( ncbi_df, sep = '\t' )
+  #      try:
+        ncbi_df = db2df(ncbi_df)
+#        except:
+ #           ncbi_df = pd.read_csv( ncbi_df, sep = '\t' )
     elif not isinstance(ncbi_df, pd.DataFrame):
         ncbi_df = pd.DataFrame({'biosample': [ncbi_df]})
     if len(ncbi_df.index) == 0:
@@ -440,11 +443,11 @@ def main(
             if exits['gff3'] != 0:
                  failed.append([ome, ncbi_df['version'][ome]])
                  continue
-        ncbi_df.loc[ome, 'assembly_path'] = output_path + 'assembly/' + \
+        ncbi_df.loc[ome, 'assemblyPath'] = output_path + 'assembly/' + \
             os.path.basename(ass_prots[ome]['assembly'])
-        ncbi_df.loc[ome, 'proteome_path'] = output_path + 'proteome/' + \
+        ncbi_df.loc[ome, 'proteome'] = output_path + 'proteome/' + \
             os.path.basename(ass_prots[ome]['proteome'])
-        ncbi_df.loc[ome, 'gff3_path'] = output_path + 'gff3/' + \
+        ncbi_df.loc[ome, 'gffPath'] = output_path + 'gff3/' + \
             os.path.basename(ass_prots[ome]['gff3'])
         new_df = new_df.append( ncbi_df.loc[ome] )
  

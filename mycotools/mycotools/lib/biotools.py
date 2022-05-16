@@ -208,9 +208,12 @@ def gff2list( gff_path, insert = False, error = True ):
     return gff_list_dict
 
 
-def list2gff( gff_dict ):
+def list2gff( gff_dict, ver = 3 ):
 
-    gff_str = ''
+    if ver:
+        gff_str = '##gff-version ' + str(ver) + '\n'
+    else:
+        gff_str = ''
     for line in gff_dict:
         add_str = '\t'.join( str(line[x]) for x in line )
         gff_str += add_str + '\n'
@@ -224,13 +227,15 @@ def gff3Comps( source = None ):
     comps['id'] = r'ID=([^;]+)'
     comps['Alias'] = r'Alias=([^;]+)'
     comps['product'] = r'product="([^"]*)' 
+    comps['OG'] = r'OG=([\w+:\d+\|]+)'
     comps['ver'] = 'gff3'
 
-    if source == 'ncbi':
-        comps['prot'] = r';protein_id=([^;]+)'
-    elif source == 'jgi':
-        comps['prot'] = r'proteinId=([^;]+)'
-        comps['transcript'] = r'transcriptId=([^;])'
+#    if source == 'ncbi':
+ #       comps['prot'] = r';protein_id=([^;]+)'
+  #  elif source == 'jgi':
+   #     comps['prot'] = r'proteinId=([^;]+)'
+    comps['prot'] = r'protein_id=([^;]+)|proteinId=([^;]+)'
+    comps['transcript'] = r'transcriptId=([^;])'
    
     return comps
 

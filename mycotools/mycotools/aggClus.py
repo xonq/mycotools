@@ -3,9 +3,9 @@
 from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
 #from sklearn.cluster import AgglomerativeClustering
-from mycotools.lib.kontools import multisub, findExecs, formatPath
+from mycotools.lib.kontools import multisub, findExecs, formatPath, eprint, vprint
 from mycotools.lib.biotools import fa2dict, dict2fa
-import string, argparse, os, sys, itertools, tempfile, re, random, pandas as pd, subprocess
+import string, argparse, os, sys, itertools, tempfile, re, random, copy, pandas as pd, subprocess
 
 sys.setrecursionlimit(1000000)
 
@@ -71,15 +71,25 @@ def createDist( alignments, minIdentity ):
     return distanceMatrix.fillna( 1 ), outMatrix.fillna( 1 )
 
 
-def runUsearch( fasta, output, maxdist ):
+def runUsearch( fasta, output, maxdist, cpus = 1, verbose = False ):
 
-    subprocess.call([
-        'usearch', '-calc_distmx', fasta,
-        '-tabbedout', output, '-maxdist',
-        maxdist
-        ] #stdout = subprocess.PIPE,
-        #stderr = subprocess.PIPE
-        )
+    if verbose:
+        subprocess.call([
+            'usearch', '-calc_distmx', fasta,
+            '-tabbedout', output, '-maxdist',
+            maxdist, '-threads', str(cpus)
+            ] #stdout = subprocess.PIPE,
+            #stderr = subprocess.PIPE
+            )
+    else:
+        subprocess.call([
+            'usearch', '-calc_distmx', fasta,
+            '-tabbedout', output, '-maxdist',
+            maxdist, '-threads', str(cpus)
+            ], stdout = subprocess.DEVNULL,
+            stderr = subprocess.DEVNULL
+            )
+
 
 
 def importDist( dis_path, sep = '\t' ):
@@ -168,7 +178,6 @@ def scipyaggd( distMat, maxDist, method = 'single' ):
 
 
 def needleMain(fasta, min_id, cpus = 1):
-    findExecs( ['needle'], exit = set('needle') )
     print( '\nCalculating needle alignments' , flush = True)
     aligns, alignCmds = set(), list()
     tmpdir = tempfile.gettempdir() + '/aggTmpZK' 
@@ -205,12 +214,94 @@ def needleMain(fasta, min_id, cpus = 1):
 
     return distanceMatrix
 
-def usearchMain(fasta, min_id):
-    findExecs( ['usearch'], exit = set('usearch') )
-    print('\nCalculating usearch alignments', flush = True)
-    runUsearch(fasta, output + '.dist', str(1 - min_id))
+def usearchMain(fasta, min_id, output, cpus = 1, verbose = False):
+    vprint('\nusearch aligning', flush = True, v = verbose)
+    runUsearch(fasta, output + '.dist', str(1 - min_id), cpus, verbose)
     distanceMatrix = importDist( output + '.dist' )
     return distanceMatrix
+
+
+def main(
+    fastaPath, minid, maxdist, minseq, maxseq, 
+    searchProg = 'usearch', linkage = 'single', 
+    iterative = False, interval = 0.05, output= None, cpus = 1,
+    verbose = False, spacer = '\t'
+    ):
+
+    attempt, direction, clusters, distanceMatrix, tree = 0, None, None, None, None
+    oldDirection, oldClusters, oldDistance_matrix, oldTree = None, None, None, None
+    while True:
+        oldDistance_matrix = distanceMatrix
+        attempt += 1
+        if searchProg == 'needle': #elif if above lines not highlighted
+            distanceMatrix = needleMain(fastaPath, minid, cpus = 1)
+        elif searchProg == 'usearch':
+            distanceMatrix = usearchMain(fastaPath, minid, output, cpus, verbose)
+        vprint('\nClustering\n', flush = True, v = verbose)
+        oldClusters, oldTree = clusters, tree
+        clusters, tree = scipyaggd(distanceMatrix, float(maxdist), linkage)
+        if iterative:
+            cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
+            for gene, index in clusters.items():
+                if index not in cluster_dict:
+                    cluster_dict[index] = []
+                cluster_dict[index].append(gene)
+            focalLen = len(cluster_dict[clusters[iterative]])
+            vprint('\t\tITERATION ' + str(attempt) + ': ' + iterative + ' cluster size: ' + str(focalLen), flush = True)
+            vprint('\t\t\tMinimum identity: ' + str(minid) + '; Maximum Distance ' + str(maxdist), flush = True, v = verbose)
+            if focalLen >= minseq:
+                if maxseq:
+                    if focalLen <= maxseq:
+                        vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                        break
+                    else:
+                        direction = 1
+                else:
+                    vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                    break
+            else:
+                direction = -1
+
+            if oldDirection:
+                if direction != oldDirection:
+                    eprint(spacer + 'WARNING: Overshot. Could not find parameters using current interval.', flush = True)
+                    vprint('Outputting Iterations ' + str(attempt) + ' & ' + str(attempt - 1), flush = True, v = verbose)
+                    break
+            else:
+                oldDirection = direction
+            minid += (interval*direction)
+            maxdist -= (interval*direction)
+
+            if minid >= 1:
+                eprint(spacer + 'WARNING: Minimum identity maximized, FAILED to achieve minimum sequences', flush = True)
+                break
+            elif maxdist <= 0:
+                eprint(spacer + 'WARNING: Maximum distance minimized, FAILED to achieve minimum sequences', flush = True)
+                break
+            elif minid <= 0:
+                eprint(spacer + 'WARNING: Minimum identity minimized, FAILED to achieve minimum sequences', flush = True)
+                break
+            elif maxdist >= 1:
+                eprint(spacer + 'WARNING: Maximum distance maximized, FAILED to achieve minimum sequences', flush = True)
+                break
+        else:
+            break
+
+    return distanceMatrix, clusters, tree, oldDistance_matrix, oldClusters, oldTree
+
+def writeData(tree, distanceMatrix, clusters, output):
+
+    #clusters = scikitaggd( distanceMatrix, float(args.max_dist), args.linkage )
+
+    out_str = '\n'.join( [i + '\t' + str(clusters[i]) for i in clusters] )
+    with open( output + '.clus', 'w' ) as out:
+        out.write( out_str )
+    if tree:
+        newick = getNewick(tree, "", tree.dist, list(distanceMatrix.index))
+
+        with open( output + '.newick', 'w' ) as out:
+            out.write(newick)
+
 
 
 
@@ -222,13 +313,13 @@ if __name__ == '__main__':
         )
     parser.add_argument( '-f', '--fasta', required = True )
     parser.add_argument( 
-        '-d', '--distance', help = 'Alignment software '
+        '-a', '--alignment', help = 'Alignment software '
         + '{"needle", "usearch"}', default = 'usearch' 
         )
     parser.add_argument( '-o', '--output', help = 'e.g. "~/name" will output name.clus, etc' )
-    parser.add_argument( '-m', '--min_id', help = 'Minimum identity'
+    parser.add_argument( '-m', '--minid', help = 'Minimum identity'
         + ' for alignment. DEFAULT 0.3', type = float, default = 0.3 )
-    parser.add_argument( '-x', '--max_dist', help = 'Maximum distance'
+    parser.add_argument( '-x', '--maxdist', help = 'Maximum distance'
         + ' for clustering (1 - minimum identity). DEFAULT: 0.6', type = float, default = 0.6)
     parser.add_argument( '-l', '--linkage', default = 'single', help = "Linkage criterion:" \
         + " 'complete' (maximum distance), 'average', 'weighted', 'centroid', or 'single'" \
@@ -249,9 +340,12 @@ if __name__ == '__main__':
     if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
         eprint('\nERROR: Invalid linkage criterium', flush = True)
         sys.exit( 1 )
-    elif args.distance not in {'needle', 'usearch'}:
+    elif args.alignment not in {'needle', 'usearch'}:
         eprint('\nERROR: Invalid alignment method', flush = True)
         sys.exit( 2 )
+    else:
+        findExecs( [args.alignment], exit = set(args.alignment) )
+
 
     fastaPath = formatPath(args.fasta)
     fa = fa2dict(fastaPath)
@@ -267,58 +361,22 @@ if __name__ == '__main__':
     if args.output:
         output = args.output
     else:
-        output = os.getcwd() + os.path.basename(fastaPath)
+        output = os.getcwd() + '/' + os.path.basename(fastaPath)
 
 #    if os.path.isfile(output + '.dist'):
  #       print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' , flush = True)
   #      distanceMatrix = importDist( output + '.dist' )
-    attempt = 0
-    while True:
-        attempt += 1
-        if args.distance == 'needle': #elif if above lines not highlighted
-            distanceMatrix = needleMain(fastaPath, args.min_id, cpus = 1)
-        elif args.distance == 'usearch':
-            distanceMatrix = usearchMain(fastaPath, args.min_id)
-        print('\nClustering\n', flush = True)
-        clusters, tree = scipyaggd(distanceMatrix, float(args.max_dist), args.linkage)
-        if args.iterative:
-            cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
-            for gene, index in clusters.items():
-                if index not in cluster_dict:
-                    cluster_dict[index] = []
-                cluster_dict[index].append(gene)
-            focalLen = len(cluster_dict[clusters[focalGene]])
-            print('\tITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True)
-            print('\t\tMinimum identity: ' + str(args.min_id) + '; Maximum Distance ' + str(args.max_dist), flush = True)
-            attempt += 1
-            args.min_id += args.interval
-            args.max_dist -= args.interval
-            if focalLen >= args.minseq:
-                if args.maxseq:
-                    if focalLen <= args.maxseq:
-                        print('\t\tSUCCESS!', flush = True)
-                        break
-                else:
-                    print('\t\tSUCCESS!', flush = True)
-                    break
-            elif args.min_id >= 1:
-                eprint('\nWARNING: Minimum identity maximized, FAILED to achieve minimum sequences', flush = True)
-                break
-            elif args.max_dist <= 0:
-                eprint('\nWARNING: Maximum distance minimized, FAILED to achieve minimum sequences', flush = True)
-                break
-        else:
-            break
             
+    distanceMatrix, clusters, tree, odm, ocl, ot = main(
+        fastaPath, args.minid, args.maxdist, args.minseq, args.maxseq, 
+        searchProg = args.alignment, linkage = args.linkage, verbose = True,
+        iterative = args.iterative, interval = args.interval, output = output, spacer = '\n'
+        )
 
-    newick = getNewick(tree, "", tree.dist, list(distanceMatrix.index))
-
-    #clusters = scikitaggd( distanceMatrix, float(args.max_dist), args.linkage )
-
-    out_str = '\n'.join( [i + '\t' + str(clusters[i]) for i in clusters] )
-    with open( output + '.clus', 'w' ) as out:
-        out.write( out_str )
-    with open( output + '.newick', 'w' ) as out:
-        out.write(newick)
+    if ocl:
+        writeData(tree, distanceMatrix, clusters, output + '0')
+        writeData(ot, odm, ocl, output + '1')
+    else:
+        writeData(tree, distanceMatrix, clusters, output)
 
     sys.exit( 0 )

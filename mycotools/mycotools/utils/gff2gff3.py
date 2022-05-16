@@ -97,9 +97,9 @@ def main( gff_list, ome, jgi_ome, safe = True, verbose = True ):
 
     gff_prep, failed, flagged = addGenes( gff_list, safe = safe )
     if failed:
-        vprint( str(len(failed)) + '\tgenes failed', v = verbose , flush = True)
+        vprint( str(len(failed)) + '\tgenes failed', v = verbose , e = True, flush = True)
     if flagged:
-        vprint( str(len(flagged)) + '\tgene coordinates from exons', v = verbose, flush = True)
+        vprint( str(len(flagged)) + '\tgene coordinates from exons', v = verbose, e = True, flush = True)
     gff3 = gff2gff3( gff_prep, ome, jgi_ome )
         
     return gff3
