@@ -87,14 +87,17 @@ def readPredb(predb_path, spacer = '\t'):
         for line in raw:
             if line.startswith('#'):
                 if not headers:
-                    predb = {x: [] for x in line.rstrip().split('\t')[1:]}
+                    predb = {x: [] for x in line.rstrip()[1:].split('\t')}
                     headers = list(predb.keys())
-            else:
+            elif line.rstrip():
                 entry = line.split('\t')
                 if len(entry) != len(headers):
                     eprint(spacer + 'ERROR: all columns must have an entry.', flush = True)
+                    eprint(headers, '\n', entry, flush = True)
                     sys.exit(3)
-                (predb[headers[i]].append(v.rstrip()) for i,v in enumerate(entry)) 
+                for i, v in enumerate(entry):
+                    predb[headers[i]].append(v.rstrip())
+#                (predb[headers[i]].append(v.rstrip()) for i,v in enumerate(entry)) 
 
     try:
         predb['genome_code'] = predb['genomeCode']
