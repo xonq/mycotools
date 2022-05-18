@@ -38,7 +38,7 @@
 
 - **MYCOTOOLS PIPELINES**
 	- [Phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
-	- [Cluster Reconstruction and Phylogenetic Analysis (CRAP)](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#cluster-reconstruction-and-phylogenetic-analysis-crap)
+	- [Cluster Reconstruction and Phylogenetic Analysis (CRAP)](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crap.py)
 
 
 ---
@@ -671,7 +671,7 @@ select the clade of interest as described in step 6a.
 <br /><br />
 
 
-## Cluster Reconstruction and Phylogenetic Analysis (CRAP)
+## Cluster Reconstrunction and Phylogenetic Analysis (CRAP)
 ### crap.py
 CRAP (originally created by Jason Slot) is a simple, elegant pipeline for
 studying the evolution of a gene cluster on a gene-by-gene basis. CRAP 

@@ -31,7 +31,9 @@ def addMissing(gff_list, intron, comps, ome):
                 par = rnas[par]
             search = re.search(comps['prot'], entry['attributes'] )
             if search:
-                prot = search.groups()[1]
+                prot = search.groups()[0]
+                if not prot:
+                    prot = search.groups()[1]
                 if re.search( r'Alias=[^;]$', entry['attributes'] ) is None:
                     if not entry['attributes'].endswith( ';' ):
                         entry['attributes'] += ';'

@@ -118,16 +118,16 @@ class mtdb(dict):
 
 
     def set_index(self, column = 'internal_ome', inplace = False):
-        data, retry, error, df = {}, bool(column), False, copy.copy(self)
+        data, retry, error, df, columns = {}, bool(column), False, copy.copy(self), copy.copy(self.columns)
         if not column:
             return df.reset_index()
         while retry:
             oldCol = set()
             try:
-                df.columns.pop(df.columns.index(column))
-            except IndexError:
+                columns.pop(columns.index(column))
+            except (ValueError, IndexError) as e:
                 df = df.reset_index() #will this actually reset the index
-                df.columns.pop(df.columns.index(column))
+                columns.pop(columns.index(column))
             try:
                 df[column]
             except KeyError:
@@ -138,14 +138,14 @@ class mtdb(dict):
                 {'genome_code', 'internal_ome', 'biosample', 'assembly', 'gff3', 'proteome'}: # if it's unique
                 for i, v in enumerate(df[column]):
                     data[v] = {}
-                    for head in df.columns:
+                    for head in columns:
                         data[v][head] = df[head][i]
             else:
                 for i, v in enumerate(df[column]):
                     if v not in data:
                         data[v] = []
                     data[v].append({})
-                    for head in df.columns:
+                    for head in columns:
                         try:
                             data[v][-1][head] = df[head][i]
                         except KeyError: # if an index exists

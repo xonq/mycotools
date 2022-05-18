@@ -2,11 +2,9 @@
 #NEED TO PARSE FOR IN GENE COORDINATES AND ANNOTATIONS
 
 import os, sys, re, argparse
-from matplotlib.pyplot import close as CLOSE
 from mycotools.lib.kontools import sysStart, formatPath, file2list
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from mycotools.lib.biotools import gff2list, gff3Comps
-
 
 
 def gff2svg( 
@@ -80,7 +78,8 @@ def gff2svg(
 
 def main(
     gff_list, svg_path, product_dict = {'hypothetical protein': '#ffffcc'}, 
-    width = 10, prod_comp = gff3Comps()['product'], null = None
+    width = 10, prod_comp = gff3Comps()['product'], null = None,
+    types = {'tRNA', 'mRNA', 'rRNA'}
     ):
 
     product_dict = gff2svg( gff_list, svg_path, product_dict, prod_comp = prod_comp, width = width, null = null )
@@ -90,13 +89,35 @@ def main(
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser( description = 'Converts .gff3(s) to .svg' )
-    parser.add_argument( '-g', '--gff' )
-    parser.add_argument( '-i', '--input', help = 'New line delimited list of gffs' )
-    parser.add_argument( '-w', '--width', type = int, default = 10, 
-        help = '.svg width; DEFAULT: 10' )
-    parser.add_argument( '-o', '--output', help = 'Optional output directory' )
+    parser = argparse.ArgumentParser(description = 'Converts .gff3(s) to .svg')
+    parser.add_argument('-g', '--gff')
+    parser.add_argument('-i', '--input', help = 'New line delimited list of gffs')
+    parser.add_argument('-w', '--width', type = int, default = 10, 
+        help = '.svg width; DEFAULT: 10')
+    parser.add_argument(
+        '-r', '--regex',
+        help = 'Expression to gather annotation. DEFAULT: "product=([^;]*)"'
+        )
+    parser.add_argument(
+        '-t', '--type', default = '"tRNA mRNA rRNA"',
+        help = 'Type to extract. DEFAULT: "tRNA mRNA rRNA"'
+        )
+    parser.add_argument('-o', '--output', help = 'Optional output directory')
     args = parser.parse_args()
+
+    if not args.regex:
+        regex = gff3Comps()['product']
+    else:
+        regex = r''
+        if args.regex.startswith(("'",'"')):
+            args.regex = args.regex[1:]
+        if args.regex.startswith(("'",'"')):
+            args.regex = args.regex[:-1]
+        for char in args.regex:
+            regex += char
+
+    args.type = args.type.replace('"','').replace("'",'')
+    types = set(args.type.split())
 
     if args.input:
         if args.output:
@@ -108,10 +129,10 @@ if __name__ == "__main__":
             if entry.endswith('/'):
                 entry = re.sub(r'/+$', '', entry)
         svg_path = os.path.dirname(gffs[0]) + re.sub(r'\.gf[^\.]+$', '.svg', os.path.basename(gffs[0]))
-        product_dict = main(gff2list(gffs[0]), svg_path )
+        product_dict = main(gff2list(gffs[0]), svg_path, prod_comp = regex, types = types)
         for gff in gffs[1:]:
             svg_path = os.path.dirname(gff) + re.sub(r'\.gf[^\.]+$', '.svg', os.path.basename(gff))
-            product_dict = main(gff2list(gff), svg_path, product_dict, args.width)
+            product_dict = main(gff2list(gff), svg_path, product_dict, args.width, prod_comp = regex, types = types)
     else:
         if args.gff.endswith('/'):
             args.gff = re.sub(r'/+$', '', args.gff)
@@ -119,6 +140,6 @@ if __name__ == "__main__":
             svg_path = formatPath(args.output) + re.sub(r'\.gf[^\.]+$', '.svg', os.path.basename(gffs[0]))
         else:
             svg_path = os.path.dirname(gffs[0]) + re.sub(r'\.gf[^\.]+$', '.svg', os.path.basename(gffs[0]))
-        main( gff2list(args.gff), svg_path, width = args.width )
+        main( gff2list(args.gff), svg_path, width = args.width, prod_comp = regex, types = types )
 
     sys.exit(0)

@@ -64,39 +64,38 @@ def trimRun( mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t' ):
         with open( out_dir + '/clipkit.sh', 'w' ) as out:
             if '#PBS' in hpc:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nqsub iqtree.sh' )
+                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nqsub tree.sh' )
             else:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nsbatch iqtree.sh' )
+                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nsbatch tree.sh' )
     
     return out_dir + '/' + name2
 
 
-def iqtreeRun( clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, spacer = '\t' ):
+def treeRun( clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, spacer = '\t' ):
 
-    cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-T', str(cpus)]
     if fast:
-        del cmd[4]
-        del cmd[3]
-        cmd.append('--fast')
+        cmd = ['fasttree', '-out', clipkit_file + '.treefile', clipkit_file]
+    else:
+        cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-T', str(cpus)]
 
-    vprint('\nOutputting bash script `iqtree.sh`.\n', v = verbose, flush = True)
+    vprint('\nOutputting bash script `tree.sh`.\n', v = verbose, flush = True)
    
     if not hpc:
         print(spacer + 'Tree building', flush = True)
         if verbose:
-            run_iqtree = subprocess.call(
+            run_tree = subprocess.call(
                 cmd
                 )
         else:
-            run_iqtree = subprocess.call(
+            run_tree = subprocess.call(
                 cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
                 )
-        if run_iqtree != 0:
-            eprint(spacer + '\tERROR: iqtree failed: ' + str(run_iqtree), flush = True)
+        if run_tree != 0:
+            eprint(spacer + '\tERROR: tree failed: ' + str(run_tree), flush = True)
             raise PhyloError
     else: 
-        with open( out_dir + '/iqtree.sh', 'w' ) as out:
+        with open( out_dir + '/tree.sh', 'w' ) as out:
             out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) )
 
 
@@ -153,7 +152,7 @@ def main(
     except (FileNotFoundError, ValueError) as e:
         clipkitOut = trimRun( mafft, out_dir, hpc, verbose, spacer = spacer )
 
-    iqtreeRun( clipkitOut, out_dir, hpc, verbose, fast, cpus, spacer = spacer )
+    treeRun( clipkitOut, out_dir, hpc, verbose, fast, cpus, spacer = spacer )
 
     if hpc:
         if slurm:
@@ -175,7 +174,7 @@ if __name__ == '__main__':
     parser.add_argument( '-a', '--alignment', \
         help = 'Alignment or directory of alignments (need fasta file extension)' )
     parser.add_argument( '--fast', action = 'store_true', \
-        help = 'Run IQTree fast option' )
+        help = 'Fasttree' )
     parser.add_argument( '-p', '--pbs', action = 'store_true', \
         help = 'Submit ALL steps to Torque.' )
     parser.add_argument( '-s', '--slurm', action = 'store_true', \
@@ -195,7 +194,15 @@ if __name__ == '__main__':
         eprint('\nERROR: no input', flush = True)
         sys.exit(7)
 
-    findExecs( ['iqtree', 'mafft', 'clipkit'] )
+    execs = ['mafft', 'clipkit']
+    if args.fast:
+        execs.append('fasttree')
+    else:
+        execs.append('iqtree')
+    if args.pbs or args.slurm:
+        findExecs(execs)
+    else:
+        findExecs(execs, execs)
 
     if args.fasta:
         input_check = formatPath(args.fasta)

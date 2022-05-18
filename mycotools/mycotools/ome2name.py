@@ -1,12 +1,17 @@
 #! /usr/bin/env python3
 
 from mycotools.lib.kontools import formatPath, sysStart, eprint
-from mycotools.lib.dbtools import db2df, masterDB
-import pandas as pd, re, sys, os
+from mycotools.lib.dbtools import masterDB, mtdb
+#from mycotools.lib.dbtools import db2df, masterDB
+import re, sys, os
 
+forbidden = [
+    '/', '\\', '[', ']', '|', '+', '=', '(', ')',
+    '{', '}', ':', ';', '<', '>', '?', '&', '*', '^',
+    '%', '@', '#', '$', '~'
+    ]
 
-
-def main( args ):
+def parseArgs(args):
 
     genus, species, strain, ome_code, goOn, alternative = True, True, True, \
         True, True, True
@@ -15,11 +20,7 @@ def main( args ):
         '`', ',', '.',
         '~', "'", '"'
         }
-    forbidden = [
-        '.', '/', '\\', '[', ']', '|', '+', '=', '(', ')',
-        '{', '}', ':', ';', '<', '>', '?', '&', '*', '^',
-        '%', '@', '#', '$', '~'
-        ]
+
     for arg in args[2:]:
         if len( arg ) > 1:
             if arg[0] in { '"', "'" }:
@@ -29,7 +30,7 @@ def main( args ):
         if os.path.isfile( formatPath(arg) ):
             if not goOn:
                 eprint( '\nERROR: multiple files' , flush = True)
-            db = db2df( arg )
+            db = mtdb( arg )
             goOn = False
             continue
         for let in arg:
@@ -45,32 +46,34 @@ def main( args ):
                 alternative = False
             elif let in allowable:
                 forbidden.append( let )
-       
 
     if goOn:
-        db = db2df( masterDB() )
+        db = mtdb( masterDB() )
 
     with open( args[1], 'r' ) as raw_input:
         data_input = raw_input.read()
 
-    for i, row in db.iterrows():
-        ome = row['internal_ome']
+    return db, data_input, genus, species, strain, ome_code, alternative
+
+def main( db, data_input, genus, species, strain, ome_code, alternative ):
+
+    db = db.set_index()
+    for ome, row in db.items():
         name = ''
-        if ome_code:
-            name += ome + '_'
         if genus:
-            if not pd.isnull( row['genus'] ):
-                name += str(row['genus']) + '_'
+            name += str(row['genus']) + '_'
         if species:
-            if not pd.isnull( row['species'] ):
+            if row['species']:
                 name += str(row['species']) + '_'
             else:
                 name += 'sp._'
         if strain:
-            if not pd.isnull( row['strain'] ):
+            if row['strain']:
                 name += str(row['strain']) + '_'
         if alternative:
             name += row['genome_code'] + '_'
+        if ome_code:
+            name += ome + '_'
         name = name[:-1]
         for i in forbidden:
             name = name.replace( i, '' )
@@ -89,7 +92,7 @@ if __name__ == '__main__':
         '"o" no ome | "g" no genus | "s" no species | "v" no strain' + \
         ' | "a" no alternative ome'
     args = sysStart( sys.argv, usage, 2, files = [sys.argv[1]] )
-    data_output = main( args )
+    db, data_input, g, sp, st, ome_code, alt = parseArgs(args)
+    data_output = main(db, data_input, g, sp, st, ome_code, alt)
     print( data_output , flush = True)
     sys.exit( 0 )
-    
