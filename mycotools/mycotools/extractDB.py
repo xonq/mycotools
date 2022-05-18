@@ -156,9 +156,9 @@ if __name__ == '__main__':
         nonpublished = args.nonpublished, inverse = args.inverse, unique_strains = args.unique_strains
         )
     if args.output:
-        df2db( new_db, output )
+        new_db.df2db( output )
     else:
-        new_db.df2db( sys.stdout,  headers = bool(args.headers) )
+        new_db.df2db( headers = bool(args.headers) )
 
  #   outro( start_time, stdout = args.output )
     sys.exit(0)

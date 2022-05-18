@@ -630,7 +630,7 @@ def SearchMain(
             search_fas[query] = fa2dict(clus_dir + query + '.fa')
 
     omes = set(db['internal_ome'])
-    if not len(search_fas) == len(queryFa) and False is True: # need more intelligent check
+    if not len(search_fas) == len(queryFa): # need more intelligent check
         print('\nRunning search against database', flush = True)
         search_fas = {**search_fas, **db2search(
             db, binary, query_path, wrk_dir, evalue = evalue, bitscore = bitscore,
