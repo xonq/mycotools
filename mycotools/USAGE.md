@@ -701,30 +701,32 @@ user to root the trees and reupload.
 
 ```bash
 (mycotools) -bash-4.2$ crap.py -h
-usage: crap.py [-h] -i INPUT [-d DATABASE] [-s SEARCH] [-og ORTHOGROUPS] [-p PLUSMINUS] [-m MAXIMUM] [-f] [--interval INTERVAL]
-               [-b BITSCORE] [-g GFF] [-r] [-o OUTPUT] [-c CPU] [-v]
+usage: crap.py [-h] -q QUERY [-d DATABASE] [-s SEARCH] [-og ORTHOGROUPS] [-p PLUSMINUS] [-m MAXIMUM] [-f]
+               [-i INTERVAL] [-b BITSCORE] [-g GFF] [--conversion CONVERSION] [-o OUTPUT] [-c CPU] [-v]
 
 Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
 
 optional arguments:
   -h, --help            show this help message and exit
-  -i INPUT, --input INPUT
+  -q QUERY, --query QUERY
                         Fasta or white-space delimited file/string of cluster genes
   -d DATABASE, --database DATABASE
   -s SEARCH, --search SEARCH
                         Search binary {mmseqs, blastp} for search-based CRAP
   -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
-                        MycotoolsDB Orthogroup tag for OG searches. DEFAULT: P for phylum
+                        MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
   -p PLUSMINUS, --plusminus PLUSMINUS
-                        Genes up-/downstream to analyze from loci. DEFAULT: 7
+                        Genes up-/downstream to analyze from loci. DEFAULT: 10
   -m MAXIMUM, --maximum MAXIMUM
                         Max sequences for trees/min for aggClus.py. DEFAULT: 250
   -f, --fast            Fasttree
-  --interval INTERVAL   Agglomerative clustering identity/distance interval. DEFAULT: 0.05
+  -i INTERVAL, --interval INTERVAL
+                        Agglomerative clustering identity/distance interval. DEFAULT: 0.05
   -b BITSCORE, --bitscore BITSCORE
                         Bitscore minimum for search algorithm. DEFAULT: 30
   -g GFF, --gff GFF     GFF for non-mycotools input. Requires -s and a fasta for -i
-  -r, --reoutput        Reoutput - permits replacing tree file, e.g. w/a rooted version
+  --conversion CONVERSION
+                        Tab delimited query conversion file for locus diagram annotation
   -o OUTPUT, --output OUTPUT
                         Output base dir
   -c CPU, --cpu CPU
