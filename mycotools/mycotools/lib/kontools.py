@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
-import datetime, sys, glob, os, re, subprocess, gzip, shutil, json, tarfile
+from datetime import datetime
+import sys, glob, os, re, subprocess, gzip, shutil, json, tarfile
 import numpy as np
 
 
@@ -352,11 +353,11 @@ def sysStart( args, usage, min_len, dirs = [], files = [] ):
     elif len( args ) < min_len:
         print( '\n' + usage + '\n' , flush = True)
         sys.exit( 2 )
-    elif not all( os.path.isfile( x ) for x in files ):
+    elif not all( os.path.isfile( formatPath(x) ) for x in files ):
         print( '\n' + usage , flush = True)
         eprint( 'ERROR: input file(s) do not exist\n' , flush = True)
         sys.exit( 3 )
-    elif not all( os.path.isfile( x ) for x in dirs ):
+    elif not all( os.path.isfile( formatPath(x) ) for x in dirs ):
         print( '\n' + usage , flush = True)
         eprint( 'ERROR: input directory does not exist\n' , flush = True)
         sys.exit( 4 )
@@ -374,7 +375,7 @@ def intro( script_name, args_dict, credit='', log = False, stdout = True):
     most. Optionally outputs a log according to `log` path.
     '''
 
-    start_time = datetime.datetime.now()
+    start_time = datetime.now()
     date = start_time.strftime( '%Y%m%d' )
 
     out_str = '\n' + script_name + '\n' + credit + \
@@ -401,7 +402,7 @@ def outro( start_time, log = False, stdout = True ):
     '''
 
     
-    end_time = datetime.datetime.now()
+    end_time = datetime.now()
     duration = end_time - start_time
     dur_min = duration.seconds/60
     out_str = '\nExecution finished: ' + str(end_time) + '\t' + \
@@ -441,6 +442,23 @@ def prep_output(output, mkdir = True, require_newdir = False, cd = False):
         os.chdir(output)
 
     return output
+
+def mkOutput(base_dir, program, reuse = True, suffix = datetime.now().strftime('%Y%m%d')):
+    if not os.path.isdir(formatPath(base_dir)):
+        raise FileNotFoundError(base_dir + ' does not exist')
+    out_dir = formatPath(base_dir) + program + '_' + suffix
+
+    if not reuse:
+        count, count_dir = 1, out_dir
+        while os.path.isdir(count_dir):
+            count_dir  += '_' + str(count)
+            count += 1
+        os.mkdir(count_dir)
+        return count_dir + '/'
+    else:
+        if not os.path.isdir(out_dir):
+            os.mkdir(out_dir)
+        return out_dir + '/'
 
 
 def checkDep( dep_list = [], var_list = [], exempt = set() ):
