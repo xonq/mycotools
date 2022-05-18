@@ -91,7 +91,7 @@ def readPredb(predb_path, spacer = '\t'):
                     headers = list(predb.keys())
             else:
                 entry = line.split('\t')
-                if len(entry) != len(data):
+                if len(entry) != len(headers):
                     eprint(spacer + 'ERROR: all columns must have an entry.', flush = True)
                     sys.exit(3)
                 (predb[headers[i]].append(v.rstrip()) for i,v in enumerate(entry)) 
