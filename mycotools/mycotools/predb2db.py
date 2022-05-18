@@ -82,12 +82,13 @@ def genPredb():
 
 def readPredb(predb_path, spacer = '\t'):
 
-    predb = {}
+    predb, headers = {}, None
     with open(predb_path, 'r') as raw:
         for line in raw:
-            if line.startswith('#'):
-                predb = {x: [] for x in line.rstrip().split('\t')[1:]}
-                headers = list(data.keys())
+            if line.startswith('#') 
+                if not headers:
+                    predb = {x: [] for x in line.rstrip().split('\t')[1:]}
+                    headers = list(predb.keys())
             else:
                 entry = line.split('\t')
                 if len(entry) != len(data):
