@@ -2,7 +2,8 @@
 
 from mycotools.lib.kontools import eprint, formatPath, file2list
 from mycotools.lib.dbtools import masterDB, db2df
-from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, grabGffAcc, gff3Comps
+from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
+from mycotools.acc2gff import grabGffAcc
 import sys, os, re, argparse, pandas as pd, multiprocessing as mp
 
 

@@ -636,9 +636,8 @@ def SearchMain(
             db, binary, query_path, wrk_dir, evalue = evalue, bitscore = bitscore,
             pident = pident, mem = mem, biotype = 'proteome', force = True
             )}
-        if queryGff:
-            for query in search_fas:
-                search_fas[query][query] = queryFa[query]
+        for query in search_fas:
+            search_fas[query][query] = queryFa[query]
     
     print('\nChecking hit fasta sizes', flush = True)
     genes2query, merges = compileGenesByOme4queries(search_fas, set(db['internal_ome']))
@@ -811,7 +810,6 @@ if __name__ == "__main__":
         if not inputFa or not args.search:
             eprint('\tnon-mycotools input requires -s, -i as a fasta, optionally -g', flush = True)
             sys.exit(4)
-
 
 
     if args.orthogroups:

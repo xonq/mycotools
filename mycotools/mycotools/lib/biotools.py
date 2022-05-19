@@ -261,38 +261,6 @@ def gtfComps():
 
     return comps
 
-def grabGffAcc( gff_list, acc ):
-
-    if ';Alias=' in gff_list[0]['attributes']:
-        alias = 'Alias=' + acc
-        alias_on = alias + ';'
-    elif ' alias "' in gff_list[0]['attributes']:
-        alias = 'alias "' + acc + '"'
-        alias_on = 'alias "' + acc + '"'
-    out_list = [ 
-        x for x in gff_list \
-        if x['attributes'].endswith(alias) or \
-            alias_on in x['attributes'] 
-# timed slower        if re.search(alias + r'(?:;|$)', x['attributes'])
-        ]
-    return out_list
-
-
-def grabGffAccs(gff_list, acc_list):
-
-    aliases, ends = set(), set()
-    for acc in acc_list:
-        aliases.add('Alias=' + acc)
-        ends.add('Alias=' + acc + ';')
-    out_list = []
-    for i in gff_list:
-        if any(i['attributes'].endswith(x) for x in aliases):
-            out_list.append(i)
-        elif any(x in i['attributes'] for x in ends):
-            out_list.append(i)
-
-    return out_list
-
 def compileExon( gff ):
 	
     exon_dict = {}

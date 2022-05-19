@@ -2,62 +2,77 @@
 
 # NEED to remove pandas requirement
 
-import pandas as pd, multiprocessing as mp
+import multiprocessing as mp
 import os, sys, argparse, re
-from mycotools.lib.biotools import gff2list, list2gff, grabGffAcc, grabGffAccs
-from mycotools.lib.dbtools import db2df, masterDB
+from mycotools.lib.biotools import gff2list, list2gff
+from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import formatPath
 
+def grabGffAcc( gff_list, acc ):
+    '''grab acc from alias'''
 
-def main( df, column = None, db = None, gff = None, cpu = 1 ):
+    if ';Alias=' in gff_list[0]['attributes']:
+        alias = 'Alias=' + acc
+        alias_on = alias + ';'
+    elif ' alias "' in gff_list[0]['attributes']:
+        alias = 'alias "' + acc + '"'
+        alias_on = 'alias "' + acc + '"'
+    out_list = [ 
+        x for x in gff_list \
+        if x['attributes'].endswith(alias) or \
+            alias_on in x['attributes'] 
+        ]
+    return out_list
 
-    acc_comp = re.compile( r'(.*?)\[(\d+)\-(\d+)\]$' )
 
-    gff_strs = {}
-    if gff: 
-        if not isinstance(df, str):
-            accessions = list(df[column])
-        else:
-            accessions = [df]
-        for acc in accessions:
-            gff_strs[acc] = list2gff(grabGffAcc( gff2list(gff), acc ))
+def grabGffAccs(gff_list, acc_list, ome = None):
+
+    aliases, ends = set(), set()
+    for acc in acc_list:
+        aliases.add('Alias=' + acc)
+        ends.add('Alias=' + acc + ';')
+    out_list = []
+    for i in gff_list:
+        if any(i['attributes'].endswith(x) for x in aliases):
+            out_list.append(i)
+        elif any(x in i['attributes'] for x in ends):
+            out_list.append(i)
+
+    if ome:
+        return out_list, ome
     else:
-        db = db.set_index( 'internal_ome' )
-        if not isinstance(df, str):
-            omes_prep = re.findall( r'^.*?_', '\n'.join(list(df[ column ])), re.M )
-            omes = set( x[:-1] for x in omes_prep )
-        else:
-            omes_prep = re.search( r'(^.*?)_', df )
-            if omes_prep is not None:
-                omes = [ omes_prep[1] ]
+        return out_list
 
-        mp_cmds = []
-        for ome in omes:
-            if not isinstance(df, str):
-                accessions = [ x.rstrip() for x in df[ column ] if x.startswith( ome + '_' ) ]
-            else:
-                accessions = [ df ]
-            if not pd.isnull( db['gff3'][ome] ):
-                gff = os.environ['MYCOGFF3'] + '/' + db['gff3'][ome]
-                if not os.path.isfile( gff ):
-                    print( '\t' + ome + ' invalid gff3' , flush = True)
-                    continue
-                gff_list = gff2list( gff )
-                mp_cmds.append([gff_list, accessions])
-#                for acc in accessions:
- #                   mp_cmds.append( [gff_list, acc] )
-            else:
-                print( '\t' + ome + ' no gff3' , flush = True)
 
-        with mp.get_context('spawn').Pool( processes = cpu ) as pool:
-            mp_strs = pool.starmap( grabGffAccs, mp_cmds )
-#                    gff_str += list2gff( grabGffAcc( gff_list, acc, tag = tag ) ) + '\n'
-        for mp_str in mp_strs:
-            gff_str = list2gff( mp_str ) + '\n'
-            ome = re.search(r';Alias=([^_]*)', mp_str[0]['attributes'])[1]
-            gff_strs[ome] =  gff_str.rstrip()
+def gffMain(gffData, accs):
+    accGffs = {}
+    if isinstance(gffData, str):
+        gff = gff2list(gffData)
+    else:
+        gff = gffData
+    for acc in accs:
+        accGffs[acc] = grabGffAcc(gff, acc)
+    return accGffs
 
-    return gff_strs
+def dbMain(db, accs, cpu = 1):
+
+    omes = set([x[:x.find('_')] for x in accs])
+    
+    grabAcc_cmds = []
+    for ome in list(omes):
+        omeAccs = [acc for acc in accs if acc.startswith(ome + '_')]
+        gffPath = formatPath('$MYCOGFF3/' + ome + '.gff3')
+        gff_list = gff2list(gff)
+        grabAcc_cmds.append([omeAccs, gff_list, ome])
+
+    with mp.Pool(processes = cpus) as pool:
+        grabAcc_res = pool.starmap(grabAccs, grabAcc_cmds)
+
+    gffs = {}
+    for res in grabAcc_res:
+        gffs[res[1]] = res[0]
+
+    return gffs
 
 
 if __name__ == '__main__':
@@ -68,8 +83,9 @@ if __name__ == '__main__':
         )
     parser.add_argument( '-a', '--accession' )
     parser.add_argument( '-i', '--input', help = 'File with accessions' )
-    parser.add_argument( '-g', '--gff', help = 'Input GFF3' )
-    parser.add_argument( '-c', '--column', default = 0, help = 'Column from `-i`, default is first' )
+    parser.add_argument( '-g', '--gff', help = 'GFF3 input' )
+    parser.add_argument( '-c', '--column', default = 1, 
+        help = 'Accssions column for -i (1 indexed). DEFAULT: 1' )
     parser.add_argument( '-o', '--ome', action = 'store_true', help = 'Output files by ome code' )
     parser.add_argument( '-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master' )
     parser.add_argument( '--cpu', type = int, default = mp.cpu_count(), \
@@ -78,13 +94,13 @@ if __name__ == '__main__':
 
     if args.input:
         input_file = formatPath( args.input )
-        if args.column == 0:
-            df = pd.read_csv(input_file, sep = '\t', header = None)
-        else:
-            df = pd.read_csv(input_file, sep = '\t')
+        with open(input_file, 'r') as raw:
+            accs = [x.rstrip().split('\t')[args.column-1] for x in raw]
     elif not args.accession:
         print('\nERROR: need input file or accession', flush = True)
         sys.exit( 1 )
+    else:
+        accs = [args.accession]
 
     if args.cpu < mp.cpu_count():
         cpu = args.cpu
@@ -93,33 +109,23 @@ if __name__ == '__main__':
 
     db_path = formatPath( args.database )
     if not args.gff:
-        db = db2df( formatPath(args.database) )
-        if args.accession:
-            gff_strs = main( args.accession, db = db, cpu = 1 )
-        else:
-            gff_strs = main( df, args.column, db = db, cpu = args.cpu )
+        db = mtdb( formatPath(args.database) )
+        gff_lists = dbMain( db, accs, cpu = args.cpu )
     else:
         gff_path = formatPath( args.gff )
-        if args.accession:
-            gff_strs = main( args.accession, gff = gff_path, cpu = 1 )
-        else:
-            gff_strs = main( df, args.column, gff = gff_path, cpu = args.cpu )
+        gff_lists = gffMain(gffData, accs)
 
     if args.accession:
-        print( gff_strs[list(gff_strs.keys())[0]].rstrip() , flush = True)
+        print( gff2list(gff_lists[list(gff_lists.keys())[0]].rstrip()) , flush = True)
     elif args.ome:
-        if not os.path.isdir( 'header2gff' ):
-            os.mkdir( 'header2gff' )
+        output = mkOutput(os.getcwd() + '/', 'acc2gff')
         for ome in gff_strs:
-            with open( 'header2gff/' + ome + '.gff3', 'w' ) as out:
-                out.write( gff_strs[ome] )
+            with open( output + ome + '.accs.gff3', 'w' ) as out:
+                out.write( list2gff(gff_lists[ome]) )
     else:
         out_str = ''
-        for ome in gff_strs:
-#            print(ome, gff_strs[ome])
-#            out_str += list2gff(gff_strs[ome])
-            out_str += gff_strs[ome] + '\n'
-            with open( input_file + '.gff3', 'w' ) as out:
-                out.write( out_str )
+        for ome in gff_lists:
+            out_str += list2gff(gff_lists[ome]) + '\n'
+        print(out_str)
 
     sys.exit( 0 )

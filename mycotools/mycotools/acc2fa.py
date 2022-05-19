@@ -8,13 +8,15 @@ from mycotools.lib.kontools import formatPath, eprint
 
 
 def extractHeaders( fasta_file, accessions, ome = None ):
+    '''searches headers for "[]", which indicate coordinate-based extraction.
+    otherwise, just retrieves the accession from the fasta dictionary'''
 
     fasta = fa2dict(fasta_file)
     out_fasta = {}
     acc_comp = re.compile( r'([^/[]*)\[(\d+)\-(\d+)\]$' )
 
     for header in accessions:
-        if '[' in header:
+        if '[' in header: # if coordinate based
             coord_search = acc_comp.search( header )
             if coord_search is not None:
                 start = int(coord_search[2]) - 1
@@ -49,6 +51,7 @@ def extractHeaders( fasta_file, accessions, ome = None ):
    
 
 def dbmain( db, accs ):
+    '''takes in mtdb, takes accessions ome by ome from accs'''
 
     fa_dict = {}
     db = db.set_index( 'internal_ome' )
@@ -59,13 +62,12 @@ def dbmain( db, accs ):
         fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
         fasta = formatPath('$MYCOFAA/' + ome + '.aa.fa')
         fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
-#            fasta_str += dict2fa(extractHeaders( fasta, accessions )) + '\n'
-#        fasta_str += dict2fa(extractHeaders( fasta, [accs] ))
 
     return fa_dict
 
 
 def famain( accs, fa, ome = None ):
+    '''takes in accessions, fasta, and retrieves accessions'''
 
     fa_dict = {}
     fa_dict = {**fa_dict, **extractHeaders( fa, accs, ome )}
@@ -73,23 +75,16 @@ def famain( accs, fa, ome = None ):
     return fa_dict
 
 
-#def main( accs_str_or_df, column = None, db = None, fa = None, start = None, end = None ):
-
- #   if db and not fa:
-  #      return dbmain(db, accs_str_or_df, column = column, start = start, end = end)
-   # elif not db and fa:
-    #    return famain(accs_str_or_df, fa, column, start, end)
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( description = 'Inputs fasta or database and new line delimitted file of headers. ' + \
         'Outputs fasta with headers' )
-    parser.add_argument( '-i', '--input', help = 'Input file with accessions' )
     parser.add_argument( '-a', '--accession', help = 'Input accession. For coordinates ' + \
         'append [$START-$END] - accepts reverse coordinates for nucleotide accessions' )
+    parser.add_argument( '-i', '--input', help = 'File with accessions' )
     parser.add_argument( '-f', '--fasta', help = 'Fasta input' )
-    parser.add_argument( '-c', '--column', default = 1, help = 'Accessions column (1 indexed). DEFAULT: 1', type = int )
+    parser.add_argument( '-c', '--column', default = 1, 
+        help = 'Accessions column for -i (1 indexed). DEFAULT: 1', type = int )
     parser.add_argument( '-s', '--start', help = 'Start index column (1 indexed)', type = int )
     parser.add_argument( '-e', '--end', help = 'End index column (1 indexed)', type = int )
     parser.add_argument( '-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master' )
@@ -97,7 +92,7 @@ if __name__ == '__main__':
 
     if args.input:
         input_file = formatPath( args.input )
-        if args.start:
+        if args.start: # if using columns for coordinates
             with open(input_file, 'r') as raw:
                 accs = []
                 for line in raw:
@@ -122,10 +117,6 @@ if __name__ == '__main__':
         fa_dict = famain( accs, fa_path )
         fasta_str = dict2fa(fa_dict)
 
-#    if not args.accession:
- #       with open( input_file + '.fa', 'w' ) as out:
-  #          out.write( fasta_str )
-   # else:
     print( fasta_str.rstrip() , flush = True)
 
     sys.exit( 0 )
