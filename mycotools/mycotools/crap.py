@@ -125,12 +125,13 @@ def runAggclus(
     verbose = False,
     ):
 
-    output_path = output + str(focalGene)    
+    output_path = output + str(focalGene) 
+    log_path = output + '.' + str(focalGene) + '.log'   
     tree, clusters, distanceMatrix, ot, ocl, odm  = aggClus(
         fa_path, minid, maxdist, minseq, maxseq,
         searchProg = 'usearch', linkage = 'single', cpus = cpus,
         iterative = focalGene, interval = 0.05, output = output_path,
-        verbose = verbose
+        verbose = verbose, log_path = log_path
         )
 
     cluster_dict = {}
@@ -142,26 +143,34 @@ def runAggclus(
     geneModule = cluster_dict[clusters[focalGene]]
     fa_dict = acc2fa(db, geneModule)
 # need to implement some method to choose if the max and min parameters couldn't be met
-#    if ocl:
- #       cd = {}
-  #      for gene, index in ocl.items():
-   #         if index not in cd:
-    #            cd[index] = []
-     #       cd[index].append(gene)
-      #  focalLen0 = len(cluster_dict[clusters[focalGene]])
-       # focalLen1 = len(cd[ocl[focalGene]])
-        #if not focalLen0 
-
- 
-#        if direction < 0: # if preferring the minimal size
- #           if focalLen0 > focalLen1 and not :
-  #              geneModule = cd[ocl[focalGene]]
-   #     else:
-    #        if focalLen0 < focalLen1:
     print('\t\t\t' + str(len(fa_dict)) + ' genes in cluster', flush = True)
     with open(output + '../' + str(out_name) + '.fa', 'w') as out:
         out.write(dict2fa(fa_dict))
     writeData(None, distanceMatrix, clusters, output_path)
+
+def outgroupMngr(
+    fa_path, db, focalGene, minseq, maxseq, clus_dir, out_name,
+    minid = 0.3, maxdist = 0.6, direction = -1, cpus = 1,
+    verbose = False
+    ):
+    output_path = clus_dir + str(focalGene) + '.outgroup'
+    log_path = clus_dir + '.' + str(focalGene) + '.log'
+    clusLog = readJson(log_path)
+    iterations = reversed(clusLog['iterations'])
+    finalQuant = int(iterations[0]['size'])
+
+    maxdist, maxseqs = None, None
+    for iteration in enumerate(iterations[1:]):
+        if int(iteration['size']) > finalQuant:
+            maxdist = float(iteration['maximum_distance'])
+            maxseqs = int(iteration['size']) + 1
+            break
+
+    if maxdist:
+        runAggclus(
+            fa_path, db, focalGene, minseq, maxseqs, clus_dir, out_name,
+            minid, maxdist, direction, cpus, verbose
+            )
 
 
 def makeOutput(base_dir, newLog):
@@ -670,7 +679,7 @@ def SearchMain(
         crapMngr(
             db, query, queryHits, out_dir, wrk_dir, tre_dir, 
             fast, treeSuffix, genes2query, plusminus, query2color, 
-            cpus, verbose, reoutput
+            cpus = cpus, verbose = verbose, reoutput = reoutput
             )
 
     for query in fas4clus:
@@ -686,7 +695,7 @@ def SearchMain(
         crapMngr(
             db, query, queryHits, out_dir, wrk_dir, tre_dir, 
             fast, treeSuffix, genes2query, plusminus, query2color, 
-            cpus, verbose, reoutput
+            cpus = cpus, verbose = verbose, reoutput = reoutput
             )
 
 
@@ -714,12 +723,17 @@ if __name__ == "__main__":
         help = 'Genes up-/downstream to analyze from loci. DEFAULT: 10',
         default = 10, type = int
         )
+    parser.add_argument('-f', '--fast', action = 'store_true', help = 'Fasttree')
     parser.add_argument(
-        '-m', '--maximum', 
+        '--maxseq', 
         help = 'Max sequences for trees/min for aggClus.py. DEFAULT: 250', 
         default = 250, type = int
         )
-    parser.add_argument('-f', '--fast', action = 'store_true', help = 'Fasttree')
+    parser.add_argument(
+        '--minid', 
+        help = 'Minimum identity for aggClus.py. DEFAULT: 0.2', 
+        default = 0.2, type = float
+        )
     parser.add_argument('-i', '--interval', help = 'Agglomerative clustering identity/distance interval. ' \
         + 'DEFAULT: 0.05', default = 0.05, type = float)
     parser.add_argument(
@@ -792,7 +806,7 @@ if __name__ == "__main__":
         'Search binary': args.search,
         'Locus +/-': args.plusminus,
         'Fast tree': args.fast,
-        'Maximum seq': args.maximum,
+        'Maximum seq': args.maxseq,
         'Bitscore': args.bitscore,
         'GFF': args.gff,
         'CPU': args.cpu,
@@ -815,27 +829,27 @@ if __name__ == "__main__":
     if args.orthogroups:
         newLog = initLog(
             args.database, inputGenes, 'orthogroups', args.bitscore,
-            args.maximum, args.plusminus
+            args.maxseq, args.plusminus
             )
         print('\nPreparing output directory', flush = True)
         out_dir, wrk_dir, gff_dir, tre_dir = makeOutput(output, newLog)
         OGmain(
             db, inputGenes, args.orthogroups, fast = args.fast, 
             out_dir = out_dir, 
-            minid = 0.3, maxdist = 0.65, minseq = 20, max_size = args.maximum, cpus = args.cpu,
+            minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = args.cpu,
             verbose = args.verbose, plusminus = args.plusminus
             )
     else:
         newLog = initLog(
             args.database, inputGenes, args.search, args.bitscore,
-            args.maximum, args.plusminus
+            args.maxseq, args.plusminus
             )
         print('\nPreparing output directory', flush = True)
         out_dir, wrk_dir, gff_dir, tre_dir = makeOutput(output, newLog)
         SearchMain(
             db, inputGenes, inputFa, inputGFF, binary = args.search, fast =
             args.fast, out_dir = out_dir,
-            minid = 0.3, maxdist = 0.65, minseq = 20, max_size = args.maximum, cpus = 1,
+            minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = 1,
             plusminus = args.plusminus, bitscore = args.bitscore, pident = 0, mem = None, verbose = args.verbose
             )
     outro(start_time)

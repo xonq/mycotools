@@ -3,7 +3,7 @@
 from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
 #from sklearn.cluster import AgglomerativeClustering
-from mycotools.lib.kontools import multisub, findExecs, formatPath, eprint, vprint
+from mycotools.lib.kontools import multisub, findExecs, formatPath, eprint, vprint, readJson, writeJson
 from mycotools.lib.biotools import fa2dict, dict2fa
 import string, argparse, os, sys, itertools, tempfile, re, random, copy, pandas as pd, subprocess
 
@@ -220,13 +220,34 @@ def usearchMain(fasta, min_id, output, cpus = 1, verbose = False):
     distanceMatrix = importDist( output + '.dist' )
     return distanceMatrix
 
+def readLog(log_path, newLog):
+    oldLog = readJson(log_path)
+    if oldLog['fasta'] == newLog['fasta'] and \
+        oldLog['minimum_id'] == newLog['minimum_id'] and \
+        oldLog['search_program'] == newLog['search_program']:
+
+        newLog['iterations'] = oldLog['iterations']
+    return newLog
+
 
 def main(
     fastaPath, minid, maxdist, minseq, maxseq, 
     searchProg = 'usearch', linkage = 'single', 
     iterative = False, interval = 0.05, output= None, cpus = 1,
-    verbose = False, spacer = '\t'
+    verbose = False, spacer = '\t', log_path = None,
+    refine = False
     ):
+
+    log_dict = {
+        'fasta': fastaPath, 'minimum_id': minid, 'maximum_distance': maxdist,
+        'minimum_sequences': minseq, 'maximum_sequences': maxseq, 'search_program': searchProg,
+        'linkage': linkage, 'interval': interval, 'focal_gene': iterative,
+        'iterations': []
+        }
+    if log_path:
+        if os.path.isfile(log_path):
+            log_dict = readLog(log_path, log_dict)
+        writeJson(log_dict, log_path)
 
     attempt, direction, clusters, distanceMatrix, tree = 0, None, None, None, None
     oldDirection, oldClusters, oldDistance_matrix, oldTree = None, None, None, None
@@ -249,6 +270,10 @@ def main(
             focalLen = len(cluster_dict[clusters[iterative]])
             vprint('\t\tITERATION ' + str(attempt) + ': ' + iterative + ' cluster size: ' + str(focalLen), flush = True)
             vprint('\t\t\tMinimum identity: ' + str(minid) + '; Maximum Distance ' + str(maxdist), flush = True, v = verbose)
+            if log_path:
+                iteration_dict = {'size': focalLen, 'maximum_distance': maxdist}
+                log_dict['iterations'].append(iteration_dict)
+                writeJson(log_dict, log_path)
             if focalLen >= minseq:
                 if maxseq:
                     if focalLen <= maxseq:
@@ -269,20 +294,23 @@ def main(
                     break
             else:
                 oldDirection = direction
-            minid += (interval*direction)
+#            minid += (interval*direction)
             maxdist -= (interval*direction)
 
-            if minid >= 1:
-                eprint(spacer + 'WARNING: Minimum identity maximized, FAILED to achieve minimum sequences', flush = True)
+ #           if minid >= 1:
+  #              eprint(spacer + 'WARNING: Minimum identity maximized, FAILED to achieve minimum sequences', flush = True)
+   #             break
+            if maxdist <= 0:
+                eprint(spacer + 'WARNING: Maximum distance minimized, FAILED to achieve parameters', flush = True)
                 break
-            elif maxdist <= 0:
-                eprint(spacer + 'WARNING: Maximum distance minimized, FAILED to achieve minimum sequences', flush = True)
-                break
-            elif minid <= 0:
-                eprint(spacer + 'WARNING: Minimum identity minimized, FAILED to achieve minimum sequences', flush = True)
-                break
+#            elif minid <= 0:
+ #               eprint(spacer + 'WARNING: Minimum identity minimized, FAILED to achieve minimum sequences', flush = True)
+  #              break
             elif maxdist >= 1:
-                eprint(spacer + 'WARNING: Maximum distance maximized, FAILED to achieve minimum sequences', flush = True)
+                eprint(spacer + 'WARNING: Maximum distance maximized, FAILED to achieve parameters', flush = True)
+                break
+            elif 1 - maxdist <= minid:
+                eprint(spacer + 'WARNING: Maximum distance exceeds minimum identity. FAILED to achieve parameters', flush = True)
                 break
         else:
             break
@@ -330,8 +358,10 @@ if __name__ == '__main__':
         + ' of minimum sequences is obtained. Requires --iterative. DEFAULT: 100', default = 100)
     parser.add_argument('--maxseq', type = int, help = 'Maximum sequences for iterative clustering. ' \
         + 'Requires --iterative. DEFAULT 1000', default = 1000)
-    parser.add_argument('--interval', type = float, help = '-m and -x adjustment for each iteration. ' \
+    parser.add_argument('--interval', type = float, help = 'Distance adjustment for each iteration. ' \
         + 'Requires --iterative. DEFAULT: 0.05', default = 0.05)
+    parser.add_argument('-r', '--refine', action = 'store_true', help = 'Refine --interval when ' \
+        + 'parameters are met.')
     parser.add_argument( '-c', '--cpus', default = 1, type = int, \
         help = 'Cores for alignment during distance matrix construction' )
     args = parser.parse_args()
@@ -346,6 +376,8 @@ if __name__ == '__main__':
     else:
         findExecs( [args.alignment], exit = set(args.alignment) )
 
+    if 1 - args.maxdist <= minid:
+        eprint('\nWARNING: 1 - maximum distance exceeds minimum identity, clustering is ineffective', flush = True)
 
     fastaPath = formatPath(args.fasta)
     fa = fa2dict(fastaPath)
@@ -359,18 +391,16 @@ if __name__ == '__main__':
             sys.exit(6)
 
     if args.output:
-        output = args.output
+        output = formatPath(args.output)
     else:
         output = os.getcwd() + '/' + os.path.basename(fastaPath)
 
-#    if os.path.isfile(output + '.dist'):
- #       print( '\nDistance matrix found! Ignoring "--min_id". Specify new output to rerun.' , flush = True)
-  #      distanceMatrix = importDist( output + '.dist' )
-            
     distanceMatrix, clusters, tree, odm, ocl, ot = main(
         fastaPath, args.minid, args.maxdist, args.minseq, args.maxseq, 
         searchProg = args.alignment, linkage = args.linkage, verbose = True,
-        iterative = args.iterative, interval = args.interval, output = output, spacer = '\n'
+        iterative = args.iterative, interval = args.interval, output = output, spacer = '\n',
+        log_path = os.dirname(output) + '.' + os.path.basename(fastaPath) + '.aggClus.json',
+        refine = args.refine
         )
 
     if ocl:
