@@ -247,7 +247,7 @@ def main(
     if log_path:
         if os.path.isfile(log_path):
             log_dict = readLog(log_path, log_dict)
-        writeJson(log_dict, log_path)
+        writeJson(log_path, log_dict)
 
     attempt, direction, clusters, distanceMatrix, tree = 0, None, None, None, None
     oldDirection, oldClusters, oldDistance_matrix, oldTree = None, None, None, None
@@ -273,7 +273,7 @@ def main(
             if log_path:
                 iteration_dict = {'size': focalLen, 'maximum_distance': maxdist}
                 log_dict['iterations'].append(iteration_dict)
-                writeJson(log_dict, log_path)
+                writeJson(log_path, log_dict)
             if focalLen >= minseq:
                 if maxseq:
                     if focalLen <= maxseq:

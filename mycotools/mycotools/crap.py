@@ -122,7 +122,7 @@ def checkFaSize(fas, max_size):
 def runAggclus(
     fa_path, db, focalGene, minseq, maxseq, output, out_name,
     minid = 0.3, maxdist = 0.65, direction = -1, cpus = 1,
-    verbose = False,
+    verbose = False, interval = 0.05
     ):
 
     output_path = output + str(focalGene) 
@@ -150,7 +150,7 @@ def runAggclus(
 
 def outgroupMngr(
     fa_path, db, focalGene, minseq, maxseq, clus_dir, out_name,
-    minid = 0.3, maxdist = 0.6, direction = -1, cpus = 1,
+    minid = 0.3, direction = -1, cpus = 1, interval = 0.05,
     verbose = False
     ):
     output_path = clus_dir + str(focalGene) + '.outgroup'
@@ -169,8 +169,16 @@ def outgroupMngr(
     if maxdist:
         runAggclus(
             fa_path, db, focalGene, minseq, maxseqs, clus_dir, out_name,
-            minid, maxdist, direction, cpus, verbose
+            minid, maxdist, direction, cpus, verbose, interval
             )
+    else:
+        minseqs = int(iterations[0]['size']) + 1
+        runAggclus(
+            fa_path, db, focalGene, minseqs, None, clus_dir, out_name,
+            minid, maxdist = max([float(x['maximum_distance']) for x in iterations]),
+            direction, cpus, verbose, interval
+            )
+        
 
 
 def makeOutput(base_dir, newLog):
@@ -499,7 +507,7 @@ def crapMngr(
 def OGmain(
     db, inputGenes, ogtag, fast = True, out_dir = None,
     minid = 0.3, maxdist = 0.65, minseq = 20, max_size = 250, cpus = 1,
-    plusminus = 5, verbose = False, reoutput = True
+    plusminus = 5, verbose = False, reoutput = True, interval = 0.05
     ):
     '''inputGenes is a list of genes within an inputted cluster'''
 
@@ -579,7 +587,7 @@ def OGmain(
         print('\t\tHierarchical agglomerative clustering', flush = True)
         runAggclus(
             clus_dir + str(query) + '.fa', db, query, minseq, max_size, clus_dir,
-            query, minid, maxdist, cpus = cpus, verbose = verbose
+            query, minid, maxdist, cpus = cpus, verbose = verbose, interval
             )
         queryFa = fa2dict(wrk_dir + query + '.fa')
         queryHits = list(queryFa.keys())
@@ -593,7 +601,8 @@ def OGmain(
 def SearchMain(
     db, inputGenes, queryFa, queryGff, binary = 'mmseqs', fast = True, out_dir = None,
     minid = 0.3, maxdist = 0.65, minseq = 20, max_size = 250, cpus = 1, reoutput = True,
-    plusminus = 5, evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False
+    plusminus = 5, evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
+    interval = 0.05
     ):
     '''inputGenes is a list of genes within an inputted cluster'''
 
@@ -688,7 +697,7 @@ def SearchMain(
         runAggclus(
             clus_dir + str(query) + '.fa', 
             db, query, minseq, max_size, 
-            clus_dir, query, minid, maxdist, cpus = cpus, verbose = verbose
+            clus_dir, query, minid, maxdist, cpus = cpus, verbose = verbose, interval
             )
         queryFa = fa2dict(wrk_dir + query + '.fa')
         queryHits = list(queryFa.keys())
@@ -837,7 +846,7 @@ if __name__ == "__main__":
             db, inputGenes, args.orthogroups, fast = args.fast, 
             out_dir = out_dir, 
             minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = args.cpu,
-            verbose = args.verbose, plusminus = args.plusminus
+            verbose = args.verbose, plusminus = args.plusminus, interval = args.interval
             )
     else:
         newLog = initLog(
@@ -850,6 +859,6 @@ if __name__ == "__main__":
             db, inputGenes, inputFa, inputGFF, binary = args.search, fast =
             args.fast, out_dir = out_dir,
             minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = 1,
-            plusminus = args.plusminus, bitscore = args.bitscore, pident = 0, mem = None, verbose = args.verbose
+            plusminus = args.plusminus, bitscore = args.bitscore, pident = 0, mem = None, verbose = args.verbose, interval = args.interval
             )
     outro(start_time)
