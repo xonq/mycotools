@@ -673,7 +673,7 @@ if __name__ == '__main__':
         formatPath(args.gff), args.prefix, args.fail
         )
     if args.assembly:
-        fna = fasta2dict(formatPath(args.assembly))
+        fna = fa2dict(formatPath(args.assembly))
         faa = gff2proteome( gff, fna )
         with open( output + '.aa.fa', 'w' ) as out:
             out.write( dict2fa( faa ) )
