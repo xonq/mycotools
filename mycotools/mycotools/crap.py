@@ -586,7 +586,7 @@ def OGmain(
         print('\t\tHierarchical agglomerative clustering', flush = True)
         runAggclus(
             clus_dir + str(query) + '.fa', db, query, minseq, max_size, clus_dir,
-            query, minid, maxdist, cpus = cpus, verbose = verbose, interval
+            query, minid, maxdist, cpus = cpus, verbose = verbose, interval = interval
             )
         queryFa = fa2dict(wrk_dir + query + '.fa')
         queryHits = list(queryFa.keys())
@@ -696,7 +696,7 @@ def SearchMain(
         runAggclus(
             clus_dir + str(query) + '.fa', 
             db, query, minseq, max_size, 
-            clus_dir, query, minid, maxdist, cpus = cpus, verbose = verbose, interval
+            clus_dir, query, minid, maxdist, cpus = cpus, verbose = verbose, interval = interval
             )
         queryFa = fa2dict(wrk_dir + query + '.fa')
         queryHits = list(queryFa.keys())
