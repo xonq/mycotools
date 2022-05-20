@@ -176,9 +176,8 @@ def outgroupMngr(
         runAggclus(
             fa_path, db, focalGene, minseqs, None, clus_dir, out_name,
             minid, maxdist = max([float(x['maximum_distance']) for x in iterations]),
-            direction, cpus, verbose, interval
+            direction = direction, cpus = cpus, verbose = verbose, interval = interval
             )
-        
 
 
 def makeOutput(base_dir, newLog):
