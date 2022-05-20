@@ -307,7 +307,7 @@ def extractLocusGene(ome, accs, gene2query, plusminus, query2color, wrk_dir):
     try:
         out_indices, geneGffs = acc2loci(gff_list, accs, plusminus, mycotools = True, geneGff = True)
     except KeyError:
-        eprint('\t\t' + ome + ' incorrectly formatted GFF3', flush = True)
+        eprint('\t\t\t' + ome + ' incorrectly formatted GFF3', flush = True)
         return
 
     extractedGenes = {}

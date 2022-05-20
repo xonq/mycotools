@@ -661,7 +661,7 @@ if __name__ == '__main__':
         with open( output + '.gff3', 'w' ) as out:
             out.write( list2gff( gff ) + '\n' )
         sys.exit(0)
-    elif not args.fasta:
+    elif not args.assembly:
         eprint('\nERROR: assembly (`-f`) required for curation\n', flush = True)
         sys.exit(2)
 
@@ -672,8 +672,8 @@ if __name__ == '__main__':
     gff, trans_str, failed, flagged = main(
         formatPath(args.gff), args.prefix, args.fail
         )
-    if args.fasta:
-        fna = fasta2dict(formatPath(args.fasta))
+    if args.assembly:
+        fna = fasta2dict(formatPath(args.assembly))
         faa = gff2proteome( gff, fna )
         with open( output + '.aa.fa', 'w' ) as out:
             out.write( dict2fa( faa ) )

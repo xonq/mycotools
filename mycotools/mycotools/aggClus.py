@@ -229,6 +229,52 @@ def readLog(log_path, newLog):
         newLog['iterations'] = oldLog['iterations']
     return newLog
 
+def iterativeRun(maxdist, minid, distanceMatrix, linkage, focalGene, log_dict = None, log_path = None, minval = 0, maxval = 1):
+
+    attempt, direction, clusters, distanceMatrix, tree = 0, None, None, None, None
+    oldDirection, oldClusters, oldTree = None, None, None, None
+    while maxdist >= minval and maxdist <= maxval and 1 - maxdist >= minid:
+        attempt += 1
+        oldClusters, oldTree = clusters, tree
+        clusters, tree = scipyaggd(distanceMatrix, float(maxdist), linkage)
+        cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
+        for gene, index in clusters.items():
+            if index not in cluster_dict:
+                cluster_dict[index] = []
+            cluster_dict[index].append(gene)
+        focalLen = len(cluster_dict[clusters[focalGene]])
+        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True)
+        vprint('\tMinimum identity: ' + str(minid) + '; Maximum Distance ' + str(maxdist), flush = True, v = verbose)
+        if log_path:
+            iteration_dict = {'size': focalLen, 'maximum_distance': maxdist}
+            log_dict['iterations'].append(iteration_dict)
+            writeJson(log_path, log_dict)
+        if focalLen >= minseq:
+            if maxseq:
+                if focalLen <= maxseq:
+                    vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                    break
+                else:
+                    direction = 1
+            else:
+                vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                break
+        else:
+            direction = -1
+
+        if oldDirection:
+            if direction != oldDirection:
+                eprint(spacer + 'WARNING: Overshot. Could not find parameters using current interval.', flush = True)
+                vprint('Outputting Iterations ' + str(attempt) + ' & ' + str(attempt - 1), flush = True, v = verbose)
+                break
+        else:
+            oldDirection = direction
+#         minid += (interval*direction)
+        maxdist -= (interval*direction)
+    else:
+        eprint(spacer + 'WARNING: Could not find a maximum distance that satisfies parameters', flush = True)
+
+    return clusters, tree, oldClusters, oldTree, log_dict    
 
 def main(
     fastaPath, minid, maxdist, minseq, maxseq, 
@@ -249,73 +295,22 @@ def main(
             log_dict = readLog(log_path, log_dict)
         writeJson(log_path, log_dict)
 
-    attempt, direction, clusters, distanceMatrix, tree = 0, None, None, None, None
-    oldDirection, oldClusters, oldDistance_matrix, oldTree = None, None, None, None
-    while True:
-        oldDistance_matrix = distanceMatrix
-        attempt += 1
-        if searchProg == 'needle': #elif if above lines not highlighted
-            distanceMatrix = needleMain(fastaPath, minid, cpus = 1)
-        elif searchProg == 'usearch':
-            distanceMatrix = usearchMain(fastaPath, minid, output, cpus, verbose)
-        vprint('\nClustering\n', flush = True, v = verbose)
-        oldClusters, oldTree = clusters, tree
+    if searchProg == 'needle': #elif if above lines not highlighted
+        distanceMatrix = needleMain(fastaPath, minid, cpus = 1)
+    elif searchProg == 'usearch':
+        distanceMatrix = usearchMain(fastaPath, minid, output, cpus, verbose)
+
+    vprint('\nClustering\n', flush = True, v = verbose)
+    if iterative:
+        clusters, tree, oldClusters, oldTree, log_dict = iterativeRun(
+            maxdist, minid, distanceMatrix, linkage, 
+            focalGene, log_dict = log_dict, log_path = log_path, minval = 0, maxval = 1
+            )
+    else:
+        oldClusters, oldTree = None, None
         clusters, tree = scipyaggd(distanceMatrix, float(maxdist), linkage)
-        if iterative:
-            cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
-            for gene, index in clusters.items():
-                if index not in cluster_dict:
-                    cluster_dict[index] = []
-                cluster_dict[index].append(gene)
-            focalLen = len(cluster_dict[clusters[iterative]])
-            vprint('\t\tITERATION ' + str(attempt) + ': ' + iterative + ' cluster size: ' + str(focalLen), flush = True)
-            vprint('\t\t\tMinimum identity: ' + str(minid) + '; Maximum Distance ' + str(maxdist), flush = True, v = verbose)
-            if log_path:
-                iteration_dict = {'size': focalLen, 'maximum_distance': maxdist}
-                log_dict['iterations'].append(iteration_dict)
-                writeJson(log_path, log_dict)
-            if focalLen >= minseq:
-                if maxseq:
-                    if focalLen <= maxseq:
-                        vprint('\t\tSUCCESS!', flush = True, v = verbose)
-                        break
-                    else:
-                        direction = 1
-                else:
-                    vprint('\t\tSUCCESS!', flush = True, v = verbose)
-                    break
-            else:
-                direction = -1
 
-            if oldDirection:
-                if direction != oldDirection:
-                    eprint(spacer + 'WARNING: Overshot. Could not find parameters using current interval.', flush = True)
-                    vprint('Outputting Iterations ' + str(attempt) + ' & ' + str(attempt - 1), flush = True, v = verbose)
-                    break
-            else:
-                oldDirection = direction
-#            minid += (interval*direction)
-            maxdist -= (interval*direction)
-
- #           if minid >= 1:
-  #              eprint(spacer + 'WARNING: Minimum identity maximized, FAILED to achieve minimum sequences', flush = True)
-   #             break
-            if maxdist <= 0:
-                eprint(spacer + 'WARNING: Maximum distance minimized, FAILED to achieve parameters', flush = True)
-                break
-#            elif minid <= 0:
- #               eprint(spacer + 'WARNING: Minimum identity minimized, FAILED to achieve minimum sequences', flush = True)
-  #              break
-            elif maxdist >= 1:
-                eprint(spacer + 'WARNING: Maximum distance maximized, FAILED to achieve parameters', flush = True)
-                break
-            elif 1 - maxdist <= minid:
-                eprint(spacer + 'WARNING: Maximum distance exceeds minimum identity. FAILED to achieve parameters', flush = True)
-                break
-        else:
-            break
-
-    return distanceMatrix, clusters, tree, oldDistance_matrix, oldClusters, oldTree
+    return distanceMatrix, clusters, tree, oldClusters, oldTree
 
 def writeData(tree, distanceMatrix, clusters, output):
 
@@ -395,7 +390,7 @@ if __name__ == '__main__':
     else:
         output = os.getcwd() + '/' + os.path.basename(fastaPath)
 
-    distanceMatrix, clusters, tree, odm, ocl, ot = main(
+    distanceMatrix, clusters, tree, ocl, ot = main(
         fastaPath, args.minid, args.maxdist, args.minseq, args.maxseq, 
         searchProg = args.alignment, linkage = args.linkage, verbose = True,
         iterative = args.iterative, interval = args.interval, output = output, spacer = '\n',
