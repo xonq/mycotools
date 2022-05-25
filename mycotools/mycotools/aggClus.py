@@ -225,14 +225,19 @@ def readLog(log_path, newLog):
     if oldLog['fasta'] == newLog['fasta'] and \
         oldLog['minimum_id'] == newLog['minimum_id'] and \
         oldLog['search_program'] == newLog['search_program']:
-
         newLog['iterations'] = oldLog['iterations']
+    elif os.path.isfile(newLog['distance_matrix']):
+        os.remove(newLog['distance_matrix'])
     return newLog
 
-def iterativeRun(maxdist, minid, distanceMatrix, linkage, focalGene, log_dict = None, log_path = None, minval = 0, maxval = 1):
+def iterativeRun(
+    minseq, maxseq, maxdist, minid, distanceMatrix, linkage, focalGene, interval = 0.1,
+    log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False
+    ):
 
-    attempt, direction, clusters, distanceMatrix, tree = 0, None, None, None, None
-    oldDirection, oldClusters, oldTree = None, None, None, None
+    exitCode = 1
+    attempt, direction, clusters, tree = 0, None, None, None
+    oldDirection, oldClusters, oldTree = None, None, None
     while maxdist >= minval and maxdist <= maxval and 1 - maxdist >= minid:
         attempt += 1
         oldClusters, oldTree = clusters, tree
@@ -243,7 +248,7 @@ def iterativeRun(maxdist, minid, distanceMatrix, linkage, focalGene, log_dict = 
                 cluster_dict[index] = []
             cluster_dict[index].append(gene)
         focalLen = len(cluster_dict[clusters[focalGene]])
-        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True)
+        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
         vprint('\tMinimum identity: ' + str(minid) + '; Maximum Distance ' + str(maxdist), flush = True, v = verbose)
         if log_path:
             iteration_dict = {'size': focalLen, 'maximum_distance': maxdist}
@@ -253,11 +258,13 @@ def iterativeRun(maxdist, minid, distanceMatrix, linkage, focalGene, log_dict = 
             if maxseq:
                 if focalLen <= maxseq:
                     vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                    exitCode = 0
                     break
                 else:
                     direction = 1
             else:
                 vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                exitCode = 0
                 break
         else:
             direction = -1
@@ -266,20 +273,66 @@ def iterativeRun(maxdist, minid, distanceMatrix, linkage, focalGene, log_dict = 
             if direction != oldDirection:
                 eprint(spacer + 'WARNING: Overshot. Could not find parameters using current interval.', flush = True)
                 vprint('Outputting Iterations ' + str(attempt) + ' & ' + str(attempt - 1), flush = True, v = verbose)
+                exitCode = 2
                 break
         else:
             oldDirection = direction
 #         minid += (interval*direction)
         maxdist -= (interval*direction)
-    else:
-        eprint(spacer + 'WARNING: Could not find a maximum distance that satisfies parameters', flush = True)
 
-    return clusters, tree, oldClusters, oldTree, log_dict    
+    return clusters, tree, oldClusters, oldTree, log_dict, exitCode
+
+def reiterativeRun(
+    minseq, maxseq, maxdist, minid, distanceMatrix, linkage, focalGene, interval = 0.01,
+    log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False
+    ):
+
+    attempt, direction, clusters, tree = 0, None, None, None
+    oldDirection, refines = None, []
+#    print(maxdist, minval, maxval)
+    while maxdist >= minval and maxdist <= maxval:
+        attempt += 1
+        clusters, tree = scipyaggd(distanceMatrix, float(maxdist), linkage)
+        cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
+        for gene, index in clusters.items():
+            if index not in cluster_dict:
+                cluster_dict[index] = []
+            cluster_dict[index].append(gene)
+        focalLen = len(cluster_dict[clusters[focalGene]])
+        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
+        vprint('\tMinimum identity: ' + str(minid) + '; Maximum Distance ' + str(maxdist), flush = True, v = verbose)
+        if log_path:
+            iteration_dict = {'size': focalLen, 'maximum_distance': maxdist}
+            log_dict['iterations'].append(iteration_dict)
+            writeJson(log_path, log_dict)
+        if focalLen >= minseq:
+            if focalLen <= maxseq:
+                refines.append([clusters, tree, True])
+                direction = -1
+            else:
+                refines.append([clusters, tree, False])
+                direction = 1
+        else:
+            refines.append([clusters, tree, False])
+            direction = -1
+
+        if oldDirection:
+            if direction != oldDirection: # if the directions changed it was
+            # met/overshot
+                if refines[-2][2]: # if the second to last run was successful
+                    return refines[-2][0], refines[-2][1], None, None, log_dict
+                else: # return the two closest to success
+                    return refines[-1][0], refines[-1][1], refines[-2][0], refines[-2][1], log_dict
+        else:
+            oldDirection = direction
+        maxdist -= (interval*direction)
+
+
 
 def main(
     fastaPath, minid, maxdist, minseq, maxseq, 
     searchProg = 'usearch', linkage = 'single', 
-    iterative = False, interval = 0.05, output= None, cpus = 1,
+    iterative = False, interval = None, output= None, cpus = 1,
     verbose = False, spacer = '\t', log_path = None,
     refine = False
     ):
@@ -287,7 +340,7 @@ def main(
     log_dict = {
         'fasta': fastaPath, 'minimum_id': minid, 'maximum_distance': maxdist,
         'minimum_sequences': minseq, 'maximum_sequences': maxseq, 'search_program': searchProg,
-        'linkage': linkage, 'interval': interval, 'focal_gene': iterative,
+        'distance_matrix': output + '.dist', 'linkage': linkage, 'focal_gene': iterative,
         'iterations': []
         }
     if log_path:
@@ -295,17 +348,66 @@ def main(
             log_dict = readLog(log_path, log_dict)
         writeJson(log_path, log_dict)
 
-    if searchProg == 'needle': #elif if above lines not highlighted
-        distanceMatrix = needleMain(fastaPath, minid, cpus = 1)
-    elif searchProg == 'usearch':
-        distanceMatrix = usearchMain(fastaPath, minid, output, cpus, verbose)
+    if os.path.isfile(log_dict['distance_matrix']):
+        distanceMatrix = importDist(log_dict['distance_matrix'])
+    else:
+        if searchProg == 'needle': #elif if above lines not highlighted
+            distanceMatrix = needleMain(fastaPath, minid, cpus = 1)
+        elif searchProg == 'usearch':
+            distanceMatrix = usearchMain(fastaPath, minid, output, cpus, verbose)
 
     vprint('\nClustering\n', flush = True, v = verbose)
-    if iterative:
-        clusters, tree, oldClusters, oldTree, log_dict = iterativeRun(
-            maxdist, minid, distanceMatrix, linkage, 
-            focalGene, log_dict = log_dict, log_path = log_path, minval = 0, maxval = 1
+    if iterative and interval:
+        clusters, tree, oldClusters, oldTree, log_dict, exitCode = iterativeRun(
+            minseq, maxseq, maxdist, minid, distanceMatrix, linkage, 
+            iterative , interval = 0.1, log_dict = log_dict, log_path = log_path, minval = 0, maxval = 1,
+            verbose = verbose
             )
+        if refine:
+            if exitCode == 0 or exitCode == 2: # parameters were met/overshot
+                if len(log_dict['iterations']) > 1: # if there's room to work
+                # with
+                    finalIter = log_dict['iterations'][-1]
+                    compIter = log_dict['iterations'][-2]
+                    interval = 0.01
+                    minval = min([
+                            compIter['maximum_distance'], finalIter['maximum_distance']
+                            ]) 
+                    maxval = max([
+                            compIter['maximum_distance'],
+                            finalIter['maximum_distance']
+                            ])
+                    clusters, tree, oldClusters, oldTree, log_dict = reiterativeRun(
+                        minseq, maxseq, minval, minid, distanceMatrix, linkage, iterative, 
+                        interval = 0.01, log_dict = log_dict, log_path = log_path, minval = minval,
+                        maxval = maxval, verbose = verbose
+                        )
+                    if oldTree:
+                        vprint(
+                            spacer + 'WARNING: Cluster does not exist within parameters', 
+                            v = verbose, flush = True
+                            )
+                    else:
+                        vprint(
+                            spacer + 'SUCCESS!', v = verbose, flush = True
+                            )
+            else: # parameters were not met
+                vprint(
+                    spacer + 'WARNING: Could not find a cluster that meets parameters', 
+                    v = verbose, flush = True
+                    )
+        elif exitCode == 0:
+            vprint(spacer + 'SUCCESS!', v = verbose, flush = True)
+        elif exitCode == 1:
+            vprint(
+                spacer + 'WARNING: Could not find a cluster that meets parameters', 
+                v = verbose, flush = True
+                )
+        else:
+            vprint(
+                spacer + 'WARNING: Overshot paremters',
+                v = verbose, flush = True
+                )
     else:
         oldClusters, oldTree = None, None
         clusters, tree = scipyaggd(distanceMatrix, float(maxdist), linkage)
@@ -326,8 +428,6 @@ def writeData(tree, distanceMatrix, clusters, output):
             out.write(newick)
 
 
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( 
@@ -341,22 +441,23 @@ if __name__ == '__main__':
         )
     parser.add_argument( '-o', '--output', help = 'e.g. "~/name" will output name.clus, etc' )
     parser.add_argument( '-m', '--minid', help = 'Minimum identity'
-        + ' for alignment. DEFAULT 0.3', type = float, default = 0.3 )
+        + ' for alignment. DEFAULT 0.2', type = float, default = 0.2 )
     parser.add_argument( '-x', '--maxdist', help = 'Maximum distance'
-        + ' for clustering (1 - minimum identity). DEFAULT: 0.6', type = float, default = 0.6)
+        + ' for clustering (1 - identity). DEFAULT: 0.75', type =
+        float, default = 0.75)
     parser.add_argument( '-l', '--linkage', default = 'single', help = "Linkage criterion:" \
         + " 'complete' (maximum distance), 'average', 'weighted', 'centroid', or 'single'" \
         + " (minimum distance) DEFAULT: 'single' (minimum)" )
     parser.add_argument('--iterative', help = 'Gene to iteratively cluster for. Requires ' \
-        + ' --minseq.')
+        + ' --minseq, eliminates --maxdist')
     parser.add_argument('--minseq', type = int, help = 'Iteratively adjust -m and -x until a cluster ' \
         + ' of minimum sequences is obtained. Requires --iterative. DEFAULT: 100', default = 100)
     parser.add_argument('--maxseq', type = int, help = 'Maximum sequences for iterative clustering. ' \
         + 'Requires --iterative. DEFAULT 1000', default = 1000)
-    parser.add_argument('--interval', type = float, help = 'Distance adjustment for each iteration. ' \
-        + 'Requires --iterative. DEFAULT: 0.05', default = 0.05)
-    parser.add_argument('-r', '--refine', action = 'store_true', help = 'Refine --interval when ' \
-        + 'parameters are met.')
+#    parser.add_argument('--interval', type = float, help = 'Distance adjustment for each iteration. ' \
+ #       + 'Requires --iterative. DEFAULT: 0.05', default = 0.05)
+    parser.add_argument('-r', '--refine', action = 'store_true', 
+        help = 'Refine cluster to maximize sequences within parameters.')
     parser.add_argument( '-c', '--cpus', default = 1, type = int, \
         help = 'Cores for alignment during distance matrix construction' )
     args = parser.parse_args()
@@ -371,7 +472,9 @@ if __name__ == '__main__':
     else:
         findExecs( [args.alignment], exit = set(args.alignment) )
 
-    if 1 - args.maxdist <= minid:
+    if args.iterative:
+        args.maxdist = 1 - minid
+    elif 1 - args.maxdist <= minid:
         eprint('\nWARNING: 1 - maximum distance exceeds minimum identity, clustering is ineffective', flush = True)
 
     fastaPath = formatPath(args.fasta)
@@ -393,7 +496,7 @@ if __name__ == '__main__':
     distanceMatrix, clusters, tree, ocl, ot = main(
         fastaPath, args.minid, args.maxdist, args.minseq, args.maxseq, 
         searchProg = args.alignment, linkage = args.linkage, verbose = True,
-        iterative = args.iterative, interval = args.interval, output = output, spacer = '\n',
+        iterative = args.iterative, interval = 0.10, output = output, spacer = '\n',
         log_path = os.dirname(output) + '.' + os.path.basename(fastaPath) + '.aggClus.json',
         refine = args.refine
         )

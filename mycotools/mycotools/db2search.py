@@ -88,7 +88,7 @@ def parseOutput( ome, file_, bitscore = 0, pident = 0 ):
     return ome_results
 
 
-def compileResults( res_dict ):
+def compileResults( res_dict, skip = [] ):
 
     output_res = {}
     for i in res_dict:
@@ -104,6 +104,9 @@ def compileResults( res_dict ):
                 output_res[query][i] = []
 
             output_res[query][i].append( [ subject, start, end ] )
+
+    for query in skip:
+        del output_res[query]
 
     return output_res
 
@@ -230,7 +233,7 @@ def ObyOsearch(
 
 # NEED to add other threshold options
     if len(rundb) > 0:
-        print('\nSearching', flush = True)
+        print('\nSearching on an ome-by-ome basis', flush = True)
         if 'blast' in blast:
             search_tups = compBlastTups(
                 rundb, blast, seq_type, 
@@ -363,7 +366,7 @@ def main(
     max_hits = None, evalue = 10, bitscore = 0, 
     pident = 0, mem = None, #coverage = 0,
     cpus = 1, force = False, biotype = None,
-    skip = None
+    skip = []
     ):
 
     if blast in {'tblastn', 'blastp'}:
@@ -405,7 +408,6 @@ def main(
             pident = pident, max_hits = max_hits
             )
     else:
-        print('\nSearching on an ome-by-ome basis', flush = True) 
         rundb = ObyOprep(
             db, report_dir, blast, query, 
             max_hits, evalue, out_dir, bitscore, pident
@@ -417,7 +419,7 @@ def main(
             )
 
     print('\nCompiling fastas', flush = True)
-    output_res = compileResults( results_dict )
+    output_res = compileResults( results_dict, skip )
     acc2fa_cmds = compAcc2fa( db, biotype, env_dir, output_res, skip = None )
     output_fas = {}
     queryfa = fa2dict(query)

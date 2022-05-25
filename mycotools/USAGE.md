@@ -675,15 +675,17 @@ select the clade of interest as described in step 6a.
 ### crap.py
 CRAP (originally created by Jason Slot) is a simple, elegant pipeline for
 studying the evolution of a gene cluster on a gene-by-gene basis. CRAP 
-will input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
-or orthogroup-based approach to find homologs in the MycotoolsDB, construct 
-phylogenies of each query sequence, and map locus synteny diagrams onto the 
-leaves of the phylogenies.
+will 1) input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
+or orthogroup-based approach to find homologs in the MycotoolsDB; 2) use 
+hierarchical clustering to truncate the sequence set and detect outgroups;
+3) construct phylogenies of each query sequence; and 4) map locus synteny 
+diagrams  onto the leaves of the phylogenies.
 
 `crap.py` can operate on a query of MycotoolsDB accessions or a standalone
 multifasta input of external accessions. Following homolog acquisition,
-`crap.py` will submit each set of hits for tree building or agglomerative
-clustering if the number of sequences exceeds the inputted maximum (`-m`).
+`crap.py` will submit each set of hits for tree building or hierarchical 
+agglomerative clustering if the number of sequences exceeds the inputted maximum 
+(`-m`).
 
 By default, `crap.py` will construct trees using 1000 bootstrap iterations
 of IQTree with the ModelFinder module. Alternatively `-f` can be specified
@@ -691,18 +693,14 @@ for `fasttree`.
 
 To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
 ```bash
-(mycotools) -bash-4.2$ crap.py -i <QUERYGENES> -d <MYCOTOOLSDB2search> -s blastp --fast --bitscore 40 --cpu 12
+(mycotools) -bash-4.2$ extractDB.py --rank phylum --lineage Basidiomycota > basi.db
+(mycotools) -bash-4.2$ crap.py -q <QUERYGENES> -d basi.db -s blastp --fast --bitscore 40 --cpu 12
 ```
-
-`crap.py` can reoutput (`-r`) using overwritten tree files. This allows the
-user to root the trees and reupload.
 
 <br />
 
 ```bash
-(mycotools) -bash-4.2$ crap.py -h
-usage: crap.py [-h] -q QUERY [-d DATABASE] [-s SEARCH] [-og ORTHOGROUPS] [-p PLUSMINUS] [-m MAXIMUM] [-f]
-               [-i INTERVAL] [-b BITSCORE] [-g GFF] [--conversion CONVERSION] [-o OUTPUT] [-c CPU] [-v]
+usage: crap.py [-h] -q QUERY [-d DATABASE] [-s SEARCH] [-b BITSCORE] [-og ORTHOGROUPS] [-p PLUSMINUS] [--maxseq MAXSEQ] [--minid MINID] [-f] [--ingroup] [-g GFF] [-o OUTPUT] [-c CPU] [-v]
 
 Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
 
@@ -713,22 +711,19 @@ optional arguments:
   -d DATABASE, --database DATABASE
   -s SEARCH, --search SEARCH
                         Search binary {mmseqs, blastp} for search-based CRAP
+  -b BITSCORE, --bitscore BITSCORE
+                        Bitscore minimum for search algorithm. DEFAULT: 30
   -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
                         MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
   -p PLUSMINUS, --plusminus PLUSMINUS
                         Genes up-/downstream to analyze from loci. DEFAULT: 10
-  -m MAXIMUM, --maximum MAXIMUM
-                        Max sequences for trees/min for aggClus.py. DEFAULT: 250
-  -f, --fast            Fasttree
-  -i INTERVAL, --interval INTERVAL
-                        Agglomerative clustering identity/distance interval. DEFAULT: 0.05
-  -b BITSCORE, --bitscore BITSCORE
-                        Bitscore minimum for search algorithm. DEFAULT: 30
+  --maxseq MAXSEQ       Max sequences for trees/min for aggClus.py. Outgroup detection may exceed this number. DEFAULT: 250
+  --minid MINID         Minimum identity for aggClus.py. DEFAULT: 0.2
+  -f, --fast            Fasttree. DEFAULT: IQTree2 1000 bootstrap iterations
+  --ingroup             Do not detect outgroups, do not root trees
   -g GFF, --gff GFF     GFF for non-mycotools input. Requires -s and a fasta for -i
-  --conversion CONVERSION
-                        Tab delimited query conversion file for locus diagram annotation
   -o OUTPUT, --output OUTPUT
-                        Output base dir
+                        Output base dir. Will rerun if previous director exists.
   -c CPU, --cpu CPU
   -v, --verbose
 ```
