@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-# NEED to remove pandas requirement
-
 import multiprocessing as mp
 import os, sys, argparse, re
 from mycotools.lib.biotools import gff2list, list2gff

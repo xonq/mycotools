@@ -1,16 +1,17 @@
 #! /usr/bin/env python3
 
 from mycotools.lib.kontools import eprint, formatPath, file2list
-from mycotools.lib.dbtools import masterDB, db2df
+from mycotools.lib.dbtools import masterDB, mtdb
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
 from mycotools.acc2gff import grabGffAcc
-import sys, os, re, argparse, pandas as pd, multiprocessing as mp
+import sys, os, re, argparse, multiprocessing as mp
 
 
 def grabFiles( ome ):
+    # grab MycotoolsDB files using ome info
     gff = formatPath( '$MYCOGFF3/' + ome + '.gff3' )
     if not os.path.isfile(gff):
-        print( 'ERROR: ' + ome + ' gff not detected' , flush = True)
+        eprint( 'ERROR: ' + ome + ' gff not detected' , flush = True)
     prot = formatPath( '$MYCOFAA/' + ome + '.aa.fa' )
     return gff, prot
 
@@ -26,8 +27,13 @@ def prepGffOutput( hit_list, gff_path, cpu = 1):
             grabGffAcc, mp_cmds
         )
     gff_strs = [ list2gff(x) for x in gff_list_strs ]
+    gff_str = '##gff-version 3\n'
+    for x in gff_strs:
+        for line in x.split('\n'):
+            if not line.startswith('#'):
+                gff_str += line + '\n'
 
-    return '\n'.join( gff_strs )
+    return gff_str
 
 
 def prepFaaOutput( hit_list, proteome_path ):
@@ -238,8 +244,8 @@ if __name__ == '__main__':
   #          sys.exit( 3 )
         out_indices = main( gff, accession, args.plusminus )
     else:
-        db = db2df( formatPath( masterDB() ) ).set_index('internal_ome')
-        out_indices = mycotools_main(db, accessions, plusminus = 10, cpus = args.cpus)
+        db = mtdb( formatPath( masterDB() ) ).set_index('internal_ome')
+        out_indices = mycotools_main(db, accessions, plusminus = 10, cpus = args.cpu)
 
 #        for i in acc_res:
  #           out_indices[i[1]] = i[0] 
@@ -253,26 +259,25 @@ if __name__ == '__main__':
                 else:
                     prot = None
             else:
-                gff, prot = grabFiles( accession, db )
-            for hit in out_indices[accession]:
-                if len( out_indices[accession][hit] ) > 0:
-                    gff_str = prepGffOutput( 
-                        out_indices[accession][hit], gff, cpu = args.cpu
-                    )
-                    with open( accession + '.locus.gff3', 'w' ) as out:
-                        out.write( gff_str )
-                    if prot:
-                        prot_str = prepFaaOutput(
-                            out_indices[accession][hit], prot
-                            )
-                        with open( accession + '.locus.aa.fa', 'w' ) as out:
-                            out.write( prot_str )
+                gff, prot = grabFiles( accession[:accession.find('_')] )
+#            for hit in out_indices[accession]:
+            if len( out_indices[accession] ) > 0:
+                gff_str = prepGffOutput( 
+                    out_indices[accession], gff, cpu = args.cpu
+                )
+                with open( accession + '.locus.gff3', 'w' ) as out:
+                    out.write( gff_str )
+                if prot:
+                    prot_str = prepFaaOutput(
+                        out_indices[accession], prot
+                        )
+                    with open( accession + '.locus.aa.fa', 'w' ) as out:
+                        out.write( prot_str )
     else:
         for accession in out_indices:
 #            print('\n' + accession + ' locus +/- ' + str(args.plusminus), flush = True)
             for hit in out_indices[accession]:
-                for index in out_indices[accession][ hit ]:
-                    print( index , flush = True)
+#                for index in out_indices[accession]:
+                print( hit, flush = True)
             print(flush = True)
- 
     sys.exit( 0 )

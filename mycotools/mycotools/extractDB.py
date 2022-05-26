@@ -1,26 +1,29 @@
 #! /usr/bin/env python3
 
-import pandas as pd, numpy as np
-import argparse, os, sys
+import argparse, os, sys, random
 from mycotools.lib.kontools import file2list, intro, outro, formatPath, eprint
 from mycotools.lib.dbtools import mtdb, extract_tax, extract_omes, masterDB
 
 def main( 
-    db, rank = False, unique_species = False, lineage_list = False,
+    db, rank = False, unique_species = 0, lineage_list = False,
     inverse = False, lineage = False, ome_list = False,
-    source = False, nonpublished = False, unique_strains = False
+    source = False, nonpublished = False
     ):
 
-    if unique_species:
-        db['full_name'] = db.apply(
-            lambda x: str(x['genus']) + '_' + str(x['species']), axis = 1
-            )
-        db = db.drop_duplicates('full_name')
-    elif unique_strains:
-        db['full_name'] = db.apply(
-            lambda x: str(x['genus']) + '_' + str(x['species']) + str(x['strain']), axis = 1
-            )
-        db = db.drop_duplicates('full_name')
+    if unique_species > 0:
+        db = db.set_index('internal_ome')
+        keys = random.shuffle(list(db.keys()))
+        prep_db0 = {x: db[x] for x in keys}
+        prep_db1 = mtdb().set_index('internal_ome')
+        found = {}
+        for ome, row in prep_db0.items():
+            name = row['genus'].lower() + '_' + row['species'].lower()
+            if name not in found:
+                name[found] = 0
+            name[found] += 1
+            if name[found] <= unique_species:
+                prep_db1[ome] = row
+        db = prep_db1.reset_index()
 
     # if a taxonomy list is specified then open it, store each entry in a list
     # and extract each taxonomic entry based on the classification specified
@@ -93,8 +96,7 @@ if __name__ == '__main__':
     parser.add_argument( '-s', '--source', help = 'Data source' )
     parser.add_argument( '-n', '--nonpublished', action = 'store_true', help = 'Include ' + \
         'restricted-use' )
-    parser.add_argument( '-u', '--unique', action = 'store_true', help = 'Unique species' )
-    parser.add_argument( '--unique_strains', action = 'store_true' )
+    parser.add_argument( '-u', '--unique', type = int, help = 'Number of same species allowed' )
     parser.add_argument( '-i', '--inverse', action = 'store_true', help = 'Inverse arguments' )
     parser.add_argument( '--headers', action = 'store_true', help = 'Include header')
     parser.add_argument( '-o', '--output' )
@@ -153,7 +155,7 @@ if __name__ == '__main__':
     new_db = main( 
         db, rank = args.rank, lineage = args.lineage, lineage_list = args.lineages,
         ome_list = args.ome, source = args.source, unique_species = args.unique, 
-        nonpublished = args.nonpublished, inverse = args.inverse, unique_strains = args.unique_strains
+        nonpublished = args.nonpublished, inverse = args.inverse
         )
     if args.output:
         new_db.df2db( output )

@@ -232,7 +232,7 @@ def readLog(log_path, newLog):
 
 def iterativeRun(
     minseq, maxseq, maxdist, minid, distanceMatrix, linkage, focalGene, interval = 0.1,
-    log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False
+    log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False, spacer = '\t'
     ):
 
     exitCode = 1
@@ -361,7 +361,7 @@ def main(
         clusters, tree, oldClusters, oldTree, log_dict, exitCode = iterativeRun(
             minseq, maxseq, maxdist, minid, distanceMatrix, linkage, 
             iterative , interval = 0.1, log_dict = log_dict, log_path = log_path, minval = 0, maxval = 1,
-            verbose = verbose
+            verbose = verbose, spacer = spacer
             )
         if refine:
             if exitCode == 0 or exitCode == 2: # parameters were met/overshot

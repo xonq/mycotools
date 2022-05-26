@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-#import pandas as pd
 import os, sys, argparse, re
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
 from mycotools.lib.dbtools import mtdb, masterDB
