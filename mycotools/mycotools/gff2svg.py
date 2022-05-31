@@ -21,7 +21,7 @@ def gff2svg(
     gff, svg_path, product_dict, colors,
     prod_comp = gff3Comps()['product'], width = 10,
     null = 'hypothetical protein', types = {'tRNA', 'mRNA', 'rRNA'},
-    max_size = 100
+    max_size = 100, labels = True
     ):
 
     # needs to end with .svg
@@ -66,7 +66,7 @@ def gff2svg(
         for i in seqs[seq]:
 #            i[0] -= start
  #           i[1] -= start
-            if i[-1] == null:
+            if i[-1] == null or not labels:
                 features.append(GraphicFeature(
                     start = i[0], end = i[1], strand = i[2],
                     color = i[3])
@@ -91,7 +91,8 @@ def gff2svg(
 def main(
     gff_list, svg_path, product_dict = {}, 
     width = 10, prod_comp = gff3Comps()['product'], 
-    null = 'hypothetical protein', types = {'tRNA', 'mRNA', 'rRNA'}
+    null = 'hypothetical protein', types = {'tRNA', 'mRNA', 'rRNA'},
+    labels = True
     ):
 
     if not set(product_dict.keys()).difference({null}): 
@@ -135,7 +136,8 @@ def main(
 
     product_dict = gff2svg(
         gff_list, svg_path, product_dict, colors,
-        prod_comp = prod_comp, width = width, null = null 
+        prod_comp = prod_comp, width = width, null = null,
+        labels = labels
         )
 
     return product_dict

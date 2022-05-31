@@ -610,10 +610,10 @@ def main( gff_path, prefix, fail = True ):
             ) 
         failed, flagged = None, None
 
-    id_comp = re.compile(gff3Comps()['id'])
+#    id_comp = re.compile(gff3Comps()['id'])
     crude_sort = sorted( unsortedGff, key = lambda x: \
         int( re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1] ))
-    gff = sortGFF(crude_sort, id_comp)
+    gff = sortGFF(crude_sort, re.compile(gff3Comps()['Alias']))
  
     return gff, trans_str, failed, flagged
 

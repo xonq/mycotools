@@ -84,11 +84,14 @@ def prepGff(gff, prots, comps, hits = set(), parDict = {}):
                 hits.add(protID)
     return parDict, hits, RNA, gff
 
-def rogueLocus(locusID, rnaGFF, wrk_dir, query2color):
+def rogueLocus(locusID, rnaGFF, wrk_dir, query2color, labels = True):
     with open(wrk_dir + 'genes/' + locusID + '.locus.genes', 'w') as out:
             out.write(list2gff(rnaGFF))
     svg_path = wrk_dir + 'svg/' + locusID + '.locus.svg'
-    gff2svg(rnaGFF, svg_path, product_dict = query2color, prod_comp = r';SearchQuery=([^;]+$)', width = 10, null = 'na')
+    gff2svg(
+        rnaGFF, svg_path, product_dict = query2color, labels = labels,
+        prod_comp = r';SearchQuery=([^;]+$)', width = 10, null = 'na'
+        )
 
 
 def inputGenes2inputOGs(inputGenes, gene2og, ogtag):
@@ -274,7 +277,7 @@ def compileGenesByOme4queries(search_fas, conversion_dict, omes = set()):
 
 
 
-def extractLocusOG(ome, genesTograb, ogs, omeGene2og, plusminus, og2color, wrk_dir):
+def extractLocusOG(ome, genesTograb, ogs, omeGene2og, plusminus, og2color, wrk_dir, labels = True):
     gff_list = gff2list(formatPath('$MYCOGFF3/' + ome + '.gff3'))
     genesTograb = [x for x in genesTograb if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
     out_indices, geneGffs = acc2loci(gff_list, genesTograb, plusminus, mycotools = True, geneGff = True)
@@ -303,12 +306,15 @@ def extractLocusOG(ome, genesTograb, ogs, omeGene2og, plusminus, og2color, wrk_d
 
     for locusID, geneGff in extractedGenes.items():
         svg_path = wrk_dir + 'svg/' + locusID + '.locus.svg'
-        gff2svg(geneGff, svg_path, product_dict = og2color, prod_comp = r';OG=([^;]+$)', width = 10, null = 'na')
+        gff2svg(
+            geneGff, svg_path, product_dict = og2color, prod_comp = r';OG=([^;]+$)', 
+            width = 10, null = 'na', labels = labels
+            )
    
     return extractedGenes
 
 
-def extractLocusGene(ome, accs, gene2query, plusminus, query2color, wrk_dir):
+def extractLocusGene(ome, accs, gene2query, plusminus, query2color, wrk_dir, labels = True):
     gff_list = gff2list(formatPath('$MYCOGFF3/' + ome + '.gff3'))
     accs = [x for x in accs if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
     try:
@@ -342,7 +348,10 @@ def extractLocusGene(ome, accs, gene2query, plusminus, query2color, wrk_dir):
 
     for locusID, geneGff in extractedGenes.items():
         svg_path = wrk_dir + 'svg/' + locusID + '.locus.svg'
-        gff2svg(geneGff, svg_path, product_dict = query2color, prod_comp = r';SearchQuery=([^;]+$)', width = 8, null = 'na')
+        gff2svg(
+            geneGff, svg_path, product_dict = query2color, labels = labels,
+            prod_comp = r';SearchQuery=([^;]+$)', width = 8, null = 'na'
+            )
    
     return extractedGenes
 
@@ -438,7 +447,7 @@ def treeMngr(
 
 def initLog(
     db_path, queries, searchMech, bitscore,
-    maximum, plusminus
+    maximum, plusminus, labels
     ):
     with open(formatPath(db_path), 'rb') as raw:
         db5 = hashlib.md5(raw.read()).hexdigest()
@@ -450,6 +459,7 @@ def initLog(
         'bitscore': bitscore,
         'clusMax':  maximum,
         'plusminus':    plusminus,
+        'labels': labels
         }
     return log_dict
 
@@ -481,6 +491,8 @@ def parseLog(logPath, newLog, out_dir):
             elif oldLog['plusminus'] != newLog['plusminus']:
                 shutil.rmtree(wrk_dir + 'genes/')
                 shutil.rmtree(wrk_dir + 'svg/')
+            elif oldLog['labels'] != newLog['labels']:
+                shutil.rmtree(wrk_dir + 'svg/')
         except KeyError:
             eprint(
                 '\tERROR: log file corrupted. Hoping for the best.', 
@@ -493,7 +505,7 @@ def crapMngr(
     db, query, queryHits, out_dir, wrk_dir, tre_dir, fast, 
     treeSuffix, genes2query, plusminus, query2color, 
     cpus = 1, verbose = False, og = False, ogs = None, reoutput = True,
-    outKeys = []
+    outKeys = [], labels = True
     ):
 
     info = treeMngr(
@@ -509,14 +521,14 @@ def crapMngr(
         for ome, ome_genes2og in genes2query.items():
             omeHits = [x for x in queryHits if x.startswith(ome + '_')]
             if omeHits:
-                extractLoci_cmds.append([ome, omeHits, ogs, ome_genes2og, plusminus, query2color, wrk_dir])
+                extractLoci_cmds.append([ome, omeHits, ogs, ome_genes2og, plusminus, query2color, wrk_dir, labels])
         with mp.Pool(processes = cpus) as pool:
             pool.starmap(extractLocusOG, extractLoci_cmds)
     else:
         for ome, ome_genes2query in genes2query.items():
             omeHits = [x for x in queryHits if x.startswith(ome + '_')]
             if omeHits:
-                extractLoci_cmds.append([ome, omeHits, ome_genes2query, plusminus, query2color, wrk_dir])
+                extractLoci_cmds.append([ome, omeHits, ome_genes2query, plusminus, query2color, wrk_dir, labels])
         with mp.Pool(processes = cpus) as pool:
             pool.starmap(extractLocusGene, extractLoci_cmds)
     
@@ -614,7 +626,7 @@ def OGmain(
         crapMngr(
             db, query, queryHits, out_dir, wrk_dir, tre_dir, fast, treeSuffix, 
             omeGene2og, plusminus, og2color, cpus, verbose, inputOGs[query], list(inputOGs.values()),
-            reoutput
+            reoutput, labels = labels
             )
 
     for query in fas4clus:
@@ -629,7 +641,7 @@ def OGmain(
         crapMngr(
             db, query, queryHits, out_dir, wrk_dir, tre_dir, fast, treeSuffix,
             omeGene2og, plusminus, og2color, cpus, verbose, inputOGs[query], list(inputOGs.values()),
-            reoutput
+            reoutput, labels = labels
             )
 
 
@@ -637,7 +649,7 @@ def SearchMain(
     db, inputGenes, queryFa, queryGff, binary = 'mmseqs', fast = True, out_dir = None,
     minid = 0.3, maxdist = 0.65, minseq = 2, max_size = 250, cpus = 1, reoutput = True,
     plusminus = 5, evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
-    interval = 0.01, outgroups = False, conversion_dict = {}
+    interval = 0.01, outgroups = False, conversion_dict = {}, labels = True
     ):
     '''inputGenes is a list of genes within an inputted cluster'''
 
@@ -664,7 +676,7 @@ def SearchMain(
             sys.exit(6)
         cleanGff = [x for x in queryGff if ';SearchQuery=' in x['attributes'] and 'RNA' in x['type']]
         for query in inputGenes:
-            rogueLocus(query, cleanGff, wrk_dir, query2color)
+            rogueLocus(query, cleanGff, wrk_dir, query2color, labels = labels)
 
     query_path = wrk_dir + 'query.crap.fa'
     if not queryFa:
@@ -752,7 +764,7 @@ def SearchMain(
             db, query, queryHits, out_dir, wrk_dir, tre_dir, 
             fast, treeSuffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
-            outKeys = outKeys
+            outKeys = outKeys, labels = labels
             )
 
     for query in fas4clus:
@@ -784,7 +796,7 @@ def SearchMain(
             db, query, queryHits, out_dir, wrk_dir, tre_dir, 
             fast, treeSuffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
-            outKeys = outKeys
+            outKeys = outKeys, labels = labels
             )
 
 
@@ -828,7 +840,6 @@ if __name__ == "__main__":
         default = 0.2, type = float
         )
     parser.add_argument('-f', '--fast', action = 'store_true', help = 'Fasttree. DEFAULT: IQTree2 1000 bootstrap iterations')
-
     parser.add_argument(
         '--conversion',
         help = 'Tab delimited conversion file for annotations: Query\tConversion'
@@ -847,10 +858,14 @@ if __name__ == "__main__":
         action = 'store_true'
         )
     parser.add_argument(
-        '-g', '--gff',
-        help = 'GFF for non-mycotools input. Requires -s and a fasta for -i'
+        '--no_label',
+        help = 'Do not label synteny diagrams',
+        action = 'store_true'
         )
-
+    parser.add_argument(
+        '-g', '--gff',
+        help = 'GFF for non-mycotools locus diagram. Requires -s and a fasta for -i'
+        )
     parser.add_argument(
         '-o', '--output', 
         help = 'Output base dir. Will rerun if previous director exists.'
@@ -908,6 +923,7 @@ if __name__ == "__main__":
         'Bitscore': args.bitscore,
         'GFF': args.gff,
         'Conversion file': args.conversion,
+        'Labels': not args.no_label,
         'CPU': args.cpu,
         'Output directory': args.output,
         'Verbose': args.verbose
@@ -932,7 +948,7 @@ if __name__ == "__main__":
     if args.orthogroups:
         newLog = initLog(
             args.database, inputGenes, 'orthogroups', args.bitscore,
-            args.maxseq, args.plusminus
+            args.maxseq, args.plusminus, not args.no_label
             )
         print('\nPreparing output directory', flush = True)
         out_dir, wrk_dir, gff_dir, tre_dir = makeOutput(output, newLog)
@@ -940,7 +956,7 @@ if __name__ == "__main__":
             db, inputGenes, args.orthogroups, fast = args.fast, 
             out_dir = out_dir, 
             minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = args.cpu,
-            verbose = args.verbose, plusminus = args.plusminus, interval = 0.1
+            verbose = args.verbose, plusminus = args.plusminus, interval = 0.1, labels = not args.no_label
             )
     else:
         newLog = initLog(
@@ -955,6 +971,6 @@ if __name__ == "__main__":
             minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = 1,
             plusminus = args.plusminus, bitscore = args.bitscore, pident = 0,
             mem = None, verbose = args.verbose, interval = 0.1, 
-            outgroups = not args.ingroup, conversion_dict = conversion_dict
+            outgroups = not args.ingroup, conversion_dict = conversion_dict, labels = not args.no_label
             )
     outro(start_time)
