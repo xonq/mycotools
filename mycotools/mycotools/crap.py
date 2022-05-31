@@ -1,11 +1,8 @@
 #! /usr/bin/env python3
 
-# NEED end of contig option in gff2svg
-# NEED an intelligent taxonomy checker to validate orthogroup tag is within DB scope
-# NEED to figure out min/maxseq for aggclus on the fly
-# NEED logoutput and intelligent resume
+# NEED intelligent resume
 # NEED to check for multiple instances of a single orthogroup/query, and use all genes as focal
-# NEED a relational query to new query name table
+# NEED to update OGmain with outgroup function, conversion function
 
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import eprint, formatPath, findExecs, intro, outro, \
@@ -26,6 +23,11 @@ except ImportError:
 import argparse, re, sys, os, datetime, hashlib, random, multiprocessing as mp
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+
+def parseConversion(conversion_file):
+    with open(conversion_file, 'r') as raw:
+        data = [x.rstrip().split('\t') for x in raw]
+    return {x[0]: x[1] for x in data}
 
 def prepGff(gff, prots, comps, hits = set(), parDict = {}):
     RNA = False
@@ -150,7 +152,7 @@ def runAggclus(
 def outgroupMngr(
     db, focalGene, minseq, maxseq, clus_dir,
     minid = 0.3, direction = -1, cpus = 1, interval = 0.1,
-    verbose = False
+    verbose = False, spacer = '\t\t\t'
     ):
 
     fa_path = clus_dir + focalGene + '.fa'
@@ -180,7 +182,7 @@ def outgroupMngr(
         minseq = int(newInfo['size'] + 1)
         runAggclus(
             fa_path, db, focalGene, minseq, None, clus_dir, out_name,
-            minid, maxdist, direction, cpus, verbose, 0.01, False
+            minid, maxdist, direction, cpus, verbose, 0.01
             )
     
 
@@ -246,7 +248,7 @@ def compileGenesByOme(inputs, wrk_dir):
 
     return omeGenes
 
-def compileGenesByOme4queries(search_fas, omes = set()):
+def compileGenesByOme4queries(search_fas, conversion_dict, omes = set()):
     queryGenes = {}
     for query, fa in search_fas.items():
         locusIDs = list(fa.keys())
@@ -258,7 +260,7 @@ def compileGenesByOme4queries(search_fas, omes = set()):
                 queryGenes[ome] = {}
             if locusID not in queryGenes[ome]:
                 queryGenes[ome][locusID] = []
-            queryGenes[ome][locusID].append(query)
+            queryGenes[ome][locusID].append(conversion_dict[query])
 
     merges = []
     for ome in queryGenes:
@@ -381,7 +383,11 @@ def mergeColorPalette(merges, query2color):
         query2color['|'.join(merge)] = query2color[merge[0]]
     return query2color
 
-def makeColorPalette(inputs):
+def makeColorPalette(inputs, conversion_dict = {}):
+    for i in inputs:
+        if i not in conversion_dict:
+            conversion_dict[i] = str(i)
+
     colors = [
         "#000000","#004949","#009292","#ff6db6","#ffb6db",
         "#490092","#006ddb","#b66dff","#6db6ff","#b6dbff",
@@ -399,20 +405,20 @@ def makeColorPalette(inputs):
     color_dict = {'na': '#ffffff'}
     if len(inputs) <= len(colors):
         for i, v in enumerate(inputs):
-            color_dict[str(v)] = colors[i]
+            color_dict[conversion_dict[v]] = colors[i]
     elif len(inputs) <= len(extColors):
         for i, v in enumerate(inputs):
-            color_dict[str(v)] = extColors[i]
+            color_dict[conversion_dict[v]] = extColors[i]
     else:
         eprint('\nWARNING: input too large for gene arrow colors', flush = True)
         try:
             for i, v in enumerate(inputs):
-                color_dict[str(v)] = extColors[i]
+                color_dict[conversion_dict[v]] = extColors[i]
         except IndexError:
             for i1, v in enumerate(inputs[i:]):
-                color_dict[str(v)] = extColors[i1-i]
+                color_dict[conversion_dict[v]] = extColors[i1-i]
 
-    return color_dict
+    return color_dict, conversion_dict
 
 
 def treeMngr(
@@ -535,7 +541,7 @@ def crapMngr(
 
 def OGmain(
     db, inputGenes, ogtag, fast = True, out_dir = None,
-    minid = 0.3, maxdist = 0.65, minseq = 20, max_size = 250, cpus = 1,
+    minid = 0.3, maxdist = 0.65, minseq = 2, max_size = 250, cpus = 1,
     plusminus = 5, verbose = False, reoutput = True, interval = 0.1
     ):
     '''inputGenes is a list of genes within an inputted cluster'''
@@ -559,7 +565,7 @@ def OGmain(
         del inputOGs[i]
         del inputGenes[i]
 
-    og2color = makeColorPalette(inputOGs)
+    og2color, conversion_dict = makeColorPalette(inputOGs)
 
     # in the future, genes without OGs will be placed into OGs via RBH
     if not inputOGs:
@@ -629,9 +635,9 @@ def OGmain(
 
 def SearchMain(
     db, inputGenes, queryFa, queryGff, binary = 'mmseqs', fast = True, out_dir = None,
-    minid = 0.3, maxdist = 0.65, minseq = 20, max_size = 250, cpus = 1, reoutput = True,
+    minid = 0.3, maxdist = 0.65, minseq = 2, max_size = 250, cpus = 1, reoutput = True,
     plusminus = 5, evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
-    interval = 0.01, outgroups = False
+    interval = 0.01, outgroups = False, conversion_dict = {}
     ):
     '''inputGenes is a list of genes within an inputted cluster'''
 
@@ -640,7 +646,7 @@ def SearchMain(
     gff_dir, tre_dir = wrk_dir + 'genes/', wrk_dir + 'trees/'
     clus_dir = wrk_dir + 'clus/'
 
-    query2color = makeColorPalette(inputGenes)
+    query2color, conversion_dict = makeColorPalette(inputGenes, conversion_dict)
 
     if queryGff:
         print('\tCleaning input GFF', flush = True)
@@ -688,7 +694,11 @@ def SearchMain(
             search_fas[query][query] = queryFa[query]
     
     print('\nChecking hit fasta sizes', flush = True)
-    genes2query, merges = compileGenesByOme4queries(search_fas, set(db['internal_ome']))
+    genes2query, merges = compileGenesByOme4queries(
+        search_fas,
+        conversion_dict, 
+        set(db['internal_ome'])
+        )
     query2color = mergeColorPalette(merges, query2color)
 
     for query in search_fas: # revert back to other fas
@@ -819,10 +829,10 @@ if __name__ == "__main__":
         )
     parser.add_argument('-f', '--fast', action = 'store_true', help = 'Fasttree. DEFAULT: IQTree2 1000 bootstrap iterations')
 
-   # parser.add_argument(
-#        '--conversion',
- #       help = 'Tab delimited query conversion file for locus diagram annotation'
-  #      )
+    parser.add_argument(
+        '--conversion',
+        help = 'Tab delimited conversion file for annotations: Query\tConversion'
+        )
 #    parser.add_argument(
  #       '-r', '--reoutput', action = 'store_true',
   #      help = 'Reoutput - permits replacing tree file, e.g. w/a rooted version'
@@ -897,6 +907,7 @@ if __name__ == "__main__":
         'Maximum seq': args.maxseq,
         'Bitscore': args.bitscore,
         'GFF': args.gff,
+        'Conversion file': args.conversion,
         'CPU': args.cpu,
         'Output directory': args.output,
         'Verbose': args.verbose
@@ -913,6 +924,10 @@ if __name__ == "__main__":
             eprint('\tnon-mycotools input requires -s, -i as a fasta, optionally -g', flush = True)
             sys.exit(4)
 
+    if args.conversion:
+        conversion_dict = parseConversion(formatPath(args.conversion))
+    else:
+        conversion_dict = {}
 
     if args.orthogroups:
         newLog = initLog(
@@ -940,6 +955,6 @@ if __name__ == "__main__":
             minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = 1,
             plusminus = args.plusminus, bitscore = args.bitscore, pident = 0,
             mem = None, verbose = args.verbose, interval = 0.1, 
-            outgroups = not args.ingroup
+            outgroups = not args.ingroup, conversion_dict = conversion_dict
             )
     outro(start_time)

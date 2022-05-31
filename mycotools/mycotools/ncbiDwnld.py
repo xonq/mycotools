@@ -96,7 +96,7 @@ def collect_ftps(
                 handle = Entrez.esearch(db=database, term=search_term)
                 genome_id = Entrez.read(handle)['IdList']
                 break
-            except RuntimeError:
+            except (RuntimeError, urllib.error.HTTPError) as e:
                 time.sleep(1)
                 esc_count += 1
         else:
@@ -162,7 +162,7 @@ def collect_ftps(
                     (ftp_path + '/md5checksums.txt').replace('ftp://','https://'), timeout = 120
                     )
                 break
-            except requests.exceptions.ConnectionError:
+            except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
                 if esc_count == 20:
                     eprint('\n\tERROR: Failed to fulfill ftp request!', flush = True)
                     sys.exit(70)

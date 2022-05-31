@@ -272,7 +272,7 @@ def iterativeRun(
         if oldDirection:
             if direction != oldDirection:
                 eprint(spacer + 'WARNING: Overshot. Could not find parameters using current interval.', flush = True)
-                vprint('Outputting Iterations ' + str(attempt) + ' & ' + str(attempt - 1), flush = True, v = verbose)
+                vprint(spacer + 'Outputting Iterations ' + str(attempt) + ' & ' + str(attempt - 1), flush = True, v = verbose)
                 exitCode = 2
                 break
         else:
@@ -405,7 +405,7 @@ def main(
                 )
         else:
             vprint(
-                spacer + 'WARNING: Overshot paremters',
+                spacer + 'WARNING: Overshot parameters',
                 v = verbose, flush = True
                 )
     else:

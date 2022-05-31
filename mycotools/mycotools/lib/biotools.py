@@ -226,7 +226,7 @@ def gff3Comps( source = None ):
     comps['par'] = r'Parent=([^;]+)'
     comps['id'] = r'ID=([^;]+)'
     comps['Alias'] = r'Alias=([^;]+)'
-    comps['product'] = r'product="([^"]*)' 
+    comps['product'] = r'product=([^"\']*)["\';|$]'
     comps['OG'] = r'OG=([\w+:\d+\|]+)'
     comps['ver'] = 'gff3'
 

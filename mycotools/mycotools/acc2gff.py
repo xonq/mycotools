@@ -6,15 +6,14 @@ from mycotools.lib.biotools import gff2list, list2gff
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import formatPath
 
-def grabGffAcc( gff_list, acc ):
+def grabGffAcc( gff_list, acc, term = 'Alias=' ):
     '''grab acc from alias'''
 
-    if ';Alias=' in gff_list[0]['attributes']:
-        alias = 'Alias=' + acc
-        alias_on = alias + ';'
-    elif ' alias "' in gff_list[0]['attributes']:
-        alias = 'alias "' + acc + '"'
-        alias_on = 'alias "' + acc + '"'
+    alias = term + acc
+    alias_on = alias + ';'
+#    elif ' alias "' in gff_list[0]['attributes']:
+ #       alias = 'alias "' + acc + '"'
+  #      alias_on = 'alias "' + acc + '"'
     out_list = [ 
         x for x in gff_list \
         if x['attributes'].endswith(alias) or \
