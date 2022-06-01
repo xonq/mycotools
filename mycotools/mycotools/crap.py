@@ -955,7 +955,7 @@ if __name__ == "__main__":
         OGmain(
             db, inputGenes, args.orthogroups, fast = args.fast, 
             out_dir = out_dir, 
-            minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = args.cpu,
+            minid = args.minid, maxdist = 0.65, minseq = 2, max_size = args.maxseq, cpus = args.cpu,
             verbose = args.verbose, plusminus = args.plusminus, interval = 0.1, labels = not args.no_label
             )
     else:
@@ -968,7 +968,7 @@ if __name__ == "__main__":
         SearchMain(
             db, inputGenes, inputFa, inputGFF, binary = args.search, fast =
             args.fast, out_dir = out_dir,
-            minid = args.minid, maxdist = 0.65, minseq = 20, max_size = args.maxseq, cpus = 1,
+            minid = args.minid, maxdist = 0.65, minseq = 2, max_size = args.maxseq, cpus = 1,
             plusminus = args.plusminus, bitscore = args.bitscore, pident = 0,
             mem = None, verbose = args.verbose, interval = 0.1, 
             outgroups = not args.ingroup, conversion_dict = conversion_dict, labels = not args.no_label
