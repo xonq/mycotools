@@ -431,7 +431,7 @@ def curate( gff, prefix, failed = set() ):
                 temp_exon_dict[ line['seqid'] ] = {}
             prot = geneComp.search( line['attributes'] )[1]
             if comps == gff3Comps():
-                protsub = re.compile( r'[\.|-].*' )
+                protsub = re.compile( r'[\.|-].*' ) # funannotate remove transcript tag
                 prot = protsub.sub( '', prot )
             if prot not in temp_exon_dict[ line['seqid'] ]:
                 temp_exon_dict[ line['seqid'] ][ prot ] = []
@@ -455,6 +455,7 @@ def curate( gff, prefix, failed = set() ):
             count += 1
 
     crudesortGff = sortGFF(gff, re.compile(comps['id']))
+    print(crudesortGff[0], crudesortGff[1])
 
     newGff, trans_set, exonCheck, cdsCheck, failed = [], set(), {}, {}, set( x[0] for x in failed )
     transComp = re.compile( r'transcript_id "(.*?)"\;' )
@@ -474,8 +475,11 @@ def curate( gff, prefix, failed = set() ):
             while transProt in trans_set:
                 count += 1
                 transProt = prot + '-T' + str( count )
-            entry['attributes'] = 'ID=' + transProt + ';Parent=' + prot + ';product=' + \
-                'hypothetical protein;Alias=' + prot
+            if entry['type'] == 'mRNA':
+                entry['attributes'] = 'ID=' + transProt + ';Parent=' + prot + ';product=' + \
+                    'hypothetical protein;Alias=' + prot
+            else:
+                entry['attributes'] = 'ID=' + transProt + ';Parent=' + prot + ';Alias=' + prot
             trans_set.add( transProt )
         elif entry['type'] == 'exon':
             if transProt not in exonCheck:

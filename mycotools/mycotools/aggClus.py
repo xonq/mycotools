@@ -3,6 +3,7 @@
 # NEED to fix error on reiterative whereby if it exits 2 on iterative it will return nothing on reiterative
 # 	speculate this has to do with it not entering the while loop
 # NEED to make outgroup detection within the bounds of maximum sequences, optional to do so
+# NEED to refine further
 
 from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
@@ -331,6 +332,8 @@ def reiterativeRun(
             oldDirection = direction
         maxdist -= (interval*direction)
 
+#    if refines[-1][2]: # if the final run was successful
+    return refines[-1][0], refines[1][1], None, None, log_dict
 
 
 def main(
