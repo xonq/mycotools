@@ -3,6 +3,8 @@
 # NEED intelligent resume
 # NEED to check for multiple instances of a single orthogroup/query, and use all genes as focal
 # NEED to update OGmain with outgroup function, conversion function
+# NEED root to be based off the furthest in outgroup % ID from focal gene
+# NEED assembly reference method
 
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import eprint, formatPath, findExecs, intro, outro, \
@@ -961,7 +963,7 @@ if __name__ == "__main__":
     else:
         newLog = initLog(
             args.database, inputGenes, args.search, args.bitscore,
-            args.maxseq, args.plusminus
+            args.maxseq, args.plusminus, not args.no_label
             )
         print('\nPreparing output directory', flush = True)
         out_dir, wrk_dir, gff_dir, tre_dir = makeOutput(output, newLog)

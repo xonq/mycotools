@@ -1,5 +1,9 @@
 #! /usr/bin/env python3
 
+# NEED to fix error on reiterative whereby if it exits 2 on iterative it will return nothing on reiterative
+# 	speculate this has to do with it not entering the while loop
+# NEED to make outgroup detection within the bounds of maximum sequences, optional to do so
+
 from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
 #from sklearn.cluster import AgglomerativeClustering
