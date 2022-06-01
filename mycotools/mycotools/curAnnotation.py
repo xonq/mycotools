@@ -454,8 +454,7 @@ def curate( gff, prefix, failed = set() ):
                 change_dict[ new_prot ] = prefix + '_' + str(count)
             count += 1
 
-    crudesortGff = sortGFF(gff, re.compile(comps['id']))
-    print(crudesortGff[0], crudesortGff[1])
+    crudesortGff = preSortGFF(gff, re.compile(comps['id']))
 
     newGff, trans_set, exonCheck, cdsCheck, failed = [], set(), {}, {}, set( x[0] for x in failed )
     transComp = re.compile( r'transcript_id "(.*?)"\;' )
@@ -546,6 +545,28 @@ def sortContig(contigData):
 
     return outContig
 
+def preSortGFF(unsorted_gff, idComp):
+
+    sorting_groups, oldGene = {}, None
+    for i, entry in enumerate(unsorted_gff):
+        seqid = entry['seqid']
+        if seqid not in sorting_groups:
+            sorting_groups[seqid] = {}
+        gene = idComp.search(entry['attributes'])[1]
+#        gene = re.sub(r'(.*?_\d+).*', r'\1', gene)
+        if gene not in sorting_groups[seqid]:
+            sorting_groups[seqid][gene] = []
+        sorting_groups[seqid][gene].append(entry)
+
+    sortedGff = []
+    for seqid in sorting_groups:
+        contigData = {}
+        for gene in sorting_groups[seqid]:
+            contigData[gene] = sortGene(sorting_groups[seqid][gene])
+        sortedGff.extend(sortContig(contigData))
+
+    return sortedGff
+
 
 def sortGFF(unsorted_gff, idComp):
 
@@ -627,7 +648,7 @@ def sortMain(gff, prefix):
     id_comp = re.compile(gff3Comps()['id'])
     crude_sort = sorted( gff, key = lambda x: \
         int( re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1] ))
-    gff = sortGFF(crude_sort, id_comp)
+    gff = preSortGFF(crude_sort, id_comp)
 
     return gff
 
