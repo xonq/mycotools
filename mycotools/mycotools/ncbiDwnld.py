@@ -2,7 +2,7 @@
 
 from Bio import Entrez
 import pandas as pd, numpy as np
-import argparse, os, time, subprocess, sys, requests, re, gzip
+import argparse, os, time, subprocess, sys, requests, re, gzip, urllib
 from mycotools.lib.kontools import intro, outro, formatPath, prep_output, eprint, vprint, findExecs
 from mycotools.lib.dbtools import log_editor, loginCheck, db2df
 from datetime import datetime
@@ -138,7 +138,7 @@ def collect_ftps(
                 ftp_path = str(record['DocumentSummarySet']['DocumentSummary'][0]['FtpPath_GenBank'])
                 esc_count = 0
                 break
-            except IndexError:
+            except (IndexError, urllib.error.HTTPError) as e:
                 time.sleep(0.1)
         else:
             if esc_count == 20:

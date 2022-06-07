@@ -2,7 +2,7 @@
 #NEED TO PARSE FOR IN GENE COORDINATES AND ANNOTATIONS
 
 import os, sys, re, argparse
-from mycotools.lib.kontools import sysStart, formatPath, file2list
+from mycotools.lib.kontools import sysStart, formatPath, file2list, getColors
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from mycotools.lib.biotools import gff2list, gff3Comps
 
@@ -100,37 +100,7 @@ def main(
         products = compileProducts(gff_list, prod_comp, types = types)
     else:
         products = list(product_dict.keys())
-    if len(products) < 16:
-        colors = [
-            "#000000","#004949","#009292","#ff6db6","#ffb6db",
-            "#490092","#006ddb","#b66dff","#6db6ff","#b6dbff",
-            "#920000","#924900","#db6d00","#24ff24","#ffff6d"
-            ]
-    elif len(products) < 27:
-        colors = [
-            "F0A3FF", "#0075DC", "#993F00", "#4C005C", "#191919",
-            "#005C31", "#2BCE48", "#FFCC99", "#808080", "#94FFB5",
-            "#8F7C00", "#9DCC00", "#C20088", "#003380", "#FFA405",
-            "#FFA8BB", "#426600", "#FF0010", "#5EF1F2", "#00998F",
-            "#E0FF66", "#740AFF", "#990000", "#FFFF80", "#FFFF00",
-            "#FF5005"
-            ]
-    else:
-        colors = [
-            '#000000', '#010067', '#d5ff00', '#ff0056', '#9e008e', 
-            '#0e4ca1', '#ffe502', '#005f39', '#00ff00', '#95003a', 
-            '#ff937e', '#a42400', '#001544', '#91d0cb', '#620e00', 
-            '#6b6882', '#0000ff', '#007db5', '#6a826c', '#00ae7e', 
-            '#c28c9f', '#be9970', '#008f9c', '#5fad4e', '#ff0000', 
-            '#ff00f6', '#ff029d', '#683d3b', '#ff74a3', '#968ae8', 
-            '#98ff52', '#a75740', '#01fffe', '#ffeee8', '#fe8900', 
-            '#bdc6ff', '#01d0ff', '#bb8800', '#7544b1', '#a5ffd2', 
-            '#ffa6fe', '#774d00', '#7a4782', '#263400', '#004754', 
-            '#43002c', '#b500ff', '#ffb167', '#ffdb66', '#90fb92', 
-            '#7e2dd2', '#bdd393', '#e56ffe', '#deff74', '#00ff78', 
-            '#009bff', '#006401', '#0076ff', '#85a900', '#00b917', 
-            '#788231', '#00ffc6', '#ff6e41', '#e85ebe'
-            ]
+    colors = getColors(len(products))
     if null not in product_dict:
         product_dict[null] = '#ffffff'
 

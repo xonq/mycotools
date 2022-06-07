@@ -25,6 +25,7 @@ def main(
                 prep_db1[ome] = row
         db = prep_db1.reset_index()
 
+
     # if a taxonomy list is specified then open it, store each entry in a list
     # and extract each taxonomic entry based on the classification specified
     if lineage_list:
@@ -96,7 +97,7 @@ if __name__ == '__main__':
     parser.add_argument( '-s', '--source', help = 'Data source' )
     parser.add_argument( '-n', '--nonpublished', action = 'store_true', help = 'Include ' + \
         'restricted-use' )
-    parser.add_argument( '-u', '--unique', type = int, help = 'Number of same species allowed' )
+    parser.add_argument( '-u', '--unique', default = 0, type = int, help = 'Number of same species allowed' )
     parser.add_argument( '-i', '--inverse', action = 'store_true', help = 'Inverse arguments' )
     parser.add_argument( '--headers', action = 'store_true', help = 'Include header')
     parser.add_argument( '-o', '--output' )

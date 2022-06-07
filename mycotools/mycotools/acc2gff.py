@@ -51,7 +51,7 @@ def gffMain(gffData, accs):
         accGffs[acc] = grabGffAcc(gff, acc)
     return accGffs
 
-def dbMain(db, accs, cpu = 1):
+def dbMain(db, accs, cpus = 1):
 
     omes = set([x[:x.find('_')] for x in accs])
     
@@ -59,11 +59,13 @@ def dbMain(db, accs, cpu = 1):
     for ome in list(omes):
         omeAccs = [acc for acc in accs if acc.startswith(ome + '_')]
         gffPath = formatPath('$MYCOGFF3/' + ome + '.gff3')
-        gff_list = gff2list(gff)
-        grabAcc_cmds.append([omeAccs, gff_list, ome])
+        gff_list = gff2list(gffPath)
+        grabAcc_res = [grabGffAccs(gff_list, omeAccs, ome)]
 
-    with mp.Pool(processes = cpus) as pool:
-        grabAcc_res = pool.starmap(grabAccs, grabAcc_cmds)
+#        grabAcc_cmds.append([gff_list, omeAccs, ome])
+
+ #   with mp.Pool(processes = cpus) as pool:
+  #      grabAcc_res = pool.starmap(grabGffAccs, grabAcc_cmds)
 
     gffs = {}
     for res in grabAcc_res:
@@ -107,13 +109,13 @@ if __name__ == '__main__':
     db_path = formatPath( args.database )
     if not args.gff:
         db = mtdb( formatPath(args.database) )
-        gff_lists = dbMain( db, accs, cpu = args.cpu )
+        gff_lists = dbMain( db, accs, cpus = args.cpu )
     else:
         gff_path = formatPath( args.gff )
         gff_lists = gffMain(gffData, accs)
 
     if args.accession:
-        print( gff2list(gff_lists[list(gff_lists.keys())[0]].rstrip()) , flush = True)
+        print( list2gff(gff_lists[list(gff_lists.keys())[0]]).rstrip() , flush = True)
     elif args.ome:
         output = mkOutput(os.getcwd() + '/', 'acc2gff')
         for ome in gff_strs:

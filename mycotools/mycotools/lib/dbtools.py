@@ -78,6 +78,9 @@ class mtdb(dict):
                     df['taxonomy'][-1] = read_tax(
                         df['taxonomy'][-1]
                         )
+                    df['taxonomy'][-1]['genus'] = df['genus'][-1]
+                    df['taxonomy'][-1]['species'] = \
+                        df['genus'][-1] + ' ' + df['species'][-1]
         return df
 
 
@@ -661,12 +664,13 @@ def extract_tax(db, taxonomy, classification, inverse = False ):
 
     taxonomy = set(x.lower() for x in taxonomy)
 #    new_db = pd.DataFrame()
-    new_db = mtdb().set_index()
     db = db.set_index()
 
 # `genus` is a special case because it has its own column, so if it is not a genus, we need to read the taxonomy
 # once it is read, we can parse the taxonomy dictionary via the inputted `classification` (taxonomic classification)
     if classification != 'genus':
+        new_db = mtdb().set_index()
+
         for ome in db:
             db[ome]['taxonomy'] = read_tax(db[ome]['taxonomy'])
             if classification in db[ome]['taxonomy']:
@@ -679,14 +683,13 @@ def extract_tax(db, taxonomy, classification, inverse = False ):
 
 # if `classification` is `genus`, simply check if that fits the criteria in `taxonomy`
     elif classification == 'genus':
-        db = db.set_index('genus')
         taxonomy = set(x[0].upper() + x[1:].lower() for x in taxonomy)
         if not inverse:
-            new_db = mtdb({x: db[x] for x in db if x in taxonomy}, index =
-                'genus')
+            new_db = mtdb({ome: row for ome, row in db.items() if row['genus'] in taxonomy}, index =
+                'internal_ome')
         else:
-            new_db = mtdb({x: db[x] for x in db if x not in taxonomy}, index =
-                'genus')
+            new_db = mtdb({ome: row for ome, row in db.items() if row['genus'] not in taxonomy}, index =
+                'internal_ome')
 
     return new_db.reset_index()
 

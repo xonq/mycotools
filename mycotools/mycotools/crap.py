@@ -131,13 +131,16 @@ def runAggclus(
     verbose = False, interval = 0.1
     ):
 
+    dmnd_dir = output + 'dmnd/'
+    if not os.path.isdir(dmnd_dir):
+        os.mkdir(dmnd_dir)
     output_path = output + str(focalGene) 
     log_path = output + '.' + str(focalGene) + '.log'   
     tree, clusters, distanceMatrix, ot, ocl = aggClus(
         fa_path, minid, maxdist, minseq, maxseq,
-        searchProg = 'usearch', linkage = 'single', cpus = cpus,
+        searchProg = 'diamond', linkage = 'single', cpus = cpus,
         iterative = focalGene, interval = interval, output = output_path,
-        verbose = verbose, log_path = log_path, refine = True
+        verbose = verbose, log_path = log_path, refine = True, dmnd_dir = dmnd_dir
         )
 
     cluster_dict = {}
@@ -170,14 +173,15 @@ def outgroupMngr(
     prevSize = len(fa2dict(clus_dir + '../' + str(focalGene) + '.fa'))
 
     prevIndex = [int(v['size']) for i,v in enumerate(iterations)].index(prevSize)
+    newInfo = iterations[prevIndex-1]
+
     if prevIndex > 0:
-        newInfo = iterations[prevIndex-1]
         runAggclus(
             fa_path, db, focalGene, None, None, clus_dir, out_name,
             minid, float(newInfo['maximum_distance']), direction,
             cpus, verbose, None
             )
-    elif 1-float(iterations[prevIndex-1]['maximum_distance']) - minid < 0.19:
+    elif 1-float(iterations[prevIndex-1]['maximum_distance']) - minid < 0:
         eprint(
             spacer + 'WARNING: cannot find outgroups with minimum ID', flush = True
             )
@@ -769,6 +773,12 @@ def SearchMain(
             outKeys = outKeys, labels = labels
             )
 
+    if fas4clus:
+        if cpus > 5:
+            clusCpus = 5
+        else:
+            clusCpus = cpus
+
     for query in fas4clus:
         print('\tQuery: ' + str(query), flush = True)
         print('\t\tHierachical agglomerative cluster', flush = True)
@@ -776,7 +786,7 @@ def SearchMain(
         runAggclus(
             clus_dir + str(query) + '.fa', 
             db, query, minseq, max_size, 
-            clus_dir, query, minid, maxdist, cpus = cpus, verbose = verbose, interval = interval
+            clus_dir, query, minid, maxdist, cpus = clusCpus, verbose = verbose, interval = interval
             )
         if outgroups:
             print('\t\tOutgroup detection', flush = True)
@@ -836,11 +846,11 @@ if __name__ == "__main__":
         'Outgroup detection may exceed this number. DEFAULT: 250', 
         default = 250, type = int
         )
-    parser.add_argument(
-        '--minid', 
-        help = 'Minimum identity for aggClus.py. DEFAULT: 0.2', 
-        default = 0.2, type = float
-        )
+#    parser.add_argument(
+ #       '--minid', 
+  #      help = 'Minimum identity for aggClus.py. DEFAULT: 0.2', 
+   #     default = 0.2, type = float
+    #    )
     parser.add_argument('-f', '--fast', action = 'store_true', help = 'Fasttree. DEFAULT: IQTree2 1000 bootstrap iterations')
     parser.add_argument(
         '--conversion',
@@ -876,7 +886,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbose', default = False, action = 'store_true')
     args = parser.parse_args()
 
-    execs = ['usearch', 'clipkit', 'mafft', 'iqtree']
+    execs = ['diamond', 'clipkit', 'mafft', 'iqtree']
     if args.search:
         if args.search not in {'mmseqs', 'blastp'}:
             eprint('\nERROR: invalid -b', flush = True)
@@ -957,7 +967,7 @@ if __name__ == "__main__":
         OGmain(
             db, inputGenes, args.orthogroups, fast = args.fast, 
             out_dir = out_dir, 
-            minid = args.minid, maxdist = 0.65, minseq = 2, max_size = args.maxseq, cpus = args.cpu,
+            minid = 0, maxdist = 0.65, minseq = 2, max_size = args.maxseq, cpus = args.cpu,
             verbose = args.verbose, plusminus = args.plusminus, interval = 0.1, labels = not args.no_label
             )
     else:
@@ -970,7 +980,7 @@ if __name__ == "__main__":
         SearchMain(
             db, inputGenes, inputFa, inputGFF, binary = args.search, fast =
             args.fast, out_dir = out_dir,
-            minid = args.minid, maxdist = 0.65, minseq = 2, max_size = args.maxseq, cpus = 1,
+            minid = 0, maxdist = 0.65, minseq = 2, max_size = args.maxseq, cpus = 1,
             plusminus = args.plusminus, bitscore = args.bitscore, pident = 0,
             mem = None, verbose = args.verbose, interval = 0.1, 
             outgroups = not args.ingroup, conversion_dict = conversion_dict, labels = not args.no_label

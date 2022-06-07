@@ -44,15 +44,15 @@ def mafftRun( fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t' ):
 def trimRun( mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t' ):
 
     name2 = os.path.basename(os.path.abspath(re.sub( r'\.mafft$', '.clipkit', mafft)))
-    cmd = 'clipkit ' + mafft + ' --output ' + out_dir + '/' + name2
+    cmd = ['clipkit', mafft, '--output', out_dir + '/' + name2]
     if not hpc:
 
         print(spacer + 'Trimming', flush = True)
         if verbose:
-            run_clipkit = subprocess.call( cmd, shell = True, stdout = subprocess.PIPE )
+            run_clipkit = subprocess.call( cmd, stdout = subprocess.PIPE )
         else:
             run_clipkit = subprocess.call( 
-                cmd, shell = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
+                cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
                 )
         if run_clipkit != 0:
             eprint(spacer + '\tERROR: `clipkit` failed: ' + str(run_clipkit) , flush = True)  

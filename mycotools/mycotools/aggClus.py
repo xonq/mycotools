@@ -1,14 +1,13 @@
 #! /usr/bin/env python3
-
-# NEED to fix error on reiterative whereby if it exits 2 on iterative it will return nothing on reiterative
-# 	speculate this has to do with it not entering the while loop
 # NEED to make outgroup detection within the bounds of maximum sequences, optional to do so
 # NEED to refine further
+# extract a fasta of the cluster of interest
+# fix output
 
 from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
 #from sklearn.cluster import AgglomerativeClustering
-from mycotools.lib.kontools import multisub, findExecs, formatPath, eprint, vprint, readJson, writeJson
+from mycotools.lib.kontools import multisub, findExecs, formatPath, eprint, vprint, readJson, writeJson, mkOutput
 from mycotools.lib.biotools import fa2dict, dict2fa
 import string, argparse, os, sys, itertools, tempfile, re, random, copy, pandas as pd, subprocess
 
@@ -25,55 +24,97 @@ def splitFasta( fa_path, output ):
 
     return fastas 
 
-
-def prepAlign( fas, output ):
-
-    fas.sort()
-    outprep = (os.path.basename(fas[0]) + '.v.' + os.path.basename(fas[1])).replace('.fa','')
-    outname = output + '/' + outprep
+ 
+def makeDmndDB(diamond, queryFile, output_dir, cpus = 1):
+    outputDB = output_dir + re.sub(r'\.[^\.]+$', '', os.path.basename(queryFile))
     cmd = [
-        'needle', '-outfile', outname, 
-        '-asequence', fas[0], '-bsequence', fas[1],
-        '-gapopen=10', '-gapextend=0.5'
+        diamond, 'makedb', '--in', queryFile,
+        '--db', outputDB, '--threads', str(cpus)
+        ]
+    dmndDBcode = subprocess.call(
+        cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
+        )
+    return outputDB, dmndDBcode
+
+
+def runDmnd(
+    diamond, queryFile, queryDB, outputFile, pid = True,
+    cpus = 1, verbose = False, blast = 'blastp'
+    ):
+
+    if pid:
+        distanceVal = 'pident'
+    else:
+        distanceVal = 'bitscore'
+
+    cmd = [
+        diamond, blast, '-d', queryDB, '-q', queryFile,
+        '--out', outputFile, '--threads', str(cpus),
+        '--outfmt', '6', 'qseqid', 'sseqid', distanceVal,
         ]
 
-    return (outname, cmd)
-
- 
-def grabIdentity( align ):
-
-    with open( align, 'r' ) as raw:
-        data = raw.read()
-    idPrep = re.search( r'Identity:\W+\d+\/\d+\W+\((.*?)\%\)', data, re.M )
-    identity = float( idPrep[1] ) / 100
-
-    return identity
+    if not verbose:
+        dmndCode = subprocess.call(
+            cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
+            )
+    else:
+        dmndCode = subprocess.call(
+            cmd
+            )
+    return outputFile, dmndCode
 
 
-def createDist( alignments, minIdentity ):
+def readDmndDist( outputFile, minVal, pid = True ):
+    # should convert this to numpy and sparse
 
-    dist_dict, out_dict = {}, {}
-    out_df = pd.DataFrame()
-    for align in alignments:
-        names = os.path.basename( align ).split( '.v.' )
-        identity = grabIdentity( align )
-        if identity > minIdentity:
-            if names[0] not in out_dict:
-                out_dict[ names[0] ] = {}
-            if names[0] not in dist_dict:
-                dist_dict[ names[0] ] = {}
-                dist_dict[names[0]][names[0]] = 0.0
-            if names[1] not in dist_dict:
-                dist_dict[ names[1] ] = {}
-                dist_dict[names[1]][names[1]] = 0.0
-            dist_dict[ names[0] ][ names[1] ] = float(identity)
-            dist_dict[ names[1] ][ names[0] ] = float(identity)
-            out_dict[ names[0] ][ names[1] ] = float(identity)
+    dist_dict = {}
+    with open(outputFile, 'r') as raw:
+        for line in raw:
+            q, s, v0 = line.rstrip().split('\t')
+            v = round(float(v0))
+            if q == s:
+                continue
+            if v > minVal:
+  #              if q not in out_dict:
+ #                   out_dict[q] = {}
+                if q not in dist_dict:
+                    dist_dict[q] = {}
+                    dist_dict[q][q] = 0.0
+                if s not in dist_dict:
+                    dist_dict[s] = {}
+                    dist_dict[s][s] = 0.0
+                dist_dict[q][s] = 100 - v
+                dist_dict[s][q] = 100 - v
+#                out_dict[q][s] = v
 
-    distanceMatrix = pd.DataFrame( dist_dict ).sort_index(1).sort_index(0)
-    outMatrix = pd.DataFrame( out_dict ).sort_index(1).sort_index(0)
+    distanceMatrix = pd.DataFrame(dist_dict).sort_index(1).sort_index(0).fillna(100)
+#    outMatrix = pd.DataFrame(out_dict).sort_index(1).sort_index(0).fillna(1)
 
-    return distanceMatrix.fillna( 1 ), outMatrix.fillna( 1 )
+    if pid:
+        distanceMatrix /= 100
+ #       outMatrix /= 100
+    else:
+        minV, maxV = min(distanceMatrix), max(distanceMatrix)
+        denom = maxV - minV
+        distanceMatrix -= minV
+#        outMatrix -= minV
+        distanceMatrix /= denom
+ #       outMatrix /= denom
+        distanceMatrix = 1 - distanceMatrix
+  #      outMatrix = 1 - outMatrix
+
+    return distanceMatrix #, outMatrix
+
+
+def writeDist(outputFile, outMatrix):
+    dist_out = ''
+    for i, row in outMatrix.iterrows():
+        for column in outMatrix.columns:
+            if str(column) != str(i) and outMatrix.at[i, column] < 1:
+                dist_out += str(i) + '\t' + str(column) + '\t' + \
+                    str(outMatrix.at[i, column]) + '\n'
+    with open( output, 'w' ) as out:
+        out.write( dist_out )
 
 
 def runUsearch( fasta, output, maxdist, cpus = 1, verbose = False ):
@@ -176,49 +217,22 @@ def scipyaggd( distMat, maxDist, method = 'single' ):
     tree = hierarchy.to_tree(linkage_matrix)
     fcluster = hierarchy.fcluster(
         linkage_matrix, maxDist, 
-        criterion = 'distance')
+        criterion = 'distance'
+        )
     clusters = getClusterLabels(distMat.index, fcluster)
 
     return clusters, tree
 
-
-def needleMain(fasta, min_id, cpus = 1):
-    print( '\nCalculating needle alignments' , flush = True)
-    aligns, alignCmds = set(), list()
-    tmpdir = tempfile.gettempdir() + '/aggTmpZK' 
-    tmpdir += ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    if not os.path.isdir( tmpdir ):
-        os.mkdir( tmpdir )
-    if not os.path.isdir( tmpdir + '/fastas' ):
-        os.mkdir( tmpdir + '/fastas' )
-    if not os.path.isdir( tmpdir + '/aligns' ):
-        os.mkdir( tmpdir + '/aligns' )
-    print('\tSTEP 1/3: Preparing data. ' + tmpdir + ' will be removed upon completion', flush = True)
-    fastas = splitFasta( fasta, tmpdir + '/fastas' )
-    for fa1 in fastas:
-        for fa2 in fastas:
-            if fa1 != fa2: 
-                out = prepAlign( [ fa1, fa2 ], tmpdir + '/aligns' )
-                if out[0] not in aligns:
-                    aligns.add( out[0] )
-                    alignCmds.append( out[1] )
-    print('\tSTEP 2/3: Aligning sequences. Using ' + str(cpus) + ' cores', flush = True)
-    codes = multisub( list(alignCmds), processes = cpus )
-    print('\tSTEP 3/3: Generating distance matrix', flush = True)
-    distanceMatrix, outMatrix = createDist( aligns, min_id )
-    dist_out = ''
-    for i, row in outMatrix.iterrows():
-        for column in outMatrix.columns:
-            if str(column) != str(i) and outMatrix.at[i, column] < 1:
-                dist_out += str(i) + '\t' + str(column) + '\t' + \
-                    str(outMatrix.at[i, column]) + '\n'
-    with open( output + '.dist', 'w' ) as out:
-        out.write( dist_out )
-    subprocess.call( ['rm', '-rf', tmpdir], stdout = subprocess.PIPE, stderr = \
-        subprocess.PIPE )
-
+def dmndMain(fastaPath, minVal, output_dir, distFile, pid = True, verbose = False, cpus = 1):
+    queryDB, makeDBcode = makeDmndDB('diamond', fastaPath, output_dir, cpus = cpus)
+    dmndOut, dmndCode = runDmnd(
+        'diamond', fastaPath, queryDB, distFile, pid = pid,
+        cpus = cpus, verbose = verbose, blast = 'blastp'
+        )
+    distanceMatrix = readDmndDist( dmndOut, minVal, pid = pid )
+#    writeDist(distFile, outMatrix)
     return distanceMatrix
-
+    
 def usearchMain(fasta, min_id, output, cpus = 1, verbose = False):
     vprint('\nusearch aligning', flush = True, v = verbose)
     runUsearch(fasta, output + '.dist', str(1 - min_id), cpus, verbose)
@@ -262,13 +276,13 @@ def iterativeRun(
         if focalLen >= minseq:
             if maxseq:
                 if focalLen <= maxseq:
-                    vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                    vprint(spacer + '\tSUCCESS!', flush = True, v = verbose)
                     exitCode = 0
                     break
                 else:
                     direction = 1
             else:
-                vprint('\t\tSUCCESS!', flush = True, v = verbose)
+                vprint(spacer + '\tSUCCESS!', flush = True, v = verbose)
                 exitCode = 0
                 break
         else:
@@ -311,12 +325,15 @@ def reiterativeRun(
             log_dict['iterations'].append(iteration_dict)
             writeJson(log_path, log_dict)
         if focalLen >= minseq:
-            if focalLen <= maxseq:
-                refines.append([clusters, tree, True])
-                direction = -1
+            if maxseq:
+                if focalLen <= maxseq:
+                    refines.append([clusters, tree, True])
+                    direction = -1
+                else:
+                    refines.append([clusters, tree, False])
+                    direction = 1
             else:
-                refines.append([clusters, tree, False])
-                direction = 1
+                return clusters, tree, None, None, log_dict
         else:
             refines.append([clusters, tree, False])
             direction = -1
@@ -338,14 +355,14 @@ def reiterativeRun(
 
 def main(
     fastaPath, minid, maxdist, minseq, maxseq, 
-    searchProg = 'usearch', linkage = 'single', 
+    searchProg = 'usearch', linkage = 'single',
     iterative = False, interval = None, output= None, cpus = 1,
     verbose = False, spacer = '\t', log_path = None,
-    refine = False
+    refine = False, pid = True, dmnd_dir = None
     ):
 
     log_dict = {
-        'fasta': fastaPath, 'minimum_id': minid, 'maximum_distance': maxdist,
+        'algorithm': searchProg, 'fasta': fastaPath, 'minimum_id': minid, 'maximum_distance': maxdist,
         'minimum_sequences': minseq, 'maximum_sequences': maxseq, 'search_program': searchProg,
         'distance_matrix': output + '.dist', 'linkage': linkage, 'focal_gene': iterative,
         'iterations': []
@@ -356,10 +373,19 @@ def main(
         writeJson(log_path, log_dict)
 
     if os.path.isfile(log_dict['distance_matrix']):
-        distanceMatrix = importDist(log_dict['distance_matrix'])
+        if searchProg == 'usearch':
+            distanceMatrix = importDist(log_dict['distance_matrix'])
+        else:
+            distanceMatrix = readDmndDist(log_dict['distance_matrix'], minid, pid = pid)
     else:
-        if searchProg == 'needle': #elif if above lines not highlighted
-            distanceMatrix = needleMain(fastaPath, minid, cpus = 1)
+        if searchProg == 'diamond': #elif if above lines not highlighted
+            if not dmnd_dir:
+                dmnd_dir = os.path.dirname(log_dict['distance_matrix']) + '/'
+            distanceMatrix = dmndMain(
+                fastaPath, minid, dmnd_dir, 
+                log_dict['distance_matrix'], pid = pid, 
+                verbose = verbose, cpus = cpus
+                )
         elif searchProg == 'usearch':
             distanceMatrix = usearchMain(fastaPath, minid, output, cpus, verbose)
 
@@ -376,7 +402,7 @@ def main(
                 # with
                     finalIter = log_dict['iterations'][-1]
                     compIter = log_dict['iterations'][-2]
-                    interval = 0.01
+                    interval = 0.005
                     minval = min([
                             compIter['maximum_distance'], finalIter['maximum_distance']
                             ]) 
@@ -386,7 +412,7 @@ def main(
                             ])
                     clusters, tree, oldClusters, oldTree, log_dict = reiterativeRun(
                         minseq, maxseq, minval, minid, distanceMatrix, linkage, iterative, 
-                        interval = 0.01, log_dict = log_dict, log_path = log_path, minval = minval,
+                        interval = interval, log_dict = log_dict, log_path = log_path, minval = minval,
                         maxval = maxval, verbose = verbose
                         )
                     if oldTree:
@@ -444,7 +470,7 @@ if __name__ == '__main__':
     parser.add_argument( '-f', '--fasta', required = True )
     parser.add_argument( 
         '-a', '--alignment', help = 'Alignment software '
-        + '{"needle", "usearch"}', default = 'usearch' 
+        + '{"diamond", "usearch"}', default = 'diamond' 
         )
     parser.add_argument( '-o', '--output', help = 'e.g. "~/name" will output name.clus, etc' )
     parser.add_argument( '-m', '--minid', help = 'Minimum identity'
@@ -473,14 +499,14 @@ if __name__ == '__main__':
     if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
         eprint('\nERROR: Invalid linkage criterium', flush = True)
         sys.exit( 1 )
-    elif args.alignment not in {'needle', 'usearch'}:
+    elif args.alignment not in {'diamond', 'usearch'}:
         eprint('\nERROR: Invalid alignment method', flush = True)
         sys.exit( 2 )
     else:
         findExecs( [args.alignment], exit = set(args.alignment) )
 
     if args.iterative:
-        args.maxdist = 1 - minid
+        args.maxdist = 1 - args.minid
     elif 1 - args.maxdist <= minid:
         eprint('\nWARNING: 1 - maximum distance exceeds minimum identity, clustering is ineffective', flush = True)
 
@@ -496,16 +522,20 @@ if __name__ == '__main__':
             sys.exit(6)
 
     if args.output:
-        output = formatPath(args.output)
+        if not os.path.isdir(formatPath(args.output)):
+            os.mkdir(formatPath(args.output))
+        dmnd_dir = formatPath(args.output)
+        output = out_dir + os.path.basename(fastaPath)
     else:
+        dmnd_dir = mkOutput(os.getcwd() + '/', 'aggClus')
         output = os.getcwd() + '/' + os.path.basename(fastaPath)
 
     distanceMatrix, clusters, tree, ocl, ot = main(
         fastaPath, args.minid, args.maxdist, args.minseq, args.maxseq, 
         searchProg = args.alignment, linkage = args.linkage, verbose = True,
         iterative = args.iterative, interval = 0.10, output = output, spacer = '\n',
-        log_path = os.dirname(output) + '.' + os.path.basename(fastaPath) + '.aggClus.json',
-        refine = args.refine
+        log_path = os.path.dirname(output) + '.' + os.path.basename(fastaPath) + '.aggClus.json',
+        refine = args.refine, pid = True, dmnd_dir = dmnd_dir, cpus = args.cpus
         )
 
     if ocl:
