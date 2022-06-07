@@ -503,12 +503,12 @@ Information on a complete [phylogenetic pipeline](https://gitlab.com/xonq/mycoto
 
 e.g. Swiftly construct a tree from a fasta
 ```bash
-(mycotools) -$ fa2tree.py -i <FASTA>.fa --fast
+(mycotools) -$ fa2tree.py -f <FASTA>.fa --fast
 ```
 
 Prepare a robust tree for slurm job submission
 ```bash
-(mycotools) -$ fa2tree.py -i <FASTA> -s -A PAS1046
+(mycotools) -$ fa2tree.py -f <FASTA> -s -A PAS1046
 ```
 
 Begin the tree pipeline by navigating into the folder and running `bash
