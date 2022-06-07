@@ -212,7 +212,7 @@ if __name__ == '__main__':
         alignment = True
     if os.path.isfile(input_check):
         main( 
-            input_check, slurm = args.slurm, 
+            input_check, slurm = args.slurm, fast = args.fast,
             pbs = args.pbs, project = args.project,
             output_dir = output, verbose = True, alignment = alignment
             )
