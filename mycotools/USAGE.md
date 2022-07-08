@@ -247,7 +247,7 @@ To submit as a job (not recommended), you must create an encrypted MycotoolsDB p
 
 <br />
 
-These scripts can input biosamples (NCBI) or genome codes (JGI). The column must have the appropriate header ('genome_code' or 'biosample') (substitute `-i aspergillus.db` with this file):
+These scripts can input assembly accessions (NCBI) or genome codes (JGI). The column must have the appropriate header ('genome_code' or 'assembly_acc') (substitute `-i aspergillus.db` with this file):
 
 `jgiGenomeCodes.txt`
 ```
@@ -259,7 +259,7 @@ Acain1
 
 `ncbiBioSamples.txt`
 ```
-biosample
+assembly_acc
 SAMN15352002
 SAMN06205226
 SAMN02744098

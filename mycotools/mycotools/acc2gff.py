@@ -119,12 +119,18 @@ if __name__ == '__main__':
     elif args.ome:
         output = mkOutput(os.getcwd() + '/', 'acc2gff')
         for ome in gff_strs:
-            with open( output + ome + '.accs.gff3', 'w' ) as out:
-                out.write( list2gff(gff_lists[ome]) )
+            if gff_lists[ome]:
+                with open( output + ome + '.accs.gff3', 'w' ) as out:
+                    out.write( list2gff(gff_lists[ome]) )
+            else:
+                eprint('ERROR: ' + ome + ' failed, no accessions retrieved', flush = True)
     else:
         out_str = ''
         for ome in gff_lists:
-            out_str += list2gff(gff_lists[ome]) + '\n'
+            if gff_lists[ome]:
+                out_str += list2gff(gff_lists[ome]) + '\n'
+            else:
+                eprint('ERROR: ' + ome + ' does not have accession', flush = True)
         print(out_str)
 
     sys.exit( 0 )

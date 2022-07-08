@@ -127,7 +127,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
     if file_type == 'gff':
         match1 = gffMatch1
         match2 = gffMatch2
-    elif file_type == 'assembly':
+    elif file_type == 'fna':
         if masked:
             match1 = re.compile(r'filename\="(' + ome + r'\_AssemblyScaffolds_Repeatmasked\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
             match2 = re.compile(r'filename\="(' + ome + r'\_AssemblyScaffolds_Repeatmasked\.fasta\.gz)".*?url\="([^ ]+)"')
@@ -138,7 +138,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
             match3 = re.compile(r'filename\="([^ ]+?AssembledScaffolds.*?\.gz)".*? url="(.*?AssembledScaffolds[^ ]*?\.gz)".*? md5\="([\w\d]+)"')
             match4 = re.compile(r'filename\="([^ ]+?AssembledScaffolds.*?\.gz)".*? url="(.*?AssembledScaffolds[^ ]*?\.gz)"')
 
-    elif file_type == 'proteome':
+    elif file_type == 'faa':
         match1 = re.compile(r'filename\="([^ ]+\_GeneCatalog_proteins_\d+\.aa\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
         match2 = re.compile(r'filename\="([^ ]+\_GeneCatalog_proteins_\d+\.aa\.fasta\.gz)".*?url\="([^ ]+)"')
         match3 = re.compile(r'filename\="([^ ]+?\.FilteredModels[^ ]+\.proteins\.[^ ]*?\.gz)".*? url\="([^ ]*?)".*? md5\="([\w\d]+)"')
@@ -414,9 +414,9 @@ def main(
     
     dwnlds = []
     if assembly:
-        dwnlds.append( 'assembly' )
+        dwnlds.append( 'fna' )
     if proteome:
-        dwnlds.append( 'proteome' )
+        dwnlds.append( 'faa' )
     if gff3:
         dwnlds.append( 'gff3' )
     if gff:
@@ -470,10 +470,10 @@ def main(
 
     if 'gff3' in df.columns:
         del df['gff3']
-    if 'proteome' in df.columns:
-        del df['proteome']
-    if 'assembly' in df.columns:
-        del df['assembly']
+    if 'faa' in df.columns:
+        del df['faa']
+    if 'fna' in df.columns:
+        del df['fna']
 
     return df, ome_set
 

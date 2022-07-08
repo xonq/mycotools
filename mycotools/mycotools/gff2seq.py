@@ -560,7 +560,7 @@ if __name__ == '__main__':
                 if ome not in gff_dicts:
                     gff_dicts[ome] = []
                     assembly_dicts[ome] = fa2dict(
-                        formatPath('$MYCOFNA/' + db.loc[ome]['assembly'])
+                        formatPath('$MYCOFNA/' + db.loc[ome]['fna'])
                         )
                 gff_dicts[ome].append(line)
         except IndexError:

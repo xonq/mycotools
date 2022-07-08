@@ -175,11 +175,17 @@ def main( gff_list, accessions, plusminus = 10, mycotools = False, geneGff = Fal
                 except TypeError: # no alias
                     pass
 
-        geneGffs = {}
+        geneGffs, todel = {}, []
         for acc in out_indices:
             geneGffs[acc] = []
             for gene in out_indices[acc]:
-                geneGffs[acc].append(geneGffs_prep[acc][gene])
+                try:
+                    geneGffs[acc].append(geneGffs_prep[acc][gene])
+                except KeyError: # gene without RNA
+                    raise KeyError('gene without RNA')
+#                    todel.append((acc, gene))
+        for acc, gene in todel:
+            del out_indices[acc][gene]
         return out_indices, geneGffs
     return out_indices
 

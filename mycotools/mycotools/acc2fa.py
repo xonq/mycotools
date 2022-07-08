@@ -57,7 +57,7 @@ def dbmain( db, accs ):
     omes = set([x[:x.find('_')] for x in accs])
     for ome in omes:
         accessions = [x for x in accs if x.startswith(ome + '_')]
-        fasta = os.environ['MYCOFAA'] + '/' + db[ome]['proteome']
+        fasta = os.environ['MYCOFAA'] + '/' + db[ome]['faa']
         fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
         fasta = formatPath('$MYCOFAA/' + ome + '.aa.fa')
         fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}

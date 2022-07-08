@@ -17,7 +17,7 @@ class mtdb(dict):
     '''
     def __init__(self, db = None, index = None):
         self.columns = ['internal_ome', 'genus', 'species', 'strain', 'version', 
-            'biosample', 'assembly', 'proteome', 'gff3',
+            'assembly_acc', 'fna', 'faa', 'gff3',
             'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
             'genome_code', 'acquisition_date']
         if not db:
@@ -51,9 +51,9 @@ class mtdb(dict):
             'species': list(df['species']),
             'strain': list(df['strain']),
             'version': list(df['version']),
-            'biosample': list(df['biosample']),
-            'assembly': list(df['assembly']),
-            'proteome': list(df['proteome']),
+            'assembly_acc': list(df['assembly_acc']),
+            'fna': list(df['fna']),
+            'faa': list(df['faa']),
             'gff3': list(df['gff3']),
             'taxonomy': list(df['taxonomy']),
             'ecology': list(df['ecology']),
@@ -93,7 +93,7 @@ class mtdb(dict):
                 if headers:
                     out.write('\t'.join([
                         'internal_ome', 'genus', 'species', 'strain', 'version', 
-                        'biosample', 'assembly', 'proteome', 'gff3',
+                        'assembly_acc', 'fna', 'faa', 'gff3',
                         'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
                         'genome_code', 'acquisition_date' 
                         ]) + '\n')
@@ -108,7 +108,7 @@ class mtdb(dict):
                 print(
                     '\t'.join([
                     'internal_ome', 'genus', 'species', 'strain', 'version', 
-                    'biosample', 'assembly', 'proteome', 'gff3',
+                    'assembly_acc', 'fna', 'faa', 'gff3',
                     'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
                     'genome_code', 'acquisition_date' 
                     ]), flush = True
@@ -138,7 +138,7 @@ class mtdb(dict):
             if len(df[column]) == 0:
                 return mtdb({}, index = column)
             if column in \
-                {'genome_code', 'internal_ome', 'biosample', 'assembly', 'gff3', 'proteome'}: # if it's unique
+                {'genome_code', 'internal_ome', 'assembly_acc', 'fna', 'gff3', 'faa'}: # if it's unique
                 for i, v in enumerate(df[column]):
                     data[v] = {}
                     for head in columns:
@@ -167,7 +167,7 @@ class mtdb(dict):
         if df.index:
             data = {x: [] for x in mtdb().columns}
             data[df.index] = list(df.keys())
-            if df.index in {'genome_code', 'internal_ome', 'biosample', 'assembly', 'gff3', 'proteome'}:
+            if df.index in {'genome_code', 'internal_ome', 'assembly_acc', 'fna', 'gff3', 'faa'}:
                 for key in df:
                     for otherCol in df[key]:
                         data[otherCol].append(df[key][otherCol])
@@ -354,7 +354,7 @@ def masterDB( path = '$MYCODB' ):
             eprint('\nERROR: master db not found in ' + path + '. Have you initialized MycoDB?', flush = True)
         master_path = formatPath( '$' + path + '/' + master + '.db' )
     except KeyError:
-        eprint('\nERROR: ' + path + ' not in path' , flush = True)
+#        eprint('\nERROR: ' + path + ' not in path' , flush = True)
         master_path = None
 
     return master_path
@@ -365,7 +365,7 @@ def db2df(data, stdin = False):
     import pandas as pd, pandas
 
     columns = [ 'internal_ome', 'genus', 'species', 'strain', 'version', 
-        'biosample', 'assembly', 'proteome', 'gff3',
+        'assembly_acc', 'fna', 'faa', 'gff3',
         'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
         'genome_code', 'acquisition_date' ]
     if not stdin:
@@ -385,20 +385,20 @@ def df2std( df ):
     '''
     Standardized organization of database columns
     '''
-    # temporary check, will remove when all scripts account for new biosample column
-    if 'biosample' in df.columns:
+    # temporary check, will remove when all scripts account for new assembly_acc column
+    if 'assembly_acc' in df.columns:
         trans_df = df[[
         'internal_ome', 'genus', 'species',
-        'strain', 'version', 'biosample', 'assembly', 
-        'proteome', 'gff3', 'taxonomy',
+        'strain', 'version', 'assembly_acc', 'fna', 
+        'faa', 'gff3', 'taxonomy',
         'ecology', 'eco_conf', 'source', 'published', 
         'genome_code', 'acquisition_date'
     ]]
     else:
         trans_df = df[[
         'internal_ome', 'genus', 'species',
-        'strain', 'assembly', 
-        'proteome', 'gff', 'gff3', 'taxonomy',
+        'strain', 'fna', 
+        'faa', 'gff', 'gff3', 'taxonomy',
         'ecology', 'eco_conf', 'source', 'published', 
         'genome_code'
         ]]
@@ -756,3 +756,9 @@ def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
         newdf.at[i, new_col] = ome
     
     return newdf
+
+
+if not masterDB():
+    eprint('WARNING: MycotoolsDB not initialized', flush = True)
+
+

@@ -12,7 +12,7 @@ from mycotools.gff2seq import aamain as gff2seq
 
 predbHeaders = [
     'genomeCode', 'genus', 'species', 'strain',
-    'version', 'biosample',
+    'version', 'assembly_acc',
     'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
     'useRestriction (yes/no)', 'publication'
     ]
@@ -149,8 +149,8 @@ def predb2mtdb(predb):
                 'species': predb['species'][i],
                 'strain': predb['strain'][i],
                 'version': predb['version'][i],
-                'biosample': predb['biosample'][i],
-                'assembly': predb['assemblyPath'][i],
+                'assembly_acc': predb['assembly_acc'][i],
+                'fna': predb['assemblyPath'][i],
                 'gff3': predb['gffPath'][i],
                 'source': predb['source'][i],
                 'published': predb['publication'][i]
@@ -162,8 +162,8 @@ def predb2mtdb(predb):
                 'species': predb['species'][i],
                 'strain': predb['strain'][i],
                 'version': predb['version'][i],
-                'biosample': predb['biosample'][i],
-                'assembly': predb['assemblyPath'][i],
+                'assembly_acc': predb['assembly_acc'][i],
+                'fna': predb['assemblyPath'][i],
                 'gff3': predb['gffPath'][i],
                 'source': predb['source'][i],
                 'published': not predb['restriction'][i]
@@ -187,9 +187,8 @@ def genOmes(newdb, refdb = None, ome_col = 'internal_ome'):
             numbers = [
                 int(re.search(r'.*?(\d+$)', x)[1]) for x in list(tax_set) if x.startswith(name)
                 ]
-            numbers.sort(reverse = True)
             if numbers:
-                number = numbers[0] + 1
+                number = max(numbers) + 1
             else:
                 number = 1
             newOme = name + str(number)
@@ -259,7 +258,7 @@ def gffMngr(ome, gff, cur_path, source, genomeCode):
 
 def add2failed(row):
     if row['source'] == 'ncbi':
-        return [row['biosample'], row['version']]
+        return [row['assembly_acc'], row['version']]
     else:
         return [row['genome_code'], row['version']]
 
@@ -277,7 +276,7 @@ def main(
     omedb = omedb.set_index('internal_ome')
     for ome, row in omedb.items():
         curCmds.append([
-            ome, row['assembly'], row['gff3'], 
+            ome, row['fna'], row['gff3'], 
             wrk_dir, row['source'], row['genome_code']
             ])
     with mp.Pool(processes = cpus) as pool:
@@ -290,9 +289,9 @@ def main(
             del omedb[data[0]]
         else:
             ome, fnaPath, gffPath, faaPath = data
-            omedb[ome]['assembly'] = fnaPath
+            omedb[ome]['fna'] = fnaPath
             omedb[ome]['gff3'] = gffPath
-            omedb[ome]['proteome'] = faaPath
+            omedb[ome]['faa'] = faaPath
 
     return omedb.reset_index(), failed
 

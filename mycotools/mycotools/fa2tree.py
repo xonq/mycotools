@@ -33,10 +33,13 @@ def mafftRun( fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t' ):
     else:
         with open( out_dir + '/mafft.sh', 'w' ) as out:
             if '#PBS' in hpc:
-                out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + '\ncd ' + out_dir + '\nqsub clipkit.sh')
+                out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
+                ' > ' + out_dir + '/' + name + '.mafft' + \
+                '\ncd ' + out_dir + '\nqsub clipkit.sh')
             else:
-                 out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + '\ncd ' + out_dir + '\nsbatch clipkit.sh')
-               
+                 out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
+		' > ' + out_dir + '/' + name + '.mafft' + \
+                '\ncd ' + out_dir + '\nsbatch clipkit.sh')
         
     return out_dir + '/' + name + '.mafft'
 

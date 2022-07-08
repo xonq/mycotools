@@ -22,9 +22,9 @@ def compileHmmCmd( db, hmmdb_path, output, ome_set = set() ):
 
     cmd_tuples = [ ]
     for i, row in db.iterrows():
-        if pd.isnull( row['proteome'] ) or row['internal_ome'] in ome_set:
+        if pd.isnull( row['faa'] ) or row['internal_ome'] in ome_set:
             continue
-        proteome_path = os.environ['MYCOFAA'] + '/' + row['proteome']
+        proteome_path = os.environ['MYCOFAA'] + '/' + row['faa']
         output_path = output + '/' + row['internal_ome'] + '.out'
         cmd = ( 'hmmsearch', '-o', output_path, hmmdb_path, proteome_path ) 
         cmd_tuples.append( cmd )
@@ -40,7 +40,7 @@ def compileextractHmmCmd( db, args, output ):
 
     cmd_tuples = [ ]
     for i, row in db.iterrows():
-        if pd.isnull( row['proteome'] ):
+        if pd.isnull( row['faa'] ):
             continue
         hmmsearch_out = output + '/' + row['internal_ome'] + '.out'
         cmd_tuples.append( ( args, hmmsearch_out, output ) )
@@ -68,8 +68,8 @@ def compileacc2fa( db, output, q_dict ):
     cmd_tuples = []
     if not os.path.isdir(output):
         os.mkdir( output )
-    fa_dict = { row['internal_ome']: os.environ['MYCOFAA'] + '/' + row['proteome'] \
-        for i, row in db.iterrows() if not pd.isnull( row['proteome'] ) }
+    fa_dict = { row['internal_ome']: os.environ['MYCOFAA'] + '/' + row['faa'] \
+        for i, row in db.iterrows() if not pd.isnull( row['faa'] ) }
     for q in q_dict:
         cmd_tuples.append( ( q_dict[q], 0, fa_dict, output + '/' + q + '.aa.fa' ) )
 

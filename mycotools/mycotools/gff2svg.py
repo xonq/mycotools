@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 #NEED TO PARSE FOR IN GENE COORDINATES AND ANNOTATIONS
 
-import os, sys, re, argparse
+import os, sys, re, argparse, random
 from mycotools.lib.kontools import sysStart, formatPath, file2list, getColors
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from mycotools.lib.biotools import gff2list, gff3Comps
@@ -92,15 +92,26 @@ def main(
     gff_list, svg_path, product_dict = {}, 
     width = 10, prod_comp = gff3Comps()['product'], 
     null = 'hypothetical protein', types = {'tRNA', 'mRNA', 'rRNA'},
-    labels = True
+    labels = True, wheel = None, shuffle = False
     ):
 
-    if not set(product_dict.keys()).difference({null}): 
-    # if no keys or null is the only product key
-        products = compileProducts(gff_list, prod_comp, types = types)
+    if not wheel:
+        if not set(product_dict.keys()).difference({null}): 
+        # if no keys or null is the only product key
+            products = compileProducts(gff_list, prod_comp, types = types)
+        else:
+            products = list(product_dict.keys())
+        colors = getColors(len(products))
+    elif wheel == 1: # spoof function to get wheel
+        colors = getColors(1)
+    elif wheel == 2:
+        colors = getColors(17)
     else:
-        products = list(product_dict.keys())
-    colors = getColors(len(products))
+        colors = getColors(28)
+
+    if shuffle:
+        random.shuffle(colors)
+
     if null not in product_dict:
         product_dict[null] = '#ffffff'
 
@@ -128,6 +139,17 @@ if __name__ == "__main__":
         '-t', '--type', default = '"tRNA mRNA rRNA"',
         help = 'Type to extract. DEFAULT: "tRNA mRNA rRNA"'
         )
+    parser.add_argument(
+        '-n', '--nolabel', action = 'store_true', default = False,
+        help = "Don't output labels on svg"
+        )
+    parser.add_argument(
+        '-c', '--color', default = None, type = int,
+        help = 'Color wheel {1 smallest, 2, 3 largest}; DEFAULT: auto'
+        )
+    parser.add_argument(
+        '-s', '--shuffle', help = 'Randomly shuffle color wheel', action = 'store_true'
+        )
     parser.add_argument('-o', '--output', help = 'Optional output directory')
     args = parser.parse_args()
 
@@ -142,6 +164,10 @@ if __name__ == "__main__":
         for char in args.regex:
             regex += char
 
+    if args.color:
+        if args.color not in {1,2,3}:
+            raise ValueError('--color must be in {1, 2, 3}')
+
     args.type = args.type.replace('"','').replace("'",'')
     types = set(args.type.split())
 
@@ -155,10 +181,16 @@ if __name__ == "__main__":
             if entry.endswith('/'):
                 entry = re.sub(r'/+$', '', entry)
         svg_path = os.path.dirname(gffs[0]) + re.sub(r'\.gf[^\.]+$', '.svg', os.path.basename(gffs[0]))
-        product_dict = main(gff2list(gffs[0]), svg_path, prod_comp = regex, types = types)
+        product_dict = main(
+            gff2list(gffs[0]), svg_path, prod_comp = regex, types = types, labels = not args.nolabel,
+            wheel = args.color, shuffle = args.shuffle
+            )
         for gff in gffs[1:]:
             svg_path = os.path.dirname(gff) + re.sub(r'\.gf[^\.]+$', '.svg', os.path.basename(gff))
-            product_dict = main(gff2list(gff), svg_path, product_dict, args.width, prod_comp = regex, types = types)
+            product_dict = main(
+                gff2list(gff), svg_path, product_dict, args.width, prod_comp = regex, 
+                types = types, labels = not args.nolabel, wheel = args.color, shuffle = args.shuffle
+                )
     else:
         if args.gff.endswith('/'):
             args.gff = re.sub(r'/+$', '', args.gff)
@@ -170,6 +202,10 @@ if __name__ == "__main__":
             svg_path = os.path.dirname(args.gff) + re.sub(
                 r'\.gf[^\.]+$', '.svg', os.path.basename(args.gff)
                 )
-        main( gff2list(args.gff), svg_path, width = args.width, prod_comp = regex, types = types )
+        main(
+            gff2list(args.gff), svg_path, width = args.width, prod_comp = regex, 
+            types = types, labels = not args.nolabel, wheel = args.color,
+            shuffle = args.shuffle
+            )
 
     sys.exit(0)

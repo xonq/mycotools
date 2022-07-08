@@ -132,8 +132,8 @@ def main(in_path, log_path = None, cpus = 1):
         cmds = []
         for ome in db:
             row = db[ome]
-            if row['assembly'] and ome not in prevOmes:
-                cmds.append((formatPath('$MYCOFNA/' + row['assembly']), ome))
+            if row['fna'] and ome not in prevOmes:
+                cmds.append((formatPath('$MYCOFNA/' + row['fna']), ome))
         with mp.Pool(processes=cpus) as pool:
             results = pool.starmap(mngr, cmds)
 
