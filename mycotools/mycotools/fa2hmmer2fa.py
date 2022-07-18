@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 
-import sys, os, re, argparse, subprocess, datetime, multiprocessing as mp
+# NEED to ditch extracthmm and move to simplified output parsing
+
+import os
+import re
+import sys
+import argparse
+import datetime
+import subprocess
+import multiprocessing as mp
 from mycotools.extractHmmsearch import main as exHmm, grabNames
 from mycotools.extractHmmAcc import main as absHmm
 from mycotools.db2search import compAcc2fa
 from mycotools.acc2fa import famain as acc2fa
 from mycotools.lib.kontools import intro, outro, findExecs, eprint, formatPath
-from mycotools.lib.dbtools import db2df, masterDB
+from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import dict2fa
 
 def runextractHmmAcc(hmm, accession, output):
@@ -32,7 +40,7 @@ def runHmmer(fasta, hmm, output, cpu = 1, binary = 'hmmsearch'):
 
 
 def runExtractHmm(
-    hmm_out, top_hits, cov_threshold, evalue, query = True
+    hmm_out, top_hits, cov_threshold, evalue, query = True, acc = None
     ):
 
     with open(hmm_out, 'r') as raw:
@@ -40,11 +48,12 @@ def runExtractHmm(
     accs = grabNames( data, query = query )
     if len(accs) > 1:
         hmm_data = exHmm(
-            data, True, top_hits, cov_threshold, evalue, query
+            data, True, top_hits, cov_threshold, evalue, query = query
             )
     else:
         hmm_data = exHmm(
-            data, list(accs)[0], top_hits, cov_threshold, evalue, query
+            data, list(accs)[0], top_hits, cov_threshold, evalue, query =
+            query
             )
     
     return hmm_data
@@ -72,11 +81,7 @@ def parseHmmData(hmm_data):
 
 def runAcc2fa(db, biotype, output_res, subhit = True, cpu = 1):
 
-    if biotype == 'assembly':
-        env_dir = os.environ['MYCOFNA'] + '/'
-    else:
-        env_dir = os.environ['MYCOFAA'] + '/'
-    acc2fa_cmds = compAcc2fa(db, biotype, env_dir, output_res, subhit)
+    acc2fa_cmds = compAcc2fa(db, biotype, output_res, subhit)
     output_fas = {}
     for query in acc2fa_cmds:
         print('\t' + query, flush = True)
@@ -101,9 +106,9 @@ def main(
     ):
 
     if binary == 'nhmmer':
-        biotype = 'assembly'
+        biotype = 'fna'
     else:
-        biotype = 'proteome'
+        biotype = 'faa'
 
     if accession:
         print('\nExtracting ' + accession, flush = True)
@@ -130,7 +135,8 @@ def main(
     
     print('\nParsing output', flush = True)
     hmm_data = runExtractHmm(
-        hmmer_out, top_hits, cov_threshold, evalue, not accession_search
+        hmmer_out, top_hits, cov_threshold, evalue, 
+        not accession_search, accession
         )
     output_res = parseHmmData(hmm_data)
 
@@ -195,7 +201,7 @@ if __name__ == '__main__':
     #        accs = args.query
 
     output_fas = main(
-        db2df(args.database), args.binary, args.fasta, args.hmm, out_dir, args.query,
+        mtdb(formatPath(args.database)), args.binary, args.fasta, args.hmm, out_dir, args.query,
         cov_threshold = args.coverage, evalue = args.evalue, cpu = args.cpu,
         accession_search = args.accession, subhit = not args.whole
         )

@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 
-import argparse, sys, re
+import re
+import sys
+import argparse
 from mycotools.lib.biotools import gff2list, list2gff, gff2Comps, gff3Comps
 from mycotools.lib.kontools import formatPath, eprint, vprint
 from mycotools.curAnnotation import addGenes, removeStartStop
@@ -101,7 +103,7 @@ def main( gff_list, ome, jgi_ome, safe = True, verbose = True ):
     if flagged:
         vprint( str(len(flagged)) + '\tgene coordinates from exons', v = verbose, e = True, flush = True)
     gff3 = gff2gff3( gff_prep, ome, jgi_ome )
-        
+
     return gff3
 
 if __name__ == '__main__':

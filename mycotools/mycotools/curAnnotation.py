@@ -2,7 +2,11 @@
 
 # NEED TO DEFAULT CHEKC FOR INTRONS FOR PREDB2DB
 
-import sys, re, os, copy, argparse
+import os
+import re
+import sys
+import copy
+import argparse
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gtfComps, gff3Comps, gff2Comps
 from mycotools.lib.kontools import collect_files, eprint, formatPath
@@ -674,9 +678,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.output:
-        output = formatPath(args.output, isdir = True)
+        output = formatPath(args.output)
         if not os.path.isdir(output):
             os.mkdir(output)
+            output += '/'
         output += args.prefix
     else:
         output = args.prefix

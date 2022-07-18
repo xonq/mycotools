@@ -1,10 +1,14 @@
 #! /usr/bin/env python3
 
+import os
+import re
+import sys
+import argparse
+import multiprocessing as mp
 from mycotools.lib.kontools import eprint, formatPath, file2list
 from mycotools.lib.dbtools import masterDB, mtdb
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
 from mycotools.acc2gff import grabGffAcc
-import sys, os, re, argparse, multiprocessing as mp
 
 
 def grabFiles( ome ):
@@ -199,8 +203,9 @@ def mycotools_main(db, accessions, plusminus = 10, cpus = 1):
             acc_dict[ome] = []
         acc_dict[ome].append(acc)
 
+    db = db.set_index('ome')
     cmds = [
-        [gff2list(grabFiles(ome)[0]), accs, args.plusminus, True] for ome, accs in acc_dict.items()
+        [gff2list(db[ome]['gff3']), accs, args.plusminus, True] for ome, accs in acc_dict.items()
         ]
     with mp.get_context('spawn').Pool(processes = cpu) as pool:
         acc_res = pool.starmap(main, cmds)
@@ -242,6 +247,8 @@ if __name__ == '__main__':
         print('\nERROR: requires input or accession', flush = True)
         sys.exit( 1 )
 
+    db = None
+
     out_indices = {}
     if args.gff: 
         gff = gff2list( formatPath(args.gff) )
@@ -250,13 +257,15 @@ if __name__ == '__main__':
   #          sys.exit( 3 )
         out_indices = main( gff, accession, args.plusminus )
     else:
-        db = mtdb( formatPath( masterDB() ) ).set_index('internal_ome')
+        db = mtdb( formatPath( masterDB() ) ).set_index('ome')
         out_indices = mycotools_main(db, accessions, plusminus = 10, cpus = args.cpu)
 
 #        for i in acc_res:
  #           out_indices[i[1]] = i[0] 
 
     if args.output:
+        if not db:
+            db = mtdb(formatPath(masterDB())).set_index('ome')
         for accession in out_indices:
             if args.gff:
                 gff = formatPath(args.gff)
@@ -265,7 +274,8 @@ if __name__ == '__main__':
                 else:
                     prot = None
             else:
-                gff, prot = grabFiles( accession[:accession.find('_')] )
+                ome = accessions[:accession.find('_')]
+                gff, prot = db[ome]['gff3'], db[ome]['faa']
 #            for hit in out_indices[accession]:
             if len( out_indices[accession] ) > 0:
                 gff_str = prepGffOutput( 

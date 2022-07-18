@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 
-import sys, os, re
+import os
+import re
+import sys
 from mycotools.lib.kontools import sysStart, formatPath, fmt_float
 from mycotools.lib.biotools import fa2dict, calc_weight
 

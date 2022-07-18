@@ -1,7 +1,10 @@
 #! /usr/bin/env python3
 
+import os
+import re
+import sys
+import argparse
 import multiprocessing as mp
-import os, sys, argparse, re
 from mycotools.lib.biotools import gff2list, list2gff
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import formatPath
@@ -54,12 +57,11 @@ def gffMain(gffData, accs):
 def dbMain(db, accs, cpus = 1):
 
     omes = set([x[:x.find('_')] for x in accs])
-    
+    db = db.set_index('ome')
     grabAcc_cmds = []
     for ome in list(omes):
         omeAccs = [acc for acc in accs if acc.startswith(ome + '_')]
-        gffPath = formatPath('$MYCOGFF3/' + ome + '.gff3')
-        gff_list = gff2list(gffPath)
+        gff_list = gff2list(db[ome]['gff3'])
         grabAcc_res = [grabGffAccs(gff_list, omeAccs, ome)]
 
 #        grabAcc_cmds.append([gff_list, omeAccs, ome])

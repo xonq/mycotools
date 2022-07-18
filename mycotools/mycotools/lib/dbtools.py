@@ -1,13 +1,21 @@
 #! /usr/bin/env python3
 
-#NEED TO CREATE STANDALONE DB CLASS
+import os
+import re
+import sys
+import copy
+import json
+import time
+import base64
+import getpass
+import hashlib
+import datetime
 import numpy as np
-import copy, sys, os, time, mycotools.lib.biotools, \
-    json, re, datetime, hashlib, getpass, base64
-from mycotools.lib.kontools import collect_files, eprint, formatPath
 from Bio import Entrez
 from urllib.error import HTTPError
 from io import StringIO
+from collections import defaultdict
+from mycotools.lib.kontools import collect_files, eprint, formatPath
 
 
 class mtdb(dict):
@@ -15,11 +23,19 @@ class mtdb(dict):
     MycotoolsDB (mtdb) class. Designed to support high throughput "pandas-like"
     interface without the overhead of pandas.
     '''
+    columns = [
+       'ome', 'genus', 'species', 'strain', 'taxonomy',
+       'version', 'source', 'biosample', 'assembly_acc',
+       'acquisition_date', 'published', 'fna', 'faa', 'gff3'
+       ]
+
+    # NEED a detect index feature for adding dicts in with alternative indices
     def __init__(self, db = None, index = None):
-        self.columns = ['internal_ome', 'genus', 'species', 'strain', 'version', 
-            'assembly_acc', 'fna', 'faa', 'gff3',
-            'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-            'genome_code', 'acquisition_date']
+        self.columns = [
+            'ome', 'genus', 'species', 'strain', 'taxonomy',
+            'version', 'source', 'biosample', 'assembly_acc',
+            'acquisition_date', 'published', 'fna', 'faa', 'gff3'
+            ]
         if not db:
             if not index:
                 super().__init__({x: [] for x in self.columns})
@@ -44,61 +60,80 @@ class mtdb(dict):
         self.index = index
 
     def pd2mtdb(df): # legacy integration
-        df.fillna('')
+        df = df.fillna('')
         db = mtdb({
-            'internal_ome': list(df['internal_ome']),
-            'genus': list(df['genus']),
-            'species': list(df['species']),
-            'strain': list(df['strain']),
-            'version': list(df['version']),
-            'assembly_acc': list(df['assembly_acc']),
-            'fna': list(df['fna']),
-            'faa': list(df['faa']),
-            'gff3': list(df['gff3']),
-            'taxonomy': list(df['taxonomy']),
-            'ecology': list(df['ecology']),
-            'eco_conf': list(df['eco_conf']),
-            'source': list(df['source']),
-            'published': list(df['published']),
-            'genome_code': list(df['genome_code']),
-            'acquisition_date': list(df['acquisition_date'])
+            x: list(df[x]) for x in mtdb.columns
             })
         return db
         
-
     def db2df(self, db_path):
-        df = {x: [] for x in self.columns}
+        df = defaultdict(list)
         with open(formatPath(db_path), 'r') as raw:
-            for line in raw:
-                if not line.startswith('#'):
-                    data = line.rstrip().split('\t')
-                    ome = data[0]
-                    for i, d in enumerate(data):
-                        df[self.columns[i]].append(d)
-                    df['taxonomy'][-1] = read_tax(
-                        df['taxonomy'][-1]
-                        )
-                    df['taxonomy'][-1]['genus'] = df['genus'][-1]
-                    df['taxonomy'][-1]['species'] = \
-                        df['genus'][-1] + ' ' + df['species'][-1]
+            data = [x.rstrip().split('\t') for x in raw if not x.startswith('#')]
+        if len(data[0]) == 16: # legacy conversion TO BE DEPRECATED
+            eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
+            columns = [
+                'ome', 'genus', 'species', 'strain', 'version',
+                'biosample', 'fna', 'faa', 'gff3', 'taxonomy', 'ecology',
+                'eco_conf',
+                'source', 'published', 'assembly_acc', 'acquisition_date'
+                ]
+        else:
+            columns = self.columns
+        for entry in data:
+            [df[c].append('') for c in columns] # add a blank entry to each
+            # column
+            for i, d in enumerate(entry):
+                df[columns[i]][-1] = d
+            df['taxonomy'][-1] = read_tax(
+                df['taxonomy'][-1]
+                )
+            df['taxonomy'][-1]['genus'] = df['genus'][-1]
+            df['taxonomy'][-1]['species'] = \
+                df['genus'][-1] + ' ' + df['species'][-1]
+        if len(data[0]) == 16: # LEGACY conversion to be deprecated
+            del df['ecology']
+            del df['eco_conf']
+        for i, ome in enumerate(df['ome']): 
+            # if malformatted due to decreased entries in some lines, this will raise an IndexError
+            if not df['fna'][i] or df['fna'][i] == ome + '.fa': # abbreviated line w/o file coordinates
+               df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fa'
+               df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.aa.fa'
+               df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
+            else: # has file coordinates
+               df['fna'][i] = formatPath(df['fna'][i])
+               df['faa'][i] = formatPath(df['faa'][i])
+               df['gff3'][i] = formatPath(df['gff3'][i])
+
         return df
 
 
     def df2db(self, db_path = None, headers = False):
         df = copy.copy(self)
         df = df.reset_index()
-        output = self.set_index('internal_ome') # does this work if its not an inplace change
+        output = mtdb(
+            {k: v for k,v in sorted(self.set_index('ome').items(), key = lambda x: x[0])},
+            index = 'ome'
+            ) 
+        # does this work if its not an inplace change
+        paths = {
+            'faa': [os.environ['MYCOFAA'] + '/', '.aa.fa'],
+            'fna': [os.environ['MYCOFNA'] + '/', '.fa'],
+            'gff3': [os.environ['MYCOGFF3'] + '/', '.gff3']
+            }
         if db_path:
             with open(db_path, 'w') as out:
                 if headers:
-                    out.write('\t'.join([
-                        'internal_ome', 'genus', 'species', 'strain', 'version', 
-                        'assembly_acc', 'fna', 'faa', 'gff3',
-                        'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-                        'genome_code', 'acquisition_date' 
-                        ]) + '\n')
+                    out.write('\t'.join(self.column)+ '\n')
                 for ome in output:
-                    output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
+                    for file_type in ['fna', 'faa', 'gff3']:
+                        output[ome][file_type] = output[ome][file_type].replace(
+                            paths[file_type][0] + ome + paths[file_type][1], ''
+                            ) # abbreviate when possible
+                    if output[ome]['taxonomy']:
+                        output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
+                    else:
+                        output[ome]['taxonomy'] = '{}'
                     out.write(
                         ome + '\t' + \
                         '\t'.join([str(output[ome][x]) for x in output[ome]]) + '\n'
@@ -106,21 +141,21 @@ class mtdb(dict):
         else:
             if headers:
                 print(
-                    '\t'.join([
-                    'internal_ome', 'genus', 'species', 'strain', 'version', 
-                    'assembly_acc', 'fna', 'faa', 'gff3',
-                    'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-                    'genome_code', 'acquisition_date' 
-                    ]), flush = True
+                    '\t'.join(self.column), flush = True
                     )
+
             for ome in output:
-                 output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
-                 print(ome + '\t' + \
-                     '\t'.join([str(output[ome][x]) for x in output[ome]]), flush = True
-                     )
+                for file_type in ['fna', 'faa', 'gff3']:
+                    output[ome][file_type] = output[ome][file_type].replace(
+                        paths[file_type][0] + ome + paths[file_type][1], ''
+                        ) # abbreviate when possible
+                output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
+                print(ome + '\t' + \
+                    '\t'.join([str(output[ome][x]) for x in output[ome]]), flush = True
+                    )
 
 
-    def set_index(self, column = 'internal_ome', inplace = False):
+    def set_index(self, column = 'ome', inplace = False):
         data, retry, error, df, columns = {}, bool(column), False, copy.copy(self), copy.copy(self.columns)
         if not column:
             return df.reset_index()
@@ -138,7 +173,7 @@ class mtdb(dict):
             if len(df[column]) == 0:
                 return mtdb({}, index = column)
             if column in \
-                {'genome_code', 'internal_ome', 'assembly_acc', 'fna', 'gff3', 'faa'}: # if it's unique
+                {'assembly_acc', 'ome', 'fna', 'gff3', 'faa'}: # if it's unique
                 for i, v in enumerate(df[column]):
                     data[v] = {}
                     for head in columns:
@@ -167,7 +202,7 @@ class mtdb(dict):
         if df.index:
             data = {x: [] for x in mtdb().columns}
             data[df.index] = list(df.keys())
-            if df.index in {'genome_code', 'internal_ome', 'assembly_acc', 'fna', 'gff3', 'faa'}:
+            if df.index in {'assembly_acc', 'ome', 'biosample', 'fna', 'gff3', 'faa'}:
                 for key in df:
                     for otherCol in df[key]:
                         data[otherCol].append(df[key][otherCol])
@@ -336,26 +371,32 @@ def readLog( log, columns = '', sep = '\t' ):
     return log_dict
 
 
-def masterDB( path = '$MYCODB' ):
+def masterDB(path = '$MYCODB'):
+    """Acquire the path of the master database by searching $MYCODB for a file
+    with a basename that starts with a date string %Y%m%d."""
 
-    path = path.replace( '$', '' )
+    path = path.replace('$', '')
     try:
-        full_path = os.environ[ path ]
-        files = collect_files( full_path, 'db' )
-        basenames = [ os.path.basename( x ) for x in files ]
-        dates = [ x.replace('.db','') for x in basenames if re.search( r'^\d+\.db$', x ) ]
-        master = '19991231'
-        for date in dates:
-            dtDate = datetime.datetime.strptime( date, "%Y%m%d" )
-            dtMast = datetime.datetime.strptime( master, "%Y%m%d" )
-            if dtDate > dtMast:
-                master = date
-        if master == '19991231':
-            eprint('\nERROR: master db not found in ' + path + '. Have you initialized MycoDB?', flush = True)
-        master_path = formatPath( '$' + path + '/' + master + '.db' )
-    except KeyError:
-#        eprint('\nERROR: ' + path + ' not in path' , flush = True)
-        master_path = None
+        full_path = os.environ[path]
+    except KeyError: # $MYCODB not initialized
+        return None
+
+    files = collect_files(full_path, 'mtdb')
+    basenames = [os.path.basename(x) for x in files]
+    dates = [x.replace('.mtdb','') \
+            for x in basenames \
+            if re.search(r'^\d+\.mtdb$', x)]
+    master = '19991231' # arbitrary master for sorting
+    for date in dates:
+        dtDate = datetime.datetime.strptime(date, "%Y%m%d")
+        dtMast = datetime.datetime.strptime(master, "%Y%m%d")
+        if dtDate > dtMast:
+            master = date
+    if master == '19991231': # if it is the arbitrary start
+        eprint('\nERROR: master db not found in ' + path \
+              + '. Have you initialized MycoDB?', flush = True)
+        return None
+    master_path = formatPath( '$' + path + '/' + master + '.mtdb')
 
     return master_path
  
@@ -363,46 +404,59 @@ def masterDB( path = '$MYCODB' ):
 # returns database dataframe
 def db2df(data, stdin = False):
     import pandas as pd, pandas
-
-    columns = [ 'internal_ome', 'genus', 'species', 'strain', 'version', 
-        'assembly_acc', 'fna', 'faa', 'gff3',
-        'taxonomy', 'ecology', 'eco_conf', 'source', 'published',
-        'genome_code', 'acquisition_date' ]
+    columns = mtdb.columns
     if not stdin:
         data = formatPath( data )
         db_df = pd.read_csv( data, sep='\t' )
-        if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
-            db_df = pd.read_csv( data, sep = '\t', names = columns )
+        if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
+            db_df = pd.read_csv( data, sep = '\t', header = None )
     else:
         db_df = pd.read_csv( StringIO(data), sep='\t' )
-        if 'internal_ome' not in set( db_df.columns ) and 'genome_code' not in set( db_df.columns ):
-            db_df = pd.read_csv( StringIO(data), sep = '\t', names = columns )
+        if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
+            db_df = pd.read_csv( StringIO(data), sep = '\t', header = None )
+
+    if len(db_df.keys()) == 16: # legacy conversion TO BE DEPRECATED
+        eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
+        db_df.columns = [
+            'ome', 'genus', 'species', 'strain', 'version',
+            'biosample', 'fna', 'faa', 'gff3', 'taxonomy', 'ecology',
+            'eco_conf',
+            'source', 'published', 'assembly_acc', 'acquisition_date'
+            ]
+    else:
+        db_df.columns = columns
+    for i, row in db_df.iterrows():
+        db_df.at[i, 'taxonomy'] = read_tax(
+            row['taxonomy']
+            )
+        db_df.at[i, 'taxonomy']['genus'] = row['genus']
+        db_df.at[i, 'taxonomy']['species'] = \
+            row['genus'] + ' ' + row['species']
+    if len(db_df) == 16: # LEGACY conversion to be deprecated
+        del db_df['ecology']
+        del db_df['eco_conf']
+    for i, row in db_df.iterrows(): 
+        # if malformatted due to decreased entries in some lines, this will raise an IndexError
+        if not row['fna'] or row['fna'] == row['ome'] + '.fa': # abbreviated line w/o file coordinates
+           db_df.at[i, 'fna'] = os.environ['MYCOFNA'] + '/' + row['ome'] + '.fa'
+           db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + '/' + row['ome'] + '.aa.fa'
+           db_df.at[i, 'gff3'] = os.environ['MYCOGFF3'] + '/' + row['ome'] + '.gff3'
+        else: # has file coordinates
+           db_df.at[i, 'fna'] = formatPath(row['fna'])
+           db_df.at[i, 'faa'] = formatPath(row['faa'])
+           db_df.at[i, 'gff3'] = formatPath(row['gff3'])
 
     return db_df
 
 
 def df2std( df ):
     '''
-    Standardized organization of database columns
+    Standardized organization of database columns. DEPRECATED pandas MTDB
     '''
-    # temporary check, will remove when all scripts account for new assembly_acc column
-    if 'assembly_acc' in df.columns:
-        trans_df = df[[
-        'internal_ome', 'genus', 'species',
-        'strain', 'version', 'assembly_acc', 'fna', 
-        'faa', 'gff3', 'taxonomy',
-        'ecology', 'eco_conf', 'source', 'published', 
-        'genome_code', 'acquisition_date'
-    ]]
-    else:
-        trans_df = df[[
-        'internal_ome', 'genus', 'species',
-        'strain', 'fna', 
-        'faa', 'gff', 'gff3', 'taxonomy',
-        'ecology', 'eco_conf', 'source', 'published', 
-        'genome_code'
-        ]]
-
+    # temporary check, will remove when all scripts account for new biosample column
+    trans_df = df[
+        mtdb.columns
+        ]
     return trans_df
 
 
@@ -412,7 +466,7 @@ def df2std( df ):
 def df2db(df, db_path, header = False, overwrite = False, std_col = True, rescue = True):
     import pandas as pd, pandas
 
-    df = df.set_index('internal_ome')
+    df = df.set_index('ome')
     df = df.sort_index()
     df = df.reset_index()
 
@@ -524,11 +578,11 @@ def hit2taxonomy(
 
 # gather taxonomy by querying NCBI
 # if `api_key` is set to `1`, it assumes the `Entrez.api` method has been called already
-def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'internal_ome'):
+def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome'):
 
     print('\nAssimilating taxonomy', flush = True)
     if isinstance(df, mtdb):
-        df = df.set_index('internal_ome')
+        df = df.set_index('ome')
         tax_dicts = {v['genus']: read_tax(v['taxonomy']) for k, v in df.items()}
     else:
         df['taxonomy'] = df['taxonomy'].replace( np.nan, None )
@@ -633,7 +687,7 @@ def read_tax(taxonomy_string):
 
 # assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database
 # forbid a list of taxonomic classifications you are not interested in and return a new database
-def assimilate_tax(db, tax_dicts, ome_index = 'internal_ome', forbid={'no rank', 'superkingdom', 'subkingdom', 'genus', 'species', 'species group', 'varietas', 'forma'}):
+def assimilate_tax(db, tax_dicts, ome_index = 'ome', forbid={'no rank', 'superkingdom', 'subkingdom', 'genus', 'species', 'species group', 'varietas', 'forma'}):
 
     genera = set(db['genus'])
     tax_dicts = {x: tax_dicts[x] for x in tax_dicts if tax_dicts[x]}
@@ -686,16 +740,16 @@ def extract_tax(db, taxonomy, classification, inverse = False ):
         taxonomy = set(x[0].upper() + x[1:].lower() for x in taxonomy)
         if not inverse:
             new_db = mtdb({ome: row for ome, row in db.items() if row['genus'] in taxonomy}, index =
-                'internal_ome')
+                'ome')
         else:
             new_db = mtdb({ome: row for ome, row in db.items() if row['genus'] not in taxonomy}, index =
-                'internal_ome')
+                'ome')
 
     return new_db.reset_index()
 
 
 # extracts all omes from an `ome_list` or the inverse and returns the extracted database
-def extract_omes(db, ome_list, index = 'internal_ome', inverse = False):
+def extract_omes(db, ome_list, index = 'ome', inverse = False):
     import pandas as pd, pandas
 
     new_db = pd.DataFrame()
@@ -716,49 +770,5 @@ def extract_omes(db, ome_list, index = 'internal_ome', inverse = False):
 
     return new_db
 
-
-# imports a database reference (if provided) and a `df` and adds a `new_col` with new ome codes that do not overlap current ones
-def gen_omes(df, reference = 0, new_col = 'internal_ome', tag = None):
-    import pandas as pd, pandas
-
-#    print('\nGenerating omes', flush = True)
-    newdf = df
-    if not new_col in set(df.keys()):
-        newdf[new_col] = ''
-    tax_set = set()
-    access = '-'
-    if isinstance(reference, pd.core.frame.DataFrame):
-        tax_set = set(reference['internal_ome'])
-#        print('\t' + str(len(tax_set)) + ' omes from reference dataset', flush = True)
-
-    for i, row in df.iterrows():
-        if not pd.isnull(row['internal_ome']) and row['internal_ome']:
-            continue
-        if pd.isnull(row['species']) or not row['species']:
-            newdf.at[i, 'species'] = 'sp.'
-            row['species'] = 'sp.'
-        name = row['genus'][:3].lower() + row['species'][:3].lower()
-        name = re.sub(r'\(|\)|\[|\]|\$|\#|\@| |\||\+|\=|\%|\^|\&|\*|\'|\"|\!|\~|\`|\,|\<|\>|\?|\;|\:|\\|\{|\}', '', name)
-        name.replace('(', '')
-        name.replace(')', '')
-        while len(name) < 6:
-            name += '.'
-        numbers = [
-            int(re.search(r'.*?(\d+$)', x)[1]) for x in list(tax_set) if x.startswith(name)
-            ]
-        numbers.sort(reverse = True)
-        if numbers:
-            number = numbers[0] + 1
-        else:
-            number = 1
-        ome = name + str(number)
-        tax_set.add(ome)
-        newdf.at[i, new_col] = ome
-    
-    return newdf
-
-
 if not masterDB():
     eprint('WARNING: MycotoolsDB not initialized', flush = True)
-
-

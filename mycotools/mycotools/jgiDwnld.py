@@ -1,6 +1,12 @@
 #! /usr/bin/env python3
 
-import subprocess, argparse, sys, os, re, time, getpass
+import os
+import re
+import sys
+import time
+import getpass
+import argparse
+import subprocess
 import pandas as pd
 from mycotools.lib.kontools import eprint, formatPath, outro, intro
 from mycotools.lib.dbtools import loginCheck
@@ -376,13 +382,13 @@ def main(
     ):
 
 #    pd.options.mode.chained_assignment = None  # default='warn'
-    if not 'genome_code' in df.columns:
+    if not 'assembly_acc' in df.columns:
         if len( df.columns ) != 1:
-            eprint( '\nInvalid input. No genome_code column and more than one column.' , flush = True)
+            eprint( '\nInvalid input. No assembly_acc column and more than one column.' , flush = True)
         else:
             ome_col = list(df.columns)[0]
     else:
-        ome_col = 'genome_code'
+        ome_col = 'assembly_acc'
 
     eprint('\nLogging into JGI', flush = True)
     login_attempt = 0
@@ -441,8 +447,8 @@ def main(
             time.sleep( 60 )
         if ome not in ome_set:
             jgi_login( user, pwd )
-            if 'internal_ome' in row.keys():
-                eprint( '\t' + row['internal_ome'] + '\t' + ome , flush = True)
+            if 'ome' in row.keys():
+                eprint( '\t' + row['ome'] + '\t' + ome , flush = True)
             else:
                 eprint( '\t' + ome , flush = True)     
             for typ in dwnlds:
@@ -481,10 +487,10 @@ def main(
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( description = \
-        "Imports table/database with JGI `genome_code` column and downloads assembly, proteome, gff, " + \
+        "Imports table/database with JGI `assembly_acc` column and downloads assembly, proteome, gff, " + \
         'and/or gff3. This script supports rerunning/continuing previous runs in the same directory. ' + \
         'JGI has stringent, nondefined ping limits, so file downloads are limited to 1 per minute.' )
-    parser.add_argument( '-i', '--input', required = True, help = 'Genome code or table with `genome_code` column of JGI ome codes' )
+    parser.add_argument( '-i', '--input', required = True, help = 'Genome code or table with `assembly_acc` column of JGI ome codes' )
     parser.add_argument( '-a', '--assembly', default = False, action = 'store_true', \
         help = 'Download assemblies.' )
     parser.add_argument( '-p', '--proteome', default = False, action = 'store_true', \
@@ -530,13 +536,13 @@ if __name__ == '__main__':
     if os.path.isfile(args.input): 
         with open(args.input, 'r') as raw:
             for line in raw:
-                if 'genome_code' in line.rstrip().split('\t'):
+                if 'assembly_acc' in line.rstrip().split('\t'):
                     df = pd.read_csv( args.input, sep = '\t', index_col = None)
                 else:
                     df = pd.read_csv(args.input, sep='\t', header = None)
                 break
     else:
-        df = pd.DataFrame({'genome_code': [args.input]})
+        df = pd.DataFrame({'assembly_acc': [args.input]})
 
     output = formatPath(args.output)
 

@@ -1,6 +1,9 @@
 #! /usr/bin/env python3
 
-import os, sys, argparse, re
+import os
+import re
+import sys
+import argparse
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import formatPath, eprint
@@ -53,13 +56,11 @@ def dbmain( db, accs ):
     '''takes in mtdb, takes accessions ome by ome from accs'''
 
     fa_dict = {}
-    db = db.set_index( 'internal_ome' )
+    db = db.set_index( 'ome' )
     omes = set([x[:x.find('_')] for x in accs])
     for ome in omes:
         accessions = [x for x in accs if x.startswith(ome + '_')]
-        fasta = os.environ['MYCOFAA'] + '/' + db[ome]['faa']
-        fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
-        fasta = formatPath('$MYCOFAA/' + ome + '.aa.fa')
+        fasta = db[ome]['faa']
         fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
 
     return fa_dict

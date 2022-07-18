@@ -1,7 +1,11 @@
 #! /usr/bin/env python3
 #NEED TO PARSE FOR IN GENE COORDINATES AND ANNOTATIONS
 
-import os, sys, re, argparse, random
+import os
+import re
+import sys
+import random
+import argparse
 from mycotools.lib.kontools import sysStart, formatPath, file2list, getColors
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from mycotools.lib.biotools import gff2list, gff3Comps

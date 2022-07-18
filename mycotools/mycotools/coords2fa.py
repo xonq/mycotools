@@ -1,9 +1,11 @@
 #! /usr/bin/env python3
 
+import os
+import sys
+import argparse
+from Bio.Seq import Seq
 from mycotools.lib.biotools import fa2dict, dict2fa
 from mycotools.lib.kontools import sysStart, eprint, formatPath
-from Bio.Seq import Seq
-import argparse, sys, os
 
 def extractCoords(fa_dict, seqid, coord_start = 0, coord_end = -1, sense = '+', fa_name = ''):
 

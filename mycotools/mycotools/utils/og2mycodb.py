@@ -1,8 +1,11 @@
 #! /usr/bin/env python3
 
+import os
+import re
+import sys
+import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
 from mycotools.lib.kontools import formatPath, sysStart
-import os, re, sys, multiprocessing as mp
 
 def og2dict(orthogroup_file):
 

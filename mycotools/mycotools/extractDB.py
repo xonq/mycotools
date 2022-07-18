@@ -1,6 +1,9 @@
 #! /usr/bin/env python3
 
-import argparse, os, sys, random
+import os
+import sys
+import random
+import argparse
 from mycotools.lib.kontools import file2list, intro, outro, formatPath, eprint
 from mycotools.lib.dbtools import mtdb, extract_tax, extract_omes, masterDB
 
@@ -11,10 +14,10 @@ def main(
     ):
 
     if unique_species > 0:
-        db = db.set_index('internal_ome')
+        db = db.set_index('ome')
         keys = random.shuffle(list(db.keys()))
         prep_db0 = {x: db[x] for x in keys}
-        prep_db1 = mtdb().set_index('internal_ome')
+        prep_db1 = mtdb().set_index('ome')
         found = {}
         for ome, row in prep_db0.items():
             name = row['genus'].lower() + '_' + row['species'].lower()
@@ -50,7 +53,7 @@ def main(
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif ome_list:
         omes = set(file2list( formatPath(ome_list) ))
-        db = db.set_index('internal_ome')
+        db = db.set_index('ome')
         new_db = mtdb()
         new_db = new_db.set_index()
         for i in db:
@@ -69,7 +72,7 @@ def main(
     elif source and inverse:
         new_db = new_db[new_db['source'] != source]
 
-    # if you want publications, then just pull those out 
+    # if you want publisheds, then just pull those out 
     new_db = new_db.set_index()
     if not nonpublished:
         todel = []

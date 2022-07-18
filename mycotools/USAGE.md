@@ -47,7 +47,7 @@
 
 
 # MYCOTOOLS DB
-The following are information regarding scripts that manipulate Mycotools .db files. To learn more about Mycotools .db, you may refer to the master [MycotoolsDB repository](https://gitlab.com/xonq/mycotoolsdb/-/README.md) (currently unavailable).
+The following are information regarding scripts that manipulate Mycotools .mtdb files. To learn more about Mycotools .mtdb, you may refer to the master [MycotoolsDB repository](https://gitlab.com/xonq/mycotoolsdb/-/README.md) (currently unavailable).
 
 <br /><br />
 
@@ -72,10 +72,10 @@ To update MycotoolsDB:
 
 ## Interfacing with the master database
 ### mycodb
-`mycodb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.db`.
+`mycodb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
 (mycotools) -$ mycodb
-/home/xonq/mycodb/mycodb/20210125.db
+/home/xonq/mycodb/mycodb/20210125.mtdb
 ```
 
 If you want to use the path of the master database you can use basic bash functionality to work with the output, 
@@ -94,22 +94,22 @@ If you are only interested in a subset of lineages in the master mycotoolsDB, th
 
 e.g. grab a database of a taxonomic order: 
 ```bash
-(mycotools) -$ extractDB.py -l Atheliales -r order > atheliales.db
+(mycotools) -$ extractDB.py -l Atheliales -r order > atheliales.mtdb
 ```
 
 grab all NCBI Aspergilli accessions: 
 ```bash
-(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.db_ncbi
+(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.mtdb_ncbi
 ``` 
 
 grab the inverse of your arguments: 
 ```bash
-(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.db_notNcbi
+(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.mtdb_notNcbi
 ```
 
 grab a list of orders from a file:
 ```bash
-(mycotools) -$ extractDB.py -ll <TAX_FILE> -r order > taxa.db
+(mycotools) -$ extractDB.py -ll <TAX_FILE> -r order > taxa.mtdb
 ```
 
 grab a list of `ome`s in a new line delimited file: 
@@ -151,22 +151,22 @@ optional arguments:
 
 ## Acquiring database files
 ### dbFiles.py
-Inputs a MycotoolsDB `.db` file (by default uses the master database), then creates symlinks of the selected file types, hard copies the files, or prints their PATHs. A symlink is simply creating a placeholder file that links to the database file... this way it does not take up additional storage space like a hard copy does. However, editing symlinks will edit the original file, so *only hard copy `--hard` if you need to edit the files*.
+Inputs a MycotoolsDB `.mtdb` file (by default uses the master database), then creates symlinks of the selected file types, hard copies the files, or prints their PATHs. A symlink is simply creating a placeholder file that links to the database file... this way it does not take up additional storage space like a hard copy does. However, editing symlinks will edit the original file, so *only hard copy `--hard` if you need to edit the files*.
 
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```bash
 (mycotools) -$ mkdir pullFiles && cd pullFiles
-(mycotools) -$ extractDB.py -r family -l Atheliaceae > atheliaceae.db
+(mycotools) -$ extractDB.py -r family -l Atheliaceae > atheliaceae.mtdb
 ```
 
 Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
 ```bash
-(mycotools) -$ dbFiles.py -d atheliaceae.db -p 
+(mycotools) -$ dbFiles.py -d atheliaceae.mtdb -p 
 ```
 
 Alternatively, if you just need the paths (links) to these files, simply run:
 ```bash
-(mycotools) -$ dbFiles.py -d atheliaceae.db -p --print
+(mycotools) -$ dbFiles.py -d atheliaceae.mtdb -p --print
 ```
 
 <br /><br />
@@ -216,8 +216,8 @@ optional MycotoolsDB, string of forbidden characters
 
 To obtain a table of organisms' annotation statistics, [create a mycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
 ```bash
-(mycotools) -$ assemblyStats.py <MYCOTOOLSDB.db>
-(mycotools) -$ annotationStats.py <MYCOTOOLSDB.db>
+(mycotools) -$ assemblyStats.py <MYCOTOOLSDB.mtdb>
+(mycotools) -$ annotationStats.py <MYCOTOOLSDB.mtdb>
 ```
 
 If you want to route the output to a file, simply redirect output by appending ` > <OUTPUTFILE>` to the command, or add an output file as the second argument
@@ -233,13 +233,13 @@ These scripts input a MycotoolsDB or can be manually made as shown at the bottom
 Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```bash
 (mycotools) -$ mkdir dwnldFiles && cd dwnldFiles
-(mycotools) -$ extractDB.py -c genus -t aspergillus > aspergillus.db_ncbi
+(mycotools) -$ extractDB.py -c genus -t aspergillus > aspergillus.mtdb_ncbi
 ```
 
-If there are organisms you don't want in the extracted `.db`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
+If there are organisms you don't want in the extracted `.mtdb`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
 ```bash
-(mycotools) -$ jgiDwnld.py -i aspergillus.db_jgi -t -e
-(mycotools) -$ ncbiDwnld.py -i aspergillus.db_ncbi -t
+(mycotools) -$ jgiDwnld.py -i aspergillus.mtdb_jgi -t -e
+(mycotools) -$ ncbiDwnld.py -i aspergillus.mtdb_ncbi -t
 ```
 
 These scripts populate with compressed files. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. 
@@ -247,11 +247,11 @@ To submit as a job (not recommended), you must create an encrypted MycotoolsDB p
 
 <br />
 
-These scripts can input assembly accessions (NCBI) or genome codes (JGI). The column must have the appropriate header ('genome_code' or 'assembly_acc') (substitute `-i aspergillus.db` with this file):
+These scripts can input assembly accessions (NCBI) or genome codes (JGI). The column must have the appropriate header ('assembly_acc' or 'assembly_acc') (substitute `-i aspergillus.mtdb` with this file):
 
 `jgiGenomeCodes.txt`
 ```
-genome_code
+assembly_acc
 Abobi1
 Absrep1
 Acain1
@@ -455,14 +455,14 @@ e.g.: `db2hmm.py -d profile.hmm` will run the master database referencing the in
 `db2hmm.py -d profile.hmm -b 1 -t 75` takes the best hit from hits with 25 - 100% query coverage
 ```bash
 (mycotools) -$ db2hmm.py --help
-Runs `hmmsearch` v each proteome in a `.db`. For each query, extracts results
+Runs `hmmsearch` v each proteome in a `.mtdb`. For each query, extracts results
 and optionally outputs a compiled fasta, hmmalignment and/or trimmed
 alignment.
 
 optional arguments:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
-                        Input database `.db`
+                        Input database `.mtdb`
   -d HMMDB, --hmmdb HMMDB
                         Hmm database `.hmm`
   -o OUTPUT, --output OUTPUT
@@ -592,7 +592,7 @@ across the mycotoolsDB.
 other organisms of interest
 
 ```bash
-extractDB.py > pubFungi.db
+extractDB.py > pubFungi.mtdb
 ```
 
 <br />
@@ -600,7 +600,7 @@ extractDB.py > pubFungi.db
 2. obtain gene homologs using `db2search.py` with an e-value threshold of 10<sup>-2</sup>:
 
 ```bash
-(mycotools) -$ db2search.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pubFungi.db
+(mycotools) -$ db2search.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pubFungi.mtdb
 ```
 
 <br />
@@ -693,8 +693,8 @@ for `fasttree`.
 
 To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
 ```bash
-(mycotools) -bash-4.2$ extractDB.py --rank phylum --lineage Basidiomycota > basi.db
-(mycotools) -bash-4.2$ crap.py -q <QUERYGENES> -d basi.db -s blastp --fast --bitscore 40 --cpu 12
+(mycotools) -bash-4.2$ extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
+(mycotools) -bash-4.2$ crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --fast --bitscore 40 --cpu 12
 ```
 
 <br />

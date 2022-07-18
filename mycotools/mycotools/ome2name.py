@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 
+import os
+import re
+import sys
 from mycotools.lib.kontools import formatPath, sysStart, eprint
 from mycotools.lib.dbtools import masterDB, mtdb
-#from mycotools.lib.dbtools import db2df, masterDB
-import re, sys, os
 
 forbidden = [
     '/', '\\', '[', ']', '|', '+', '=', '(', ')',
@@ -71,7 +72,7 @@ def main( db, data_input, genus, species, strain, ome_code, alternative ):
             if row['strain']:
                 name += str(row['strain']) + '_'
         if alternative:
-            name += row['genome_code'] + '_'
+            name += row['assembly_acc'] + '_'
         if ome_code:
             name += ome + '_'
         name = name[:-1]

@@ -1,8 +1,10 @@
 #! /usr/bin/env python3
 
+import os
+import re
+import sys
 from mycotools.lib.biotools import gff2list
 from mycotools.lib.kontools import formatPath, eprint
-import sys, re, os
 
 
 def compileExon( gff_path, output, ome = None ):
@@ -92,8 +94,7 @@ def main(in_path, log_path = None, cpus = 1):
         cmds = []
         for ome in db:
             if ome not in prevOmes:
-                row = db[ome]
-                cmds.append((formatPath('$MYCOGFF3/' + row['gff3']), True, ome))
+                cmds.append((db[ome]['gff3'], True, ome,))
         with mp.Pool(processes = cpus) as pool:
             res = pool.starmap(compileExon, cmds)
 

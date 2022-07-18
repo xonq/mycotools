@@ -1,9 +1,13 @@
 #! /usr/bin/env python3
 
-import argparse, sys, os, re, pandas as pd
+import os
+import re
+import sys
+import argparse
+import pandas as pd
+from shutil import copy as cp
 from mycotools.lib.dbtools import db2df, df2db, masterDB
 from mycotools.lib.kontools import formatPath, prep_output
-from shutil import copy
 
 
 def softMain( filetypes, envtypes, db, output_path, print_link = False ):
@@ -39,7 +43,7 @@ def hardMain( filetypes, envtypes, db, output_path ):
         for ftype in filetypes:
             if not pd.isnull( row[ ftype ] ):
                 fpath = formatPath( '$' + envtypes[ftype] + '/' + row[ftype] )
-                copy( fpath, output_path + ftype + '/' + os.path.basename( fpath ) ) 
+                cp( fpath, output_path + ftype + '/' + os.path.basename( fpath ) ) 
 
 if __name__ == '__main__':
 

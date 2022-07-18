@@ -1,10 +1,12 @@
 #! /usr/bin/env python3
 
-from mycotools.lib.dbtools import db2df, masterDB
+import re
+import sys
+import argparse
+from Bio.Seq import Seq
+from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps, dict2fa
 from mycotools.lib.kontools import formatPath, sysStart, eprint
-from Bio.Seq import Seq
-import re, sys, argparse
 
 def sortGene(sorting_group):
 
@@ -74,7 +76,23 @@ def sortMain(gff):
     return gff
 
 def grabCDS( gff_dicts ):
-    return [x for x in gff_dicts if x['type'].lower() == 'cds']
+    """Grab CDSs that are associated with genes. gff_dicts is a
+    mycotools.lib.biotools gff2list() list"""
+
+    mrnas = []
+    for entry in gff_dicts:
+        if entry['type'] == 'mRNA':
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            mrnas.extend(alias.split('|')) # account for posttranslational mods
+
+    mrna_set, out_cds = set(mrnas), []
+    for entry in gff_dicts:
+        if entry['type'] == 'cds':
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            if alias in mrna_set:
+                out_cds.append(entry)
+
+    return out_cds
 
 def order_neg_dict( neg_dict ):
 
@@ -551,7 +569,7 @@ if __name__ == '__main__':
         assembly_dicts = {'input': fa2dict( formatPath(args.assembly) )}
         gff_dicts = {'input': input_gff}
     else:
-        db = db2df(masterDB()).set_index('internal_ome')
+        db = mtdb(masterDB()).set_index('ome')
         gff_dicts, assembly_dicts = {}, {}
         try:
             for line in input_gff:
@@ -559,9 +577,7 @@ if __name__ == '__main__':
                 ome = re.search( r'(.*?)_', gene )[1]
                 if ome not in gff_dicts:
                     gff_dicts[ome] = []
-                    assembly_dicts[ome] = fa2dict(
-                        formatPath('$MYCOFNA/' + db.loc[ome]['fna'])
-                        )
+                    assembly_dicts[ome] = fa2dict(db[ome]['fna'])
                 gff_dicts[ome].append(line)
         except IndexError:
             eprint('\nERROR: ' + args.gff + ' is incompatible with MycotoolsDB', flush = True)

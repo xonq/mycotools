@@ -1,20 +1,27 @@
 #! /usr/bin/env python3
 
-import argparse, subprocess, os, datetime, sys, re, copy
-import multiprocessing as mp, numpy as np
+import os
+import re
+import sys
+import copy
+import datetime
+import argparse
+import subprocess
+import numpy as np
+import multiprocess as mp
 from mycotools.lib.kontools import eprint, intro, outro, formatPath, multisub, collect_files, findExecs
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import dict2fa, fa2dict
 from mycotools.acc2fa import famain as acc2fa
 
 
-def compileBlastCmd( ome, biofile, env_dir, out_dir, blast_scaf ):
+def compileBlastCmd( ome, biofile, out_dir, blast_scaf ):
     return blast_scaf + ['-out', out_dir + ome + '.tsv', \
-        '-subject', env_dir + biofile]
+        '-subject', biofile]
 
-def compBlastTups( 
+def comp_blast_tups( 
     seq_db, blast_type, seq_type, out_dir, 
-    biotype, env_dir, query, hsps = None, max_hits = None,
+    biotype, query, hsps = None, max_hits = None,
     evalue = None
     ):
 
@@ -30,19 +37,18 @@ def compBlastTups(
         blast_scaf.extend([ '-max_target_seqs', str(max_hits) ])
 
     blast_cmds = []
-    for i, ome in enumerate(seq_db['internal_ome']):
+    for i, ome in enumerate(seq_db['ome']):
         if seq_db[biotype][i]:
             blast_cmds.append( compileBlastCmd(
-                ome, seq_db[biotype][i], env_dir,
+                ome, seq_db[biotype][i],
                 out_dir, blast_scaf
                 ) )
-
     return blast_cmds
 
 
 def compMMseqTups( 
     seq_db, out_dir, 
-    biotype, env_dir, query, mmseqs = 'mmseqs',
+    biotype, query, mmseqs = 'mmseqs',
     evalue = None
     ):
 
@@ -56,17 +62,13 @@ def compMMseqTups(
 #        cmd_scaf.extend([ '-max_target_seqs', str(max_hits) ])
 
     search_cmds = []
-    for i, ome in enumerate(seq_db['internal_ome']):
+    for i, ome in enumerate(seq_db['ome']):
         if seq_db[biotype][i]:
             new_cmd = copy.deepcopy(cmd_scaf)
-            inputFile = formatPath(env_dir + seq_db[biotype][i])
+            inputFile = formatPath(seq_db[biotype][i])
             outputFile = formatPath(out_dir + ome + '.out')
             new_cmd.insert(3, inputFile)
             new_cmd.insert(4, outputFile)
-#            search_cmds.append([
- #               mmseqs, query, formatPath(env_dir + row[biotype]),
-  #              out_dir + ome + '.out', 'tmp'
-   #             ])
             search_cmds.append(new_cmd)
 
 
@@ -111,9 +113,9 @@ def compileResults( res_dict, skip = [] ):
     return output_res
 
 
-def compAcc2fa( db, biotype, env_dir, output_res, subhit = False, skip = None ):
+def compAcc2fa( db, biotype, output_res, subhit = False, skip = None ):
 
-    acc2fa_cmds, db = {}, db.set_index('internal_ome')
+    acc2fa_cmds, db = {}, db.set_index('ome')
     if subhit or biotype == 'assembly':
         for query in output_res:
             if skip:
@@ -125,11 +127,11 @@ def compAcc2fa( db, biotype, env_dir, output_res, subhit = False, skip = None ):
                     accs.append(hit[0] + '[' + hit[1] + '-' + hit[2] + ']')
                 if biotype == 'assembly':
                     acc2fa_cmds[query].append(
-                        [accs, env_dir + db[i][biotype]]
+                        [accs, db[i][biotype]]
                         )
                 else:
                     acc2fa_cmds[query].append(
-                        [accs, env_dir + db[i][biotype]]
+                        [accs, db[i][biotype]]
                         )
     else:
         for query in output_res:
@@ -144,7 +146,7 @@ def compAcc2fa( db, biotype, env_dir, output_res, subhit = False, skip = None ):
                 if accs:
                     try:
                         acc2fa_cmds[query].append( [
-                            list(set(accs)), env_dir + db[i][biotype]
+                            list(set(accs)), db[i][biotype]
                             ] )
                     except KeyError:
                         eprint('\t' + i + ' not in db')
@@ -213,7 +215,7 @@ def ObyOprep(
             os.path.basename(x)[:-4] for x in reports \
             if os.path.getsize(x) > 0
             }
-        rundb, checkdb = mtdb({}).set_index('internal_ome'), db.set_index('internal_ome')
+        rundb, checkdb = mtdb({}).set_index('ome'), db.set_index('ome')
         for ome, val in checkdb.items():
             if ome not in finished:
                 rundb[ome] = val
@@ -221,13 +223,12 @@ def ObyOprep(
         if log_list0[-2:] != log_list1[-2:]:
             reparse = True
 #        print(rundb, flush = True)
-
     return rundb
 
 
 def ObyOsearch(
     db, rundb, blast, seq_type, report_dir, biotype,
-    env_dir, query, hsps, max_hits, evalue, cpus,
+    query, hsps, max_hits, evalue, cpus,
     bitscore, pident
     ):
 
@@ -235,23 +236,22 @@ def ObyOsearch(
     if len(rundb) > 0:
         print('\nSearching on an ome-by-ome basis', flush = True)
         if 'blast' in blast:
-            search_tups = compBlastTups(
+            search_tups = comp_blast_tups(
                 rundb, blast, seq_type, 
-                report_dir, biotype, env_dir, query, 
+                report_dir, biotype, query, 
                 hsps = hsps, max_hits = max_hits, evalue = evalue
                 )
         else:
             search_tups = compMMseqTups(
                 rundb, report_dir, 
-                biotype, env_dir, query, mmseqs = 'mmseqs',
+                biotype, query, mmseqs = 'mmseqs',
                 evalue = evalue
                 )
-
         search_outs = multisub( search_tups, processes = cpus )
     
    
     parse_tups = []
-    for i, ome in enumerate(db['internal_ome']):
+    for i, ome in enumerate(db['ome']):
         if db[biotype][i]:
             parse_tups.append( [ome,
                 report_dir + ome + '.tsv',
@@ -344,7 +344,7 @@ def parseDBout( db, file_, bitscore = 0, pident = 0, max_hits = None ):
                     ome_results[ome] = []
                 ome_results[ome].append(data)
 
-    x_omes = set(db['internal_ome'])
+    x_omes = set(db['ome'])
     omes_results = {
         x: ome_results[x] for x in ome_results if x in x_omes
         }
@@ -371,20 +371,14 @@ def main(
 
     if blast in {'tblastn', 'blastp'}:
         seq_type = 'prot'
-        biotype = 'proteome'
-        env_dir = os.environ['MYCOFAA'] + '/'
+        biotype = 'faa'
         search_db = checkSearchDB()
     elif blast in {'blastx', 'blastn'}:
         seq_type = 'nucl'
-        biotype = 'assembly'
-        env_dir = os.environ['MYCOFNA'] + '/'
+        biotype = 'fna'
         search_db = None
     elif blast == 'mmseqs':
         search_db = checkSearchDB('mmseqs')
-        if biotype == 'proteome':
-            env_dir = os.environ['MYCOFAA'] + '/'
-        elif biotype == 'assembly':
-            env_dir = os.environ['MYCOFNA'] + '/'
     else:
         eprint('\nERROR: invalid search binary: ' + blast, flush = True)
 
@@ -414,13 +408,13 @@ def main(
             )
         results_dict = ObyOsearch(
             db, rundb, blast, None, report_dir, biotype,
-            env_dir, query, hsps, max_hits, evalue, cpus,
+            query, hsps, max_hits, evalue, cpus,
             bitscore, pident
             )
 
     print('\nCompiling fastas', flush = True)
     output_res = compileResults( results_dict, skip )
-    acc2fa_cmds = compAcc2fa( db, biotype, env_dir, output_res, skip = None )
+    acc2fa_cmds = compAcc2fa( db, biotype, output_res, skip = None )
     output_fas = {}
     queryfa = fa2dict(query)
     for query1, cmd in acc2fa_cmds.items():
@@ -489,9 +483,9 @@ if __name__ == '__main__':
             eprint('\nERROR: -st required for mmseqs', flush = True)
             sys.exit(3)
         if args.sequencetype == 'aa':
-            biotype = 'proteome'
+            biotype = 'faa'
         else:
-            biotype = 'assembly'
+            biotype = 'fna'
     else:
         biotype = None
         

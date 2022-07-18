@@ -1,6 +1,10 @@
 #! /usr/bin/env python3
 
-import os, re, sys, subprocess, argparse
+import os
+import re
+import sys
+import argparse
+import subprocess
 from mycotools.lib.kontools import eprint, vprint, collect_files, formatPath, intro, outro, findExecs
 from mycotools.lib.biotools import fa2dict
 
@@ -186,7 +190,10 @@ if __name__ == '__main__':
     parser.add_argument( '-o', '--output' )
     args = parser.parse_args()
 
-    output = formatPath( args.output, isdir = True )
+    output = formatPath(args.output)
+    if output:
+        if not output.endswith('/'):
+            output += '/' # bring to mycotools path expectations
     args_dict = {
         'Fasta': args.fasta, 'Alignment': args.alignment, 'Fast': args.fast,
         'Torque': args.pbs, 'Slurm': args.slurm, 'HPC project': args.project, 'Output': output

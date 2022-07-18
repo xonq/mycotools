@@ -1,8 +1,11 @@
 #! /usr/bin/env python3
 
+import os
+import sys
+import time
+import getpass
 from Bio import Entrez
 from mycotools.lib.kontools import file2list, eprint
-import sys, os, sys, getpass, time
 
 
 if __name__ == '__main__':

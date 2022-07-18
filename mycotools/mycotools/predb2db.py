@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
-import sys, os, re, shutil, multiprocessing as mp
+import os
+import re
+import shutil
+import multiprocessing as mp
+from collections import Counter
 from mycotools.lib.kontools import gunzip, mkOutput, formatPath, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gff3Comps, gff2Comps
@@ -11,17 +15,17 @@ from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.gff2seq import aamain as gff2seq
 
 predbHeaders = [
-    'genomeCode', 'genus', 'species', 'strain',
-    'version', 'assembly_acc',
+    'assembly_accession', 'genus', 'species', 'strain',
+    'version', 'biosample',
     'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
-    'useRestriction (yes/no)', 'publication'
+    'useRestriction (yes/no)', 'published'
     ]
 
 def prepOutput(base_dir):
     out_dir = mkOutput(base_dir, 'predb2db')
     wrk_dir = out_dir + 'working/'
     dirs = [
-        out_dir, wrk_dir, wrk_dir + 'gff/', wrk_dir + 'fna/', wrk_dir + 'faa/'
+        out_dir, wrk_dir, wrk_dir + 'gff3/', wrk_dir + 'fna/', wrk_dir + 'faa/'
         ]
     for dir_ in dirs:
         if not os.path.isdir(dir_):
@@ -100,11 +104,11 @@ def readPredb(predb_path, spacer = '\t'):
 #                (predb[headers[i]].append(v.rstrip()) for i,v in enumerate(entry)) 
 
     try:
-        predb['genome_code'] = predb['genomeCode']
-        del predb['genomeCode']
+        predb['assembly_acc'] = predb['assembly_accession']
+        del predb['assembly_accession']
     except KeyError:
-        if not 'genome_code' in predb and not 'genomeCode' in predb:
-            predb['genome_code'] = ['' for x in predb['genus']]
+        if not 'assembly_acc' in predb and not 'assembly_accession' in predb:
+            predb['assembly_acc'] = ['' for x in predb['genus']]
     try:
         predb['source'] = predb['genomeSource (ncbi/jgi/new)']
         del predb['genomeSource (ncbi/jgi/new)']
@@ -118,10 +122,10 @@ def readPredb(predb_path, spacer = '\t'):
             eprint(spacer + 'ERROR: useRestriction entries must be in {y, n, yes, no}', flush = True)
             sys.exit(4)
     except KeyError:
-        if not 'restriction' in predb and 'publication' not in predb:
+        if not 'restriction' in predb and 'published' not in predb:
             raise KeyError
-        elif 'publication' in predb:
-            predb['restriction'] = [bool(x) for x in predb['publication']]
+        elif 'published' in predb:
+            predb['restriction'] = [bool(x) for x in predb['published']]
 
     if any(x.lower() not in {'jgi', 'ncbi', 'new'} \
         for x in predb['source']):
@@ -142,42 +146,50 @@ def readPredb(predb_path, spacer = '\t'):
 def predb2mtdb(predb):
     infdb = mtdb()
     for i, code in enumerate(predb['genus']):
-        if predb['publication'][i]:
+        if predb['published'][i]:
             toAdd = {
-                'genome_code': predb['genome_code'][i],
+                'assembly_acc': predb['assembly_acc'][i],
                 'genus': predb['genus'][i],
                 'species': predb['species'][i],
                 'strain': predb['strain'][i],
                 'version': predb['version'][i],
-                'assembly_acc': predb['assembly_acc'][i],
+                'biosample': predb['biosample'][i],
                 'fna': predb['assemblyPath'][i],
                 'gff3': predb['gffPath'][i],
                 'source': predb['source'][i],
-                'published': predb['publication'][i]
+                'published': predb['published'][i]
                 }
         else:
             toAdd = {
-                'genome_code': predb['genome_code'][i],
+                'assembly_acc': predb['assembly_acc'][i],
                 'genus': predb['genus'][i],
                 'species': predb['species'][i],
                 'strain': predb['strain'][i],
                 'version': predb['version'][i],
-                'assembly_acc': predb['assembly_acc'][i],
+                'biosample': predb['biosample'][i],
                 'fna': predb['assemblyPath'][i],
                 'gff3': predb['gffPath'][i],
                 'source': predb['source'][i],
                 'published': not predb['restriction'][i]
                 }
-#        if predb['publication'][i]:
- #           toAdd['published'] = predb['publication'][i]
+#        if predb['published'][i]:
+ #           toAdd['published'] = predb['published'][i]
         infdb = infdb.append(toAdd)
     return infdb
 
-def genOmes(newdb, refdb = None, ome_col = 'internal_ome'):
+def gen_omes(newdb, refdb = None, ome_col = 'ome', forbidden = set()):
 
-    tax_set = set(refdb['internal_ome'])
-    for i, ome in enumerate(newdb['internal_ome']):
-        if not ome:
+    ref_ome_check = [k for k,v in Counter(refdb['ome']).items() if v > 1]
+    new_ome_check = [k for k,v in Counter(newdb['ome']).items() if v > 1 and k]
+    if ref_ome_check:
+        raise ValueError('corrupted reference database with non-unique omes: '
+                        + str(ref_ome_check))
+    elif new_ome_check:
+        raise ValueError('corrupted pre-database with non-unique omes: '
+                        + str(new_ome_check))
+    tax_set = set(refdb['ome']).union(forbidden)
+    for i, ome in enumerate(newdb['ome']):
+        if not ome: # if there isn't an ome for this entry yet
             name = newdb['genus'][i][:3].lower() + newdb['species'][i][:3].lower()
             name = re.sub(r'\(|\)|\[|\]|\$|\#|\@| |\||\+|\=|\%|\^|\&|\*|\'|\"|\!|\~|\`|\,|\<|\>|\?|\;|\:|\\|\{|\}', '', name)
             name.replace('(', '')
@@ -193,34 +205,60 @@ def genOmes(newdb, refdb = None, ome_col = 'internal_ome'):
                 number = 1
             newOme = name + str(number)
             tax_set.add(newOme)
-            newdb['internal_ome'][i] = newOme
+            newdb['ome'][i] = newOme
+        elif ome:
+            format_search = re.search(r'^[^\d_,\'";:\\\|\[\]\{\}\=\+\!@#\$\%\^' 
+                                      + r'&\*\(\)]{6}\d+[^-_+=\\\|\{\[\}\]\:;'
+                                      + r'\'\"\,\<\>\?/\`\~\!\@\#\$\%\^\&\*\('
+                                      + r'\)]+', ome) # crude format check
+            if not format_search:
+                raise ValueError('invalid ome ' + ome)
+            if ome in tax_set: # it's an update
+                v_search = re.search(r'\.(\d+)$', ome)
+                if v_search:
+                    v = int(v_search[1]) + 1 # new version
+                    new_ome = re.sub(r'\.\d+$', '.' + str(v), ome)
+                else:
+                    new_ome = ome + '.1' # first modified version
+                new_db['ome'][i] = new_ome
 
     return newdb
 
-def curMngr(ome, fna_path, gff_path, wrk_dir, source, genomeCode):
+def cur_mngr(ome, fna_path, gff_path, wrk_dir, 
+            source, assembly_accession, exit = False):
 
     try:
         newFNA_path = moveBioFile( fna_path, ome, 'fa', wrk_dir + 'fna/' )
     except IOError:
-        return ome, False, 'assembly'
+        return ome, False, 'fna'
     try:
-        newGFF_path = moveBioFile(gff_path, ome, 'gff3', wrk_dir + 'gff/', suffix = '.uncur')
+        newGFF_path = moveBioFile(gff_path, ome, 'gff3', wrk_dir + 'gff3/', suffix = '.uncur')
     except IOError:
         return ome, False, 'gff3'
 
-    gff = gff2list(newGFF_path)
-    cur_path = re.sub(r'\.uncur$', '', newGFF_path)
-
-    curGFF_path = gffMngr(ome, gff, cur_path, source, genomeCode)
-    faa = gff2seq(gff, fa2dict(newFNA_path))
+    curGFF_path = re.sub(r'\.uncur$', '', newGFF_path)
     faa_path = wrk_dir + 'faa/' + ome + '.aa.fa'
-    with open(faa_path, 'w') as out:
-        out.write(dict2fa(faa))
+    if not os.path.isfile(curGFF_path):
+        gff = gff2list(newGFF_path)
+        try:
+            gff_mngr(ome, gff, curGFF_path, source, assembly_accession)
+        except: # catch all errors
+            if exit:
+                print('\t' + ome + '|' + assembly_accession \
+                    + 'failed gff curation', flush = True)
+                sys.exit(17)
+            return ome, False, 'gff3'
+
+    if not os.path.isfile(faa_path):
+        faa = gff2seq(gff2list(curGFF_path), fa2dict(newFNA_path))
+        with open(faa_path + '.tmp', 'w') as out:
+            out.write(dict2fa(faa))
+        os.rename(faa_path + '.tmp', faa_path)
 
     return ome, newFNA_path, curGFF_path, faa_path
 
 
-def gffMngr(ome, gff, cur_path, source, genomeCode):
+def gff_mngr(ome, gff, cur_path, source, assembly_accession):
 
     gffVer, alias = None, False
     for entry in gff:
@@ -249,38 +287,38 @@ def gffMngr(ome, gff, cur_path, source, genomeCode):
         else:
             gff = curGFF3(gff, ome)
     else:
-        gff = gff2gff3(gff, ome, genomeCode, verbose = False)
+        gff = gff2gff3(gff, ome, assembly_accession, verbose = False)
 
-    with open(cur_path, 'w') as out:
+    with open(cur_path + '.tmp', 'w') as out:
         out.write(list2gff(gff))
-
-    return cur_path 
+    os.rename(cur_path + '.tmp', cur_path)
 
 def add2failed(row):
     if row['source'] == 'ncbi':
         return [row['assembly_acc'], row['version']]
     else:
-        return [row['genome_code'], row['version']]
+        return [row['assembly_acc'], row['version']]
 
 def main(
     predb, refdb, wrk_dir, 
-    verbose = False, spacer = '\t', cpus = 1
+    verbose = False, spacer = '\t', forbidden = set(), 
+    cpus = 1, exit = False
     ):
 
     failed = []
 
     infdb = predb2mtdb(predb)
-    omedb = genOmes(infdb, refdb, ome_col = 'internal_ome')
+    omedb = gen_omes(infdb, refdb, ome_col = 'ome', forbidden = forbidden)
     
     curCmds = []
-    omedb = omedb.set_index('internal_ome')
+    omedb = omedb.set_index('ome')
     for ome, row in omedb.items():
         curCmds.append([
             ome, row['fna'], row['gff3'], 
-            wrk_dir, row['source'], row['genome_code']
+            wrk_dir, row['source'], row['assembly_acc']
             ])
     with mp.Pool(processes = cpus) as pool:
-        curData = pool.starmap(curMngr, curCmds)
+        curData = pool.starmap(cur_mngr, curCmds)
 
     for data in curData:
         if not data[1]:
@@ -321,7 +359,7 @@ if __name__ == '__main__':
 
     predb = readPredb(formatPath(sys.argv[1]), spacer = '\t')
     out_dir, wrk_dir = prepOutput(os.path.dirname(formatPath(sys.argv[1])))
-    omedb, failed = main(predb, refDB, wrk_dir)
+    omedb, failed = main(predb, refDB, wrk_dir, exit = True)
 
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
     tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)

@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
-# parses all fasta files inputted as arguments and stores them as {filename: {genes: {description: }{sequence: }}}
 
+import re
+import sys
 from mycotools.lib.kontools import eprint
-import re, sys
 
 aa_weights = {
     'A': 89.1, 'R': 174.2, 'N': 132.1, 'D': 133.1, 'C': 121.2, 'E': 147.1,
@@ -229,11 +229,6 @@ def gff3Comps( source = None ):
     comps['product'] = r'product=([^"\']*)["\';|$]'
     comps['OG'] = r'OG=([\w+:\d+\|]+)'
     comps['ver'] = 'gff3'
-
-#    if source == 'ncbi':
- #       comps['prot'] = r';protein_id=([^;]+)'
-  #  elif source == 'jgi':
-   #     comps['prot'] = r'proteinId=([^;]+)'
     comps['prot'] = r'protein_id=([^;]+)|proteinId=([^;]+)'
     comps['transcript'] = r'transcriptId=([^;])'
    

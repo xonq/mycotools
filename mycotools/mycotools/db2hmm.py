@@ -1,18 +1,19 @@
 #! /usr/bin/env python3
 
+import os
+import re
+import sys
+import argparse
+import subprocess
+import pandas as pd
+import multiprocessing as mp
+from StringIO import StringIO
 from mycotools.lib.kontools import intro, outro, collect_files, multisub, findExecs
 from mycotools.lib.dbtools import db2df
 from mycotools.lib.biotools import dict2fa
 from mycotools.extractHmmsearch import main as exHmm
 from mycotools.acc2fa import main as acc2fa
 from mycotools.extractHmmAcc import grabAccs, main as absHmm
-import pandas as pd, re, os, sys, multiprocessing as mp
-import argparse, subprocess
-if sys.version_info[0] < 3:
-    from StringIO import StringIO
-else:
-    from io import StringIO
-
 
 def compileHmmCmd( db, hmmdb_path, output, ome_set = set() ):
     '''
@@ -22,10 +23,10 @@ def compileHmmCmd( db, hmmdb_path, output, ome_set = set() ):
 
     cmd_tuples = [ ]
     for i, row in db.iterrows():
-        if pd.isnull( row['faa'] ) or row['internal_ome'] in ome_set:
+        if pd.isnull( row['faa'] ) or row['ome'] in ome_set:
             continue
         proteome_path = os.environ['MYCOFAA'] + '/' + row['faa']
-        output_path = output + '/' + row['internal_ome'] + '.out'
+        output_path = output + '/' + row['ome'] + '.out'
         cmd = ( 'hmmsearch', '-o', output_path, hmmdb_path, proteome_path ) 
         cmd_tuples.append( cmd )
 
@@ -42,7 +43,7 @@ def compileextractHmmCmd( db, args, output ):
     for i, row in db.iterrows():
         if pd.isnull( row['faa'] ):
             continue
-        hmmsearch_out = output + '/' + row['internal_ome'] + '.out'
+        hmmsearch_out = output + '/' + row['ome'] + '.out'
         cmd_tuples.append( ( args, hmmsearch_out, output ) )
 
     return cmd_tuples
@@ -68,7 +69,7 @@ def compileacc2fa( db, output, q_dict ):
     cmd_tuples = []
     if not os.path.isdir(output):
         os.mkdir( output )
-    fa_dict = { row['internal_ome']: os.environ['MYCOFAA'] + '/' + row['faa'] \
+    fa_dict = { row['ome']: os.environ['MYCOFAA'] + '/' + row['faa'] \
         for i, row in db.iterrows() if not pd.isnull( row['faa'] ) }
     for q in q_dict:
         cmd_tuples.append( ( q_dict[q], 0, fa_dict, output + '/' + q + '.aa.fa' ) )

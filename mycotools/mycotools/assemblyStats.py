@@ -4,7 +4,10 @@ Takes a database as argument 1 and an output for the .tsv as argument 2.
 Calculates basic genome statistics.
 '''
 
-import sys, os, multiprocessing as mp, copy
+import os
+import sys
+import copy
+import multiprocessing as mp
 from mycotools.lib.dbtools import mtdb
 from mycotools.lib.biotools import fa2dict
 from mycotools.lib.kontools import formatPath, eprint
@@ -133,7 +136,7 @@ def main(in_path, log_path = None, cpus = 1):
         for ome in db:
             row = db[ome]
             if row['fna'] and ome not in prevOmes:
-                cmds.append((formatPath('$MYCOFNA/' + row['fna']), ome))
+                cmds.append((row['fna'], ome,))
         with mp.Pool(processes=cpus) as pool:
             results = pool.starmap(mngr, cmds)
 
