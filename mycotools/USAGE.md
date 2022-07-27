@@ -522,16 +522,16 @@ View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 
 
 ## Hierarchical agglomerative clustering
-### aggClus.py
+### fa2clus.py
 Hierarchical agglomerative clustering is a useful systematic approach to
 clustering groups of sequences for phylogenetic analysis via percent identity.
 Some gene families (e.g. P450s) yield 10,000s of results for BLAST searches against the
-MycotoolsDB. `aggClus.py` allows the user to truncate these sets without constructing a
-phylogeny using a minimum percent identity cutoff. `aggClus.py` optionally implements
+MycotoolsDB. `fa2clus.py` allows the user to truncate these sets without constructing a
+phylogeny using a minimum percent identity cutoff. `fa2clus.py` optionally implements
 an automated iterative approach to obtaining a cluster of minimum - maximum size
 with the gene of interest.
 
-`aggClus.py` will either take a `fasta` and generate a distance matrix using 
+`fa2clus.py` will either take a `fasta` and generate a distance matrix using 
 `usearch calc_distmx` by default or the % identity of `needle` alignments.
 Then, cluster sequences via hierarchical agglomerative clustering and output a
 `.clus` file of cluster assignments and `.newick` dendrogram. 
@@ -543,12 +543,12 @@ license are sufficient for distance matrix calculation even on large datasets.
 e.g. Calculate a distance matrix and cluster from a fasta with a minimum
 identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 ```bash
-aggClus.py -f <FASTA>.fa -m 0.2 -x 0.7
+fa2clus.py -f <FASTA>.fa -m 0.2 -x 0.7
 ```
 
 Iteratively cluster until a cluster size of 50-200 genes is achieved:
 ```bash
-aggClus.py -f <FASTA> -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
+fa2clus.py -f <FASTA> -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
 ```
 
 
@@ -609,7 +609,7 @@ db2search.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pub.mtdb
 genes recovered from the analysis:
 
 ```bash
-(mycotools -$ grep '>' <RESULTS.fasta> | wc -l
+grep '>' <RESULTS.fasta> | wc -l
 ```
 
 <br />
@@ -653,7 +653,7 @@ clustering. Adjust the % identity for both arguments as needed. You may need to
 submit this as a job
 
 ```bash
-aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
+fa2clus.py -f <FASTA>.fa -m 0.3 -x 0.7
 ```
 
 <br />
@@ -717,8 +717,8 @@ optional arguments:
                         MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
   -p PLUSMINUS, --plusminus PLUSMINUS
                         Genes up-/downstream to analyze from loci. DEFAULT: 10
-  --maxseq MAXSEQ       Max sequences for trees/min for aggClus.py. Outgroup detection may exceed this number. DEFAULT: 250
-  --minid MINID         Minimum identity for aggClus.py. DEFAULT: 0.2
+  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py. Outgroup detection may exceed this number. DEFAULT: 250
+  --minid MINID         Minimum identity for fa2clus.py. DEFAULT: 0.2
   -f, --fast            Fasttree. DEFAULT: IQTree2 1000 bootstrap iterations
   --ingroup             Do not detect outgroups, do not root trees
   -g GFF, --gff GFF     GFF for non-mycotools input. Requires -s and a fasta for -i
