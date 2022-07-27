@@ -5,7 +5,7 @@ import sys
 import argparse
 from Bio.Seq import Seq
 from mycotools.lib.biotools import fa2dict, dict2fa
-from mycotools.lib.kontools import sysStart, eprint, formatPath
+from mycotools.lib.kontools import sys_start, eprint, format_path
 
 def extractCoords(fa_dict, seqid, coord_start = 0, coord_end = -1, sense = '+', fa_name = ''):
 
@@ -36,11 +36,11 @@ if __name__ == '__main__':
         + '\nfasta\tsequence_id\tstart_coordinate\tend_coordinate\tstrand_sense' \
         +  '\n\ncoords2fa.py coords.tsv'
 
-    args = sysStart(sys.argv[1:], usage, 1, files = [sys.argv[1]])
+    args = sys_start(sys.argv[1:], usage, 1, files = [sys.argv[1]])
 
     out_fa, error = {}, ''
     try:
-        fa_file = formatPath(args[0])
+        fa_file = format_path(args[0])
         if fa_file.endswith('/'):
             fa_name = os.path.basename(fa_file[:-1])
         else:
@@ -74,7 +74,7 @@ if __name__ == '__main__':
             eprint('\nERROR: incorrectly formatted input', flush = True)
 
     for fa_file, rows in files_data.items():
-        fa = fa2dict(formatPath(fa_file))
+        fa = fa2dict(format_path(fa_file))
         if fa_file.endswith('/'):
             fa_name = os.path.basename(fa_file[:-1])
         else:

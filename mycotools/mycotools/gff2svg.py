@@ -1,12 +1,14 @@
 #! /usr/bin/env python3
+
 #NEED TO PARSE FOR IN GENE COORDINATES AND ANNOTATIONS
+#NEED to create a single file output option for multiple inputs
 
 import os
 import re
 import sys
 import random
 import argparse
-from mycotools.lib.kontools import sysStart, formatPath, file2list, getColors
+from mycotools.lib.kontools import sys_start, format_path, file2list, getColors
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from mycotools.lib.biotools import gff2list, gff3Comps
 
@@ -19,7 +21,10 @@ def compileProducts(gff, prod_comp, types = {'tRNA', 'mRNA', 'rRNA'}):
             if prod is not None:
                 product = prod[1].lower()
                 products.append(product)
-    return list(set(products))
+    out_products = list(set([
+        x.replace('"', '') for x in products
+        ]))
+    return out_products
 
 def gff2svg( 
     gff, svg_path, product_dict, colors,
@@ -27,7 +32,6 @@ def gff2svg(
     null = 'hypothetical protein', types = {'tRNA', 'mRNA', 'rRNA'},
     max_size = 100, labels = True
     ):
-
     # needs to end with .svg
     if not svg_path.endswith('.svg'):
         svg_path += '.svg'
@@ -41,6 +45,7 @@ def gff2svg(
             prod = re.search(prod_comp, i['attributes']) # find the product
             if prod is not None:
                 product = prod[1].lower() # lower case for uniformity
+                product = product.replace('"', '')
                 if product == null or not product: # if the product is a null
                 # value it should be annotated as such
                     product = null
@@ -122,7 +127,7 @@ def main(
     product_dict = gff2svg(
         gff_list, svg_path, product_dict, colors,
         prod_comp = prod_comp, width = width, null = null,
-        labels = labels
+        labels = labels, types = types
         )
 
     return product_dict
@@ -177,9 +182,9 @@ if __name__ == "__main__":
 
     if args.input:
         if args.output:
-            out_dir = formatPath(args.output)
+            out_dir = format_path(args.output)
         else:
-            out_dir = formatPath(os.path.dirname(args.input))
+            out_dir = format_path(os.path.dirname(args.input))
         gffs = file2list(args.input)
         for entry in gffs:
             if entry.endswith('/'):
@@ -199,7 +204,7 @@ if __name__ == "__main__":
         if args.gff.endswith('/'):
             args.gff = re.sub(r'/+$', '', args.gff)
         if args.output:
-            svg_path = formatPath(args.output) + re.sub(
+            svg_path = format_path(args.output) + re.sub(
                 r'\.gf[^\.]+$', '.svg', os.path.basename(args.gff)
                 )
         else:

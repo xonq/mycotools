@@ -7,9 +7,8 @@ import copy
 import datetime
 import argparse
 import subprocess
-import numpy as np
-import multiprocess as mp
-from mycotools.lib.kontools import eprint, intro, outro, formatPath, multisub, collect_files, findExecs
+import multiprocessing as mp
+from mycotools.lib.kontools import eprint, intro, outro, format_path, multisub, collect_files, findExecs
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import dict2fa, fa2dict
 from mycotools.acc2fa import famain as acc2fa
@@ -65,8 +64,8 @@ def compMMseqTups(
     for i, ome in enumerate(seq_db['ome']):
         if seq_db[biotype][i]:
             new_cmd = copy.deepcopy(cmd_scaf)
-            inputFile = formatPath(seq_db[biotype][i])
-            outputFile = formatPath(out_dir + ome + '.out')
+            inputFile = format_path(seq_db[biotype][i])
+            outputFile = format_path(out_dir + ome + '.out')
             new_cmd.insert(3, inputFile)
             new_cmd.insert(4, outputFile)
             search_cmds.append(new_cmd)
@@ -156,7 +155,7 @@ def compAcc2fa( db, biotype, output_res, subhit = False, skip = None ):
 
 def prepOutput(out_dir, query):
 
-    out_dir, query = formatPath(out_dir), formatPath( query )
+    out_dir, query = format_path(out_dir), format_path( query )
     if not out_dir.endswith('/'):
         out_dir += '/'
     if not os.path.isdir( out_dir ):
@@ -269,13 +268,13 @@ def checkSearchDB(binary = 'blast'):
 
     db_date = os.path.basename(masterDB())
     if 'blast' in binary:
-        search_db = formatPath('$MYCOFAA/blastdb/' + db_date + '.00.psd')
+        search_db = format_path('$MYCOFAA/blastdb/' + db_date + '.00.psd')
         if os.path.isfile(search_db):
             return search_db[:-7]
         elif os.path.isfile(search_db[:-7] + '.psd'):
             return search_db[:-7]
     else:
-        search_db = formatPath('$MYCOFAA/blastdb/' + db_date.replace('.db','') + '.mmseqs.db')
+        search_db = format_path('$MYCOFAA/blastdb/' + db_date.replace('.db','') + '.mmseqs.db')
         if os.path.isfile(search_db):
             return search_db
 
@@ -314,7 +313,7 @@ def dbmmseq(
     out_file = report_dir + os.path.basename(db_path)[:-3].replace('.mmseqs','') + '.out'
 #    output_str = '"query,target,pident,alen,mismatch,gapopen,qstart,qend,sstart,send,evalue,bits"'
     cmd_scaf = [
-        mmseqs, 'easy-search', formatPath(query), db_path, out_file, 'tmp',
+        mmseqs, 'easy-search', format_path(query), db_path, out_file, 'tmp',
 #        '--format-output', "0", 
         '--threads', str(cpus*2),
         ]
@@ -468,7 +467,7 @@ if __name__ == '__main__':
     parser.add_argument( '-f', '--force', action = 'store_true', help = 'Force ome-by-ome blast' )
     args = parser.parse_args()
 
-    db_path = formatPath( args.database )
+    db_path = format_path( args.database )
     if args.cpu > mp.cpu_count():
         cpus = mp.cpu_count()
     else:
@@ -490,7 +489,7 @@ if __name__ == '__main__':
         biotype = None
         
     start_args = {
-        'Search binary': args.search, 'query': formatPath(args.query), 
+        'Search binary': args.search, 'query': format_path(args.query), 
         'database': db_path, 'output': args.output, 'max evalue': evalue,
         'min bitscore': args.bitscore, 'max hits/organism': args.maxhits, #'coverage': args.coverage, 
         'min identity': args.identity, 'cores': cpus, 'force ome-by-ome': args.force
@@ -500,7 +499,7 @@ if __name__ == '__main__':
     date = start_time.strftime('%Y%m%d')
     findExecs( [args.search], exit = {args.search} )
    
-    output_dirPrep = formatPath( args.output ) 
+    output_dirPrep = format_path( args.output ) 
     if not output_dirPrep.endswith('/'):
         output_dirPrep = re.sub(r'/+$', '', output_dirPrep)
     output_dir = output_dirPrep + date + '_db2search/'

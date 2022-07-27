@@ -3,7 +3,7 @@
 import os
 import re
 import sys
-from mycotools.lib.kontools import formatPath, sysStart, eprint
+from mycotools.lib.kontools import format_path, sys_start, eprint
 from mycotools.lib.dbtools import masterDB, mtdb
 
 forbidden = [
@@ -28,7 +28,7 @@ def parseArgs(args):
                 arg = arg[1:]
                 if arg[-1] in {'"', "'"}:
                     arg = arg[:-1]
-        if os.path.isfile( formatPath(arg) ):
+        if os.path.isfile( format_path(arg) ):
             if not goOn:
                 eprint( '\nERROR: multiple files' , flush = True)
             db = mtdb( arg )
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         'optional mycotools db, string of forbidden characters\n' + \
         '"o" no ome | "g" no genus | "s" no species | "v" no strain' + \
         ' | "a" no alternative ome'
-    args = sysStart( sys.argv, usage, 2, files = [sys.argv[1]] )
+    args = sys_start( sys.argv, usage, 2, files = [sys.argv[1]] )
     db, data_input, g, sp, st, ome_code, alt = parseArgs(args)
     data_output = main(db, data_input, g, sp, st, ome_code, alt)
     print( data_output , flush = True)

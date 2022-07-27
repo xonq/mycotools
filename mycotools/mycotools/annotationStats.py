@@ -4,7 +4,7 @@ import os
 import re
 import sys
 from mycotools.lib.biotools import gff2list
-from mycotools.lib.kontools import formatPath, eprint
+from mycotools.lib.kontools import format_path, eprint
 
 
 def compileExon( gff_path, output, ome = None ):
@@ -109,7 +109,7 @@ def main(in_path, log_path = None, cpus = 1):
 
 
         if not log_path:
-#            output_file = os.path.basename(formatPath(sys.argv[1])) + '.annStats.tsv'
+#            output_file = os.path.basename(format_path(sys.argv[1])) + '.annStats.tsv'
             print('#ome\ttotal_length\tgenes\tmean_length\tmedian_length', flush = True)
             for ome in out:
                 print(ome + '\t' + out[ome], flush = True)
@@ -136,15 +136,15 @@ if __name__ == '__main__':
     elif len( sys.argv ) < 2:
         print(usage, flush = True)
         sys.exit(1)
-    elif not os.path.isfile( formatPath(sys.argv[1]) ):
+    elif not os.path.isfile( format_path(sys.argv[1]) ):
         print(usage, flush = True)
         sys.exit(1)
     elif len( sys.argv ) > 2:
-        log_path = formatPath(sys.argv[2])
+        log_path = format_path(sys.argv[2])
     else:
         log_path = None
 
-    in_path = formatPath(sys.argv[1])
+    in_path = format_path(sys.argv[1])
     main(in_path, log_path, os.cpu_count())
 
     sys.exit(0)

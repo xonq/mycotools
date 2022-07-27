@@ -13,7 +13,7 @@ from mycotools.extractHmmsearch import main as exHmm, grabNames
 from mycotools.extractHmmAcc import main as absHmm
 from mycotools.db2search import compAcc2fa
 from mycotools.acc2fa import famain as acc2fa
-from mycotools.lib.kontools import intro, outro, findExecs, eprint, formatPath
+from mycotools.lib.kontools import intro, outro, findExecs, eprint, format_path
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import dict2fa
 
@@ -179,7 +179,7 @@ if __name__ == '__main__':
         out_dir = os.getcwd() + '/' + date + '_fa2hmm2fa/'
     if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
-    out_dir = formatPath(out_dir)
+    out_dir = format_path(out_dir)
 
 
     if args.evalue:
@@ -188,20 +188,20 @@ if __name__ == '__main__':
         evalue = None
 
     args_dict = {
-        'Fasta': formatPath(args.fasta), 'Hmm': formatPath(args.hmm), 'Binary': args.binary,
-        'MycoDB': formatPath(args.database), 'Hmm Acc': args.query, 'Min Coverage': args.coverage,
+        'Fasta': format_path(args.fasta), 'Hmm': format_path(args.hmm), 'Binary': args.binary,
+        'MycoDB': format_path(args.database), 'Hmm Acc': args.query, 'Min Coverage': args.coverage,
         'Max E-value': evalue, 'Accessions': args.accession, 'Full Seq': args.whole, 'Output': out_dir, 'CPU': args.cpu
         }
     start_time = intro('fa2hmmer2fa', args_dict)
 
 #    if args.query:
- #       if os.path.isfile(formatPath(args.query)):
+ #       if os.path.isfile(format_path(args.query)):
   #          accs = file2list(args.query)
    #     else:
     #        accs = args.query
 
     output_fas = main(
-        mtdb(formatPath(args.database)), args.binary, args.fasta, args.hmm, out_dir, args.query,
+        mtdb(format_path(args.database)), args.binary, args.fasta, args.hmm, out_dir, args.query,
         cov_threshold = args.coverage, evalue = args.evalue, cpu = args.cpu,
         accession_search = args.accession, subhit = not args.whole
         )

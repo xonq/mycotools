@@ -5,7 +5,7 @@ import re
 import sys
 import argparse
 import multiprocessing as mp
-from mycotools.lib.kontools import eprint, formatPath, file2list
+from mycotools.lib.kontools import eprint, format_path, file2list
 from mycotools.lib.dbtools import masterDB, mtdb
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
 from mycotools.acc2gff import grabGffAcc
@@ -13,10 +13,10 @@ from mycotools.acc2gff import grabGffAcc
 
 def grabFiles( ome ):
     # grab MycotoolsDB files using ome info
-    gff = formatPath( '$MYCOGFF3/' + ome + '.gff3' )
+    gff = format_path( '$MYCOGFF3/' + ome + '.gff3' )
     if not os.path.isfile(gff):
         eprint( 'ERROR: ' + ome + ' gff not detected' , flush = True)
-    prot = formatPath( '$MYCOFAA/' + ome + '.aa.fa' )
+    prot = format_path( '$MYCOFAA/' + ome + '.aa.fa' )
     return gff, prot
 
 
@@ -26,10 +26,10 @@ def prepGffOutput( hit_list, gff_path, cpu = 1):
     mp_cmds = []
     for hit in hit_list:
         mp_cmds.append( [gff_list, hit] )
-    with mp.get_context('spawn').Pool( processes = cpu ) as pool:
+    with mp.Pool( processes = cpu ) as pool:
         gff_list_strs = pool.starmap(
             grabGffAcc, mp_cmds
-        )
+            )
     gff_strs = [ list2gff(x) for x in gff_list_strs ]
     gff_str = '##gff-version 3\n'
     for x in gff_strs:
@@ -207,7 +207,7 @@ def mycotools_main(db, accessions, plusminus = 10, cpus = 1):
     cmds = [
         [gff2list(db[ome]['gff3']), accs, args.plusminus, True] for ome, accs in acc_dict.items()
         ]
-    with mp.get_context('spawn').Pool(processes = cpu) as pool:
+    with mp.Pool(processes = cpu) as pool:
         acc_res = pool.starmap(main, cmds)
 
     out_indices = {}
@@ -219,18 +219,18 @@ def mycotools_main(db, accessions, plusminus = 10, cpus = 1):
 
 if __name__ == '__main__':
 
-    mp.set_start_method('spawn')
-    parser = argparse.ArgumentParser( description = 'Extracts loci from accession(s)' )
-    parser.add_argument( '-i', '--input', help = 'File of accessions' )
-    parser.add_argument( '-a', '--accession' )
-    parser.add_argument( '-p', '--plusminus', default = 10, type = int,
-        help = 'Genes +/- from accession. DEFAULT: 10' )
-    parser.add_argument( '-o', '--output', action = 'store_true',
-        help = 'Output locus fasta(s) and gff(s)' )
-    parser.add_argument( '-g', '--gff', help = 'Input GFF file' )
-    parser.add_argument( '-f', '--faa', help = 'Input protein fasta file' )
-    parser.add_argument( '-s', '--sep', help = 'Separator for input file.', default = '\n')
-    parser.add_argument( '--cpu', type = int, default = 1, help = 'CPUs, DEFAULT: 1' )
+    parser = argparse.ArgumentParser(description = 'Extracts loci from accession(s)')
+    parser.add_argument('-a', '--accession')
+    parser.add_argument('-i', '--input', help = 'File of accessions')
+    parser.add_argument('-p', '--plusminus', default = 10, type = int,
+        help = 'Genes +/- from accession. DEFAULT: 10')
+    parser.add_argument('-o', '--output', action = 'store_true',
+        help = 'Output locus fasta(s) and gff(s)')
+    parser.add_argument('-g', '--gff', help = 'Input GFF file')
+    parser.add_argument('-f', '--faa', help = 'Input protein fasta file')
+    parser.add_argument('-s', '--sep', help = 'Separator for input file.', default = '\n')
+    parser.add_argument('-d', '--database', default = masterDB(), help = 'MTDB; DEFAULT: master')
+    parser.add_argument('--cpu', type = int, default = 1)
     args = parser.parse_args()
 
     if args.cpu < mp.cpu_count():
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     args.sep = args.sep.replace("'",'').replace('"','')
  
     if args.input:
-        accessions = file2list( formatPath(args.input), sep = args.sep )
+        accessions = file2list( format_path(args.input), sep = args.sep )
     elif args.accession:
         accessions = [ args.accession ]
     else:
@@ -251,13 +251,13 @@ if __name__ == '__main__':
 
     out_indices = {}
     if args.gff: 
-        gff = gff2list( formatPath(args.gff) )
+        gff = gff2list( format_path(args.gff) )
 #        if not args.faa:
  #           print('\nERROR: no proteome', flush = True)
   #          sys.exit( 3 )
         out_indices = main( gff, accession, args.plusminus )
     else:
-        db = mtdb( formatPath( masterDB() ) ).set_index('ome')
+        db = mtdb(format_path(args.database)).set_index('ome')
         out_indices = mycotools_main(db, accessions, plusminus = 10, cpus = args.cpu)
 
 #        for i in acc_res:
@@ -265,16 +265,16 @@ if __name__ == '__main__':
 
     if args.output:
         if not db:
-            db = mtdb(formatPath(masterDB())).set_index('ome')
+            db = mtdb(format_path(args.database)).set_index('ome')
         for accession in out_indices:
             if args.gff:
-                gff = formatPath(args.gff)
+                gff = format_path(args.gff)
                 if args.faa:
-                    prot = formatPath(args.faa)
+                    prot = format_path(args.faa)
                 else:
                     prot = None
             else:
-                ome = accessions[:accession.find('_')]
+                ome = accession[:accession.find('_')]
                 gff, prot = db[ome]['gff3'], db[ome]['faa']
 #            for hit in out_indices[accession]:
             if len( out_indices[accession] ) > 0:

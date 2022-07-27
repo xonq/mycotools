@@ -6,7 +6,7 @@ import sys
 import argparse
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
 from mycotools.lib.dbtools import mtdb, masterDB
-from mycotools.lib.kontools import formatPath, eprint
+from mycotools.lib.kontools import format_path, eprint
 
 
 def extractHeaders( fasta_file, accessions, ome = None ):
@@ -59,10 +59,11 @@ def dbmain( db, accs ):
     db = db.set_index( 'ome' )
     omes = set([x[:x.find('_')] for x in accs])
     for ome in omes:
-        accessions = [x for x in accs if x.startswith(ome + '_')]
-        fasta = db[ome]['faa']
-        fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
-
+        if ome:
+            accessions = [x for x in accs if x.startswith(ome + '_')]
+            fasta = db[ome]['faa']
+            fa_dict = {**fa_dict, **extractHeaders(fasta, accessions)}
+    
     return fa_dict
 
 
@@ -91,7 +92,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.input:
-        input_file = formatPath( args.input )
+        input_file = format_path( args.input )
         if args.start: # if using columns for coordinates
             with open(input_file, 'r') as raw:
                 accs = []
@@ -107,13 +108,13 @@ if __name__ == '__main__':
     else:
         accs = [args.accession]
        
-    db_path = formatPath( args.database )
+    db_path = format_path( args.database )
     if not args.fasta:
-        db = mtdb( formatPath(args.database) )
+        db = mtdb( format_path(args.database) )
         fa_dict = dbmain( db, accs )
         fasta_str = dict2fa(fa_dict)
     else:
-        fa_path = formatPath( args.fasta )
+        fa_path = format_path( args.fasta )
         fa_dict = famain( accs, fa_path )
         fasta_str = dict2fa(fa_dict)
 

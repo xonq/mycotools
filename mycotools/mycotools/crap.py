@@ -22,8 +22,8 @@ try:
 except ImportError:
     raise ImportError('Install ete3 into your conda environment via `conda install ete3`')
 from mycotools.lib.dbtools import mtdb, masterDB
-from mycotools.lib.kontools import eprint, formatPath, findExecs, intro, outro, \
-    readJson, writeJson
+from mycotools.lib.kontools import eprint, format_path, findExecs, intro, outro, \
+    read_json, write_json
 from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Comps
 from mycotools.acc2fa import dbmain as acc2fa
 from mycotools.fa2clus import writeData, main as fa2clus
@@ -179,7 +179,7 @@ def outgroupMngr(
     fa_path = clus_dir + focalGene + '.fa'
     out_name = str(focalGene) + '.outgroup'
     log_path = clus_dir + '.' + str(focalGene) + '.log'
-    clusLog = readJson(log_path)
+    clusLog = read_json(log_path)
     iterations = sorted(
         clusLog['iterations'], key = lambda x: x['size'], reverse = True
         )
@@ -223,7 +223,7 @@ def makeOutput(base_dir, newLog):
     else:
         if not os.path.isdir(base_dir):
             os.mkdir(base_dir)
-        output_dir = formatPath(base_dir)
+        output_dir = format_path(base_dir)
 
 
     logPath = output_dir + '.craplog.json'
@@ -479,10 +479,10 @@ def initLog(
     db_path, queries, searchMech, bitscore,
     maximum, plusminus, labels
     ):
-    with open(formatPath(db_path), 'rb') as raw:
+    with open(format_path(db_path), 'rb') as raw:
         db5 = hashlib.md5(raw.read()).hexdigest()
     log_dict = {
-        'db_path':  formatPath(db_path),
+        'db_path':  format_path(db_path),
         'db':   db5,
         'queries':  ','.join(sorted(queries)),
         'search':   searchMech,
@@ -496,7 +496,7 @@ def initLog(
 def parseLog(logPath, newLog, out_dir):
     wrk_dir = out_dir + 'working/'
     try:
-        oldLog = readJson(logPath)
+        oldLog = read_json(logPath)
     except FileNotFoundError:
         oldLog = None
 
@@ -534,7 +534,7 @@ def parseLog(logPath, newLog, out_dir):
                 '\tERROR: log file corrupted. Hoping for the best.', 
                 flush = True
                 )
-    writeJson(logPath, newLog)
+    write_json(logPath, newLog)
 
 
 def crapMngr(
@@ -589,7 +589,7 @@ def crapMngr(
 
 def OGmain(
     db, inputGenes, ogtag, fast = True, out_dir = None,
-    minid = 0.05, clusParam = 0.65, minseq = 2, max_size = 250, cpus = 1,
+    minid = 0.05, clusParam = 0.65, minseq = 3, max_size = 250, cpus = 1,
     plusminus = 5, verbose = False, reoutput = True, interval = 0.1,
     outgroups = True, labels = True
     ):
@@ -735,7 +735,7 @@ def OGmain(
 
 def SearchMain(
     db, inputGenes, queryFa, queryGff, binary = 'mmseqs', fast = True, out_dir = None,
-    minid = 0.05, clusParam = 0.65, minseq = 2, max_size = 250, cpus = 1, reoutput = True,
+    minid = 0.05, clusParam = 0.65, minseq = 3, max_size = 250, cpus = 1, reoutput = True,
     plusminus = 5, evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True
     ):
@@ -948,7 +948,8 @@ if __name__ == "__main__":
   #      help = 'Minimum identity for fa2clus.py. DEFAULT: 0.2', 
    #     default = 0.2, type = float
     #    )
-    parser.add_argument('-f', '--fast', action = 'store_true', help = 'Fasttree. DEFAULT: IQTree2 1000 bootstrap iterations')
+    parser.add_argument('-i', '--iqtree', action = 'store_true', 
+        help = 'IQTree2 1000 bootstrap iterations. DEFAULT: fasttree')
     parser.add_argument(
         '--conversion',
         help = 'Tab delimited conversion file for annotations: Query\tConversion'
@@ -1001,7 +1002,7 @@ if __name__ == "__main__":
             inputFa = fa2dict(args.query)
             inputGenes = list(inputFa.keys())
             if args.gff:
-                inputGFF = gff2list(formatPath(args.gff))
+                inputGFF = gff2list(format_path(args.gff))
         else:
             with open(args.query, 'r') as raw:
                 data = raw.read()
@@ -1020,14 +1021,20 @@ if __name__ == "__main__":
         eprint('\nERROR: -p is less than input cluster size', flush = True)
         sys.exit(1)
 
-    output = formatPath(args.output)
+    if args.iqtree:
+        tree = 'iqtree'
+        fast = False
+    else:
+        tree = 'fasttree'
+        fast = True
+    output = format_path(args.output)
     args_dict = {
         'Input': ','.join(inputGenes), 
         'Database': args.database,
         'Orthogroup Tag': args.orthogroups,
         'Search binary': args.search,
         'Locus +/-': args.plusminus,
-        'Fast tree': args.fast,
+        'Tree': tree,
         'Maximum seq': args.maxseq,
         'Bitscore': args.bitscore,
         'GFF': args.gff,
@@ -1050,7 +1057,7 @@ if __name__ == "__main__":
             sys.exit(4)
 
     if args.conversion:
-        conversion_dict = parseConversion(formatPath(args.conversion))
+        conversion_dict = parseConversion(format_path(args.conversion))
     else:
         conversion_dict = {}
 
@@ -1062,9 +1069,9 @@ if __name__ == "__main__":
         print('\nPreparing output directory', flush = True)
         out_dir, wrk_dir, gff_dir, tre_dir = makeOutput(output, newLog)
         OGmain(
-            db, inputGenes, args.orthogroups, fast = args.fast, 
+            db, inputGenes, args.orthogroups, fast = fast, 
             out_dir = out_dir, 
-            minid = 0.05, clusParam = 0.65, minseq = 2, max_size = args.maxseq, cpus = args.cpu,
+            minid = 0.05, clusParam = 0.65, minseq = 3, max_size = args.maxseq, cpus = args.cpu,
             verbose = args.verbose, plusminus = args.plusminus, interval = 0.1, labels = not args.no_label,
             outgroups = not args.ingroup
             )
@@ -1077,8 +1084,8 @@ if __name__ == "__main__":
         out_dir, wrk_dir, gff_dir, tre_dir = makeOutput(output, newLog)
         SearchMain(
             db, inputGenes, inputFa, inputGFF, binary = args.search, fast =
-            args.fast, out_dir = out_dir,
-            minid = 0.05, clusParam = 0.65, minseq = 2, max_size = args.maxseq, cpus = 1,
+            fast, out_dir = out_dir,
+            minid = 0.05, clusParam = 0.65, minseq = 3, max_size = args.maxseq, cpus = 1,
             plusminus = args.plusminus, bitscore = args.bitscore, pident = 0,
             mem = None, verbose = args.verbose, interval = 0.1, 
             outgroups = not args.ingroup, conversion_dict = conversion_dict, labels = not args.no_label

@@ -2,10 +2,12 @@
 
 import os
 import re
+import sys
+import copy
 import shutil
 import multiprocessing as mp
 from collections import Counter
-from mycotools.lib.kontools import gunzip, mkOutput, formatPath, eprint, vprint
+from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gff3Comps, gff2Comps
 from mycotools.lib.dbtools import mtdb, masterDB, loginCheck
@@ -53,15 +55,15 @@ def moveBioFile( old_path, ome, typ, wrk_dir, suffix = '' ):
         else:
             new_path = wrk_dir + ome + '.' + typ + suffix
             temp_path = old_path[:-3]
-        copyFile(formatPath(temp_path), new_path)
+        copyFile(format_path(temp_path), new_path)
     else:
         new_path = wrk_dir + ome + '.' + typ +  suffix
         if not os.path.isfile(new_path) and os.path.isfile(old_path):
-            copyFile(formatPath(old_path), new_path)
+            copyFile(format_path(old_path), new_path)
         elif not os.path.isfile(new_path):
             raise IOError
         else:
-            copyFile(formatPath(old_path), new_path)
+            copyFile(format_path(old_path), new_path)
 
     return new_path
 
@@ -132,8 +134,8 @@ def readPredb(predb_path, spacer = '\t'):
         eprint(spacer + 'ERROR: genoemSource entries must be in {jgi, ncbi, new}', flush = True)
         sys.exit(5)
     for i, path in enumerate(predb['assemblyPath']):
-        predb['assemblyPath'][i] = formatPath(predb['assemblyPath'][i])
-        predb['gffPath'][i] = formatPath(predb['gffPath'][i])
+        predb['assemblyPath'][i] = format_path(predb['assemblyPath'][i])
+        predb['gffPath'][i] = format_path(predb['gffPath'][i])
         if predb['restriction'][i].lower() in {'y', 'yes'}:
             predb['restriction'][i] = True
         if not predb['species'][i]:
@@ -177,8 +179,12 @@ def predb2mtdb(predb):
         infdb = infdb.append(toAdd)
     return infdb
 
-def gen_omes(newdb, refdb = None, ome_col = 'ome', forbidden = set()):
+def gen_omes(
+    newdb, refdb = None, ome_col = 'ome', forbidden = set(),
+    spacer = '\t'
+    ):
 
+    t_failed = []
     ref_ome_check = [k for k,v in Counter(refdb['ome']).items() if v > 1]
     new_ome_check = [k for k,v in Counter(newdb['ome']).items() if v > 1 and k]
     if ref_ome_check:
@@ -187,25 +193,57 @@ def gen_omes(newdb, refdb = None, ome_col = 'ome', forbidden = set()):
     elif new_ome_check:
         raise ValueError('corrupted pre-database with non-unique omes: '
                         + str(new_ome_check))
-    tax_set = set(refdb['ome']).union(forbidden)
+    tax_list = list(set(refdb['ome']).union(forbidden))
+    tax_count = {}
+    for tax in tax_list:
+        abb = tax[:6]
+        if abb in tax_count:
+            num = int(tax[6:])
+            if tax_count[abb] < num:
+                tax_count[abb] = num
+        else:
+            tax_count[abb] = num
+    tax_count = Counter(tax_count)
+    todel, tax_count = [], Counter()
     for i, ome in enumerate(newdb['ome']):
         if not ome: # if there isn't an ome for this entry yet
-            name = newdb['genus'][i][:3].lower() + newdb['species'][i][:3].lower()
+            try:
+                name = newdb['genus'][i][:3].lower() + newdb['species'][i][:3].lower()
+            except TypeError:
+                todel.append(i)
+                if not isinstance(newdb['assembly_acc'][i], float):
+                    eprint(spacer + newdb['assembly_acc'][i] + ' no metadata - ' \
+                         + 'failed', flush = True)
+                elif 'index' in newdb: # for updateDB
+                    if not isinstance(newdb, float):
+                        eprint(spacer + newdb['index'][i] + ' no metadata - ' \
+                            + 'failed', flush = True)
+                    continue 
+                else: # no use appending failed when there's no identifiable
+                # info
+                    continue
+                row = {key: newdb[key][i] for key in mtdb.columns \
+                       if key != 'ome'}
+                t_failed.append(add2failed(row))
+                continue
             name = re.sub(r'\(|\)|\[|\]|\$|\#|\@| |\||\+|\=|\%|\^|\&|\*|\'|\"|\!|\~|\`|\,|\<|\>|\?|\;|\:|\\|\{|\}', '', name)
             name.replace('(', '')
             name.replace(')', '')
             while len(name) < 6:
                 name += '.'
-            numbers = [
-                int(re.search(r'.*?(\d+$)', x)[1]) for x in list(tax_set) if x.startswith(name)
-                ]
-            if numbers:
-                number = max(numbers) + 1
-            else:
-                number = 1
-            newOme = name + str(number)
-            tax_set.add(newOme)
-            newdb['ome'][i] = newOme
+            tax_count[name] += 1
+            new_ome = name + str(tax_count[name])
+#            numbers = [
+ #               int(re.search(r'.*?(\d+$)', x)[1]) for x in list(tax_set) if x.startswith(name)
+  #              ]
+   #         if numbers:
+    #            number = max(numbers) + 1
+     #       else:
+      #          number = 1
+       #     new_ome = name + str(number)
+        #    tax_set.add(new_ome)
+            newdb['ome'][i] = new_ome
+            print(spacer + new_ome, flush = True)
         elif ome:
             format_search = re.search(r'^[^\d_,\'";:\\\|\[\]\{\}\=\+\!@#\$\%\^' 
                                       + r'&\*\(\)]{6}\d+[^-_+=\\\|\{\[\}\]\:;'
@@ -220,9 +258,14 @@ def gen_omes(newdb, refdb = None, ome_col = 'ome', forbidden = set()):
                     new_ome = re.sub(r'\.\d+$', '.' + str(v), ome)
                 else:
                     new_ome = ome + '.1' # first modified version
-                new_db['ome'][i] = new_ome
+                newdb['ome'][i] = new_ome
+                print(spacer + new_ome, flush = True)
 
-    return newdb
+    for i in reversed(todel):
+        for key in mtdb.columns:
+            del newdb[key][i]
+
+    return newdb, t_failed
 
 def cur_mngr(ome, fna_path, gff_path, wrk_dir, 
             source, assembly_accession, exit = False):
@@ -250,7 +293,14 @@ def cur_mngr(ome, fna_path, gff_path, wrk_dir,
             return ome, False, 'gff3'
 
     if not os.path.isfile(faa_path):
-        faa = gff2seq(gff2list(curGFF_path), fa2dict(newFNA_path))
+        try:
+            faa = gff2seq(gff2list(curGFF_path), fa2dict(newFNA_path))
+        except: # catch all errors
+            if exit:
+                print('\t' + ome + '|' + assembly_accession \
+                    + 'failed proteome generation', flush  = True)
+                sys.exit(18)
+            return ome, False, 'faa'
         with open(faa_path + '.tmp', 'w') as out:
             out.write(dict2fa(faa))
         os.rename(faa_path + '.tmp', faa_path)
@@ -294,8 +344,8 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
     os.rename(cur_path + '.tmp', cur_path)
 
 def add2failed(row):
-    if row['source'] == 'ncbi':
-        return [row['assembly_acc'], row['version']]
+    if isinstance(row['assembly_acc'], float) or not row['assembly_acc']:
+        return False
     else:
         return [row['assembly_acc'], row['version']]
 
@@ -305,10 +355,9 @@ def main(
     cpus = 1, exit = False
     ):
 
-    failed = []
-
     infdb = predb2mtdb(predb)
-    omedb = gen_omes(infdb, refdb, ome_col = 'ome', forbidden = forbidden)
+    omedb, failed = gen_omes(infdb, refdb, ome_col = 'ome', forbidden = forbidden,
+                     spacer = spacer)
     
     curCmds = []
     omedb = omedb.set_index('ome')
@@ -347,7 +396,7 @@ if __name__ == '__main__':
         print(genPredb())
         sys.exit(0)
     elif len(sys.argv) == 3:
-        refDB = mtdb(formatPath(sys.argv[2]))
+        refDB = mtdb(format_path(sys.argv[2]))
     else:
         refDB = mtdb(masterDB())
 
@@ -357,8 +406,8 @@ if __name__ == '__main__':
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
-    predb = readPredb(formatPath(sys.argv[1]), spacer = '\t')
-    out_dir, wrk_dir = prepOutput(os.path.dirname(formatPath(sys.argv[1])))
+    predb = readPredb(format_path(sys.argv[1]), spacer = '\t')
+    out_dir, wrk_dir = prepOutput(os.path.dirname(format_path(sys.argv[1])))
     omedb, failed = main(predb, refDB, wrk_dir, exit = True)
 
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax

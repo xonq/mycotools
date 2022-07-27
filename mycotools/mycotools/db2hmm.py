@@ -7,12 +7,12 @@ import argparse
 import subprocess
 import pandas as pd
 import multiprocessing as mp
-from StringIO import StringIO
+from io import StringIO
 from mycotools.lib.kontools import intro, outro, collect_files, multisub, findExecs
 from mycotools.lib.dbtools import db2df
 from mycotools.lib.biotools import dict2fa
 from mycotools.extractHmmsearch import main as exHmm
-from mycotools.acc2fa import main as acc2fa
+from mycotools.acc2fa import dbmain as acc2fa
 from mycotools.extractHmmAcc import grabAccs, main as absHmm
 
 def compileHmmCmd( db, hmmdb_path, output, ome_set = set() ):

@@ -4,7 +4,7 @@ import os
 import sys
 import random
 import argparse
-from mycotools.lib.kontools import file2list, intro, outro, formatPath, eprint
+from mycotools.lib.kontools import file2list, intro, outro, format_path, eprint
 from mycotools.lib.dbtools import mtdb, extract_tax, extract_omes, masterDB
 
 def main( 
@@ -32,7 +32,7 @@ def main(
     # if a taxonomy list is specified then open it, store each entry in a list
     # and extract each taxonomic entry based on the classification specified
     if lineage_list:
-        taxonomy_list = file2list( formatPath(lineage_list) )
+        taxonomy_list = file2list( format_path(lineage_list) )
         if not taxonomy_list:
             sys.exit( 15 )
 
@@ -52,7 +52,7 @@ def main(
 
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif ome_list:
-        omes = set(file2list( formatPath(ome_list) ))
+        omes = set(file2list( format_path(ome_list) ))
         db = db.set_index('ome')
         new_db = mtdb()
         new_db = new_db.set_index()
@@ -108,7 +108,7 @@ if __name__ == '__main__':
     parser.add_argument( '-ol', '--ome', help = "File w/list of omes" )
     parser.add_argument( '-ll', '--lineages', help = 'File w/list of lineages (same rank)' )
     args = parser.parse_args()
-    db_path = formatPath( args.database )
+    db_path = format_path( args.database )
 
 
     if (args.lineage or args.lineages) and not args.rank:
@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
     output = 'stdout'
     if args.output:
-        output = formatPath( args.output )
+        output = format_path( args.output )
         if not output.endswith( '/' ):
             tag = ''
                        

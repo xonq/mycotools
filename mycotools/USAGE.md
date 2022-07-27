@@ -56,7 +56,7 @@ The following are information regarding scripts that manipulate Mycotools .mtdb 
 To initialize a curated database of all NCBI and MycoCosm (JGI) genomes, run the following
 
 ```bash
-(mycotools) -$ updateDB.py -i <INIT DIRECTORY>
+updateDB.py -i <INIT DIRECTORY>
 ```
 
 <br /><br />
@@ -65,7 +65,7 @@ To initialize a curated database of all NCBI and MycoCosm (JGI) genomes, run the
 To update MycotoolsDB:
 
 ```bash
-(mycotools) -$ updateDB.py -u
+updateDB.py -u
 ```
 
 <br /><br />
@@ -74,15 +74,15 @@ To update MycotoolsDB:
 ### mycodb
 `mycodb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
-(mycotools) -$ mycodb
+mycodb
 /home/xonq/mycodb/mycodb/20210125.mtdb
 ```
 
 If you want to use the path of the master database you can use basic bash functionality to work with the output, 
 e.g. to open in a text editor or to grep the file:
 ```bash
-(mycotools) -$ vim $(mycodb)
-(mycotools) -$ grep 'Psilocybe' $(mycodb)
+vim $(mycodb)
+grep 'Psilocybe' $(mycodb)
 ```
 
 <br /><br />
@@ -94,31 +94,31 @@ If you are only interested in a subset of lineages in the master mycotoolsDB, th
 
 e.g. grab a database of a taxonomic order: 
 ```bash
-(mycotools) -$ extractDB.py -l Atheliales -r order > atheliales.mtdb
+extractDB.py -l Atheliales -r order > atheliales.mtdb
 ```
 
 grab all NCBI Aspergilli accessions: 
 ```bash
-(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.mtdb_ncbi
+extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.mtdb_ncbi
 ``` 
 
 grab the inverse of your arguments: 
 ```bash
-(mycotools) -$ extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.mtdb_notNcbi
+extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.mtdb_notNcbi
 ```
 
 grab a list of orders from a file:
 ```bash
-(mycotools) -$ extractDB.py -ll <TAX_FILE> -r order > taxa.mtdb
+extractDB.py -ll <TAX_FILE> -r order > taxa.mtdb
 ```
 
 grab a list of `ome`s in a new line delimited file: 
 ```bash
-(mycotools) -$ extractDB.py ---ome <OME_FILE>
+extractDB.py ---ome <OME_FILE>
 ```
 
 ```bash
-(mycotools) -$ extractDB.py --help
+extractDB.py --help
 usage: extractDB.py [-h] [-d DATABASE] [-l LINEAGE] [-r RANK] [-s SOURCE] [-n]
                     [-u] [--unique_strains] [-i] [--headers] [-o OUTPUT] [-]
                     [-ol OME] [-ll LINEAGES]
@@ -155,18 +155,18 @@ Inputs a MycotoolsDB `.mtdb` file (by default uses the master database), then cr
 
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```bash
-(mycotools) -$ mkdir pullFiles && cd pullFiles
-(mycotools) -$ extractDB.py -r family -l Atheliaceae > atheliaceae.mtdb
+mkdir pullFiles && cd pullFiles
+extractDB.py -r family -l Atheliaceae > atheliaceae.mtdb
 ```
 
 Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
 ```bash
-(mycotools) -$ dbFiles.py -d atheliaceae.mtdb -p 
+dbFiles.py -d atheliaceae.mtdb -p 
 ```
 
 Alternatively, if you just need the paths (links) to these files, simply run:
 ```bash
-(mycotools) -$ dbFiles.py -d atheliaceae.mtdb -p --print
+dbFiles.py -d atheliaceae.mtdb -p --print
 ```
 
 <br /><br />
@@ -177,14 +177,14 @@ To add in-house annotations predb2db.py will input your genome and metadata, cur
 
 First, generate a predb spreadsheet:
 ```bash
-(mycotools) -$ predb2db.py > predb.tsv
+predb2db.py > predb.tsv
 ```
 
 The resulting `predb.tsv` can be filled in via spreadsheet software and exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and separate by tabs. De novo annotations produced by Funannotate/Orthofiller must be filled in as "new" for the genomeSource column. If using a plain-text editor, export with UTF-8 formatting and account for blank entries with a tab.
 
 Finally, generate a mycotoolsDB file from your predb, and notify your database manager that it is ready for integration:
 ```bash
-(mycotools) -$ predb2db.py <PREDB.TSV>
+predb2db.py <PREDB.TSV>
 ```
 
 <br /><br />
@@ -196,7 +196,7 @@ Substitutes MycotoolsDB organism code names (e.g. `fusgra1`) for taxonomic infor
 
 e.g. to substitute ome for genus species and strain: `ome2name.py <INPUT> oa`
 ```bash
-(mycotools) -$ ome2name.py -h
+ome2name.py -h
 USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCOTOOLSDB] asvg*&
 DEFAULTS: master db, see script for default forbidden characters
 Input file to regex sub omes with their name.
@@ -210,14 +210,14 @@ optional MycotoolsDB, string of forbidden characters
 ## Sequence data statistics
 ### assemblyStats.py / annotationStats.py
 ```bash
-(mycotools) -$ assemblyStats.py <ASSEMBLY.fa>
-(mycotools) -$ annotationStats.py <ANNOTATION.gff3>
+assemblyStats.py <ASSEMBLY.fa>
+annotationStats.py <ANNOTATION.gff3>
 ```
 
 To obtain a table of organisms' annotation statistics, [create a mycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
 ```bash
-(mycotools) -$ assemblyStats.py <MYCOTOOLSDB.mtdb>
-(mycotools) -$ annotationStats.py <MYCOTOOLSDB.mtdb>
+assemblyStats.py <MYCOTOOLSDB.mtdb>
+annotationStats.py <MYCOTOOLSDB.mtdb>
 ```
 
 If you want to route the output to a file, simply redirect output by appending ` > <OUTPUTFILE>` to the command, or add an output file as the second argument
@@ -232,14 +232,14 @@ These scripts input a MycotoolsDB or can be manually made as shown at the bottom
 
 Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```bash
-(mycotools) -$ mkdir dwnldFiles && cd dwnldFiles
-(mycotools) -$ extractDB.py -c genus -t aspergillus > aspergillus.mtdb_ncbi
+mkdir dwnldFiles && cd dwnldFiles
+extractDB.py -c genus -t aspergillus > aspergillus.mtdb_ncbi
 ```
 
 If there are organisms you don't want in the extracted `.mtdb`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
 ```bash
-(mycotools) -$ jgiDwnld.py -i aspergillus.mtdb_jgi -t -e
-(mycotools) -$ ncbiDwnld.py -i aspergillus.mtdb_ncbi -t
+jgiDwnld.py -i aspergillus.mtdb_jgi -t -e
+ncbiDwnld.py -i aspergillus.mtdb_ncbi -t
 ```
 
 These scripts populate with compressed files. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. 
@@ -270,7 +270,7 @@ SAMN02744098
 You can download NCBI SRA's by acquiring NCBI's SRA tools, making sure `fastq-dump` is included in your PATH, and then running:
 
 ```bash
-(mycotools) -$ ncbiDwnld.py --sra -i <REFERENCE>
+ncbiDwnld.py --sra -i <REFERENCE>
 ```
 
 You can create a file with SRA ID's or BioProject, etc. Basically any query that is unique and sufficient to acquire the SRRs of interest. For paired-end reads, append `-pe` to the command.
@@ -283,19 +283,19 @@ You can create a file with SRA ID's or BioProject, etc. Basically any query that
 By default, if you are querying using a MycotoolsDB accession then it can search the database without a standalone file.
 Let's say you want to query *Panaeolus cyanescens'* PsiD and the NCBI accession is "PPQ80975.1". Find Panaelous cyanescens' ome code in the database:
 ```bash
-(mycotools) -$ grep Panaeolus $(mycodb) | grep cyanescens | cut -f 1
+grep Panaeolus $(mycodb) | grep cyanescens | cut -f 1
 ```
 
 The first column in the output is `pancya1`, which is the ome code for this organism. Now, prepend the code to the accession and grab it from the db (you can use `>` after the commands to pipe output to a file):
 ```bash
-(mycotools) -$ acc2gff.py -a pancya1_PPQ80975.1
-(mycotools) -$ acc2fa.py -a pancya1_PPQ80975.1
+acc2gff.py -a pancya1_PPQ80975.1
+acc2fa.py -a pancya1_PPQ80975.1
 ```
 
 If you have a list of accessions, create an input file with the accessions separated by new lines then run:
 ```bash
-(mycotools) -$ acc2gff.py -i <INPUTFILE>
-(mycotools) -$ acc2fa.py -i <INPUTFILE>
+acc2gff.py -i <INPUTFILE>
+acc2fa.py -i <INPUTFILE>
 ```
 
 <br /><br />
@@ -328,7 +328,7 @@ sequence are considered.
 e.g. extract nucleotide sequences and 1 kilobase flanks and noncoding regions within the following genes:
 
 ```bash
-(mycotools) -$ gff2seq.py -g <.GFF3> -a <.FNA> -nc -pm 1000 -n
+gff2seq.py -g <.GFF3> -a <.FNA> -nc -pm 1000 -n
 ```
 
 ```
@@ -354,12 +354,12 @@ Inputs an accession (`-a`) or new line separated list of accessions and optional
 
 output gff and protein fasta of an accession's cluster (outputs to `<ACCESSION>_clus*`):
 ```bash
-(mycotools) -$ acc2loci.py -o -a <MYCOTOOLSDB_ACCESSION>
+acc2loci.py -o -a <MYCOTOOLSDB_ACCESSION>
 ```
 
 list proximal +/- 5 genes to standard out:
 ```bash
-(mycotools) -$ acc2loci.py -a fibsp.1_906341 -p 5
+acc2loci.py -a fibsp.1_906341 -p 5
 
 fibsp.1_906341 locus +/- 5
 fibsp.1_880711
@@ -382,7 +382,7 @@ fibsp.1_906343
 `curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and add an `Alias=<PREFIX>` field for MycotoolsDB compatible accession for each entry.
 
 ```bash
-(mycotools) -$ curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY> -p <CODENAME>
+curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY> -p <CODENAME>
 ```
 
 ### curGFF3.py / curProteome.py / gff2gff3.py
@@ -403,7 +403,7 @@ e.g. make an SVG from a GFF3: `gff2svg.py -g <MY.gff3>`
 make SVGs for all GFF3s in a new line delimited list with width set to 20:
 
 ```bash
-(mycotools) -$ gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
+gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
 ```
 
 
@@ -415,7 +415,7 @@ make SVGs for all GFF3s in a new line delimited list with width set to 20:
 `db2search.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycotoolsDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
 
 ```bash
-(mycotools) -$ db2search.py --help
+db2search.py --help
 usage: db2search.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
                    [-o OUTPUT] [-p PREVIOUS] [--cpu CPU]
 
@@ -454,7 +454,7 @@ e.g.: `db2hmm.py -d profile.hmm` will run the master database referencing the in
 
 `db2hmm.py -d profile.hmm -b 1 -t 75` takes the best hit from hits with 25 - 100% query coverage
 ```bash
-(mycotools) -$ db2hmm.py --help
+db2hmm.py --help
 Runs `hmmsearch` v each proteome in a `.mtdb`. For each query, extracts results
 and optionally outputs a compiled fasta, hmmalignment and/or trimmed
 alignment.
@@ -503,12 +503,12 @@ Information on a complete [phylogenetic pipeline](https://gitlab.com/xonq/mycoto
 
 e.g. Swiftly construct a tree from a fasta
 ```bash
-(mycotools) -$ fa2tree.py -f <FASTA>.fa --fast
+fa2tree.py -f <FASTA>.fa --fast
 ```
 
 Prepare a robust tree for slurm job submission
 ```bash
-(mycotools) -$ fa2tree.py -f <FASTA> -s -A PAS1046
+fa2tree.py -f <FASTA> -s -A PAS1046
 ```
 
 Begin the tree pipeline by navigating into the folder and running `bash
@@ -543,12 +543,12 @@ license are sufficient for distance matrix calculation even on large datasets.
 e.g. Calculate a distance matrix and cluster from a fasta with a minimum
 identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
 ```bash
-(mycotools) -$ aggClus.py -f <FASTA>.fa -m 0.2 -x 0.7
+aggClus.py -f <FASTA>.fa -m 0.2 -x 0.7
 ```
 
 Iteratively cluster until a cluster size of 50-200 genes is achieved:
 ```bash
-(mycotools) -$ aggClus.py -f <FASTA> -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
+aggClus.py -f <FASTA> -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
 ```
 
 
@@ -567,8 +567,8 @@ complexity increases with sample size.
 For a small set of genes, such as ITS, one can usually assume that the gene family is 
 strictly vertically inherited, so the dataset can be cut down to closely 
 related organisms. For most other genes, it is not valid to assume the gene family
-is vertically conserved because horizontal transfer is a prominent modality of gene 
-evolution in Fungi. 
+is vertically conserved because horizontal transfer is a prominent modality of
+gene transmission in prokaryotes and fungi.
 
 It is thus both important to adequately sample and systematically truncate 
 the dataset into a manageable set of gene homologs. This is accomplished by
@@ -592,7 +592,7 @@ across the mycotoolsDB.
 other organisms of interest
 
 ```bash
-extractDB.py > pubFungi.mtdb
+extractDB.py > pub.mtdb
 ```
 
 <br />
@@ -600,7 +600,7 @@ extractDB.py > pubFungi.mtdb
 2. obtain gene homologs using `db2search.py` with an e-value threshold of 10<sup>-2</sup>:
 
 ```bash
-(mycotools) -$ db2search.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pubFungi.mtdb
+db2search.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pub.mtdb
 ```
 
 <br />
@@ -619,7 +619,7 @@ building. Otherwise, proceed to the `b` steps. If the sample size is too large
 to finish the analysis, specify `--fast` below. 
 
 ```bash
-(mycotools) -$ fa2tree.py -f <BLASTRESULTS.fasta> -s -A
+fa2tree.py -f <BLASTRESULTS.fasta> -s -A
 <PROJECT>
 ```
 
@@ -628,7 +628,7 @@ to finish the analysis, specify `--fast` below.
 5a. `fa2tree.py` created a directory, now submit the job
 
 ```bash
-(mycotools) -$ sbatch <TREEDIRECTORY>/mafft.sh
+sbatch <TREEDIRECTORY>/mafft.sh
 ```
 
 <br />
@@ -642,7 +642,7 @@ text file. Then, restart the phylogenetic reconstruction by obtaining the
 sequences using `acc2fa.py` and restarting 4a with the output fasta.
 
 ```bash
-(mycotools) -$ acc2fa.py -i <FILEWITHACCESSIONS>
+acc2fa.py -i <FILEWITHACCESSIONS>
 ```
 
 <br />
@@ -653,7 +653,7 @@ clustering. Adjust the % identity for both arguments as needed. You may need to
 submit this as a job
 
 ```bash
-(mycotools) -$ aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
+aggClus.py -f <FASTA>.fa -m 0.3 -x 0.7
 ```
 
 <br />

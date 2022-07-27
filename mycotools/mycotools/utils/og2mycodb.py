@@ -5,7 +5,7 @@ import re
 import sys
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
-from mycotools.lib.kontools import formatPath, sysStart
+from mycotools.lib.kontools import format_path, sys_start
 
 def og2dict(orthogroup_file):
 
@@ -63,7 +63,7 @@ def editOGtag(ogtag_dict, ogtag, og):
 
     return new_oginfo
 
-def mycodbOGs(file_path = formatPath('$MYCOGFF3/../ogs.tsv'), omes = set()):
+def mycodbOGs(file_path = format_path('$MYCOGFF3/../ogs.tsv'), omes = set()):
 
     ogInfo_dict = {}
     with open(file_path, 'r') as raw:
@@ -96,7 +96,7 @@ def extractOGs(ogInfo_dict, ogtag):
 
     return og2gene, gene2og
 
-def og2mycoDB(ogInfo_dict, omes = set(), file_path = formatPath('$MYCOGFF3/../ogs.tsv')):
+def og2mycoDB(ogInfo_dict, omes = set(), file_path = format_path('$MYCOGFF3/../ogs.tsv')):
 
     out_list = []
     if os.path.isfile(file_path):
@@ -141,7 +141,7 @@ def dbMain(og_file, ogtag):
     ome_ogs = og2dict(og_file)
     omes = set(ome_ogs.keys())
     try:
-        ogInfo_dict = mycodbOGs(file_path = formatPath('$MYCOGFF3/../ogs.tsv'), omes = omes)
+        ogInfo_dict = mycodbOGs(file_path = format_path('$MYCOGFF3/../ogs.tsv'), omes = omes)
     except FileNotFoundError:
         ogInfo_dict = {}
     for ome in ome_ogs:
@@ -151,7 +151,7 @@ def dbMain(og_file, ogtag):
             else:
                 ogInfo_dict[gene] = {ogtag: ome_ogs[ome][gene]}
 
-    og2mycoDB(ogInfo_dict, omes = omes, file_path = formatPath('$MYCOGFF3/../ogs.tsv'))
+    og2mycoDB(ogInfo_dict, omes = omes, file_path = format_path('$MYCOGFF3/../ogs.tsv'))
 
 
 
@@ -161,7 +161,7 @@ def dbMainGff(og_file, ogtag, cpus = 1):
 
     og2gff_cmds = []
     for ome in ome_ogs:
-        og2gff_cmds.append([ome_ogs[ome], formatPath('$MYCOGFF3/' + ome + '.gff3'), ogtag])
+        og2gff_cmds.append([ome_ogs[ome], format_path('$MYCOGFF3/' + ome + '.gff3'), ogtag])
     with mp.Pool(processes = cpus) as pool:
         pool.starmap(og2gff, og2gff_cmds)
 
@@ -172,10 +172,10 @@ if __name__ == '__main__':
         + 'og2mycodb.py <Orthogroups.txt> <TAG>\n\n' \
         + 'Default tags: kingdom [K], phylum [P], subphylum [U], class [C], order [O], family [F], genus [G],' \
         + 'species [S]'
-    args = sysStart(sys.argv[1:], usage, 2, files = [sys.argv[1]])
+    args = sys_start(sys.argv[1:], usage, 2, files = [sys.argv[1]])
     if len(args) > 2:
         cpus = int(args[2])
     else:
         cpus = 1
-    dbMain(formatPath(args[0]), args[1])
+    dbMain(format_path(args[0]), args[1])
     sys.exit(0)

@@ -7,7 +7,7 @@ import argparse
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff
 from mycotools.lib.dbtools import mtdb, masterDB
-from mycotools.lib.kontools import formatPath
+from mycotools.lib.kontools import format_path
 
 def grabGffAcc( gff_list, acc, term = 'Alias=' ):
     '''grab acc from alias'''
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.input:
-        input_file = formatPath( args.input )
+        input_file = format_path( args.input )
         with open(input_file, 'r') as raw:
             accs = [x.rstrip().split('\t')[args.column-1] for x in raw]
     elif not args.accession:
@@ -108,12 +108,12 @@ if __name__ == '__main__':
     else:
         cpu = mp.cpu_count()
 
-    db_path = formatPath( args.database )
+    db_path = format_path( args.database )
     if not args.gff:
-        db = mtdb( formatPath(args.database) )
+        db = mtdb( format_path(args.database) )
         gff_lists = dbMain( db, accs, cpus = args.cpu )
     else:
-        gff_path = formatPath( args.gff )
+        gff_path = format_path( args.gff )
         gff_lists = gffMain(gffData, accs)
 
     if args.accession:

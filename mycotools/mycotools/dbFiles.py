@@ -7,7 +7,7 @@ import argparse
 import pandas as pd
 from shutil import copy as cp
 from mycotools.lib.dbtools import db2df, df2db, masterDB
-from mycotools.lib.kontools import formatPath, prep_output
+from mycotools.lib.kontools import format_path, prep_output
 
 
 def softMain( filetypes, envtypes, db, output_path, print_link = False ):
@@ -28,7 +28,7 @@ def softMain( filetypes, envtypes, db, output_path, print_link = False ):
         for i, row in db.iterrows():
             for ftype in filetypes:
                 if not pd.isnull( row[ ftype ] ):
-                    fpath = formatPath( '$' + envtypes[ftype] + '/' + row[ftype] )
+                    fpath = format_path( '$' + envtypes[ftype] + '/' + row[ftype] )
                     print( fpath , flush = True)
 
 
@@ -42,7 +42,7 @@ def hardMain( filetypes, envtypes, db, output_path ):
     for i, row in db.iterrows():
         for ftype in filetypes:
             if not pd.isnull( row[ ftype ] ):
-                fpath = formatPath( '$' + envtypes[ftype] + '/' + row[ftype] )
+                fpath = format_path( '$' + envtypes[ftype] + '/' + row[ftype] )
                 cp( fpath, output_path + ftype + '/' + os.path.basename( fpath ) ) 
 
 if __name__ == '__main__':
@@ -61,8 +61,8 @@ if __name__ == '__main__':
         print('\nERROR: no file type (-a, -g, -p) selected', flush = True)
         sys.exit(4)
 
-    db_path = formatPath( args.database )
-    output_path = prep_output( formatPath( args.output ), cd = False )
+    db_path = format_path( args.database )
+    output_path = prep_output( format_path( args.output ), cd = False )
     args_dict = {
         'DATABASE': db_path, 'OUTPUT': output_path,
         'ASSEMBLY': args.assembly, 'PROTEOME': args.proteome,

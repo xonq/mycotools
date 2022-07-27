@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED to make mtdb automatically type and restrict types on import
+
 import os
 import re
 import sys
@@ -10,12 +12,11 @@ import base64
 import getpass
 import hashlib
 import datetime
-import numpy as np
 from Bio import Entrez
 from urllib.error import HTTPError
 from io import StringIO
 from collections import defaultdict
-from mycotools.lib.kontools import collect_files, eprint, formatPath
+from mycotools.lib.kontools import collect_files, eprint, format_path
 
 
 class mtdb(dict):
@@ -59,6 +60,11 @@ class mtdb(dict):
             super().__init__(mtdb.db2df(self, db))
         self.index = index
 
+   # def mtdb2pd(self):
+  #      copy_mtdb = copy.deepcopy(self)
+ #       copy_mtdb = copy_mtdb.reset_index()
+#        return pd.DataFrame(copy_mtdb) # assume pd is imported
+
     def pd2mtdb(df): # legacy integration
         df = df.fillna('')
         db = mtdb({
@@ -68,7 +74,9 @@ class mtdb(dict):
         
     def db2df(self, db_path):
         df = defaultdict(list)
-        with open(formatPath(db_path), 'r') as raw:
+        if os.stat(db_path).st_size == 0:
+            return {x: [] for x in mtdb.columns}
+        with open(format_path(db_path), 'r') as raw:
             data = [x.rstrip().split('\t') for x in raw if not x.startswith('#')]
         if len(data[0]) == 16: # legacy conversion TO BE DEPRECATED
             eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
@@ -101,9 +109,9 @@ class mtdb(dict):
                df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.aa.fa'
                df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
             else: # has file coordinates
-               df['fna'][i] = formatPath(df['fna'][i])
-               df['faa'][i] = formatPath(df['faa'][i])
-               df['gff3'][i] = formatPath(df['gff3'][i])
+               df['fna'][i] = format_path(df['fna'][i])
+               df['faa'][i] = format_path(df['faa'][i])
+               df['gff3'][i] = format_path(df['gff3'][i])
 
         return df
 
@@ -124,7 +132,7 @@ class mtdb(dict):
         if db_path:
             with open(db_path, 'w') as out:
                 if headers:
-                    out.write('\t'.join(self.column)+ '\n')
+                    out.write('#' + '\t'.join(self.columns)+ '\n')
                 for ome in output:
                     for file_type in ['fna', 'faa', 'gff3']:
                         output[ome][file_type] = output[ome][file_type].replace(
@@ -141,7 +149,7 @@ class mtdb(dict):
         else:
             if headers:
                 print(
-                    '\t'.join(self.column), flush = True
+                    '#' + '\t'.join(self.columns), flush = True
                     )
 
             for ome in output:
@@ -247,7 +255,7 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
 
     salt = b'D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118'
     #NEED to make this store a password
-    if os.path.isfile( formatPath(info_path) ):
+    if os.path.isfile( format_path(info_path) ):
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.backends import default_backend
@@ -265,9 +273,9 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
             hash_pwd = sys.stdin.readline().rstrip()
         key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
         fernet = Fernet( key )
-#        with open(formatPath(info_path) + '/.key', 'rb') as raw_key:
+#        with open(format_path(info_path) + '/.key', 'rb') as raw_key:
  #           fernet = Fernet(raw_key)
-        with open(formatPath(info_path), 'rb') as raw_file:
+        with open(format_path(info_path), 'rb') as raw_file:
             data = raw_file.read()
         decrypted = fernet.decrypt(data)
         data = decrypted.decode('UTF-8').split('\n')
@@ -308,7 +316,7 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
             fernet = Fernet( key )
             out_data = ncbi_email + '\t' + ncbi_api + '\t' + jgi_email + '\t' + jgi_pwd
             encrypt_data = fernet.encrypt(out_data)
-            with open( formatPath(info_path), 'wb' ) as out:
+            with open( format_path(info_path), 'wb' ) as out:
                 out.write(encrypt_data)
 #
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
@@ -396,7 +404,7 @@ def masterDB(path = '$MYCODB'):
         eprint('\nERROR: master db not found in ' + path \
               + '. Have you initialized MycoDB?', flush = True)
         return None
-    master_path = formatPath( '$' + path + '/' + master + '.mtdb')
+    master_path = format_path( '$' + path + '/' + master + '.mtdb')
 
     return master_path
  
@@ -405,8 +413,10 @@ def masterDB(path = '$MYCODB'):
 def db2df(data, stdin = False):
     import pandas as pd, pandas
     columns = mtdb.columns
-    if not stdin:
-        data = formatPath( data )
+    if isinstance(data, mtdb):
+        db_df = pd.DataFrame(data.reset_index())
+    elif not stdin:
+        data = format_path( data )
         db_df = pd.read_csv( data, sep='\t' )
         if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
             db_df = pd.read_csv( data, sep = '\t', header = None )
@@ -442,9 +452,9 @@ def db2df(data, stdin = False):
            db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + '/' + row['ome'] + '.aa.fa'
            db_df.at[i, 'gff3'] = os.environ['MYCOGFF3'] + '/' + row['ome'] + '.gff3'
         else: # has file coordinates
-           db_df.at[i, 'fna'] = formatPath(row['fna'])
-           db_df.at[i, 'faa'] = formatPath(row['faa'])
-           db_df.at[i, 'gff3'] = formatPath(row['gff3'])
+           db_df.at[i, 'fna'] = format_path(row['fna'])
+           db_df.at[i, 'faa'] = format_path(row['faa'])
+           db_df.at[i, 'gff3'] = format_path(row['gff3'])
 
     return db_df
 
@@ -471,7 +481,7 @@ def df2db(df, db_path, header = False, overwrite = False, std_col = True, rescue
     df = df.reset_index()
 
     if db_path != sys.stdout:
-        db_path = formatPath( db_path )
+        db_path = format_path( db_path )
     elif overwrite:
         number = 0
         while os.path.exists(db_path):
@@ -578,14 +588,14 @@ def hit2taxonomy(
 
 # gather taxonomy by querying NCBI
 # if `api_key` is set to `1`, it assumes the `Entrez.api` method has been called already
-def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome'):
+def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
+                    rank = 'kingdom'):
 
-    print('\nAssimilating taxonomy', flush = True)
     if isinstance(df, mtdb):
         df = df.set_index('ome')
         tax_dicts = {v['genus']: read_tax(v['taxonomy']) for k, v in df.items()}
     else:
-        df['taxonomy'] = df['taxonomy'].replace( np.nan, None )
+        df['taxonomy'] = df['taxonomy'].fillna({})
         tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
 
     count = 0
@@ -636,7 +646,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome'):
 # if there are multiple TaxIDs, use the first one found
         if king:
             for lineage in lineages:
-                if lineage['Rank'] == 'kingdom':
+                if lineage['Rank'] == rank:
                     if lineage['ScientificName'].lower() == king:
                         taxid = tax
                         if len(ids) > 1:

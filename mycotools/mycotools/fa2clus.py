@@ -18,7 +18,7 @@ import argparse
 import itertools
 import subprocess
 import pandas as pd
-from mycotools.lib.kontools import multisub, findExecs, formatPath, eprint, vprint, readJson, writeJson, mkOutput
+from mycotools.lib.kontools import multisub, findExecs, format_path, eprint, vprint, read_json, write_json, mkOutput
 from mycotools.lib.biotools import fa2dict, dict2fa
 
 sys.setrecursionlimit(1000000)
@@ -284,7 +284,7 @@ def usearchMain(fasta, min_id, output, cpus = 1, verbose = False):
     return distanceMatrix
 
 def readLog(log_path, newLog):
-    oldLog = readJson(log_path)
+    oldLog = read_json(log_path)
     if oldLog['fasta'] == newLog['fasta'] and \
         oldLog['minimum_id'] == newLog['minimum_id'] and \
         oldLog['search_program'] == newLog['search_program']:
@@ -316,7 +316,7 @@ def iterativeRun(
         if log_path:
             iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
             log_dict['iterations'].append(iteration_dict)
-            writeJson(log_path, log_dict)
+            write_json(log_path, log_dict)
         if focalLen >= minseq:
             if maxseq:
                 if focalLen <= maxseq:
@@ -374,7 +374,7 @@ def reiterativeRun(
         if log_path:
             iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
             log_dict['iterations'].append(iteration_dict)
-            writeJson(log_path, log_dict)
+            write_json(log_path, log_dict)
         if focalLen >= minseq:
             if maxseq:
                 if focalLen <= maxseq:
@@ -437,7 +437,7 @@ def main(
     if log_path:
         if os.path.isfile(log_path):
             log_dict = readLog(log_path, log_dict)
-        writeJson(log_path, log_dict)
+        write_json(log_path, log_dict)
 
     if os.path.isfile(log_dict['distance_matrix']):
         if searchProg == 'usearch':
@@ -603,7 +603,7 @@ if __name__ == '__main__':
  #   else:
 #        clusParam = args.inflation
 
-    fastaPath = formatPath(args.fasta)
+    fastaPath = format_path(args.fasta)
     fa = fa2dict(fastaPath)
     if args.iterative:
         focalGene = args.iterative
@@ -615,9 +615,9 @@ if __name__ == '__main__':
             sys.exit(6)
 
     if args.output:
-        if not os.path.isdir(formatPath(args.output)):
-            os.mkdir(formatPath(args.output))
-        dmnd_dir = formatPath(args.output)
+        if not os.path.isdir(format_path(args.output)):
+            os.mkdir(format_path(args.output))
+        dmnd_dir = format_path(args.output)
         output = dmnd_dir + os.path.basename(fastaPath)
     else:
         dmnd_dir = mkOutput(os.getcwd() + '/', 'fa2clus')

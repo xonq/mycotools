@@ -4,7 +4,7 @@ import re
 import sys
 import argparse
 from mycotools.lib.biotools import gff2list, list2gff, gff2Comps, gff3Comps
-from mycotools.lib.kontools import formatPath, eprint, vprint
+from mycotools.lib.kontools import format_path, eprint, vprint
 from mycotools.curAnnotation import addGenes, removeStartStop
 
 def gff2gff3( gff_list, ome, jgi_ome ):
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         help = 'Fail genes w/o CDS sequences that lack start or stop codons' )
     args = parser.parse_args()
 
-    gff_list = gff2list(formatPath( args.input ))
+    gff_list = gff2list(format_path( args.input ))
     eprint( args.ome + '\t' + args.input , flush = True)
     gff3 = main( gff_list, args.ome, args.jgi, args.fail )
     print( list2gff( gff3 ) , flush = True)

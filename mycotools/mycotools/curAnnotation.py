@@ -9,7 +9,7 @@ import copy
 import argparse
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gtfComps, gff3Comps, gff2Comps
-from mycotools.lib.kontools import collect_files, eprint, formatPath
+from mycotools.lib.kontools import collect_files, eprint, format_path
 from mycotools.gff2seq import aamain as gff2proteome
 
 
@@ -678,7 +678,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.output:
-        output = formatPath(args.output)
+        output = format_path(args.output)
         if not os.path.isdir(output):
             os.mkdir(output)
             output += '/'
@@ -687,7 +687,7 @@ if __name__ == '__main__':
         output = args.prefix
 
     if args.sort:
-        gff = sortMain(gff2list(formatPath(args.gff)), args.prefix)
+        gff = sortMain(gff2list(format_path(args.gff)), args.prefix)
         with open( output + '.gff3', 'w' ) as out:
             out.write( list2gff( gff ) + '\n' )
         sys.exit(0)
@@ -700,10 +700,10 @@ if __name__ == '__main__':
         sys.exit(1)
 
     gff, trans_str, failed, flagged = main(
-        formatPath(args.gff), args.prefix, args.fail
+        format_path(args.gff), args.prefix, args.fail
         )
     if args.assembly:
-        fna = fa2dict(formatPath(args.assembly))
+        fna = fa2dict(format_path(args.assembly))
         faa = gff2proteome( gff, fna )
         with open( output + '.aa.fa', 'w' ) as out:
             out.write( dict2fa( faa ) )

@@ -8,7 +8,7 @@ import getpass
 import argparse
 import subprocess
 import pandas as pd
-from mycotools.lib.kontools import eprint, formatPath, outro, intro
+from mycotools.lib.kontools import eprint, format_path, outro, intro
 from mycotools.lib.dbtools import loginCheck
 
 def jgi_login( user, pwd ):
@@ -98,7 +98,7 @@ def checkMatches( match1, match2, match3, match4, xml_data, file_type):
     return matches, preexisting, findall
 
 
-def JGIdwnld( ome, file_type, output, masked = True ):
+def JGIdwnld( ome, file_type, output, masked = True, spacer = '\t' ):
     '''Download JGI files. For each type of file, use regular expressions to 
     gather the URL from the file. Grab the md5checksum if possible from the 
     xml as well. Create arbitrary values for md5 and curl_cmd. If the download file
@@ -211,13 +211,13 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                             as dwnld_data_raw:
                             dwnld_data = dwnld_data_raw.read()
                         if re.search( '307 Temporary Redirect', dwnld_data ):
-                            print('\t\t' + dwnld + ' link has moved. Trying a different link.', flush = True)
+                            print(spacer +'\t' + dwnld + ' link has moved. Trying a different link.', flush = True)
                             matches1 = re.search( 
                                     r'url\="(\/portal\/' + ome + r'\/download\/' + \
                                     dwnld + r')', data)
                             if matches1:
                                 dwnld_url = prefix + matches1[1].replace( '&amp;', '&' )
-                                print('\t\t' + dwnld_url, flush = True)
+                                print(spacer + '\t' + dwnld_url, flush = True)
                             break
                         else:
                             if not dwnld_md5:
@@ -226,19 +226,19 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                                         stdout = subprocess.PIPE 
                                         )
                                 check_size_res = check_size.stdout.decode( 'utf-8' )
-                                print('\t\tFile exists - no md5 to check.', flush = True)
+                                print(spacer + '\tFile exists - no md5 to check.', flush = True)
                                 check_size_find = re.search(r'\d+', check_size_res)
                                 size = check_size_find[0]
                                 if int(size) < 10:
-                                    print('\t\tInvalid file size.', flush = True)
+                                    print(spacer + '\tInvalid file size.', flush = True)
                                 else:
                                     md5 = None
                             else:
-                                print('\t\tFile exists, but md5 does not match.', flush = True)
+                                print(spacer + '\tFile exists, but md5 does not match.', flush = True)
                             break
                     except UnicodeDecodeError:
                         if not dwnld_md5:
-                            print('\t\tFile exists - no md5 to check.', flush = True)
+                            print(spacer + '\tFile exists - no md5 to check.', flush = True)
                             check_size = subprocess.run( 
                                     ['wc', '-l', output + '/' + file_type + '/' + dwnld], 
                                     stdout = subprocess.PIPE )
@@ -246,13 +246,13 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                             check_size_find = re.search(r'\d+', check_size_res)
                             size = check_size_find[0]
                             if int(size) < 10:
-                                print('\t\tInvalid file size.', flush = True)
+                                print(spacer + '\tInvalid file size.', flush = True)
                             else:
                                 md5 = None
                                 preexisting = True
                                 check = dwnld
                         else:
-                            print('\t\tFile exists, but md5 does not match.', flush = True)
+                            print(spacer + '\tFile exists, but md5 does not match.', flush = True)
                         break
 
         while md5 != dwnld_md5 and curl_cmd != 0 and attempt < 3:
@@ -282,7 +282,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                                 dwnld_data = dwnld_data_raw.read()
                             if re.search( '307 Temporary Redirect', dwnld_data ):
                                 print(
-                                    '\t\t\t' + dwnld + ' link has moved. ' + \
+                                    spacer + '\t\t' + dwnld + ' link has moved. ' + \
                                     'Trying a different link.'
                                     )
                                 matches1 = re.search( 
@@ -291,13 +291,13 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                                         )
                                 if matches1:
                                     dwnld_url = prefix + matches1[1].replace( '&amp;', '&' )
-                                    print('\t\t' + dwnld_url, flush = True)
+                                    print(spacer + '\t' + dwnld_url, flush = True)
                                 else:
-                                    print('\t\t\t\tNo valid alternative link. Skip.', flush = True)
+                                    print(spacer + '\t\tNo valid alternative link. Skip.', flush = True)
                                     attempt = 4
                                     break
                             else:
-                                print('\t\tFile exists - no md5 to check.', flush = True)
+                                print(spacer + '\tFile exists - no md5 to check.', flush = True)
                                 check_size = subprocess.run( 
                                         "wc -l " + output + '/' + file_type + '/' + dwnld, 
                                         stdout = subprocess.PIPE 
@@ -306,7 +306,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                                 check_size_find = re.search(r'\d+', check_size_res)
                                 size = check_size_find[0]
                                 if int(size) < 10:
-                                    print('\t\tInvalid file size. Attempt ' + str(attempt), flush = True)
+                                    print(spacer + '\tInvalid file size. Attempt ' + str(attempt), flush = True)
                                 else:
                                     md5 = None
                                     break
@@ -315,7 +315,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                         time.sleep( 60 )
 
                 elif md5 != dwnld_md5 and attempt == 1:
-                    print('\t\tERROR: md5 does not match JGI. Attempt ' + str(attempt), flush = True)
+                    print(spacer + '\tERROR: md5 does not match JGI. Attempt ' + str(attempt), flush = True)
                     curl_cmd = -1
                     check = 2
                     while True:
@@ -325,16 +325,16 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                                 dwnld_data = dwnld_data_raw.read()
                             if re.search( '307 Temporary Redirect', dwnld_data ):
                                 print(
-                                    '\t\t\t' + dwnld + ' link has moved. ' + \
+                                    spacer + '\t' + dwnld + ' link has moved. ' + \
                                     'Trying a different link.'
                                 )
                                 matches1 = re.search( r'url\="(\/portal\/' + \
                                         ome + r'\/download\/' + dwnld + r')', data)
                                 if matches1:
                                     dwnld_url = prefix + matches1[1].replace( '&amp;', '&' )
-                                    print('\t\t' + dwnld_url, flush = True)
+                                    print(spacer + '\t' + dwnld_url, flush = True)
                                 else:
-                                    print('\t\t\t\tNo valid alternative link. Skip.', flush = True)
+                                    print(spacer + '\tNo valid alternative link. Skip.', flush = True)
                                     attempt = 4
                             break
                         except UnicodeDecodeError:
@@ -342,7 +342,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                             break
                         time.sleep( 60 )
                 elif md5 != dwnld_md5 and attempt == 2:
-                    print('\t\tERROR: md5 does not match JGI. Attempt ' + str(attempt), flush = True)
+                    print(spacer + '\tERROR: md5 does not match JGI. Attempt ' + str(attempt), flush = True)
                     curl_cmd = -1
                     matches1 = re.search( 
                         r'url\="(\/portal\/' + ome + r'\/download\/' + dwnld + r')', data
@@ -353,21 +353,21 @@ def JGIdwnld( ome, file_type, output, masked = True ):
                     time.sleep( 60 )
                     check = 2
                 elif md5 != dwnld_md5:
-                    print('\t\tERROR: md5 does not match JGI. Attempt ' + str(attempt), flush = True)
+                    print(spacer + '\tERROR: md5 does not match JGI. Attempt ' + str(attempt), flush = True)
                     check = 2
             else:
                 print(
-                    '\t\tERROR: Failed to retrieve ' + file_type + '. `curl` error: ' \
-                    + str(curl_cmd) + '\nAttempt' + str(attempt)
+                    spacer + '\tERROR: Failed to retrieve ' + file_type + '. `curl` error: ' \
+                    + str(curl_cmd) + '\n' + spacer + '\tAttempt' + str(attempt)
                     )
                 check = 2
 
         if attempt == 3:
             if md5 != dwnld_md5:
-                print('\t\tExcluding from database - potential failure', flush = True)
+                print(spacer + '\tExcluding from database - potential failure', flush = True)
                 curl_cmd = 0
             if curl_cmd != 0:
-                print('\t\tFile failed to download', flush = True)
+                print(spacer + '\tFile failed to download', flush = True)
 
 #    else:
  #       print('\t\tfailed', flush = True)
@@ -378,7 +378,7 @@ def JGIdwnld( ome, file_type, output, masked = True ):
 
 def main( 
     df, output, user, pwd, assembly = True, proteome = False, gff3 = True, 
-    gff = False, transcript = False, est = False, masked = True
+    gff = False, transcript = False, est = False, masked = True, spacer = '\t'
     ):
 
 #    pd.options.mode.chained_assignment = None  # default='warn'
@@ -390,14 +390,14 @@ def main(
     else:
         ome_col = 'assembly_acc'
 
-    eprint('\nLogging into JGI', flush = True)
+    eprint(spacer + 'Logging into JGI', flush = True)
     login_attempt = 0
     while jgi_login( user, pwd ) != 0 and login_attempt < 5:
-        eprint('\nJGI Login Failed. Attempt: ' + str(login_attempt), flush = True)
+        eprint(spacer + '\tJGI Login Failed. Attempt: ' + str(login_attempt), flush = True)
         time.sleep( 5 )
         login_attempt += 1
         if login_attempt == 5:
-            eprint('\nERROR: Failed login 5 attempts.', flush = True)
+            eprint(spacer + '\tERROR: Failed login 5 attempts.', flush = True)
             sys.exit( 100 )
 
     if not os.path.exists( output + '/xml' ):
@@ -412,11 +412,11 @@ def main(
         if error_check != -1:
             time.sleep( 0.1 )
 
-    eprint( '\nDownloading JGI files\n\tMaximum rate: 1 genome/min' , flush = True)
+    eprint(spacer + 'Downloading JGI files\n\tMaximum rate: 1 genome/min' , flush = True)
     if len( df ) > 60:
-        eprint( '\tMinimum time: ' + str(len(df)) / 60 + ' hours' , flush = True)
+        eprint(spacer + 'Minimum time: ' + str(len(df)) / 60 + ' hours' , flush = True)
     else:
-        eprint( '\tMinimum time: ' + str(len(df)) + ' minutes' , flush = True)
+        eprint(spacer + 'Minimum time: ' + str(len(df)) + ' minutes' , flush = True)
     
     dwnlds = []
     if assembly:
@@ -448,12 +448,12 @@ def main(
         if ome not in ome_set:
             jgi_login( user, pwd )
             if 'ome' in row.keys():
-                eprint( '\t' + row['ome'] + '\t' + ome , flush = True)
+                eprint(spacer + row['ome'] + '\t' + ome , flush = True)
             else:
-                eprint( '\t' + ome , flush = True)     
+                eprint(spacer + ome , flush = True)     
             for typ in dwnlds:
                 check, preexisting, new_typ = JGIdwnld(
-                    ome, typ, output, masked = masked
+                    ome, typ, output, masked = masked, spacer = spacer
                 )
                 if type(check) != int:
                     if new_typ == 'gff':
@@ -465,9 +465,9 @@ def main(
                     check = os.path.basename( os.path.abspath( check ) )
                 elif type(check) == int:
                     ome_set.add(row[ome_col])
-                eprint('\t\t' + new_typ + ': exit status ' + str(check), flush = True)
+                eprint(spacer + '\t' + new_typ + ': exit status ' + str(check), flush = True)
         else:
-            eprint( '\t' + ome + ' failed.' , flush = True)
+            eprint(spacer + ome + ' failed.' , flush = True)
 
     if os.path.exists( 'cookies' ):
         os.remove( 'cookies' )
@@ -544,11 +544,12 @@ if __name__ == '__main__':
     else:
         df = pd.DataFrame({'assembly_acc': [args.input]})
 
-    output = formatPath(args.output)
+    output = format_path(args.output)
 
     jgi_df = main( 
         df, output, user, pwd, args.assembly, args.proteome, 
-        args.gff3, args.gff, args.transcript, args.est, not args.nonmasked
+        args.gff3, args.gff, args.transcript, args.est, not args.nonmasked,
+        spacer = ''
         )
     df.to_csv( os.path.normpath(args.input) + '_jgiDwnld', sep = '\t', index = False )
 

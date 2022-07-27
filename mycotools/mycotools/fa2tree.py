@@ -5,7 +5,7 @@ import re
 import sys
 import argparse
 import subprocess
-from mycotools.lib.kontools import eprint, vprint, collect_files, formatPath, intro, outro, findExecs
+from mycotools.lib.kontools import eprint, vprint, collect_files, format_path, intro, outro, findExecs
 from mycotools.lib.biotools import fa2dict
 
 class PhyloError(Exception):
@@ -129,11 +129,11 @@ def main(
         out_dir = output_dir + '/' + dir_name
         if not os.path.isdir( out_dir ):
             os.mkdir( out_dir )
-        out_dir = formatPath(out_dir)
+        out_dir = format_path(out_dir)
     else:
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
-        out_dir = formatPath(output_dir)
+        out_dir = format_path(output_dir)
 
     fasta_name = os.path.basename( os.path.abspath(fasta_path))
     mafft = out_dir + '/' + fasta_name + '.mafft'
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     parser.add_argument( '-o', '--output' )
     args = parser.parse_args()
 
-    output = formatPath(args.output)
+    output = format_path(args.output)
     if output:
         if not output.endswith('/'):
             output += '/' # bring to mycotools path expectations
@@ -215,10 +215,10 @@ if __name__ == '__main__':
         findExecs(execs, execs)
 
     if args.fasta:
-        input_check = formatPath(args.fasta)
+        input_check = format_path(args.fasta)
         alignment = False
     else:
-        input_check = formatPath(args.alignment)
+        input_check = format_path(args.alignment)
         alignment = True
     if os.path.isfile(input_check):
         main( 

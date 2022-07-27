@@ -10,7 +10,7 @@ import copy
 import multiprocessing as mp
 from mycotools.lib.dbtools import mtdb
 from mycotools.lib.biotools import fa2dict
-from mycotools.lib.kontools import formatPath, eprint
+from mycotools.lib.kontools import format_path, eprint
 
 
 def calcMask( contig_list ):
@@ -197,9 +197,9 @@ if __name__ == '__main__':
         print( usage , flush = True)
         sys.exit( 1 )
 
-    in_path = formatPath(sys.argv[1])
+    in_path = format_path(sys.argv[1])
     if len(sys.argv) > 2:
-        log_path = formatPath(sys.argv[2])
+        log_path = format_path(sys.argv[2])
     else:
         log_path = None
 

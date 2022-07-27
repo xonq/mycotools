@@ -6,7 +6,7 @@ import argparse
 from Bio.Seq import Seq
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps, dict2fa
-from mycotools.lib.kontools import formatPath, sysStart, eprint
+from mycotools.lib.kontools import format_path, sys_start, eprint
 
 def sortGene(sorting_group):
 
@@ -75,22 +75,38 @@ def sortMain(gff):
 
     return gff
 
-def grabCDS( gff_dicts ):
+def grabCDS(gff_dicts, spacer = '\t'):
     """Grab CDSs that are associated with genes. gff_dicts is a
     mycotools.lib.biotools gff2list() list"""
 
-    mrnas = []
+    mrnas, genes, warning, ome = [], [], False, None
     for entry in gff_dicts:
         if entry['type'] == 'mRNA':
-            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            try:
+                alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+                if not ome:
+                    ome = alias[:alias.find('_')]
+            except TypeError:
+                raise TypeError(str(entry))
             mrnas.extend(alias.split('|')) # account for posttranslational mods
+        elif entry['type'] == 'gene':
+            try:
+                alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            except TypeError:
+                if not warning and ome:
+                    eprint(spacer + 'WARNING: ' + str(ome) + ' missing aliases', flush = True)
+                    warning = True
+#                raise TypeError(str(entry))
+            genes.extend(alias.split('|')) # account for alternate splicing
 
-    mrna_set, out_cds = set(mrnas), []
+    mrna_set = set([x for x in mrnas if x in set(genes)])
+    out_cds = []
     for entry in gff_dicts:
-        if entry['type'] == 'cds':
+        if entry['type'] == 'CDS':
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             if alias in mrna_set:
                 out_cds.append(entry)
+
 
     return out_cds
 
@@ -400,7 +416,7 @@ def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, fullRegion = Fa
                         )
                     del pos_dict[seqid][startGene]
                 else:
-                    rev_comp = str(Seq(assem_dict[contig]['sequence']).reverse_complement())
+                    rev_comp = str(Seq(assem_dict[seqid]['sequence']).reverse_complement())
                     startFlanks[seqid] = negPlusMinusCode(
                         neg_dict[seqid][startGene], len(rev_comp), plusminus, rev_comp, plus = False
                         )
@@ -526,9 +542,9 @@ def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, fullRegion = Fa
     
     return genes_fa_dict
 
-def aamain( gff_dicts, assem_dict ):
+def aamain( gff_dicts, assem_dict, spacer = '\t' ):
     
-    cdss = grabCDS( gff_dicts )
+    cdss = grabCDS( gff_dicts, spacer )
     pos_dict, neg_dict = grabCoords( cdss )
 
     genes_fa_dict = {}
@@ -564,9 +580,9 @@ if __name__ == '__main__':
     parser.add_argument('-af', '--all_flanks', action = 'store_true', help = '-n and -nc only')
     args = parser.parse_args()
 
-    input_gff = gff2list(formatPath(args.gff))
+    input_gff = gff2list(format_path(args.gff))
     if args.assembly:
-        assembly_dicts = {'input': fa2dict( formatPath(args.assembly) )}
+        assembly_dicts = {'input': fa2dict( format_path(args.assembly) )}
         gff_dicts = {'input': input_gff}
     else:
         db = mtdb(masterDB()).set_index('ome')
