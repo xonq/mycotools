@@ -303,7 +303,7 @@ acc2fa.py -i <INPUTFILE>
 ### coords2fa.py
 
 ```bash
-(mycotools) -bash-4.2$ coords2fa.py -h
+coords2fa.py -h
 
 Input nucleotide fasta/tsv input, extract coordinates
 coords2fa.py <FA> <SEQID> <START_COORD> <END_COORD> <STRAND_SENSE>
@@ -687,20 +687,25 @@ multifasta input of external accessions. Following homolog acquisition,
 agglomerative clustering if the number of sequences exceeds the inputted maximum 
 (`-m`).
 
-By default, `crap.py` will construct trees using 1000 bootstrap iterations
-of IQTree with the ModelFinder module. Alternatively `-f` can be specified
-for `fasttree`.
+By default, `crap.py` will construct trees using fasttree. Fasttree is usually
+sufficient to get an idea of how the cluster is evolving because CRAP builds
+phylogenies for all query genes within a cluster, so congruent topology across
+different genes is a good window into the evolution. Alternatively, CRAP can
+also construct 1000 bootstrap iterations
+of IQTree with the ModelFinder module by specifying `-i`/`--iqtree`.
 
 To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
 ```bash
-(mycotools) -bash-4.2$ extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
-(mycotools) -bash-4.2$ crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --fast --bitscore 40 --cpu 12
+extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
+crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
 ```
 
 <br />
 
 ```bash
-usage: crap.py [-h] -q QUERY [-d DATABASE] [-s SEARCH] [-b BITSCORE] [-og ORTHOGROUPS] [-p PLUSMINUS] [--maxseq MAXSEQ] [--minid MINID] [-f] [--ingroup] [-g GFF] [-o OUTPUT] [-c CPU] [-v]
+usage: crap.py [-h] -q QUERY [-d DATABASE] [-s SEARCH] [-b BITSCORE] [-og ORTHOGROUPS] [-p PLUSMINUS]
+               [--maxseq MAXSEQ] [-i] [--conversion CONVERSION] [--ingroup] [--no_label] [-g GFF]
+               [-o OUTPUT] [-c CPU] [-v]
 
 Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
 
@@ -717,11 +722,14 @@ optional arguments:
                         MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
   -p PLUSMINUS, --plusminus PLUSMINUS
                         Genes up-/downstream to analyze from loci. DEFAULT: 10
-  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py. Outgroup detection may exceed this number. DEFAULT: 250
-  --minid MINID         Minimum identity for fa2clus.py. DEFAULT: 0.2
-  -f, --fast            Fasttree. DEFAULT: IQTree2 1000 bootstrap iterations
+  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py. Outgroup detection may exceed this
+                        number. DEFAULT: 250
+  -i, --iqtree          IQTree2 1000 bootstrap iterations. DEFAULT: fasttree
+  --conversion CONVERSION
+                        Tab delimited conversion file for annotations: Query Conversion
   --ingroup             Do not detect outgroups, do not root trees
-  -g GFF, --gff GFF     GFF for non-mycotools input. Requires -s and a fasta for -i
+  --no_label            Do not label synteny diagrams
+  -g GFF, --gff GFF     GFF for non-mycotools locus diagram. Requires -s and a fasta for -i
   -o OUTPUT, --output OUTPUT
                         Output base dir. Will rerun if previous director exists.
   -c CPU, --cpu CPU
