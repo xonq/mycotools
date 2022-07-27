@@ -243,7 +243,6 @@ def gen_omes(
        #     new_ome = name + str(number)
         #    tax_set.add(new_ome)
             newdb['ome'][i] = new_ome
-            print(spacer + new_ome, flush = True)
         elif ome:
             format_search = re.search(r'^[^\d_,\'";:\\\|\[\]\{\}\=\+\!@#\$\%\^' 
                                       + r'&\*\(\)]{6}\d+[^-_+=\\\|\{\[\}\]\:;'

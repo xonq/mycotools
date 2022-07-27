@@ -1,3 +1,5 @@
+![mycotools database](https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png)
+
 # Mycotools Database (MTDB)
 
 MTDBs are locally assimilated, uniformly curated databases of JGI MycoCosm (preferred) and NCBI
