@@ -4,6 +4,8 @@
     >
 </p>
 
+<br />
+
 # PURPOSE
 Bring broadscale comparative genomics to the masses. 
 
@@ -19,6 +21,14 @@ Mycotools is a compilation of computational biology tools and database [Mycotool
 - The `.mtdb` database format enables swift transitions from analyses with datasets of 100,000s genomes to as few as a lineage of interest. No more scrambling to acquire files for an analysis.
 
 Mycotools is currently available as a beta subset of the full suite, excluding the database assimilation tools. MycotoolsDB is currently restricted to Ohio Supercomputer Center - if you are interested in early access, please email `konkelzach@protonmail.com`.
+
+<p align="center">
+    <img
+        src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png"
+    >
+</p>
+
+<br />
 
 By integrating with the curated MycotoolsDB, Mycotools aids routine-complex tasks like retrieving `gff` or `fasta` accessions; running and compiling `fasta`s of MycotoolsDB BLAST/hmmsearches; biology-based database manipulation tools; automated phylogenetic analysis pipelines from blast to Pfam extraction to tree prediction, etc etc. Mycotools includes sets of utilities that also enable easy acquisition of batches of sequence data using `ncbiDwnld.py` and `jgiDwnld.py`.
 
