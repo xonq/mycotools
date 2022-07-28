@@ -1,6 +1,6 @@
 <p align="center">
     <img
-        src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/logo.png"
+        src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.png"
     >
 </p>
 
