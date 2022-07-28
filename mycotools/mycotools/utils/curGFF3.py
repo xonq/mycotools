@@ -254,7 +254,8 @@ def acquireFormat( gff_list ):
                 return 'misc_gff3'
     return None
 
-def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps()):
+def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
+                 cur_seqids = False):
 
     genes, pseudogenes, rnas = [], [], {}
     mrnas = defaultdict(list) 
@@ -283,21 +284,40 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps()):
                 transcripts[par].append(id_)
 
     id_dict, pseudogenes = {}, set(pseudogenes)
-    for i, entry in enumerate(cur_list):
-        if 'gene' in entry['type']:
-            id_ = re.search(comps['id'], entry['attributes'])[1]
-            id_dict[id_] = {}
-        elif entry['type'] == 'CDS':
-            try:
-                par = re.search(comps['par'], entry['attributes'])[1]
-            except TypeError:
-                continue
-            try:
-                id_dict[rnas[par]][par] = re.search(comps['Alias'], entry['attributes'])[1]
-            except KeyError: # pseudogene or CDS parent is related to gene, not
-            # RNA
-                id_dict[par][par] = re.search(comps['Alias'],
-                                              entry['attributes'])[1]
+    if cur_seqids:
+        for i, entry in enumerate(cur_list):
+            if not entry['seqid'].startswith(ome + '_'):
+                entry['seqid'] = ome + '_' + entry['seqid']
+            if 'gene' in entry['type']:
+                id_ = re.search(comps['id'], entry['attributes'])[1]
+                id_dict[id_] = {}
+            elif entry['type'] == 'CDS':
+                try:
+                    par = re.search(comps['par'], entry['attributes'])[1]
+                except TypeError:
+                    continue
+                try:
+                    id_dict[rnas[par]][par] = re.search(comps['Alias'], entry['attributes'])[1]
+                except KeyError: # pseudogene or CDS parent is related to gene, not
+                # RNA
+                    id_dict[par][par] = re.search(comps['Alias'],
+                                                  entry['attributes'])[1]
+    else:
+        for i, entry in enumerate(cur_list):
+            if 'gene' in entry['type']:
+                id_ = re.search(comps['id'], entry['attributes'])[1]
+                id_dict[id_] = {}
+            elif entry['type'] == 'CDS':
+                try:
+                    par = re.search(comps['par'], entry['attributes'])[1]
+                except TypeError:
+                    continue
+                try:
+                    id_dict[rnas[par]][par] = re.search(comps['Alias'], entry['attributes'])[1]
+                except KeyError: # pseudogene or CDS parent is related to gene, not
+                # RNA
+                    id_dict[par][par] = re.search(comps['Alias'],
+                                                  entry['attributes'])[1]
 
     trna_count, rrna_count, ptrna_count, rna_count, etc_count = 1, 1, 1, 1, 1
     estranged = []
@@ -397,7 +417,7 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps()):
     return cur_list
 
 
-def curGff3( gff_list, ome ):
+def curGff3(gff_list, ome, cur_seqids = False):
 
     cur_list, intron = [], False
     for line in gff_list:
@@ -405,12 +425,13 @@ def curGff3( gff_list, ome ):
             intron = True
 
     cur_list, pseudocount = addMissing(gff_list, intron, gff3Comps(), ome)
-    final_list = compileGenes(cur_list, ome, pseudocount) #, par2id)
+    final_list = compileGenes(cur_list, ome, pseudocount,
+                              cur_seqids = cur_seqids)
 
     return final_list
 
 
-def main( gff_path, ome):
+def main(gff_path, ome, cur_seqids = False):
 
     if isinstance(gff_path, str):
         gff = gff2list( format_path(gff_path) )
@@ -422,13 +443,13 @@ def main( gff_path, ome):
         eprint('\tERROR: type unknown ' + gff_path, flush = True)
         return None
 
-    new_gff = curGff3( gff, ome )
+    new_gff = curGff3(gff, ome, cur_seqids)
 
     return new_gff
 
 
 if __name__ == '__main__':
-    usage = 'Imports gene coordinates file gff3, ome, and curates headers'
+    usage = 'Imports gene coordinates file gff3, ome and curates headers'
     sys_start( sys.argv, usage, 3, files = [sys.argv[1]] )
     cur_gff = main( format_path(sys.argv[1]), sys.argv[2] )
     print( list2gff( cur_gff ) , flush = True)

@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED to convert gff list to appropriate types
+
 import re
 import sys
 from mycotools.lib.kontools import eprint
@@ -181,41 +183,37 @@ def calc_gc(gene):
 
 
 # need to change into a class
-def gff2list( gff_path, insert = False, error = True ):
+def gff2list(gff_path, error = True):
 
     gff_list_dict = []
     with open( gff_path, 'r' ) as raw_gff:
         try:
             for line in raw_gff:
-                if not line.startswith('#') and len(line) > 5: 
-                    if line.endswith('\n'):
-                        line = line.rstrip()
-                    col_list = line.split(sep='\t')
-                    if len(col_list) == 8 and insert:
-                        col_list.insert(2, 'CDS')
+                if not line.startswith('#'): 
+                    line = line.rstrip()
+                    col_list = line.split(sep = '\t')
                     gff_list_dict.append({
                         'seqid': col_list[0], 'source': col_list[1], 'type': col_list[2],
-                        'start': col_list[3], 'end': col_list[4], 'score': col_list[5],
+                        'start': int(col_list[3]), 'end': int(col_list[4]), 'score': col_list[5],
                         'strand': col_list[6], 'phase': col_list[7], 'attributes': col_list[8]
                         })
         except IndexError:
             if not error:
                 gff_list_dict = None
             else:
-                eprint( line , flush = True)
-                raise IndexError
+                raise IndexError(line)
             
     return gff_list_dict
 
 
-def list2gff( gff_dict, ver = 3 ):
+def list2gff(gff_list, ver = 3):
 
     if ver:
         gff_str = '##gff-version ' + str(ver) + '\n'
     else:
         gff_str = ''
-    for line in gff_dict:
-        add_str = '\t'.join( str(line[x]) for x in line )
+    for line in gff_list:
+        add_str = '\t'.join(str(val) for val in list(line.values()))
         gff_str += add_str + '\n'
 
     return gff_str.rstrip()

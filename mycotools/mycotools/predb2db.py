@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# NEED to curate assembly and gff references to ome_contig
+
 import os
 import re
 import sys
@@ -16,14 +18,14 @@ from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.gff2seq import aamain as gff2seq
 
-predbHeaders = [
+predb_headers = [
     'assembly_accession', 'genus', 'species', 'strain',
     'version', 'biosample',
     'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
     'useRestriction (yes/no)', 'published'
     ]
 
-def prepOutput(base_dir):
+def prep_output(base_dir):
     out_dir = mkOutput(base_dir, 'predb2db')
     wrk_dir = out_dir + 'working/'
     dirs = [
@@ -34,7 +36,7 @@ def prepOutput(base_dir):
             os.mkdir(dir_)
     return dirs[:2]
 
-def copyFile( old_path, new_path ):
+def copy_file( old_path, new_path ):
 
     try:
         shutil.copy( old_path, new_path )
@@ -43,32 +45,29 @@ def copyFile( old_path, new_path ):
         raise IOError
 
 
-def moveBioFile(old_path, ome, typ, wrk_dir, suffix = '' ):
+def move_biofile(old_path, ome, typ, wrk_dir, suffix = '' ):
 
     if old_path.endswith('.gz'):
         if not os.path.isfile(old_path[:-3]):
             temp_path = gunzip(old_path)
-            if temp_path:
-                new_path = wrk_dir + ome + '.' + typ +  suffix
-            else:
-                raise IOError
+            new_path = wrk_dir + ome + '.' + typ +  suffix
         else:
             new_path = wrk_dir + ome + '.' + typ + suffix
             temp_path = old_path[:-3]
-        copyFile(format_path(temp_path), new_path)
+        copy_file(format_path(temp_path), new_path)
     else:
         new_path = wrk_dir + ome + '.' + typ +  suffix
         if not os.path.isfile(new_path) and os.path.isfile(old_path):
-            copyFile(format_path(old_path), new_path)
+            copy_file(format_path(old_path), new_path)
         elif not os.path.isfile(new_path):
             raise IOError
         else:
-            copyFile(format_path(old_path), new_path)
+            copy_file(format_path(old_path), new_path)
 
     return new_path
 
 
-def genPredb():
+def gen_predb():
     example = [
         'Fibsp1', 'Fibularhizoctonia', 'psychrophila', 'CBS',
         '1.0', 'n', '<PATH/TO/ASSEMBLY>', '<PATH/TO/GFF3>', 'jgi',
@@ -81,12 +80,12 @@ def genPredb():
         'De novo annotations produced by Funannotate/Orthofiller must be ' + \
         'filled in as "new" for the genomeSource column. The row below is an ' + \
         'example', flush = True)
-    outputStr = '#' + '\t'.join(predbHeaders)
+    outputStr = '#' + '\t'.join(predb_headers)
     outputStr += '\n#' + '\t'.join(example) + '\n'
 
     return outputStr
 
-def readPredb(predb_path, spacer = '\t'):
+def read_predb(predb_path, spacer = '\t'):
 
     predb, headers = {}, None
     with open(predb_path, 'r') as raw:
@@ -197,8 +196,8 @@ def gen_omes(
     tax_count = {}
     for tax in tax_list:
         abb = tax[:6]
+        num = int(tax[6:])
         if abb in tax_count:
-            num = int(tax[6:])
             if tax_count[abb] < num:
                 tax_count[abb] = num
         else:
@@ -233,15 +232,6 @@ def gen_omes(
                 name += '.'
             tax_count[name] += 1
             new_ome = name + str(tax_count[name])
-#            numbers = [
- #               int(re.search(r'.*?(\d+$)', x)[1]) for x in list(tax_set) if x.startswith(name)
-  #              ]
-   #         if numbers:
-    #            number = max(numbers) + 1
-     #       else:
-      #          number = 1
-       #     new_ome = name + str(number)
-        #    tax_set.add(new_ome)
             newdb['ome'][i] = new_ome
         elif ome:
             format_search = re.search(r'^[^\d_,\'";:\\\|\[\]\{\}\=\+\!@#\$\%\^' 
@@ -257,6 +247,7 @@ def gen_omes(
                     new_ome = re.sub(r'\.\d+$', '.' + str(v), ome)
                 else:
                     new_ome = ome + '.1' # first modified version
+                eprint(spacer + ome + ' update -> ' + new_ome, flush = True)
                 newdb['ome'][i] = new_ome
 
     for i in reversed(todel):
@@ -265,42 +256,68 @@ def gen_omes(
 
     return newdb, t_failed
 
-def cur_mngr(ome, fna_path, gff_path, wrk_dir, 
+def cur_fna(cur_raw_fna_path, uncur_raw_fna_path, ome):
+    with open(cur_raw_fna_path + '.tmp', 'w') as out:
+        with open(uncur_raw_fna_path, 'r') as in_:
+            for line in in_:
+                if line.startswith('>'):
+                    if not line.startswith('>' + ome + '_'):
+                        out.write('>' + ome + '_' + line[1:])
+                    else: # already curated
+                        out.write(line)
+                else:
+                    out.write(line)
+    os.rename(cur_raw_fna_path + '.tmp', cur_raw_fna_path)
+
+def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir, 
             source, assembly_accession, exit = False,
-            remove = False):
-    newGFF_path = wrk_dir + 'gff3/' + ome + '.gff3.uncur'
-    newFNA_path = wrk_dir + 'fna/' + ome + '.fa'
-    if not os.path.isfile(newFNA_path):
+            remove = False, spacer = '\t'):
+
+    # assembly FNAs
+    uncur_fna_path = wrk_dir + 'fna/' + ome + '.fna.uncur'
+    cur_fna_path = wrk_dir + 'fna/' + ome + '.fna'
+    if not os.path.isfile(cur_fna_path):
         try:
-            newFNA_path = moveBioFile(fna_path, ome, 'fa', wrk_dir + 'fna/')
+            uncur_fna_path = move_biofile(raw_fna_path, ome, 'fa', wrk_dir + 'fna/',
+                                      suffix = '.uncur')
         except IOError:
+            eprint(spacer + ome + '|' + assembly_accession \
+                 + ' failed FNA parsing', flush = True)
             return ome, False, 'fna'
-    
-    curGFF_path = re.sub(r'\.uncur$', '', newGFF_path)
-    if not os.path.isfile(curGFF_path):
+        cur_fna(cur_fna_path, uncur_fna_path, ome)
+
+    # gene coordinate GFF3s
+    uncur_gff_path = wrk_dir + 'gff3/' + ome + '.gff3.uncur'
+    cur_gff_path = wrk_dir + 'gff3/' + ome + '.gff3'
+    if not os.path.isfile(cur_gff_path):
         try:
-            newGFF_path = moveBioFile(gff_path, ome, 'gff3', wrk_dir + 'gff3/', suffix = '.uncur')
+            uncur_gff_path = move_biofile(raw_gff_path, ome, 'gff3', 
+                                          wrk_dir + 'gff3/', suffix = '.uncur')
         except IOError:
+            eprint(spacer + ome + '|' + assembly_accession \
+                 + ' failed GFF3 parsing', flush = True)
             return ome, False, 'gff3'
     
-        gff = gff2list(newGFF_path)
+        gff = gff2list(uncur_gff_path)
         try:
-            gff_mngr(ome, gff, curGFF_path, source, assembly_accession)
-        except: # catch all errors
+            gff_mngr(ome, gff, cur_gff_path, source, assembly_accession)
+        except: # catch all errors to continue script
+            eprint(spacer + ome + '|' + assembly_accession \
+                + ' failed GFF3 curation', flush = True)
             if exit:
-                print('\t' + ome + '|' + assembly_accession \
-                    + ' failed gff curation', flush = True)
                 sys.exit(17)
             return ome, False, 'gff3'
 
-    faa_path = wrk_dir + 'faa/' + ome + '.aa.fa'
+    # proteome FAAs
+    faa_path = wrk_dir + 'faa/' + ome + '.faa'
     if not os.path.isfile(faa_path):
         try:
-            faa = gff2seq(gff2list(curGFF_path), fa2dict(newFNA_path))
+            faa = gff2seq(gff2list(cur_gff_path), fa2dict(uncur_fna_path),
+                          spacer = spacer)
         except: # catch all errors
+            eprint(spacer + ome + '|' + assembly_accession \
+                 + ' failed proteome generation', flush  = True)
             if exit:
-                print('\t' + ome + '|' + assembly_accession \
-                    + ' failed proteome generation', flush  = True)
                 sys.exit(18)
             return ome, False, 'faa'
         with open(faa_path + '.tmp', 'w') as out:
@@ -308,18 +325,20 @@ def cur_mngr(ome, fna_path, gff_path, wrk_dir,
         os.rename(faa_path + '.tmp', faa_path)
 
     if remove:
-        if os.path.isfile(newGFF_path):
-            os.remove(newGFF_path)
-        if os.path.isfile(gff_path):
-            os.remove(gff_path)
-        if os.path.isfile(re.sub(r'\.gz$', '', gff_path)):
-            os.remove(re.sub(r'\.gz$', '', gff_path))
-        if os.path.isfile(fna_path):
-            os.remove(fna_path)
-        if os.path.isfile(re.sub(r'\.gz$', '', fna_path)):
-            os.remove(re.sub(r'\.gz$', '', fna_path))
+        if os.path.isfile(uncur_gff_path):
+            os.remove(uncur_gff_path)
+        if os.path.isfile(raw_gff_path):
+            os.remove(raw_gff_path)
+        if os.path.isfile(re.sub(r'\.gz$', '', raw_gff_path)):
+            os.remove(re.sub(r'\.gz$', '', raw_gff_path))
+        if os.path.isfile(uncur_fna_path):
+            os.remove(uncur_fna_path)
+        if os.path.isfile(raw_fna_path):
+            os.remove(raw_fna_path)
+        if os.path.isfile(re.sub(r'\.gz$', '', raw_fna_path)):
+            os.remove(re.sub(r'\.gz$', '', raw_fna_path))
 
-    return ome, newFNA_path, curGFF_path, faa_path
+    return ome, cur_fna_path, cur_gff_path, faa_path
 
 
 def gff_mngr(ome, gff, cur_path, source, assembly_accession):
@@ -340,18 +359,20 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                 aliasOme = alias[1]
                 for entry in gff:
                     alias0 = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
-                    aliasNum = alias0[alias0.find('_') + 1:]
-                    newAlias = ome + '_' + aliasNum
+                    alias_num = alias0[alias0.find('_') + 1:]
+                    new_alias = ome + '_' + alias_num
                     entry['attributes'] = re.sub(
-                        gff3Comps()['Alias'], 'Alias='+ newAlias,
+                        gff3Comps()['Alias'], 'Alias='+ new_alias,
                         entry['attributes']
                         )
             else:
-                gff, trans_str, failed, flagged = curRogue(gff, ome)
+                gff, trans_str, failed, flagged = curRogue(gff, ome,
+                                                           cur_seqids = True)
         else:
-            gff = curGFF3(gff, ome)
+            gff = curGFF3(gff, ome, cur_seqids = True)
     else:
-        gff = gff2gff3(gff, ome, assembly_accession, verbose = False)
+        gff = gff2gff3(gff, ome, assembly_accession, verbose = False,
+                       cur_seqids = True)
 
     with open(cur_path + '.tmp', 'w') as out:
         out.write(list2gff(gff))
@@ -373,27 +394,26 @@ def main(
     omedb, failed = gen_omes(infdb, refdb, ome_col = 'ome', forbidden = forbidden,
                      spacer = spacer)
     
-    curCmds = []
+    cur_cmds = []
     omedb = omedb.set_index('ome')
     for ome, row in omedb.items():
-        curCmds.append([
+        cur_cmds.append([
             ome, row['fna'], row['gff3'], 
             wrk_dir, row['source'], row['assembly_acc'],
-            exit, remove
+            exit, remove, spacer
             ])
     with mp.Pool(processes = cpus) as pool:
-        curData = pool.starmap(cur_mngr, curCmds)
+        cur_data = pool.starmap(cur_mngr, cur_cmds)
 
-    for data in curData:
+    for data in cur_data:
         if not data[1]:
-            eprint(spacer + data[0] + ' failed ' + data[2], flush = True)
             failed.append(add2failed(omedb[data[0]]))
             del omedb[data[0]]
         else:
-            ome, fnaPath, gffPath, faaPath = data
-            omedb[ome]['fna'] = fnaPath
-            omedb[ome]['gff3'] = gffPath
-            omedb[ome]['faa'] = faaPath
+            ome, fna_path, gff3_path, faa_path = data
+            omedb[ome]['fna'] = fna_path
+            omedb[ome]['gff3'] = gff3_path
+            omedb[ome]['faa'] = faa_path
 
     return omedb.reset_index(), failed
 
@@ -405,10 +425,10 @@ if __name__ == '__main__':
     '<REFERENCEDB>'
 
     if any(x in {'-h', '--help', '-help'} for x in sys.argv):
-        print('\n' + usage + '\n', flush = True)
+        eprint('\n' + usage + '\n', flush = True)
         sys.exit(1)
     elif len(sys.argv) == 1:
-        print(genPredb())
+        print(gen_predb())
         sys.exit(0)
     elif len(sys.argv) == 3:
         refDB = mtdb(format_path(sys.argv[2]))
@@ -421,8 +441,8 @@ if __name__ == '__main__':
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
-    predb = readPredb(format_path(sys.argv[1]), spacer = '\t')
-    out_dir, wrk_dir = prepOutput(os.path.dirname(format_path(sys.argv[1])))
+    predb = read_predb(format_path(sys.argv[1]), spacer = '\t')
+    out_dir, wrk_dir = prep_output(os.path.dirname(format_path(sys.argv[1])))
     omedb, failed = main(predb, refDB, wrk_dir, exit = True)
 
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax

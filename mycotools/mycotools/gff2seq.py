@@ -360,12 +360,14 @@ def ntNegNoncode(rev_seq, negtig_dict, plusminus = 0):
     return genes_fa_dict
 
 
-def ntmain( gff_dicts, assem_dict, coding = True, flanks = True, fullRegion = False, plusminus = 0 ):
+def ntmain(gff_dicts, assem_dict, coding = True, 
+           flanks = True, fullRegion = False, plusminus = 0,
+           spacer = '\t'):
     
     if fullRegion:
         flanks, coding = True, False
     contig_dict, contig_info, genes_fa_dict, geneOrder = {}, {}, {}, {}
-    cdss = grabCDS( sortMain(gff_dicts) )
+    cdss = grabCDS( sortMain(gff_dicts), spacer = spacer )
     for cds in cdss:
         seqid = cds['seqid']
         if seqid not in contig_dict:

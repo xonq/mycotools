@@ -619,7 +619,7 @@ def addExons( gff ):
     return gff
 
 
-def main( gff_path, prefix, fail = True ):
+def main(gff_path, prefix, fail = True, cur_seqids = False):
 
     if isinstance(gff_path, str):
         gff = gff2list( gff_path )
@@ -643,7 +643,11 @@ def main( gff_path, prefix, fail = True ):
     crude_sort = sorted( unsortedGff, key = lambda x: \
         int( re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1] ))
     gff = sortGFF(crude_sort, re.compile(gff3Comps()['Alias']))
- 
+    if cur_seqids:
+        for entry in gff:
+            if not entry['seqid'].startswith(prefix + '_'):
+                entry['seqid'] = prefix + '_' + entry['seqid']
+
     return gff, trans_str, failed, flagged
 
 
@@ -705,7 +709,7 @@ if __name__ == '__main__':
     if args.assembly:
         fna = fa2dict(format_path(args.assembly))
         faa = gff2proteome( gff, fna )
-        with open( output + '.aa.fa', 'w' ) as out:
+        with open( output + '.faa', 'w' ) as out:
             out.write( dict2fa( faa ) )
 
     with open( output + '.gff3', 'w' ) as out:

@@ -7,7 +7,7 @@ from mycotools.lib.biotools import gff2list, list2gff, gff2Comps, gff3Comps
 from mycotools.lib.kontools import format_path, eprint, vprint
 from mycotools.curAnnotation import addGenes, removeStartStop
 
-def gff2gff3( gff_list, ome, jgi_ome ):
+def gff2gff3(gff_list, ome, jgi_ome):
 
     comps2, exon_dict, cds_dict, out_list, gene_dict = gff2Comps(), {}, {}, [], {}
     for entry in gff_list:
@@ -95,14 +95,19 @@ def gff2gff3( gff_list, ome, jgi_ome ):
     return out_list
 
 
-def main( gff_list, ome, jgi_ome, safe = True, verbose = True ):
+def main(gff_list, ome, jgi_ome, safe = True, verbose = True,
+         cur_seqids = False):
 
     gff_prep, failed, flagged = addGenes( gff_list, safe = safe )
     if failed:
         vprint( str(len(failed)) + '\tgenes failed', v = verbose , e = True, flush = True)
     if flagged:
         vprint( str(len(flagged)) + '\tgene coordinates from exons', v = verbose, e = True, flush = True)
-    gff3 = gff2gff3( gff_prep, ome, jgi_ome )
+    gff3 = gff2gff3(gff_prep, ome, jgi_ome)
+    if cur_seqids:
+        for entry in gff3:
+            if not entry['seqid'].startswith(ome + '_'):
+                entry['seqid'] = ome + '_' + entry['seqid']
 
     return gff3
 

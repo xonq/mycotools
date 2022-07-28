@@ -99,14 +99,16 @@ class mtdb(dict):
             df['taxonomy'][-1]['genus'] = df['genus'][-1]
             df['taxonomy'][-1]['species'] = \
                 df['genus'][-1] + ' ' + df['species'][-1]
+            df['taxonomy'][-1]['strain'] = \
+                df['strain'][-1]
         if len(data[0]) == 16: # LEGACY conversion to be deprecated
             del df['ecology']
             del df['eco_conf']
         for i, ome in enumerate(df['ome']): 
             # if malformatted due to decreased entries in some lines, this will raise an IndexError
-            if not df['fna'][i] or df['fna'][i] == ome + '.fa': # abbreviated line w/o file coordinates
-               df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fa'
-               df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.aa.fa'
+            if not df['fna'][i] or df['fna'][i] == ome + '.fna': # abbreviated line w/o file coordinates
+               df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fna'
+               df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.faa'
                df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
             else: # has file coordinates
                df['fna'][i] = format_path(df['fna'][i])
@@ -125,8 +127,8 @@ class mtdb(dict):
             ) 
         # does this work if its not an inplace change
         paths = {
-            'faa': [os.environ['MYCOFAA'] + '/', '.aa.fa'],
-            'fna': [os.environ['MYCOFNA'] + '/', '.fa'],
+            'faa': [os.environ['MYCOFAA'] + '/', '.faa'],
+            'fna': [os.environ['MYCOFNA'] + '/', '.fna'],
             'gff3': [os.environ['MYCOGFF3'] + '/', '.gff3']
             }
         if db_path:
@@ -157,6 +159,11 @@ class mtdb(dict):
                     output[ome][file_type] = output[ome][file_type].replace(
                         paths[file_type][0] + ome + paths[file_type][1], ''
                         ) # abbreviate when possible
+                for rank in ['species', 'genus', 'strain']:
+                    try:
+                        del output[ome]['taxonomy'][rank]
+                    except KeyError:
+                        pass
                 output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                 print(ome + '\t' + \
                     '\t'.join([str(output[ome][x]) for x in output[ome]]), flush = True
@@ -447,9 +454,9 @@ def db2df(data, stdin = False):
         del db_df['eco_conf']
     for i, row in db_df.iterrows(): 
         # if malformatted due to decreased entries in some lines, this will raise an IndexError
-        if not row['fna'] or row['fna'] == row['ome'] + '.fa': # abbreviated line w/o file coordinates
-           db_df.at[i, 'fna'] = os.environ['MYCOFNA'] + '/' + row['ome'] + '.fa'
-           db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + '/' + row['ome'] + '.aa.fa'
+        if not row['fna'] or row['fna'] == row['ome'] + '.fna': # abbreviated line w/o file coordinates
+           db_df.at[i, 'fna'] = os.environ['MYCOFNA'] + '/' + row['ome'] + '.fna'
+           db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + '/' + row['ome'] + '.faa'
            db_df.at[i, 'gff3'] = os.environ['MYCOGFF3'] + '/' + row['ome'] + '.gff3'
         else: # has file coordinates
            db_df.at[i, 'fna'] = format_path(row['fna'])

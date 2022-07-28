@@ -1,4 +1,4 @@
-![mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.white.png)
+![mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.png)
 
 <br /><br />
 

@@ -11,15 +11,6 @@ from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Com
 from mycotools.acc2gff import grabGffAcc
 
 
-def grabFiles( ome ):
-    # grab MycotoolsDB files using ome info
-    gff = format_path( '$MYCOGFF3/' + ome + '.gff3' )
-    if not os.path.isfile(gff):
-        eprint( 'ERROR: ' + ome + ' gff not detected' , flush = True)
-    prot = format_path( '$MYCOFAA/' + ome + '.aa.fa' )
-    return gff, prot
-
-
 def prepGffOutput( hit_list, gff_path, cpu = 1):
 
     gff_list = gff2list( gff_path )
@@ -287,7 +278,7 @@ if __name__ == '__main__':
                     prot_str = prepFaaOutput(
                         out_indices[accession], prot
                         )
-                    with open( accession + '.locus.aa.fa', 'w' ) as out:
+                    with open( accession + '.locus.faa', 'w' ) as out:
                         out.write( prot_str )
     else:
         for accession in out_indices:
