@@ -5,9 +5,9 @@
 </p>
 
 # PURPOSE
-Bring the power of broadscale genomic analyses to the masses. 
+Bring broadscale comparative genomics to the masses. 
 
-Mycotools is a compilation of computational biology tools and database [MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md) software that facilitate large-scale prokaryotic and fungal comparative genomics. MycotoolsDB locally assimilates all NCBI and MycoCosm (Joint Genome Institute) into a database schema with uniform file curation, scalability, and automation as guiding principles. 
+Mycotools is a compilation of computational biology tools and database [MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md) software that facilitate large-scale prokaryotic and fungal comparative genomics. MycotoolsDB locally assimilates all NCBI and MycoCosm (Joint Genome Institute) genomes into a database schema with uniform file curation, scalability, and automation as guiding principles. 
 
 - Installation is as simple as `updateDB.py --init <DIR>`. No more limited and
   incomplete databases.
