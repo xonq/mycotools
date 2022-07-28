@@ -1,4 +1,4 @@
-![mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png)![mycotools database](https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png)
+![mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png) ![mycotools database](https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png)
 
 # Mycotools Database (MTDB)
 
