@@ -43,7 +43,7 @@ def copyFile( old_path, new_path ):
         raise IOError
 
 
-def moveBioFile( old_path, ome, typ, wrk_dir, suffix = '' ):
+def moveBioFile(old_path, ome, typ, wrk_dir, suffix = '' ):
 
     if old_path.endswith('.gz'):
         if not os.path.isfile(old_path[:-3]):
@@ -258,7 +258,6 @@ def gen_omes(
                 else:
                     new_ome = ome + '.1' # first modified version
                 newdb['ome'][i] = new_ome
-                print(spacer + new_ome, flush = True)
 
     for i in reversed(todel):
         for key in mtdb.columns:
@@ -267,42 +266,58 @@ def gen_omes(
     return newdb, t_failed
 
 def cur_mngr(ome, fna_path, gff_path, wrk_dir, 
-            source, assembly_accession, exit = False):
-
-    try:
-        newFNA_path = moveBioFile( fna_path, ome, 'fa', wrk_dir + 'fna/' )
-    except IOError:
-        return ome, False, 'fna'
-    try:
-        newGFF_path = moveBioFile(gff_path, ome, 'gff3', wrk_dir + 'gff3/', suffix = '.uncur')
-    except IOError:
-        return ome, False, 'gff3'
-
+            source, assembly_accession, exit = False,
+            remove = False):
+    newGFF_path = wrk_dir + 'gff3/' + ome + '.gff3.uncur'
+    newFNA_path = wrk_dir + 'fna/' + ome + '.fa'
+    if not os.path.isfile(newFNA_path):
+        try:
+            newFNA_path = moveBioFile(fna_path, ome, 'fa', wrk_dir + 'fna/')
+        except IOError:
+            return ome, False, 'fna'
+    
     curGFF_path = re.sub(r'\.uncur$', '', newGFF_path)
-    faa_path = wrk_dir + 'faa/' + ome + '.aa.fa'
     if not os.path.isfile(curGFF_path):
+        try:
+            newGFF_path = moveBioFile(gff_path, ome, 'gff3', wrk_dir + 'gff3/', suffix = '.uncur')
+        except IOError:
+            return ome, False, 'gff3'
+    
         gff = gff2list(newGFF_path)
         try:
             gff_mngr(ome, gff, curGFF_path, source, assembly_accession)
         except: # catch all errors
             if exit:
                 print('\t' + ome + '|' + assembly_accession \
-                    + 'failed gff curation', flush = True)
+                    + ' failed gff curation', flush = True)
                 sys.exit(17)
             return ome, False, 'gff3'
 
+    faa_path = wrk_dir + 'faa/' + ome + '.aa.fa'
     if not os.path.isfile(faa_path):
         try:
             faa = gff2seq(gff2list(curGFF_path), fa2dict(newFNA_path))
         except: # catch all errors
             if exit:
                 print('\t' + ome + '|' + assembly_accession \
-                    + 'failed proteome generation', flush  = True)
+                    + ' failed proteome generation', flush  = True)
                 sys.exit(18)
             return ome, False, 'faa'
         with open(faa_path + '.tmp', 'w') as out:
             out.write(dict2fa(faa))
         os.rename(faa_path + '.tmp', faa_path)
+
+    if remove:
+        if os.path.isfile(newGFF_path):
+            os.remove(newGFF_path)
+        if os.path.isfile(gff_path):
+            os.remove(gff_path)
+        if os.path.isfile(re.sub(r'\.gz$', '', gff_path)):
+            os.remove(re.sub(r'\.gz$', '', gff_path))
+        if os.path.isfile(fna_path):
+            os.remove(fna_path)
+        if os.path.isfile(re.sub(r'\.gz$', '', fna_path)):
+            os.remove(re.sub(r'\.gz$', '', fna_path))
 
     return ome, newFNA_path, curGFF_path, faa_path
 
@@ -351,7 +366,7 @@ def add2failed(row):
 def main(
     predb, refdb, wrk_dir, 
     verbose = False, spacer = '\t', forbidden = set(), 
-    cpus = 1, exit = False
+    cpus = 1, exit = False, remove = False
     ):
 
     infdb = predb2mtdb(predb)
@@ -363,7 +378,8 @@ def main(
     for ome, row in omedb.items():
         curCmds.append([
             ome, row['fna'], row['gff3'], 
-            wrk_dir, row['source'], row['assembly_acc']
+            wrk_dir, row['source'], row['assembly_acc'],
+            exit, remove
             ])
     with mp.Pool(processes = cpus) as pool:
         curData = pool.starmap(cur_mngr, curCmds)

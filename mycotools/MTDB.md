@@ -28,6 +28,12 @@ make routine comparative genomic analyses accessible
 
 ## MTDB standards
 ### `.mtdb` file format standard
+Example row:
+```
+#ome    genus   species strain  taxonomy        version source  biosample   assembly_acc    acquisition_date        published       fna     faa     gff3
+aaoarx1 Aaosphaeria     arxii   CBS17579        {"clade": "dothideomyceta", "kingdom": "Fungi", "phylum": "Ascomycota", "subphylum": "Pezizomycotina", "class": "Dothideomycetes", "subclass": "Pleosporomycetidae", "order": "Pleosporales", "family": "", "subfamily": "", "genus": "Aaosphaeria", "species": "Aaosphaeria arxii"}    v1.0    jgi             Aaoar1  20210414 Haridas S et al.,2020
+```
+
 Tab-delimited file, with one row per genome and ordered columns:
 - `ome`: MTDB accession "ome" - first three letters of genus, first three letters of species
 (or "sp."), unique database number, and optional MTDB version tag '.\d+', e.g.

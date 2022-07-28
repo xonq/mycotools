@@ -150,7 +150,7 @@ optional arguments:
 
 
 ## Acquiring database files
-### dbFiles.py
+### db2files.py
 Inputs a MycotoolsDB `.mtdb` file (by default uses the master database), then creates symlinks of the selected file types, hard copies the files, or prints their PATHs. A symlink is simply creating a placeholder file that links to the database file... this way it does not take up additional storage space like a hard copy does. However, editing symlinks will edit the original file, so *only hard copy `--hard` if you need to edit the files*.
 
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
@@ -159,14 +159,14 @@ mkdir pullFiles && cd pullFiles
 extractDB.py -r family -l Atheliaceae > atheliaceae.mtdb
 ```
 
-Then, run `dbFiles.py` to copy the protein fastas into the current directory (call `-h` to see all options):
+Then, run `db2files.py` to copy the protein fastas into the current directory (call `-h` to see all options):
 ```bash
-dbFiles.py -d atheliaceae.mtdb -p 
+db2files.py -d atheliaceae.mtdb -p 
 ```
 
 Alternatively, if you just need the paths (links) to these files, simply run:
 ```bash
-dbFiles.py -d atheliaceae.mtdb -p --print
+db2files.py -d atheliaceae.mtdb -p --print
 ```
 
 <br /><br />
@@ -279,7 +279,7 @@ You can create a file with SRA ID's or BioProject, etc. Basically any query that
 
 
 ## Grab accessions
-### acc2fa.py / acc2gff.py
+### acc2fa.py / acc2gff.py / acc2gbk.py
 By default, if you are querying using a MycotoolsDB accession then it can search the database without a standalone file.
 Let's say you want to query *Panaeolus cyanescens'* PsiD and the NCBI accession is "PPQ80975.1". Find Panaelous cyanescens' ome code in the database:
 ```bash
@@ -290,12 +290,14 @@ The first column in the output is `pancya1`, which is the ome code for this orga
 ```bash
 acc2gff.py -a pancya1_PPQ80975.1
 acc2fa.py -a pancya1_PPQ80975.1
+acc2gbk.py -a pancya1_PPQ80975.1
 ```
 
 If you have a list of accessions, create an input file with the accessions separated by new lines then run:
 ```bash
 acc2gff.py -i <INPUTFILE>
 acc2fa.py -i <INPUTFILE>
+acc2gbk.py -i <INPUTFILE>
 ```
 
 <br /><br />
@@ -350,7 +352,9 @@ optional arguments:
 
 ## Grab loci
 ### acc2loci.py
-Inputs an accession (`-a`) or new line separated list of accessions and optional genes +/- (`-p`, default 10). Outputs gene accessions or a gff and protein fasta of the clusters.
+Inputs an accession (`-a`) or new line separated list of accessions and
+optional genes +/- (`-p`, default 10). Outputs gene accessions or a gff and
+protein fasta of the loci.
 
 output gff and protein fasta of an accession's cluster (outputs to `<ACCESSION>_clus*`):
 ```bash
@@ -361,7 +365,6 @@ list proximal +/- 5 genes to standard out:
 ```bash
 acc2loci.py -a fibsp.1_906341 -p 5
 
-fibsp.1_906341 locus +/- 5
 fibsp.1_880711
 fibsp.1_846234
 fibsp.1_809145

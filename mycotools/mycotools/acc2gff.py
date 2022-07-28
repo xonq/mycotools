@@ -78,7 +78,7 @@ def dbMain(db, accs, cpus = 1):
 
 if __name__ == '__main__':
 
-    mp.set_start_method('spawn')
+#    mp.set_start_method('spawn')
     parser = argparse.ArgumentParser( 
         description = 'Inputs gff or database and new line delimitted file of accessions.'
         )
@@ -89,8 +89,7 @@ if __name__ == '__main__':
         help = 'Accssions column for -i (1 indexed). DEFAULT: 1' )
     parser.add_argument( '-o', '--ome', action = 'store_true', help = 'Output files by ome code' )
     parser.add_argument( '-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master' )
-    parser.add_argument( '--cpu', type = int, default = mp.cpu_count(), \
-        help = 'CPUs to parallelize accession searches. DEFAULT: all' )
+    parser.add_argument( '--cpu', type = int, default = mp.cpu_count())
     args = parser.parse_args()
 
     if args.input:

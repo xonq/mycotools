@@ -168,7 +168,7 @@ if __name__ == "__main__":
         regex = r''
         if args.regex.startswith(("'",'"')):
             args.regex = args.regex[1:]
-        if args.regex.startswith(("'",'"')):
+        if args.regex.endswith(("'",'"')):
             args.regex = args.regex[:-1]
         for char in args.regex:
             regex += char
