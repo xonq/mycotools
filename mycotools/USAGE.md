@@ -388,8 +388,11 @@ fibsp.1_906343
 curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY> -p <CODENAME>
 ```
 
-### curGFF3.py / curProteome.py / gff2gff3.py
-There are several scripts in the `utils` used to curate gene coordinate files and proteomes for the MycotoolsDB. `curGFF3.py` is tested with both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB compatible `gff3`, and `curProteome.py` curates NCBI or JGI proteomes.
+### curGFF3.py / gff2gff3.py
+There are several scripts in the `utils` used to curate gene coordinate files
+and proteomes for the MycotoolsDB. `curGFF3.py` is tested with both JGI and
+NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB
+compatible `gff3`
 
 <br /><br />
 
