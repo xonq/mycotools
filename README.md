@@ -13,6 +13,9 @@ Mycotools is a compilation of computational biology tools and database [Mycotool
   incomplete databases.
 - `updateDB.py --update` brings the database to the current date. No more
   database obsolecence in the wake of accelerating genome availability.
+- The MycotoolsDB (MTDB) uniformly curates the numerous notorious iterations of
+  the `gff`, allowing for reliable analyses and format expectations from
+  multiple eras.
 - The `.mtdb` database format enables swift transitions from analyses with datasets of 100,000s genomes to as few as a lineage of interest. No more scrambling to acquire files for an analysis.
 
 Mycotools is currently available as a beta subset of the full suite, excluding the database assimilation tools. MycotoolsDB is currently restricted to Ohio Supercomputer Center - if you are interested in early access, please email `konkelzach@protonmail.com`.
