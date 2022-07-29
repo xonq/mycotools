@@ -86,6 +86,15 @@ class mtdb(dict):
                 'eco_conf',
                 'source', 'published', 'assembly_acc', 'acquisition_date'
                 ]
+            for i, ome in enumerate(df['ome']): 
+                if df['fna'][i] and df['fna'][i] != ome + '.fna':
+                   df['fna'][i] = format_path(df['fna'][i])
+                   df['faa'][i] = format_path(df['faa'][i])
+                   df['gff3'][i] = format_path(df['gff3'][i])
+                else:
+                   df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fna'
+                   df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.faa'
+                   df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
         else:
             columns = self.columns
         for entry in data:
@@ -93,9 +102,13 @@ class mtdb(dict):
             # column
             for i, d in enumerate(entry):
                 df[columns[i]][-1] = d
-            df['taxonomy'][-1] = read_tax(
-                df['taxonomy'][-1]
-                )
+            try:
+                df['taxonomy'][-1] = read_tax(
+                    df['taxonomy'][-1]
+                    )
+            except json.decoder.JSONDecodeError:
+                print(df['taxonomy'][-1])
+                sys.exit()
             df['taxonomy'][-1]['genus'] = df['genus'][-1]
             df['taxonomy'][-1]['species'] = \
                 df['genus'][-1] + ' ' + df['species'][-1]
@@ -106,11 +119,11 @@ class mtdb(dict):
             del df['eco_conf']
         for i, ome in enumerate(df['ome']): 
             # if malformatted due to decreased entries in some lines, this will raise an IndexError
-            if df['fna'][i] and df['fna'][i] != ome + '.fna':
-               df['fna'][i] = format_path(df['fna'][i])
-               df['faa'][i] = format_path(df['faa'][i])
-               df['gff3'][i] = format_path(df['gff3'][i])
-            else:
+ #           if df['fna'][i]:
+#               df['fna'][i] = format_path(df['fna'][i])
+  #             df['faa'][i] = format_path(df['faa'][i])
+   #            df['gff3'][i] = format_path(df['gff3'][i])
+            if not df['fna']:
                df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fna'
                df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.faa'
                df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
@@ -126,9 +139,9 @@ class mtdb(dict):
             ) 
         # does this work if its not an inplace change
         paths = {
-            'faa': [os.environ['MYCOFAA'] + '/', '.faa'],
-            'fna': [os.environ['MYCOFNA'] + '/', '.fna'],
-            'gff3': [os.environ['MYCOGFF3'] + '/', '.gff3']
+            'faa': [os.environ['MYCOFAA'], '.faa'],
+            'fna': [os.environ['MYCOFNA'], '.fna'],
+            'gff3': [os.environ['MYCOGFF3'], '.gff3']
             }
         if db_path:
             with open(db_path, 'w') as out:
