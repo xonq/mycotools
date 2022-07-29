@@ -74,18 +74,18 @@ updateDB.py -u
 <br /><br />
 
 ## Interfacing with the master database
-### mycodb
-`mycodb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
+### mtdb
+`mtdb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
-mycodb
-/home/xonq/mycodb/mycodb/20210125.mtdb
+mtdb
+/home/xonq/mtdb/mtdb/20210125.mtdb
 ```
 
 If you want to use the path of the master database you can use basic bash functionality to work with the output, 
 e.g. to open in a text editor or to grep the file:
 ```bash
-vim $(mycodb)
-grep 'Psilocybe' $(mycodb)
+vim $(mtdb)
+grep 'Psilocybe' $(mtdb)
 ```
 
 <br /><br />
