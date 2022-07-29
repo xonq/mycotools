@@ -76,8 +76,8 @@ to be a pipelining-friendly software suite, both from a command line and
 python scripting standpoint,  while also emphasizing the Unix
 philosophy for each script to *do one thing and do it well*. 
 
-I have found that I am *primarily* a [functional
-programmer](https://docs.python.org/3/howto/functional.html), i.e. my code seldom incorporates novel classes.
+I *primarily* abide by the [functional
+programming paradigm](https://docs.python.org/3/howto/functional.html), i.e. I avoid implicit state changes and my code seldom incorporates novel classes.
 I am not a purist, as you will find the `mtdb` class for the 
 Mycotools Database objects (in the future there will be several more classes),
 but only because it is 1) used frequently, 2) requires rigid formatting, and 3) *needs
