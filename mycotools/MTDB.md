@@ -1,4 +1,4 @@
-![mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png) ![mycotools database](https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png)
+![mycotools database](https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png)
 
 # Mycotools Database (MTDB)
 
@@ -136,3 +136,5 @@ master database.
 The master MTDB should be generated from one user, and privileges should be
 distributed using `chmod`. Note, the master user/group are the only ones with 
 privileges to update and merge manually curated `predb` files into the master database.
+
+![mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png)

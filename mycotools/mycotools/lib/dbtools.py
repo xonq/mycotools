@@ -598,7 +598,7 @@ def hit2taxonomy(
 def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                     rank = 'kingdom'):
 
-    if isinstance(df, mtdb):
+    if isinstance(df, mtdb) or isinstance(df['taxonomy'], list):
         df = df.set_index('ome')
         tax_dicts = {v['genus']: read_tax(v['taxonomy']) for k, v in df.items()}
     else:
@@ -608,7 +608,8 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
     count = 0
 
     for genus in tax_dicts:
-        if any(tax_dicts[genus][x] for x in tax_dicts[genus]):
+        if any(tax_dicts[genus][x] for x in tax_dicts[genus] \
+            if x not in {'genus', 'species', 'strain'}):
             continue
         print('\t' + genus, flush = True)
 # if there is no api key, sleep for a second after 3 queries
@@ -653,7 +654,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
 # if there are multiple TaxIDs, use the first one found
         if king:
             for lineage in lineages:
-                if lineage['Rank'] == rank:
+                if lineage['Rank'].lower() == rank.lower():
                     if lineage['ScientificName'].lower() == king:
                         taxid = tax
                         if len(ids) > 1:
