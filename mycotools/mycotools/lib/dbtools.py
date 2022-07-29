@@ -106,17 +106,16 @@ class mtdb(dict):
             del df['eco_conf']
         for i, ome in enumerate(df['ome']): 
             # if malformatted due to decreased entries in some lines, this will raise an IndexError
-            if not df['fna'][i] or df['fna'][i] == ome + '.fna': # abbreviated line w/o file coordinates
-               df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fna'
-               df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.faa'
-               df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
-            else: # has file coordinates
+            if df['fna'][i] and df['fna'][i] != ome + '.fna':
                df['fna'][i] = format_path(df['fna'][i])
                df['faa'][i] = format_path(df['faa'][i])
                df['gff3'][i] = format_path(df['gff3'][i])
+            else:
+               df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fna'
+               df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.faa'
+               df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
 
         return df
-
 
     def df2db(self, db_path = None, headers = False):
         df = copy.copy(self)
@@ -168,7 +167,6 @@ class mtdb(dict):
                 print(ome + '\t' + \
                     '\t'.join([str(output[ome][x]) for x in output[ome]]), flush = True
                     )
-
 
     def set_index(self, column = 'ome', inplace = False):
         data, retry, error, df, columns = {}, bool(column), False, copy.copy(self), copy.copy(self.columns)
@@ -240,8 +238,6 @@ class mtdb(dict):
         for key in self.columns:
             df[key].append(info[key])
         return df.set_index(index)
-        
-              
                 
 def getLogin( ncbi, jgi ):
 
@@ -256,7 +252,6 @@ def getLogin( ncbi, jgi ):
     print(flush = True)
 
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
-
 
 def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
 
@@ -328,7 +323,6 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
 #
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
-
 def genConfig( 
     branch = 'stable', forbidden = '$MYCODB/log/forbidden.tsv',
     repo = "https://gitlab.com/xonq/mycodb", 
@@ -345,8 +339,6 @@ def genConfig(
 
     return config
 
-
-
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit` 
 def log_editor( log, ome, edit ):
 
@@ -362,7 +354,6 @@ def log_editor( log, ome, edit ):
 
     with open( log, 'w' ) as towrite:
         towrite.write(new_data)
-
 
 def readLog( log, columns = '', sep = '\t' ):
 
@@ -384,7 +375,6 @@ def readLog( log, columns = '', sep = '\t' ):
         log_dict[ line[0] ] = { columns[ x ]: line[ x ] for x in range( 1, len( line ) ) }
 
     return log_dict
-
 
 def masterDB(path = '$MYCODB'):
     """Acquire the path of the master database by searching $MYCODB for a file
@@ -465,7 +455,6 @@ def db2df(data, stdin = False):
 
     return db_df
 
-
 def df2std( df ):
     '''
     Standardized organization of database columns. DEPRECATED pandas MTDB
@@ -475,7 +464,6 @@ def df2std( df ):
         mtdb.columns
         ]
     return trans_df
-
 
 # imports dataframe and organizes it in accord with the `std df` format
 # exports as database file into `db_path`. If rescue is set to 1, save in home folder if output doesn't exist
@@ -513,7 +501,6 @@ def df2db(df, db_path, header = False, overwrite = False, std_col = True, rescue
                 eprint('\nOutput directory does not exist. Rescue not enabled.', flush = True)
                 raise FileNotFoundError
                 break
-
 
 def hit2taxonomy( 
     taxid, 
@@ -572,14 +559,6 @@ def hit2taxonomy(
                 time.sleep( 300 )
                 Entrez.email = email
                 Entrez.api_key = api
- #               wrapper = io.TextIOWrapper(
-  #                  io.BytesIO(),
-   #                 encoding = 'utf-8',
-    #                line_buffering = True,
-     #               )
-      #          for line in tax_handle:
-       #             wrapper.write(line + '\n')
-        #        tax_handle = wrapper
             sleep = True
 
     if records:
@@ -591,7 +570,6 @@ def hit2taxonomy(
                     continue
 
     return tax_dict, sleep
-
 
 # gather taxonomy by querying NCBI
 # if `api_key` is set to `1`, it assumes the `Entrez.api` method has been called already
@@ -686,7 +664,6 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
 
     return tax_dicts
 
-
 # read taxonomy by conterting the string into a dictionary using `json.loads`
 def read_tax(taxonomy_string):
    
@@ -701,7 +678,6 @@ def read_tax(taxonomy_string):
         return tax_dict
     else:
         return {}
-
 
 # assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database
 # forbid a list of taxonomic classifications you are not interested in and return a new database
@@ -725,68 +701,6 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome', forbid={'no rank', 'superki
             )
 
     return db
-
-
-# extract taxonomy and return a database with just the taxonomy you are interested in
-def extract_tax(db, taxonomy, classification, inverse = False ):
-#    import pandas as pd, pandas
-
-    if isinstance(taxonomy, str):
-        taxonomy = [taxonomy]
-
-    taxonomy = set(x.lower() for x in taxonomy)
-#    new_db = pd.DataFrame()
-    db = db.set_index()
-
-# `genus` is a special case because it has its own column, so if it is not a genus, we need to read the taxonomy
-# once it is read, we can parse the taxonomy dictionary via the inputted `classification` (taxonomic classification)
-    if classification != 'genus':
-        new_db = mtdb().set_index()
-
-        for ome in db:
-            db[ome]['taxonomy'] = read_tax(db[ome]['taxonomy'])
-            if classification in db[ome]['taxonomy']:
-                if db[ome]['taxonomy'][classification].lower() in taxonomy and not inverse:
-                    new_db[ome] = db[ome]
-                elif inverse and db[ome]['taxonomy'][classification].lower() not in taxonomy:
-                    new_db[ome] = db[ome]
-            elif inverse:
-               new_db[ome] = db[ome]
-
-# if `classification` is `genus`, simply check if that fits the criteria in `taxonomy`
-    elif classification == 'genus':
-        taxonomy = set(x[0].upper() + x[1:].lower() for x in taxonomy)
-        if not inverse:
-            new_db = mtdb({ome: row for ome, row in db.items() if row['genus'] in taxonomy}, index =
-                'ome')
-        else:
-            new_db = mtdb({ome: row for ome, row in db.items() if row['genus'] not in taxonomy}, index =
-                'ome')
-
-    return new_db.reset_index()
-
-
-# extracts all omes from an `ome_list` or the inverse and returns the extracted database
-def extract_omes(db, ome_list, index = 'ome', inverse = False):
-    import pandas as pd, pandas
-
-    new_db = pd.DataFrame()
-    ref_set = set()
-    ome_set = set(ome_list)
-    if not inverse:
-        for ome in ome_set:
-            ref_set.add(ome.lower())
-    else:
-        for i, row in db.iterrows():
-            if row[index] not in ome_set:
-                ref_set.add( row[index].lower() )
-
-    db = db.set_index(index)
-    for i,row in db.iterrows():
-        if row[index].lower() in ref_set:
-            new_db = new_db.append(row)
-
-    return new_db
 
 if not masterDB():
     eprint('WARNING: MycotoolsDB not initialized', flush = True)

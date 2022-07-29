@@ -7,7 +7,7 @@ import argparse
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff
 from mycotools.lib.dbtools import mtdb, masterDB
-from mycotools.lib.kontools import format_path
+from mycotools.lib.kontools import format_path, stdin2str
 
 def grabGffAcc( gff_list, acc, term = 'Alias=' ):
     '''grab acc from alias'''
@@ -82,14 +82,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser( 
         description = 'Inputs gff or database and new line delimitted file of accessions.'
         )
-    parser.add_argument( '-a', '--accession' )
-    parser.add_argument( '-i', '--input', help = 'File with accessions' )
-    parser.add_argument( '-g', '--gff', help = 'GFF3 input' )
-    parser.add_argument( '-c', '--column', default = 1, 
-        help = 'Accssions column for -i (1 indexed). DEFAULT: 1' )
-    parser.add_argument( '-o', '--ome', action = 'store_true', help = 'Output files by ome code' )
-    parser.add_argument( '-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master' )
-    parser.add_argument( '--cpu', type = int, default = mp.cpu_count())
+    parser.add_argument('-a', '--accession', help = '"-" for stdin')
+    parser.add_argument('-i', '--input', help = 'File with accessions')
+    parser.add_argument('-g', '--gff', help = 'GFF3 input')
+    parser.add_argument('-c', '--column', default = 1, 
+        help = 'Accssions column for -i (1 indexed). DEFAULT: 1')
+    parser.add_argument('-o', '--ome', action = 'store_true', help = 'Output files by ome code')
+    parser.add_argument('-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master')
+    parser.add_argument('--cpu', type = int, default = mp.cpu_count())
     args = parser.parse_args()
 
     if args.input:
@@ -97,10 +97,13 @@ if __name__ == '__main__':
         with open(input_file, 'r') as raw:
             accs = [x.rstrip().split('\t')[args.column-1] for x in raw]
     elif not args.accession:
-        print('\nERROR: need input file or accession', flush = True)
-        sys.exit( 1 )
+        raise ValueError('need input file or accession')
     else:
-        accs = [args.accession]
+        if '-' == args.accession:
+            data = stdin2str()
+            accs = data.split()
+        else:
+            accs = [args.accession]
 
     if args.cpu < mp.cpu_count():
         cpu = args.cpu

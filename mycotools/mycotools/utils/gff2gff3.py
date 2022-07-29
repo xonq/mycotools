@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED to arrive at a consensus for protein and transcript IDs
+
 import re
 import sys
 import argparse

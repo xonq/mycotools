@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 # NEED TO DEFAULT CHEKC FOR INTRONS FOR PREDB2DB
+# NEED to arrive at a consensus for protein IDs
 
 import os
 import re

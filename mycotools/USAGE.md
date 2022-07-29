@@ -22,8 +22,8 @@
 	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
 	- [Extract fasta coordinates](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#fasta-coordinates)
-	- [GFF to sequence](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#gene-coordinates-to-sequences)
 	- [Grabbing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-loci)
+	- [GFF to sequence](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#gene-coordinates-to-sequences)
 	- [Visualizing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#visualizing-loci)
 	- [Curating annotation](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#curate-annotation)
 
@@ -282,24 +282,60 @@ You can create a file with SRA ID's or BioProject, etc. Basically any query that
 
 ## Grab accessions
 ### acc2fa.py / acc2gff.py / acc2gbk.py
-By default, if you are querying using a MycotoolsDB accession then it can search the database without a standalone file.
-Let's say you want to query *Panaeolus cyanescens'* PsiD and the NCBI accession is "PPQ80975.1". Find Panaelous cyanescens' ome code in the database:
-```bash
-grep Panaeolus $(mycodb) | grep cyanescens | cut -f 1
-```
+All Mycotools accessions - assembly or protein - are `<ome>_<acc>` where "ome"
+is the MTDB genome codename and "acc" is the accession.
+Let's say you want to query *Panaeolus cyanescens'* (ome: pancya1) PsiD and the NCBI accession is "PPQ80975.1"
 
-The first column in the output is `pancya1`, which is the ome code for this organism. Now, prepend the code to the accession and grab it from the db (you can use `>` after the commands to pipe output to a file):
+Prepend the ome codename to "_" and the accession and grab it from the MTDB:
 ```bash
 acc2gff.py -a pancya1_PPQ80975.1
 acc2fa.py -a pancya1_PPQ80975.1
 acc2gbk.py -a pancya1_PPQ80975.1
 ```
 
+To output to file, simply append `> <FILENAME>` to your command. 
+
 If you have a list of accessions, create an input file with the accessions separated by new lines then run:
 ```bash
 acc2gff.py -i <INPUTFILE>
 acc2fa.py -i <INPUTFILE>
 acc2gbk.py -i <INPUTFILE>
+```
+
+Alternatively, input accessions from stdin:
+```bash
+echo "pancya1_PPQ80975.1" | acc2gbk.py -a -
+```
+
+### Grab loci
+### acc2locus.py
+Grab loci the same as above within a set number of genes plus or minus:
+
+list proximal +/- 5 genes to standard out:
+```bash
+acc2locus.py -a fibsp.1_906341 -p 5
+
+fibsp.1_880711
+fibsp.1_846234
+fibsp.1_809145
+fibsp.1_923701
+fibsp.1_771516
+fibsp.1_906341
+fibsp.1_719531
+fibsp.1_846242
+fibsp.1_138
+fibsp.1_942299
+fibsp.1_906343
+```
+
+Generate a genbank from the locus (useful for `clinker`):
+```bash
+acc2locus.py -a <OME>_<ACC> -p 5 | acc2gbk.py -a -
+```
+
+Output GFFs and protein fastas for the locus:
+```bash
+acc2locus.py -a <OME>_<ACC> -p 5 --ome
 ```
 
 <br /><br />
@@ -347,37 +383,6 @@ optional arguments:
   -pm PLUSMINUS, --plusminus PLUSMINUS
                         -n only
   -af, --all_flanks     -n and -nc only
-```
-
-<br /><br />
-
-
-## Grab loci
-### acc2loci.py
-Inputs an accession (`-a`) or new line separated list of accessions and
-optional genes +/- (`-p`, default 10). Outputs gene accessions or a gff and
-protein fasta of the loci.
-
-output gff and protein fasta of an accession's cluster (outputs to `<ACCESSION>_clus*`):
-```bash
-acc2loci.py -o -a <MYCOTOOLSDB_ACCESSION>
-```
-
-list proximal +/- 5 genes to standard out:
-```bash
-acc2loci.py -a fibsp.1_906341 -p 5
-
-fibsp.1_880711
-fibsp.1_846234
-fibsp.1_809145
-fibsp.1_923701
-fibsp.1_771516
-fibsp.1_906341
-fibsp.1_719531
-fibsp.1_846242
-fibsp.1_138
-fibsp.1_942299
-fibsp.1_906343
 ```
 
 <br /><br />

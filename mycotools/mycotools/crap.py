@@ -28,7 +28,7 @@ from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Com
 from mycotools.acc2fa import dbmain as acc2fa
 from mycotools.fa2clus import writeData, main as fa2clus
 from mycotools.fa2tree import main as fa2tree, PhyloError
-from mycotools.acc2loci import main as acc2loci
+from mycotools.acc2locus import main as acc2locus
 from mycotools.gff2svg import main as gff2svg
 from mycotools.db2search import main as db2search
 from mycotools.ome2name import main as ome2name
@@ -302,7 +302,7 @@ def extractLocusOG(gff3, ome, genesTograb, ogs, omeGene2og, plusminus, og2color,
     gff_list = gff2list(gff3)
     genesTograb = [x for x in genesTograb if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
     try:
-        out_indices, geneGffs = acc2loci(gff_list, genesTograb, plusminus, mycotools = True, geneGff = True)
+        out_indices, geneGffs = acc2locus(gff_list, genesTograb, plusminus, mycotools = True, geneGff = True)
     except KeyError:
         eprint('\t\t\t' + ome + ' incorrectly formatted GFF3', flush = True)
         return
@@ -343,7 +343,7 @@ def extractLocusGene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_di
     gff_list = gff2list(gff3)
     accs = [x for x in accs if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
     try:
-        out_indices, geneGffs = acc2loci(gff_list, accs, plusminus, mycotools = True, geneGff = True)
+        out_indices, geneGffs = acc2locus(gff_list, accs, plusminus, mycotools = True, geneGff = True)
     except KeyError:
         eprint('\t\t\t' + ome + ' incorrectly formatted GFF3', flush = True)
         return

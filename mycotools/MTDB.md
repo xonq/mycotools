@@ -97,6 +97,19 @@ proteome `faa` fasta.
 - CDS: CDS ID will contain a unique number `cds\d+`; parent will be an RNA ID; typically contains a
   `protein_id/product_id` field
 
+#### - `gff3` attributes field formatting
+MTDB recognizes several attribute fields, separated by a semi-colon and
+optionally contained within single/double quotes. MTDB permits non-recognized
+fields.
+
+- `Alias=<ome>_<acc>`: MTDB accession; REQUIRED
+- `ID=[^;]+`: entry `ID`; REQUIRED
+- `Parent=[^;]+`: the `ID` this row is descended from, i.e.
+  gene->mRNA->CDS/exon
+- `[protein_id[^;]+|proteinId=[^;]+]`: protein ID field
+- `product=[^;]+`: functional annotation
+- `[transcriptId=[^;]+|transcript_id=[^;]+]`: transcript ID field
+
 #### - alternate splicing
 Alternately spliced genes are accounted for in curation. Genes with alternately
 spliced descendants will have multiple aliases, separated by '|'. mRNAs and

@@ -7,7 +7,7 @@ import argparse
 import multiprocessing as mp
 from collections import defaultdict
 from Bio.Seq import Seq
-from mycotools.lib.kontools import eprint, format_path
+from mycotools.lib.kontools import eprint, format_path, stdin2str
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps
 from mycotools.acc2gff import dbMain as acc2gff
@@ -180,7 +180,7 @@ def main(gff_list, db, product_search = r'product=([^;]+)'):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description = "Inputs MTDB gff or accessions, outputs GenBank file" )
-    parser.add_argument('-a', '--accession')
+    parser.add_argument('-a', '--accession', help = '"-" for stdin')
     parser.add_argument('-i', '--input', help = 'File with accessions')
     parser.add_argument('-g', '--gff', help = 'GFF3 input')
     parser.add_argument('-p', '--product', 
@@ -203,7 +203,11 @@ if __name__ == '__main__':
         for acc in accs_prep:
             accs.extend(acc)
     elif args.accession:
-        accs = [args.accession]
+        if args.accession == '-':
+            data = stdin2str()
+            accs = data.split()
+        else: 
+            accs = [args.accession]
     elif not args.gff:
         raise FileNotFoundError('need input file or accession')
 

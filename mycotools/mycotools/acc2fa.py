@@ -6,7 +6,7 @@ import sys
 import argparse
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
 from mycotools.lib.dbtools import mtdb, masterDB
-from mycotools.lib.kontools import format_path, eprint
+from mycotools.lib.kontools import format_path, eprint, stdin2str
 
 
 def extractHeaders( fasta_file, accessions, ome = None ):
@@ -80,8 +80,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( description = 'Inputs fasta or database and new line delimitted file of headers. ' + \
         'Outputs fasta with headers' )
-    parser.add_argument( '-a', '--accession', help = 'Input accession. For coordinates ' + \
-        'append [$START-$END] - accepts reverse coordinates for nucleotide accessions' )
+    parser.add_argument( '-a', '--accession', help = '"-" for stdin. For coordinates ' + \
+        'append [$START-$END] - reverse coordinates for antisense' )
     parser.add_argument( '-i', '--input', help = 'File with accessions' )
     parser.add_argument( '-f', '--fasta', help = 'Fasta input' )
     parser.add_argument( '-c', '--column', default = 1, 
@@ -106,7 +106,11 @@ if __name__ == '__main__':
             with open(input_file, 'r') as raw:
                 accs = [x.rstrip().split('\t')[args.column-1] for x in raw]
     else:
-        accs = [args.accession]
+        if '-' == args.accession:
+            data = stdin2str()
+            accs = data.split()
+        else:
+            accs = [args.accession]
        
     db_path = format_path( args.database )
     if not args.fasta:

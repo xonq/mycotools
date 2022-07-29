@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 # NEED to curate CDS parents to ensure they relate to the RNA
+# NEED to curate protein ids to be a uniform title
 
 import os
 import re
