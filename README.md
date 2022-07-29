@@ -41,3 +41,7 @@ Check out [README.md](https://gitlab.com/xonq/mycotools/-/tree/master/mycotools)
 
 # CITING
 If Mycotools contribute to your analysis, please cite this git repository (gitlab.com/xonq/mycotools) and mention the Mycotools version in line.
+
+<img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
+
+<br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
