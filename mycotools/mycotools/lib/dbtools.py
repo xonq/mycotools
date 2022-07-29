@@ -123,10 +123,10 @@ class mtdb(dict):
 #               df['fna'][i] = format_path(df['fna'][i])
   #             df['faa'][i] = format_path(df['faa'][i])
    #            df['gff3'][i] = format_path(df['gff3'][i])
-            if not df['fna']:
-               df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fna'
-               df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.faa'
-               df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
+            if not df['fna'][i]:
+               df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
+               df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
+               df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
 
         return df
 
