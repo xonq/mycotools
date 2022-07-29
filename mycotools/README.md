@@ -85,3 +85,7 @@ specific manipulations* that are cumbersome in default classes alone.
 *I will continue functional programming*, striving to format 
 in accord with PEP-8 with minimal deviance - while there is still work to be done any code edits should 
 favor the functional paradigm, unless a demonstrated need for a class (above) exists.
+
+<img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
+
+<br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />

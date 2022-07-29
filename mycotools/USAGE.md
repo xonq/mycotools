@@ -1,6 +1,7 @@
-![mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png)
+![Mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.png)
 
-# INDEX
+# USAGE GUIDE
+**Table of Contents**
 
 <br />
 
@@ -748,3 +749,9 @@ optional arguments:
   -c CPU, --cpu CPU
   -v, --verbose
 ```
+
+<img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
+
+<br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
+
+
