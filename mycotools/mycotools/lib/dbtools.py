@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-# NEED to make mtdb automatically type and restrict types on import
+# NEED to make mycodb path references stores in a config
 
 import os
 import re
@@ -16,7 +16,8 @@ from Bio import Entrez
 from urllib.error import HTTPError
 from io import StringIO
 from collections import defaultdict
-from mycotools.lib.kontools import collect_files, eprint, format_path
+from mycotools.lib.kontools import collect_files, eprint, format_path, \
+    read_json
 
 
 class mtdb(dict):
@@ -614,9 +615,18 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
 
 # gather taxonomy from information present in the genus column and query NCBI using Entrez
         ids = None
-        search_term = str(genus) + ' [GENUS]'
-        handle = Entrez.esearch(db='Taxonomy', term=search_term)
-        ids = Entrez.read(handle)['IdList']
+        fails = 0
+        while True:
+            try:
+                search_term = str(genus) + ' [GENUS]'
+                handle = Entrez.esearch(db='Taxonomy', term=search_term)
+                ids = Entrez.read(handle)['IdList']
+                break
+            except RuntimeError:
+                fails += 1
+                if fails > 3:
+                    break
+                time.sleep(1)
         count += 1
         if len(ids) == 0:
             print('\t\tNo taxonomy information', flush = True)
@@ -715,5 +725,12 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome', forbid={'no rank', 'superki
 
     return db
 
+interface = format_path('~/.mycotools/config.json')
+if os.path.isfile(interface):
+    envs_info = read_json(interface)
+    for var, env in envs_info[envs_info['active']].items():
+        os.environ[var] = env
+
 if not masterDB():
-    eprint('WARNING: MycotoolsDB not initialized', flush = True)
+    eprint('WARNING: MycotoolsDB not initialized; setup using `mtdb -h`', flush = True)
+

@@ -49,17 +49,26 @@
 <br /><br /><br />
 
 
-# MYCOTOOLS DB
-The following are information regarding scripts that manipulate Mycotools .mtdb files. To learn more about Mycotools .mtdb, you may refer to the master [MycotoolsDB repository](https://gitlab.com/xonq/mycotoolsdb/-/README.md) (currently unavailable).
+# MYCOTOOLSDB
+The following scripts interface with and manipulate MycotoolsDB (MTDB) `.mtdb`
+files. To learn more about MycotoolsDB and the `.mtdb` format standard, refer to
+[this guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md).
 
 <br /><br />
 
 ## Initialization
 ### updateDB.py
-To initialize a curated database of all NCBI and MycoCosm (JGI) genomes, run the following
+#### FUNGI
+To initialize a curated database of all NCBI and MycoCosm (JGI) fungal genomes:
 
 ```bash
 updateDB.py -i <INIT DIRECTORY>
+```
+
+#### PROKARYOTES
+To initialize a curated database of all NCBI genomes prokaryotic genomes:
+```bash
+updateDB.py -i <INIT_DIRECTORY> -p
 ```
 
 <br /><br />
@@ -75,7 +84,7 @@ updateDB.py -u
 
 ## Interfacing with the master database
 ### mtdb
-`mtdb` is a utility that integrates with the master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
+`mtdb` is a utility that initializes interfacing with an established master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
 mtdb
 /home/xonq/mtdb/mtdb/20210125.mtdb
@@ -86,6 +95,18 @@ e.g. to open in a text editor or to grep the file:
 ```bash
 vim $(mtdb)
 grep 'Psilocybe' $(mtdb)
+```
+
+To add interfacing with a fungal/prokaryote master MTDB:
+```bash
+mtdb -f <FUNGAL_MTDB_DIR>
+mtdb -p <PROKARYOTE_MTDB_DIR>
+```
+
+To switch between established interfaces:
+```bash
+mtdb -f
+mtdb -p
 ```
 
 <br /><br />
@@ -312,21 +333,34 @@ echo "pancya1_PPQ80975.1" | acc2gbk.py -a -
 ### acc2locus.py
 Grab loci the same as above within a set number of genes plus or minus:
 
+list proximal +/- 5Kb from accession to standard out:
+```bash
+acc2locus.py -a fibpsy1_906341 -p 5000 -b
+
+fibpsy1_809145
+fibpsy1_923701
+fibpsy1_771516
+fibpsy1_906341
+fibpsy1_719531
+fibpsy1_846242
+fibpsy1_138
+```
+
 list proximal +/- 5 genes to standard out:
 ```bash
-acc2locus.py -a fibsp.1_906341 -p 5
+acc2locus.py -a fibpsy1_906341 -p 5
 
-fibsp.1_880711
-fibsp.1_846234
-fibsp.1_809145
-fibsp.1_923701
-fibsp.1_771516
-fibsp.1_906341
-fibsp.1_719531
-fibsp.1_846242
-fibsp.1_138
-fibsp.1_942299
-fibsp.1_906343
+fibpsy1_880711
+fibpsy1_846234
+fibpsy1_809145
+fibpsy1_923701
+fibpsy1_771516
+fibpsy1_906341
+fibpsy1_719531
+fibpsy1_846242
+fibpsy1_138
+fibpsy1_942299
+fibpsy1_906343
 ```
 
 Generate a genbank from the locus (useful for `clinker`):

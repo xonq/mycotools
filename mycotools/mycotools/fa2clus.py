@@ -316,7 +316,7 @@ def iterativeRun(
         if log_path:
             iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
             log_dict['iterations'].append(iteration_dict)
-            write_json(log_path, log_dict)
+            write_json(log_dict, log_path)
         if focalLen >= minseq:
             if maxseq:
                 if focalLen <= maxseq:
@@ -374,7 +374,7 @@ def reiterativeRun(
         if log_path:
             iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
             log_dict['iterations'].append(iteration_dict)
-            write_json(log_path, log_dict)
+            write_json(log_dict, log_path)
         if focalLen >= minseq:
             if maxseq:
                 if focalLen <= maxseq:
@@ -437,7 +437,7 @@ def main(
     if log_path:
         if os.path.isfile(log_path):
             log_dict = readLog(log_path, log_dict)
-        write_json(log_path, log_dict)
+        write_json(log_dict, log_path)
 
     if os.path.isfile(log_dict['distance_matrix']):
         if searchProg == 'usearch':

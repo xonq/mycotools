@@ -534,7 +534,7 @@ def parseLog(logPath, newLog, out_dir):
                 '\tERROR: log file corrupted. Hoping for the best.', 
                 flush = True
                 )
-    write_json(logPath, newLog)
+    write_json(newLog, logPath)
 
 
 def crapMngr(

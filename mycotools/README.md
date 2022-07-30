@@ -51,14 +51,14 @@ pip install mycotools --upgrade
 
 ## 3) Integrate with installed MycotoolsDB 
 #### OSC
-If you are using the Ohio Supercomputer and have access to PAS1046, then simply run this command to integrate your installation with the eukaryote database:
+If you are using the Ohio Supercomputer and have access to PAS1046, then simply run this command to integrate your installation with the fungal database:
 ```bash
-mtdb --init /fs/project/PAS1046/databases/mtdb/
+mtdb --fungi /fs/project/PAS1046/databases/mtdb/
 ```
 
 for the prokaryote OSC database:
 ```bash
-mtdb --init /fs/ess/PAS1568/mycotools
+mtdb --prokaryote /fs/ess/PAS1568/mycotools/
 ```
 
 Restart your login and you're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
