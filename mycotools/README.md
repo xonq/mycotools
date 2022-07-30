@@ -61,10 +61,10 @@ for the prokaryote OSC database:
 mtdb --prokaryote /fs/ess/PAS1568/mycotools/
 ```
 
-Restart your login and you're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
+You're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
 #### Non-OSC
-MycotoolsDB is currently not available for widespread use. We are waiting to complete our intial analyses and publish the data before releasing.
+MycotoolsDB will be available September, 2022.
 
 <br /><br /><br />
 

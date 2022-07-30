@@ -9,7 +9,7 @@
 - **MYCOTOOLSDB TOOLS**
 	- [Initializing MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#initialization)
 	- [Updating MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#updating)
-	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-db)
+	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
 	- [Adding local genomes to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#adding-local-genomes)
@@ -58,6 +58,10 @@ files. To learn more about MycotoolsDB and the `.mtdb` format standard, refer to
 
 ## Initialization
 ### updateDB.py
+updateDB.py is for initializing and building the master MTDB; to interface with
+an established MTDB, see
+[interfacing](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
+
 #### FUNGI
 To initialize a curated database of all NCBI and MycoCosm (JGI) fungal genomes:
 
@@ -82,7 +86,7 @@ updateDB.py -u
 
 <br /><br />
 
-## Interfacing with the master database
+## Interfacing
 ### mtdb
 `mtdb` is a utility that initializes interfacing with an established master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
@@ -108,6 +112,7 @@ To switch between established interfaces:
 mtdb -f
 mtdb -p
 ```
+
 
 <br /><br />
 
