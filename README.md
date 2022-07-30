@@ -3,6 +3,7 @@
         src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.white.png"
     >
 </p>
+(supports prokaryotes too!)
 
 <br />
 
