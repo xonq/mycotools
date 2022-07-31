@@ -116,8 +116,7 @@ grep 'Psilocybe' $(mtdb)
 
 To add interfacing with a fungal/prokaryote master MTDB:
 ```bash
-mtdb -f <FUNGAL_MTDB_DIR>
-mtdb -p <PROKARYOTE_MTDB_DIR>
+mtdb -i <DATABASE_BASE_DIRECTORY>
 ```
 
 To switch between established interfaces:

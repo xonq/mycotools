@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-# NEED to make mycodb path references stores in a config
+# NEED to make login check more intuitive and easier for NCBI only
 
 import os
 import re
@@ -267,7 +267,7 @@ def getLogin( ncbi, jgi ):
 
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
-def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
+def loginCheck( info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True ):
 
     salt = b'D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118'
     #NEED to make this store a password
@@ -284,7 +284,7 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
         )
         print(flush = True)
         if sys.stdin.isatty():
-            hash_pwd = getpass.getpass( prompt = 'MycoDB login password (stdin allowed): ' )
+            hash_pwd = getpass.getpass( prompt = 'MTDB login password (stdin allowed): ' )
         else:
             hash_pwd = sys.stdin.readline().rstrip()
         key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
@@ -296,7 +296,7 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
         decrypted = fernet.decrypt(data)
         data = decrypted.decode('UTF-8').split('\n')
         if len(data) != 4:
-            eprint('BAD PASSWORD FILE. Delete ~/.mycodb to reset.', flush = True)
+            eprint('BAD PASSWORD FILE. Delete ~/.mycotools/mtdb_key to reset.', flush = True)
             sys.exit(8)
         ncbi_email = data[0].rstrip()
         ncbi_api = data[1].rstrip()
@@ -337,9 +337,9 @@ def loginCheck( info_path = '~/.mycodb', ncbi = True, jgi = True ):
 #
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
-def genConfig( 
-    branch = 'stable', forbidden = '$MYCODB/log/forbidden.tsv',
-    repo = "https://gitlab.com/xonq/mycodb", 
+def gen_config( 
+    branch = 'fungi', forbidden = '$MYCODB/log/forbidden.tsv',
+    repo = "https://gitlab.com/xonq/mycotoolsdb", 
     rogue = False, nonpublished = False
     ):
 
@@ -436,6 +436,8 @@ def db2df(data, stdin = False):
         if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
             db_df = pd.read_csv( StringIO(data), sep = '\t', header = None )
 
+    db_df = db_df.fillna('')
+
     if len(db_df.keys()) == 16: # legacy conversion TO BE DEPRECATED
         eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
         db_df.columns = [
@@ -453,19 +455,19 @@ def db2df(data, stdin = False):
         db_df.at[i, 'taxonomy']['genus'] = row['genus']
         db_df.at[i, 'taxonomy']['species'] = \
             row['genus'] + ' ' + row['species']
-    if len(db_df) == 16: # LEGACY conversion to be deprecated
-        del db_df['ecology']
-        del db_df['eco_conf']
-    for i, row in db_df.iterrows(): 
         # if malformatted due to decreased entries in some lines, this will raise an IndexError
-        if not row['fna'] or row['fna'] == row['ome'] + '.fna': # abbreviated line w/o file coordinates
-           db_df.at[i, 'fna'] = os.environ['MYCOFNA'] + '/' + row['ome'] + '.fna'
-           db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + '/' + row['ome'] + '.faa'
-           db_df.at[i, 'gff3'] = os.environ['MYCOGFF3'] + '/' + row['ome'] + '.gff3'
+        if row['fna'] or row['fna'] == row['ome'] + '.fna': # abbreviated line w/o file coordinates
+           db_df.at[i, 'fna'] = os.environ['MYCOFNA'] + row['ome'] + '.fna'
+           db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + row['ome'] + '.faa'
+           db_df.at[i, 'gff3'] = os.environ['MYCOGFF3'] + row['ome'] + '.gff3'
         else: # has file coordinates
            db_df.at[i, 'fna'] = format_path(row['fna'])
            db_df.at[i, 'faa'] = format_path(row['faa'])
            db_df.at[i, 'gff3'] = format_path(row['gff3'])
+
+    if len(db_df) == 16: # LEGACY conversion to be deprecated
+        del db_df['ecology']
+        del db_df['eco_conf']
 
     return db_df
 
