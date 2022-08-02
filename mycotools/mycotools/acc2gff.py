@@ -62,12 +62,11 @@ def dbMain(db, accs, cpus = 1):
     for ome in list(omes):
         omeAccs = [acc for acc in accs if acc.startswith(ome + '_')]
         gff_list = gff2list(db[ome]['gff3'])
-        grabAcc_res = [grabGffAccs(gff_list, omeAccs, ome)]
+#        grabAcc_res = [grabGffAccs(gff_list, omeAccs, ome)]
+        grabAcc_cmds.append([gff_list, omeAccs, ome])
 
-#        grabAcc_cmds.append([gff_list, omeAccs, ome])
-
- #   with mp.Pool(processes = cpus) as pool:
-  #      grabAcc_res = pool.starmap(grabGffAccs, grabAcc_cmds)
+    with mp.Pool(processes = cpus) as pool:
+        grabAcc_res = pool.starmap(grabGffAccs, grabAcc_cmds)
 
     gffs = {}
     for res in grabAcc_res:

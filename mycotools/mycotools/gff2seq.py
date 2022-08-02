@@ -6,7 +6,7 @@ import argparse
 from Bio.Seq import Seq
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps, dict2fa
-from mycotools.lib.kontools import format_path, sys_start, eprint
+from mycotools.lib.kontools import format_path, sys_start, eprint, stdin2str
 
 def sortGene(sorting_group):
 
@@ -572,7 +572,7 @@ if __name__ == '__main__':
            'and outputs nucleotides/proteins. Use an abstracted gene gff ' + \
            '(acc2gff.py) to only output a smaller set of gene(s).'
        )
-    parser.add_argument('-g', '--gff', required = True)
+    parser.add_argument('-g', '--gff', help = '"-" for stdin', required = True)
     parser.add_argument('-n', '--nucleotide', action = 'store_true')
     parser.add_argument('-p', '--protein', action = 'store_true')
     parser.add_argument('-a', '--assembly')
@@ -582,7 +582,11 @@ if __name__ == '__main__':
     parser.add_argument('-af', '--all_flanks', action = 'store_true', help = '-n and -nc only')
     args = parser.parse_args()
 
-    input_gff = gff2list(format_path(args.gff))
+    if args.gff == '-':
+        data = stdin2str()
+        input_gff = gff2list(data, path = False)
+    else:
+        input_gff = gff2list(format_path(args.gff))
     if args.assembly:
         assembly_dicts = {'input': fa2dict( format_path(args.assembly) )}
         gff_dicts = {'input': input_gff}

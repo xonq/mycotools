@@ -17,7 +17,7 @@ from urllib.error import HTTPError
 from io import StringIO
 from collections import defaultdict
 from mycotools.lib.kontools import collect_files, eprint, format_path, \
-    read_json
+    read_json, write_json
 
 
 class mtdb(dict):
@@ -87,16 +87,9 @@ class mtdb(dict):
                 'eco_conf',
                 'source', 'published', 'assembly_acc', 'acquisition_date'
                 ]
-            for i, ome in enumerate(df['ome']): 
-                if df['fna'][i] and df['fna'][i] != ome + '.fna':
-                   df['fna'][i] = format_path(df['fna'][i])
-                   df['faa'][i] = format_path(df['faa'][i])
-                   df['gff3'][i] = format_path(df['gff3'][i])
-                else:
-                   df['fna'][i] = os.environ['MYCOFNA'] + '/' + ome + '.fna'
-                   df['faa'][i] = os.environ['MYCOFAA'] + '/' + ome + '.faa'
-                   df['gff3'][i] = os.environ['MYCOGFF3'] + '/' + ome + '.gff3'
+            legacy = True
         else:
+            legacy = False
             columns = self.columns
         for entry in data:
             [df[c].append('') for c in columns] # add a blank entry to each
@@ -118,16 +111,17 @@ class mtdb(dict):
         if len(data[0]) == 16: # LEGACY conversion to be deprecated
             del df['ecology']
             del df['eco_conf']
-        for i, ome in enumerate(df['ome']): 
-            # if malformatted due to decreased entries in some lines, this will raise an IndexError
- #           if df['fna'][i]:
-#               df['fna'][i] = format_path(df['fna'][i])
-  #             df['faa'][i] = format_path(df['faa'][i])
-   #            df['gff3'][i] = format_path(df['gff3'][i])
-            if not df['fna'][i]:
-               df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
-               df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
-               df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
+        if legacy:
+            for i, ome in enumerate(df['ome']):
+                df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
+                df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
+                df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
+        else:
+            for i, ome in enumerate(df['ome']): 
+                if not df['fna'][i]:
+                    df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
+                    df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
+                    df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
 
         return df
 
@@ -726,6 +720,32 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome', forbid={'no rank', 'superki
             )
 
     return db
+
+def mtdb_connect(config, dbtype, 
+                 mtdb_config_file= format_path('~/.mycotools/config.json')):
+    config['active'] = dbtype
+    write_json(config, mtdb_config_file)
+    for var, env in config[config['active']].items():
+        os.environ[var] = env
+
+def mtdb_initialize(mycodb_loc, 
+                    mtdb_config_file= format_path('~/.mycotools/config.json')):
+    mtdb_config = read_json(mycodb_loc + 'config/mtdb.json')
+    dbtype = mtdb_config['branch']
+    eprint('Establishing ' + dbtype + ' connection', flush = True)
+    config = {}
+
+    if not os.path.isdir(mycodb_loc + 'mycodb'):
+        raise FileNotFoundError('invalid MycotoolsDB path')
+    dPath = mycodb_loc + 'data/'
+    config[dbtype] = {
+        'MYCODB': mycodb_loc + 'mycodb/',
+        'MYCOFNA': dPath + 'fna/',
+        'MYCOFAA': dPath + 'faa/',
+        'MYCOGFF3': dPath + 'gff3/'
+        }
+    mtdb_connect(config, mtdb_config_file, dbtype)
+
 
 interface = format_path('~/.mycotools/config.json')
 if os.path.isfile(interface):

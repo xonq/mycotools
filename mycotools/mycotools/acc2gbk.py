@@ -48,11 +48,13 @@ def contig2gbk(ome, row, contig, contig_dict,
             seq_coords.append(sorted([t_start, t_end]))
 
     seq_coords.sort(key = lambda x: x[0])
-    startTest = int(seq_coords[0][0])
-    endTest = int(seq_coords[-1][1])
+    init_startTest = int(seq_coords[0][0]) - 1
+    init_endTest = int(seq_coords[-1][1])
+    endTest = init_endTest - init_startTest
+    startTest = 1
 
     # are we within 1Kb of the contig edge?
-    if startTest - 1000 <= 0 or endTest + 1000 >= len(contig_seq):
+    if init_startTest - 1000 <= 0 or init_endTest + 1000 >= len(contig_seq):
         edge = '/contig_edge="True"'
     else:
         edge = '/contig_edge="False"'
@@ -65,7 +67,8 @@ def contig2gbk(ome, row, contig, contig_dict,
         "VERSION     " + name + '\n' + \
         "KEYWORDS    .\nSOURCE    " + row['source'] + "\n  ORGANISM  " + \
         str(row['genus']) + '_' + str(row['species']) + '_' + \
-        str(row['strain']) + '_' + ome + \
+        str(row['strain']) + '_' + ome + '\n' + \
+        "COMMENT     coordinates are relative to adjustment: " + str(init_startTest) + \
         '\n            .\nFEATURES             Location/Qualifiers\n' + \
         '     region          ' + str(startTest) + '..' + str(endTest) + '\n' + \
         '                     ' + str(edge) + '\n'
@@ -92,10 +95,7 @@ def contig2gbk(ome, row, contig, contig_dict,
                 else:
                     used_aliases.add(alias)
             id_ = re.search(gff3Comps()['id'], entry['attributes'])[1]
-            try:
-                parent = re.search(gff3Comps()['par'], entry['attributes'])[1]
-            except TypeError:
-                parent = ''
+
             try:
                 product = re.search(product_search, entry['attributes'])[1]
             except TypeError: # no product
@@ -104,20 +104,25 @@ def contig2gbk(ome, row, contig, contig_dict,
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
             if entry['strand'] == '+':
-                gbk += str(start) + '..' + str(end) + '\n                     '
+                gbk += str(start-init_startTest) + '..' \
+                    + str(end-init_startTest) + '\n                     '
             else:
-                gbk += 'complement(' + str(start) + '..' + str(end) + ')\n                     '
-            gbk += '/Alias="' + alias + '"\n                     '
-            gbk += '/ID="' + id_ + '"\n                     '
-            if parent:
-                gbk += '/Parent="' + parent + '"\n                     '
-            gbk += '/gene="' + alias + '"\n                     ' 
+                gbk += 'complement(' + str(start-init_startTest) \
+                    + '..' + str(end-init_startTest) + ')\n                     '
+#            gbk += '/Alias="' + alias + '"\n                     '
+#            if parent:
+ #               gbk += '/Parent="' + parent + '"\n                     '
+#            gbk += '/gene="' + alias + '"\n                     ' 
+            gbk += '/locus_tag="' + alias + '"\n                     ' 
+
             if product:
                 gbk += '/product="' + product + '"\n                     '
             if entry['phase'] != '.':
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
             if entry['type'] == 'CDS':
+                gbk += '                     '
+                gbk += '/protein_id="' + alias + '"\n'
                 gbk += '                     ' + \
                     '/transl_table=1\n                     /translation="'
                 inputSeq = faa[alias]['sequence']
@@ -129,11 +134,14 @@ def contig2gbk(ome, row, contig, contig_dict,
                     lines.extend(toAdd)
                 gbk += lines[0] + '\n'
                 if len(lines) > 1:
-                    for index in range(1, len(lines) - 1):
-                        gbk += '                     ' + lines[index] + '\n'
+                    for line in lines[1:len(lines)-1]:
+                        gbk += '                     ' + line + '\n'
                     gbk += '                     ' + lines[-1] + '"\n'
                 else:
                     gbk += '"\n'
+            elif entry['type'].lower() in {'mrna', 'trna', 'rrna', 'rna'}:
+                gbk += '                     /transcript_id="' + id_ + '"\n'
+
      
     assSeq = ''
     for coordinates in seq_coords:

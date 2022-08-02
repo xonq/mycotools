@@ -69,44 +69,45 @@ def reverse_complement(seq):
     return new_seq
 
 
-def fa2dict(fasta_file):
+def fa2dict(fasta_input, file_ = True):
     fasta_dict = {}
+    if file_:
+        with open(fasta_input, 'r') as fasta:
+            str_fasta = ''
+            for line in fasta:
+                data = line.rstrip()
+                if data.startswith('>'):
+                    str_fasta += '\n' + data.rstrip() + '\n'
+                elif data:
+                    str_fasta += data
+                # concatenates the prep string with the prepped line from the fasta file
+        str_fasta = str_fasta.lstrip()
+    else:
+        str_fasta = fasta_input
 
-    with open(fasta_file, 'r') as fasta:
-        str_fasta = ''
-        for line in fasta:
-            # rstrips if it's not a sequence line and isn't a line with only \n
-            if line[0] != '>' and line[0] != '\n':
-                line = line.rstrip()
-            # concatenates a new line character if it is the first sequence line
-            if line[0] == '>' and str_fasta != '':
-                str_fasta = str_fasta + '\n'
-            # concatenates the prep string with the prepped line from the fasta file
-            str_fasta = str_fasta + line
+    # extracts 0) seq ID and description and 1) sequence
+    extracted = re.findall( r'(^>[^\n]*)\n([^>]*)', str_fasta, re.M)
 
-        # extracts 0) seq ID and description and 1) sequence
-        extracted = re.findall( r'(^>[^\n]*)\n([^>]*)', str_fasta, re.M)
+    # adds a new dictionary for each gene
+    for val in extracted:
+        step1 = val[0]
+        step2 = re.search(r'^>([^ ]*)', step1)
+        gene = step2[1]
+        step3 = re.search(r' (.*)', step1)
+        if step3:
+            descrip = step3[1]
+        else:
+            descrip = ''
 
-        # adds a new dictionary for each gene
-        for index in range(len(extracted)):
-            step1 = extracted[index][0]
-            step2 = re.search(r'^>([^ ]*)', step1)
-            gene = step2[1]
-            step3 = re.search(r' (.*)', step1)
-            if step3:
-                descrip = step3[1]
-            else:
-                descrip = ''
+        seq = val[1]
+        if seq[-1] == '\n' or seq[-1] == '\r':
+            seq = seq.rstrip()
 
-            seq = extracted[index][1]
-            if seq[-1] == '\n' or seq[-1] == '\r':
-                seq = seq.rstrip()
-
-            # prepares dictionaries for each gene with description, seq, rvcmpl_seq, and codons
-            fasta_dict[gene] = {}
-            if descrip != '\n':
-                fasta_dict[gene]['description'] = descrip
-            fasta_dict[gene]['sequence'] = seq
+        # prepares dictionaries for each gene with description, seq, rvcmpl_seq, and codons
+        fasta_dict[gene] = {}
+        if descrip != '\n':
+            fasta_dict[gene]['description'] = descrip
+        fasta_dict[gene]['sequence'] = seq
 
     return fasta_dict
 
@@ -183,25 +184,30 @@ def calc_gc(gene):
 
 
 # need to change into a class
-def gff2list(gff_path, error = True):
+def gff2list(gff_info, path = True, error = True):
 
     gff_list_dict = []
-    with open( gff_path, 'r' ) as raw_gff:
-        try:
-            for line in raw_gff:
-                if not line.startswith('#'): 
-                    line = line.rstrip()
-                    col_list = line.split(sep = '\t')
-                    gff_list_dict.append({
-                        'seqid': col_list[0], 'source': col_list[1], 'type': col_list[2],
-                        'start': int(col_list[3]), 'end': int(col_list[4]), 'score': col_list[5],
-                        'strand': col_list[6], 'phase': col_list[7], 'attributes': col_list[8]
-                        })
-        except IndexError:
-            if not error:
-                gff_list_dict = None
-            else:
-                raise IndexError(line)
+    if path:
+        with open( gff_info, 'r' ) as raw_gff:
+            data = raw_gff.read().split('\n')
+    else:
+        data = gff_info.split('\n')
+    try:
+        for line in data:
+            if not line.startswith('#'): 
+                col_list = line.split(sep = '\t')
+                gff_list_dict.append({
+                    'seqid': col_list[0], 'source': col_list[1], 'type': col_list[2],
+                    'start': int(col_list[3]), 'end': int(col_list[4]), 'score': col_list[5],
+                    'strand': col_list[6], 'phase': col_list[7],
+                    'attributes': col_list[8].rstrip()
+                    })
+    except IndexError:
+        raise IndexError(str(len(col_list)) + '/9 expected tab-' \
+                        + 'delimitted fields: ' + str(line))
+    except ValueError:
+        raise ValueError(str(col_list[4:6]) + ' invalid integer ' \
+                        + 'conversion: ' + str(line))
             
     return gff_list_dict
 
