@@ -2,6 +2,7 @@
 
 import os
 import sys
+import copy
 import random
 import argparse
 from collections import defaultdict
@@ -9,7 +10,8 @@ from mycotools.lib.kontools import file2list, intro, outro, format_path, eprint
 from mycotools.lib.dbtools import mtdb, masterDB
 
 def extract_unique(db, allowed = 1, sp = True):
-    keys = random.shuffle(list(db.keys()))
+    keys = copy.deepcopy(list(db.keys()))
+    random.shuffle(keys)
     prep_db0 = {x: db[x] for x in keys}
     prep_db1 = mtdb().set_index('ome')
     if sp:
@@ -17,7 +19,7 @@ def extract_unique(db, allowed = 1, sp = True):
         for ome, row in prep_db0.items():
             name = row['taxonomy']['species']
             found[name] += 1
-            if name[found] <= allowed:
+            if found[name] <= allowed:
                 prep_db1[ome] = row
     else:
         found = set()

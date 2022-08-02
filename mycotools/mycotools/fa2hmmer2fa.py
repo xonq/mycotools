@@ -10,7 +10,7 @@ import datetime
 import subprocess
 import multiprocessing as mp
 from mycotools.extractHmmsearch import main as exHmm, grabNames
-from mycotools.extractHmmAcc import main as absHmm
+from mycotools.extractHmmAcc import main as extr_hmm
 from mycotools.db2search import compAcc2fa
 from mycotools.acc2fa import famain as acc2fa
 from mycotools.lib.kontools import intro, outro, findExecs, eprint, format_path
@@ -21,7 +21,7 @@ def runextractHmmAcc(hmm, accession, output):
 
     with open(hmm, 'r') as raw:
         hmm_data = raw.read()
-    hmm_str = absHmm(hmm_data, accession)
+    hmm_str = extr_hmm(hmm_data, accession)
     with open(output, 'w') as out:
         out.write(hmm_str)
 
@@ -148,7 +148,6 @@ def main(
 
 if __name__ == '__main__':
 
-    mp.set_start_method('spawn')
     parser = argparse.ArgumentParser( 
         description = 'Runs hmmsearch or nhmmer on a fasta and returns a fasta of hits'
         )

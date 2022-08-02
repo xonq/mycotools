@@ -53,12 +53,9 @@ def contig2gbk(ome, row, contig, contig_dict,
     endTest = init_endTest - init_startTest
     startTest = 1
 
-    # are we within 1Kb of the contig edge?
-    if init_startTest - 1000 <= 0 or init_endTest + 1000 >= len(contig_seq):
-        edge = '/contig_edge="True"'
-    else:
-        edge = '/contig_edge="False"'
-    
+    # specify the contig edge - may cause parsers (BiG-SCAPE/antiSMASH) to fail
+    edge = '/contig_edge=' + str(init_startTest) + '-;' \
+         + str(len(contig_seq) - init_endTest) + '+'
     name = ome + '_' + contig
     relativeEnd = seq_coords[-1][1] - seq_coords[0][0]
     gbk = "LOCUS       " + name + '\n' + \
@@ -86,8 +83,91 @@ def contig2gbk(ome, row, contig, contig_dict,
   #          product = '|'.join(sorted(prot_dict['products']))
    #     else:
     #        product = list(prot_dict['products'])[0]
-
+        final_coords = ''
+        entries = defaultdict(list)
         for entry in prot_list:
+            if entry['type'].lower() == 'cds':
+                entries['CDS'].append(entry)
+            elif entry['type'].lower() == 'exon':
+                entries['exon'].append(entry)
+            elif entry['type'].lower() in {'mrna', 'rrna', 'trna', 'rna'}:
+                entries['RNA'].append(entry)
+            elif entry['type'].lower() in {'gene', 'pseudogene'}:
+                entries['gene'].append(entry)
+
+        if entries['CDS']:
+            entry = entries['CDS'][0]
+            strand = entry['strand']
+            cds_coords = ''
+            if strand == '+':
+                for cds in entries['CDS']:
+                    coords = [cds['start'], cds['end']]
+                    max_c, min_c = max(coords), min(coords)
+                    cds_coords += str(min_c) + '..' + str(max_c) + ','
+            else:
+                for cds in entries['CDS']:
+                    coords = [cds['start'] - init_startTest, 
+                              cds['end'] - init_startTest]
+                    max_c, min_c = max(coords), min(coords)
+                    cds_coords += 'complement(' + str(min_c) + '..' \
+                               + str(max_c) + '),'
+            cds_coords = cds_coords[:-1]
+            cds_coords_list = cds_coords.split(',')
+            final_coords = '' 
+            total_len = 0
+            for coord in cds_coords_list[:-1]:
+                if total_len + len(coord) < 57 or total_len == 0:
+                    final_coords += coord + ','
+                    total_len += len(coord) + 1
+                else:
+                    total_len = len(coord) + 1
+                    final_coords += '\n                     ' \
+                                 + coord + ','
+            if total_len == 0 or total_len + len(cds_coords_list[-1]) < 58:
+                final_coords += cds_coords_list[-1]
+            else:
+                final_coords += '\n                     ' \
+                             + cds_coords_list[-1]
+            if len(cds_coords_list) > 1:
+                final_coords = 'join(' + final_coords + ')'
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            id_ = re.search(gff3Comps()['id'], entry['attributes'])[1]
+
+            try:
+                product = re.search(product_search, entry['attributes'])[1]
+            except TypeError: # no product
+                product = ''
+            gbk += '     ' + entry['type'] + \
+                '                '[:-len(entry['type'])]
+            final_coords += '\n                     '
+            gbk += final_coords
+            gbk += '/locus_tag="' + alias + '"\n                     ' 
+
+            if product:
+                gbk += '/product="' + product + '"\n                     '
+            if entry['phase'] != '.':
+                gbk += '/phase="' + entry['phase'] + '"\n                     '
+            gbk += '/source="' + entry['source'] + '"\n'
+            gbk += '                     '
+            gbk += '/protein_id="' + alias + '"\n'
+            gbk += '                     ' + \
+                '/transl_table=1\n                     /translation="'
+            inputSeq = faa[alias]['sequence']
+            lines = [inputSeq[:45]]
+            if len(inputSeq) > 45:
+                restSeq = inputSeq[45:]
+                n = 59
+                toAdd = [restSeq[i:i+n] for i in range(0, len(restSeq), n)]
+                lines.extend(toAdd)
+            gbk += lines[0] + '\n'
+            if len(lines) > 1:
+                for line in lines[1:len(lines)-1]:
+                    gbk += '                     ' + line + '\n'
+                gbk += '                     ' + lines[-1] + '"\n'
+            else:
+                gbk += '"\n'
+
+        for entry in entries['gene']:
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             if '|' in alias: # alternately spliced gene
                 if alias in used_aliases:
@@ -104,15 +184,12 @@ def contig2gbk(ome, row, contig, contig_dict,
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
             if entry['strand'] == '+':
-                gbk += str(start-init_startTest) + '..' \
+                gene_coords = str(start-init_startTest) + '..' \
                     + str(end-init_startTest) + '\n                     '
             else:
-                gbk += 'complement(' + str(start-init_startTest) \
+                gene_coords = 'complement(' + str(start-init_startTest) \
                     + '..' + str(end-init_startTest) + ')\n                     '
-#            gbk += '/Alias="' + alias + '"\n                     '
-#            if parent:
- #               gbk += '/Parent="' + parent + '"\n                     '
-#            gbk += '/gene="' + alias + '"\n                     ' 
+            gbk += gene_coords
             gbk += '/locus_tag="' + alias + '"\n                     ' 
 
             if product:
@@ -120,37 +197,34 @@ def contig2gbk(ome, row, contig, contig_dict,
             if entry['phase'] != '.':
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
-            if entry['type'] == 'CDS':
-                gbk += '                     '
-                gbk += '/protein_id="' + alias + '"\n'
-                gbk += '                     ' + \
-                    '/transl_table=1\n                     /translation="'
-                inputSeq = faa[alias]['sequence']
-                lines = [inputSeq[:45]]
-                if len(inputSeq) > 45:
-                    restSeq = inputSeq[45:]
-                    n = 59
-                    toAdd = [restSeq[i:i+n] for i in range(0, len(restSeq), n)]
-                    lines.extend(toAdd)
-                gbk += lines[0] + '\n'
-                if len(lines) > 1:
-                    for line in lines[1:len(lines)-1]:
-                        gbk += '                     ' + line + '\n'
-                    gbk += '                     ' + lines[-1] + '"\n'
-                else:
-                    gbk += '"\n'
-            elif entry['type'].lower() in {'mrna', 'trna', 'rrna', 'rna'}:
-                gbk += '                     /transcript_id="' + id_ + '"\n'
 
-     
-    assSeq = ''
-    for coordinates in seq_coords:
-        assSeq += contig_seq[coordinates[0]:coordinates[1]]
+        for entry in entries['RNA']:
+            gbk += '     ' + entry['type'] + \
+                '                '[:-len(entry['type'])]
+            if final_coords:
+                gbk += final_coords
+            else:
+                gbk += gene_coords
+            gbk += '/locus_tag="' + alias + '"\n                     ' 
+
+            if product:
+                gbk += '/product="' + product + '"\n                     '
+            if entry['phase'] != '.':
+                gbk += '/phase="' + entry['phase'] + '"\n                     '
+            gbk += '/source="' + entry['source'] + '"\n'
+            gbk += '                     /transcript_id="' + id_ + '"\n'
+
+
+    total_coords = []
+    for coord in seq_coords:
+        total_coords.extend(coord)
+    min_c, max_c = min(total_coords), max(total_coords)
+#    for coordinates in seq_coords:
+    assSeq = contig_seq[min_c:max_c]
     seqLines = [assSeq[i:i+60] for i in range(0, len(assSeq), 60)]
     count = -59
 
     gbk += 'ORIGIN\n'
-   
     for line in seqLines:
         count += 60
         gbk += '{:>9}'.format(str(count)) + ' '
