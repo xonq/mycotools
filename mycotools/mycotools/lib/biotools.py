@@ -189,19 +189,19 @@ def gff2list(gff_info, path = True, error = True):
     gff_list_dict = []
     if path:
         with open( gff_info, 'r' ) as raw_gff:
-            data = raw_gff.read().split('\n')
+            data = [x.split('\t') for x in raw_gff.read().split('\n') \
+                    if x and not x.startswith('#')]
     else:
-        data = gff_info.split('\n')
+        data = [x.split('\t') for x in gff_info.split('\n') \
+                if x and not x.startswith('#')]
     try:
-        for line in data:
-            if not line.startswith('#'): 
-                col_list = line.split(sep = '\t')
-                gff_list_dict.append({
-                    'seqid': col_list[0], 'source': col_list[1], 'type': col_list[2],
-                    'start': int(col_list[3]), 'end': int(col_list[4]), 'score': col_list[5],
-                    'strand': col_list[6], 'phase': col_list[7],
-                    'attributes': col_list[8].rstrip()
-                    })
+        for col_list in data:
+            gff_list_dict.append({
+                'seqid': col_list[0], 'source': col_list[1], 'type': col_list[2],
+                'start': int(col_list[3]), 'end': int(col_list[4]), 'score': col_list[5],
+                'strand': col_list[6], 'phase': col_list[7],
+                'attributes': col_list[8]
+                })
     except IndexError:
         raise IndexError(str(len(col_list)) + '/9 expected tab-' \
                         + 'delimitted fields: ' + str(line))
