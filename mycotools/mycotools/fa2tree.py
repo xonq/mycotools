@@ -1,5 +1,8 @@
 #! /usr/bin/env python3
 
+# NEED to implement multigene phylogeny
+# NEED to implement fa2clus?
+
 import os
 import re
 import sys

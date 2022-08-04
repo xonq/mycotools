@@ -806,5 +806,10 @@ optional arguments:
 <br /><br /><br /><br /><br /><br /><br /><br /><br />
 
 ## TODO
-add ncbiAcc2fa
-separate better/organize into wiki
+- add ncbiAcc2fa
+- separate better/organize into wiki
+- document clinker pipeline
+- add images of pipeline output
+- fa2hmmer2fa annotation
+- update crap information
+- eggnog to synteny diagram

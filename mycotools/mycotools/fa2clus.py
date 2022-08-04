@@ -2,6 +2,7 @@
 
 # NEED to try MCL using the binary
 # NEED to make outgroup detection within the bounds of maximum sequences, optional to do so
+    # NEEDs heavy optimization in general
 # extract a fasta of the cluster of interest
 # fix output
 # NEED to avoid rerunning already ran values, only when necessary
@@ -20,22 +21,11 @@ import subprocess
 import pandas as pd
 from mycotools.lib.kontools import multisub, findExecs, format_path, eprint, vprint, read_json, write_json, mkOutput
 from mycotools.lib.biotools import fa2dict, dict2fa
-
 sys.setrecursionlimit(1000000)
 
-def splitFasta( fa_path, output ):
-
-    fastas = []
-    fa = fa2dict( fa_path )
-    for header in fa:
-        with open( output + '/' + header + '.fa', 'w' ) as out:
-            out.write( '>' + header + '\n' + fa[header]['sequence'] + '\n' )
-        fastas.append( output + '/' + header + '.fa' )
-
-    return fastas 
-
- 
 def makeDmndDB(diamond, queryFile, output_dir, cpus = 1):
+    """create a diamond database:
+    diamond: binary path, queryFile: query_path"""
     outputDB = output_dir + re.sub(r'\.[^\.]+$', '', os.path.basename(queryFile))
     cmd = [
         diamond, 'makedb', '--in', queryFile,
@@ -46,11 +36,11 @@ def makeDmndDB(diamond, queryFile, output_dir, cpus = 1):
         )
     return outputDB, dmndDBcode
 
-
 def runDmnd(
     diamond, queryFile, queryDB, outputFile, pid = True,
     cpus = 1, verbose = False, blast = 'blastp', minid = 15
     ):
+    """run diamond, no self-hits, more-sensitive"""
 
     if pid:
         distanceVal = 'pident'
@@ -61,7 +51,7 @@ def runDmnd(
         diamond, blast, '-d', queryDB, '-q', queryFile,
         '--out', outputFile, '--threads', str(cpus),
         '--outfmt', '6', 'qseqid', 'sseqid', distanceVal,
-        '--id', str(minid), '--no-self-hits'
+        '--id', str(minid), '--no-self-hits', '--more-sensitive'
         ]
 
     if not verbose:
@@ -74,9 +64,8 @@ def runDmnd(
             )
     return outputFile, dmndCode
 
-
 def readDmndDist( outputFile, minVal, pid = True ):
-    # should convert this to numpy and sparse
+    """Read a diamond output as a distance matrix"""
 
     dist_dict = {}
     with open(outputFile, 'r') as raw:
@@ -87,8 +76,6 @@ def readDmndDist( outputFile, minVal, pid = True ):
                 if q == s:
                     continue
                 if v > minVal:
-      #              if q not in out_dict:
-     #                   out_dict[q] = {}
                     if q not in dist_dict:
                         dist_dict[q] = {}
                         dist_dict[q][q] = 0.0
@@ -97,7 +84,6 @@ def readDmndDist( outputFile, minVal, pid = True ):
                         dist_dict[s][s] = 0.0
                     dist_dict[q][s] = 100 - v
                     dist_dict[s][q] = 100 - v
-    #                out_dict[q][s] = v
             distanceMatrix = pd.DataFrame(dist_dict).sort_index(1).sort_index(0).fillna(100)
         else:
              for line in raw:
@@ -106,47 +92,25 @@ def readDmndDist( outputFile, minVal, pid = True ):
                 if q == s:
                     continue
                 if v > minVal:
-      #              if q not in out_dict:
-     #                   out_dict[q] = {}
                     if q not in dist_dict:
                         dist_dict[q] = {}
                         dist_dict[q][q] = 0.0
                     if s not in dist_dict:
                         dist_dict[s] = {}
                         dist_dict[s][s] = 0.0
-#                    dist_dict[q][s] = 100 - v
- #                   dist_dict[s][q] = 100 - v
-    #                out_dict[q][s] = v           
              distanceMatrix = pd.DataFrame(dist_dict).sort_index(1).sort_index(0).fillna(0)
 
-#    outMatrix = pd.DataFrame(out_dict).sort_index(1).sort_index(0).fillna(1)
 
     if pid:
         distanceMatrix /= 100
- #       outMatrix /= 100
     else:
         minV, maxV = min(distanceMatrix), max(distanceMatrix)
         denom = maxV - minV
         distanceMatrix -= minV
-#        outMatrix -= minV
         distanceMatrix /= denom
- #       outMatrix /= denom
         distanceMatrix = 1 - distanceMatrix
-  #      outMatrix = 1 - outMatrix
 
     return distanceMatrix #, outMatrix
-
-
-def writeDist(outputFile, outMatrix):
-    dist_out = ''
-    for i, row in outMatrix.iterrows():
-        for column in outMatrix.columns:
-            if str(column) != str(i) and outMatrix.at[i, column] < 1:
-                dist_out += str(i) + '\t' + str(column) + '\t' + \
-                    str(outMatrix.at[i, column]) + '\n'
-    with open( output, 'w' ) as out:
-        out.write( dist_out )
-
 
 def runUsearch( fasta, output, clusParam, cpus = 1, verbose = False ):
 
@@ -166,8 +130,6 @@ def runUsearch( fasta, output, clusParam, cpus = 1, verbose = False ):
             ], stdout = subprocess.DEVNULL,
             stderr = subprocess.DEVNULL
             )
-
-
 
 def importDist( dis_path, sep = '\t' ):
     '''Imports a distance matrix with each line formatted as `organism $SEP organism $SEP distance`.
@@ -195,7 +157,6 @@ def importDist( dis_path, sep = '\t' ):
 
     return distanceMatrix.fillna( 1.0 )
 
-
 def scikitaggd( distanceMatrix, maxDist = 0.6, linkage = 'single' ):
     '''Performs agglomerative clustering and extracts the cluster labels, then sorts according to
     cluster number. In the future, this will also extract a Newick tree.'''
@@ -213,7 +174,6 @@ def scikitaggd( distanceMatrix, maxDist = 0.6, linkage = 'single' ):
 
     return clusters
 
-
 def getNewick(node, newick, parentdist, leaf_names):
     '''Code from https://stackoverflow.com/questions/28222179/save-dendrogram-to-newick-format
     adopted from @jfn'''
@@ -228,7 +188,6 @@ def getNewick(node, newick, parentdist, leaf_names):
         newick = getNewick(node.get_right(), ",%s" % (newick), node.dist, leaf_names)
         newick = "(%s" % (newick)
         return newick
-
 
 def getClusterLabels( labels, clusters ):
 
@@ -274,7 +233,6 @@ def dmndMain(fastaPath, minVal, output_dir, distFile, pid = True, verbose = Fals
         )
     os.rename(distFile + '.tmp', distFile)
     distanceMatrix = readDmndDist( distFile, minVal, pid = pid )
-#    writeDist(distFile, outMatrix)
     return distanceMatrix
     
 def usearchMain(fasta, min_id, output, cpus = 1, verbose = False):
@@ -297,57 +255,83 @@ def iterativeRun(
     minseq, maxseq, clusParam, mincon, distanceMatrix, focalGene, linkage = 'single', interval = 0.1,
     log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False, spacer = '\t'
     ):
+    """
+    Iteratively clusters until input parameters are met.
 
-    exitCode = 1
+    minseq: int(minimum sequences in a cluster)
+    maxseq: int(maximum sequences in a cluster)
+    clusParam: float(maximum_distance for agglomerative)
+    mincon: minimum connection value
+    distanceMatrix: distanceMatrix generated from fa2clus functions
+    focalGene: str(gene to cluster around)
+    linkage: agglomerative clustering linkage parameter
+    interval: interval to adjust clusParam per iteration
+    log_dict: log
+    log_path: log_file path
+    minval: int(minimum clusParam value)
+    maxval: int(maximum clusParam value)
+    verbose: bool(verbosity)
+    spacer: str(stderr/stdout spacer)
+    """
+
+    exitCode = 1 # default exit code is failure
     attempt, direction, clusters, tree = 0, None, None, None
     oldDirection, oldClusters, oldTree = None, None, None
     while clusParam >= minval and clusParam <= maxval and 1 - clusParam >= mincon:
-        attempt += 1
+        attempt += 1 # keep track of iterations for output details
         oldClusters, oldTree = clusters, tree
         clusters, tree = scipyaggd(distanceMatrix, float(clusParam), linkage)
+        # cluster
         cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
-        for gene, index in clusters.items():
+        for gene, index in clusters.items(): # create a dictionary clusID:
+        # [genes]
             if index not in cluster_dict:
                 cluster_dict[index] = []
             cluster_dict[index].append(gene)
-        focalLen = len(cluster_dict[clusters[focalGene]])
-        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
+        focalLen = len(cluster_dict[clusters[focalGene]]) 
+        # size of cluster with focalGene
+        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene \
+             + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
         vprint('Cluster parameter: ' + str(clusParam), flush = True, v = verbose)
-        if log_path:
+        if log_path: # output the iteration details to the log
             iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
             log_dict['iterations'].append(iteration_dict)
             write_json(log_dict, log_path)
-        if focalLen >= minseq:
-            if maxseq:
-                if focalLen <= maxseq:
+        if focalLen >= minseq: # if greater than minimum sequences
+            if maxseq: # if there is a max set of sequences
+                if focalLen <= maxseq: # if less than max sequences
                     vprint(spacer + '\tSUCCESS!', flush = True, v = verbose)
                     exitCode = 0
                     break
-                else:
+                else: # descend
                     direction = 1
-            else:
+            else: # no max sequences, minimum is met, this was successful
                 vprint(spacer + '\tSUCCESS!', flush = True, v = verbose)
                 exitCode = 0
                 break
-        else:
+        else: # need to increase cluster size
             direction = -1
 
-        if oldDirection:
-            if direction != oldDirection:
-                eprint(spacer + 'WARNING: Overshot. Could not find parameters using current interval.', flush = True)
-                vprint(spacer + 'Outputting Iterations ' + str(attempt) + ' & ' + str(attempt - 1), flush = True, v = verbose)
+        if oldDirection: # if there is an older iteration
+            if direction != oldDirection: # if the direction switched
+                eprint(spacer + 'WARNING: Overshot. ' \
+                     + 'Could not find parameters using current interval.', 
+                       flush = True)
+                vprint(spacer + 'Outputting Iterations ' + str(attempt) \
+                     + ' & ' + str(attempt - 1), flush = True, v = verbose)
                 exitCode = 2
                 break
-        else:
+        else: # set the old iteration direction detail
             oldDirection = direction
 #         mincon += (interval*direction)
 
         oclusParam = copy.copy(clusParam)
-        clusParam -= (interval*direction)
+        clusParam -= (interval*direction) 
+        # adjust the clusParameter based on the direction it should change
         if oclusParam != minval and oclusParam != maxval:
-            if clusParam < minval:
+            if clusParam < minval: # set as minimum value if it descends below
                 clusParam = minval
-            elif clusParam > maxval:
+            elif clusParam > maxval: # set as maximum if it ascends above
                 clusParam = maxval
 
     return clusters, tree, oldClusters, oldTree, log_dict, exitCode
@@ -356,36 +340,44 @@ def reiterativeRun(
     minseq, maxseq, clusParam, mincon, distanceMatrix, focalGene, linkage = 'single', interval = 0.01,
     log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False
     ):
+    """Goal is to refine cluster size as close to maxseq as much as possible"""
 
     attempt, direction, clusters, tree = 0, None, None, None
     oldDirection, refines = None, []
-#    print(clusParam, minval, maxval)
-    while clusParam >= minval and clusParam <= maxval:
-        attempt += 1
+    while clusParam >= minval and clusParam <= maxval: # while a valid cluster
+    # parameter
+        attempt += 1 # log attempts
         clusters, tree = scipyaggd(distanceMatrix, float(clusParam), linkage)
+        # recluster
         cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
         for gene, index in clusters.items():
             if index not in cluster_dict:
                 cluster_dict[index] = []
             cluster_dict[index].append(gene)
         focalLen = len(cluster_dict[clusters[focalGene]])
-        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
-        vprint('\tMinimum connection: ' + str(mincon) + '; Maximum Distance ' + str(clusParam), flush = True, v = verbose)
-        if log_path:
+        # find the length of the cluster with the gene
+        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene \
+             + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
+        vprint('\tMinimum connection: ' + str(mincon) + \
+             + '; Maximum Distance ' + str(clusParam), flush = True, v = verbose)
+        if log_path: # output the log
             iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
             log_dict['iterations'].append(iteration_dict)
             write_json(log_dict, log_path)
-        if focalLen >= minseq:
-            if maxseq:
-                if focalLen <= maxseq:
-                    refines.append([clusters, tree, True])
-                    direction = -1
+        if focalLen >= minseq: # if the focal cluster is > minimum size
+            if maxseq: # check if there is a maximum size
+                if focalLen <= maxseq: # if less than the maximum
+                    refines.append([clusters, tree, True]) # append the info to
+                    # refine info
+                    direction = -1 # we can climb
                 else:
-                    refines.append([clusters, tree, False])
+                    refines.append([clusters, tree, False]) # else we need to
+                    # go down
                     direction = 1
             else:
+                # if there is no maximum size, then we met the goal
                 return clusters, tree, None, None, log_dict
-        else:
+        else: # if less than the minimum size, then we need to climb
             refines.append([clusters, tree, False])
             direction = -1
 
@@ -408,9 +400,6 @@ def reiterativeRun(
             elif clusParam > maxval:
                 clusParam = maxval
 
-
-
-#    if refines[-1][2]: # if the final run was successful
     return refines[-1][0], refines[-1][1], None, None, log_dict
 
 

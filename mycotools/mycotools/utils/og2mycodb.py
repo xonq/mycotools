@@ -83,7 +83,7 @@ def mycodbOGs(file_path = format_path('$MYCOGFF3/../ogs.tsv'), omes = set()):
 
     return ogInfo_dict
 
-def extractOGs(ogInfo_dict, ogtag):
+def extract_ogs(ogInfo_dict, ogtag):
 
     og2gene, gene2og = {}, {}
     for gene in ogInfo_dict:

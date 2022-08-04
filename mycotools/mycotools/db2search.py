@@ -44,6 +44,43 @@ def comp_blast_tups(
                 ) )
     return blast_cmds
 
+def compileDiamondCmd(ome, dmnd_db, out_dir, blast_scaf):
+    return blast_scaf + ['--out', out_dir + ome + '.tsv', \
+        '--subject', dmnd_db]
+
+def comp_diamond_tups( 
+    seq_db, diamond, blast_type, seq_type, out_dir, 
+    biotype, query, hsps = None, max_hits = None,
+    evalue = None
+    ):
+
+    if not os.path.isdir(out_dir + 'dmnd/'):
+        os.mkdir(out_dir + 'dmnd/')
+    blast_scaf = [
+        diamond, blast_type, '-query', query,
+        '--outfmt', '6'
+        ]
+    if evalue:
+        blast_scaf.extend(['--evalue', str(evalue)])
+    if hsps:
+        blast_scaf.extend(['--max_hsps', str(hsps)])
+    if max_hits:
+        blast_scaf.extend(['--max_target_seqs', str(max_hits)])
+
+    blast_cmds, db_cmds = [], []
+    for i, ome in enumerate(seq_db['ome']):
+        if seq_db[biotype][i]:
+            db_cmds.append([
+                diamond, 'makedb', '--in', seq_db[biotype][i],
+                '--db', out_dir + 'dmnd/' + ome, '-p', '2'
+                ])
+            blast_cmds.append(compileDiamondCmd(
+                ome, out_dir + 'dmnd/' + ome,
+                out_dir, blast_scaf
+                ))
+    return db_cmds, blast_cmds
+
+
 
 def compMMseqTups( 
     seq_db, out_dir, 
@@ -228,13 +265,19 @@ def ObyOprep(
 def ObyOsearch(
     db, rundb, blast, seq_type, report_dir, biotype,
     query, hsps, max_hits, evalue, cpus,
-    bitscore, pident
+    bitscore, pident, diamond
     ):
 
 # NEED to add other threshold options
     if len(rundb) > 0:
         print('\nSearching on an ome-by-ome basis', flush = True)
-        if 'blast' in blast:
+        if diamond:
+            db_tups, search_tups = comp_diamond_tups(
+                rundb, diamond, blast, seq_type, report_dir, biotype, query,
+                hsps = hsps, max_hits = max_hits, evalue = evalue
+                )
+            db_outs = multisub(db_tups, processes = cpus)
+        elif 'blast' in blast:
             search_tups = comp_blast_tups(
                 rundb, blast, seq_type, 
                 report_dir, biotype, query, 
@@ -248,7 +291,6 @@ def ObyOsearch(
                 )
         search_outs = multisub( search_tups, processes = cpus )
     
-   
     parse_tups = []
     for i, ome in enumerate(db['ome']):
         if db[biotype][i]:
@@ -282,22 +324,33 @@ def checkSearchDB(binary = 'blast'):
 def dbBlast(
     db_path, blast_type, query, 
     evalue, hsps, cpus,
-    report_dir
+    report_dir, diamond = False
     ):
 
     out_file = report_dir + os.path.basename(db_path)[:-3] + '.out'
-    blast_scaf = [
-        blast_type, '-query', query, '-outfmt', '6',
-        '-db', db_path, '-num_threads', str(cpus), '-out',
-        out_file, '-num_descriptions', str(135904025),
-        '-num_alignments', str(135904025)
-        ]
-
-    if evalue:
-        blast_scaf.extend(['-evalue', str(evalue)])
-    if hsps:
-        blast_scaf.extend(['-max_hsps', str(hsps)])
-
+    if not diamond:
+        blast_scaf = [
+            blast_type, '-query', query, '-outfmt', '6',
+            '-db', db_path, '-num_threads', str(cpus), '-out',
+            out_file, '-num_descriptions', str(135904025),
+            '-num_alignments', str(135904025)
+            ]
+        if evalue:
+            blast_scaf.extend(['-evalue', str(evalue)])
+        if hsps:
+            blast_scaf.extend(['-max_hsps', str(hsps)])
+    else:
+        blast_scaf = [
+            diamond, blast_type, '--query', query, '--outfmt', '6',
+            '--db', db_path, '-p', str(cpus * 2), '--out',
+            out_file, '--num_descriptions', '135904025',
+            '--num_alignments', '135904025'
+            ]
+        if evalue:
+            blast_scaf.extend(['--evalue', str(evalue)])
+        if hsps:
+            blast_scaf.extend(['--max_hsps', str(hsps)])
+    
     blast_call = subprocess.call(
         blast_scaf#, stdout = subprocess.PIPE,
     #    stderr = subprocess.PIPE
@@ -365,7 +418,7 @@ def main(
     max_hits = None, evalue = 10, bitscore = 0, 
     pident = 0, mem = None, #coverage = 0,
     cpus = 1, force = False, biotype = None,
-    skip = []
+    skip = [], diamond = None
     ):
 
     if blast in {'tblastn', 'blastp'}:
@@ -387,7 +440,7 @@ def main(
         if 'blast' in blast:
             search_exit, search_output = dbBlast(
                 search_db, blast, query, evalue, 
-                hsps, cpus, report_dir
+                hsps, cpus, report_dir, diamond = diamond
                 )
         else:
             search_exit, search_output = dbmmseq(
@@ -408,7 +461,7 @@ def main(
         results_dict = ObyOsearch(
             db, rundb, blast, None, report_dir, biotype,
             query, hsps, max_hits, evalue, cpus,
-            bitscore, pident
+            bitscore, pident, diamond
             )
 
     print('\nCompiling fastas', flush = True)
@@ -447,24 +500,27 @@ if __name__ == '__main__':
             'in ' + os.environ['MYCOFAA'] + '/blastdb/ then it is recommended to ' +
             'use the bit score threshold as it is not dependent on database size.'
         )
-    parser.add_argument( '-s', '--search', required = True, 
-        help = 'Search binary { mmseqs, blastn, blastp, tblastn, blastx }' )
+    parser.add_argument('-s', '--search', required = True, 
+        help = 'Search binary {mmseqs, blastn, blastp, tblastn, blastx}')
+    parser.add_argument('-d', '--diamond', action = 'store_true',
+        help = 'Use diamond version of --search. Not recommended for ' \
+             + 'ome-by-ome')
     parser.add_argument('-st', '--sequencetype', help = 'Subject sequence type {aa, nt} for mmseqs')
-    parser.add_argument( '-q', '--query', required = True, help = 'Query fasta' )
-    parser.add_argument( '-e', '--evalue', type = int,
-        help = 'Negative e-value order max, e.g. 2 for 10^-2' )
-    parser.add_argument( '-b', '--bitscore', default = 0,
-        type = int, help = 'Bit score minimum' )
-    parser.add_argument( '-i', '--identity', default = 0,
-        type = float, help = 'Identity minimum, e.g. 0.6' )
+    parser.add_argument('-q', '--query', required = True, help = 'Query fasta')
+    parser.add_argument('-e', '--evalue', type = int,
+        help = 'Negative e-value order max, e.g. 2 for 10^-2')
+    parser.add_argument('-b', '--bitscore', default = 0,
+        type = int, help = 'Bit score minimum')
+    parser.add_argument('-i', '--identity', default = 0,
+        type = float, help = 'Identity minimum, e.g. 0.6')
     #parser.add_argument( '-c', '--coverage', type = float, help = 'Query coverage +/-, e.g. 0.5' )
-    parser.add_argument( '-m', '--maxhits', type = int, help = 'Max hits for each organism' )
-    parser.add_argument( '-d', '--database', default = masterDB(), 
-        help = 'DEFAULT: masterdb' )
-    parser.add_argument( '-o', '--output', default = os.getcwd() )
-    parser.add_argument( '--cpu', default = mp.cpu_count(), type = int, help = 'DEFAULT: all' )
-    parser.add_argument( '--ram', help = 'Useful for mmseqs: e.g. 10M or 5G' )
-    parser.add_argument( '-f', '--force', action = 'store_true', help = 'Force ome-by-ome blast' )
+    parser.add_argument('-m', '--maxhits', type = int, help = 'Max hits for each organism')
+    parser.add_argument('-db', '--database', default = masterDB(), 
+        help = 'DEFAULT: masterdb')
+    parser.add_argument('-o', '--output', default = os.getcwd() )
+    parser.add_argument('--cpu', default = mp.cpu_count(), type = int, help = 'DEFAULT: all')
+    parser.add_argument('--ram', help = 'Useful for mmseqs: e.g. 10M or 5G')
+    parser.add_argument('-f', '--force', action = 'store_true', help = 'Force ome-by-ome blast')
     args = parser.parse_args()
 
     db_path = format_path( args.database )
@@ -481,6 +537,10 @@ if __name__ == '__main__':
         if not args.sequencetype or args.sequencetype not in {'aa', 'nt'}:
             eprint('\nERROR: -st required for mmseqs', flush = True)
             sys.exit(3)
+        elif args.diamond:
+            eprint('\nERROR: --diamond cannot be specified with -s mmseqs',
+                   flush = True)
+            sys.exit(4)
         if args.sequencetype == 'aa':
             biotype = 'faa'
         else:
@@ -489,7 +549,7 @@ if __name__ == '__main__':
         biotype = None
         
     start_args = {
-        'Search binary': args.search, 'query': format_path(args.query), 
+        'Search binary': args.search, 'Diamond binary': args.diamond, 'query': format_path(args.query), 
         'database': db_path, 'output': args.output, 'max evalue': evalue,
         'min bitscore': args.bitscore, 'max hits/organism': args.maxhits, #'coverage': args.coverage, 
         'min identity': args.identity, 'cores': cpus, 'force ome-by-ome': args.force
@@ -497,7 +557,11 @@ if __name__ == '__main__':
 
     start_time = intro( 'db2search', start_args )
     date = start_time.strftime('%Y%m%d')
-    findExecs( [args.search], exit = {args.search} )
+    execs = []
+    if args.diamond:
+        execs.append('diamond')
+    execs.append(args.search)
+    findExecs(execs, exit = set(execs))
    
     output_dirPrep = format_path( args.output ) 
     if not output_dirPrep.endswith('/'):

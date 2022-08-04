@@ -95,13 +95,62 @@ def contig2gbk(ome, row, contig, contig_dict,
             elif entry['type'].lower() in {'gene', 'pseudogene'}:
                 entries['gene'].append(entry)
 
+
+        for entry in entries['gene']:
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            if '|' in alias: # alternately spliced gene
+                if alias in used_aliases:
+                    continue
+                else:
+                    used_aliases.add(alias)
+            id_ = re.search(gff3Comps()['id'], entry['attributes'])[1]
+
+            try:
+                product = re.search(product_search, entry['attributes'])[1]
+            except TypeError: # no product
+                product = ''
+            start, end = sorted([int(entry['start']), int(entry['end'])])
+            gbk += '     ' + entry['type'] + \
+                '                '[:-len(entry['type'])]
+            if entry['strand'] == '+':
+                gene_coords = str(start-init_startTest) + '..' \
+                    + str(end-init_startTest) + '\n                     '
+            else:
+                gene_coords = 'complement(' + str(start-init_startTest) \
+                    + '..' + str(end-init_startTest) + ')\n                     '
+            gbk += gene_coords
+            gbk += '/locus_tag="' + alias + '"\n                     ' 
+
+            if product:
+                gbk += '/product="' + product + '"\n                     '
+            if entry['phase'] != '.':
+                gbk += '/phase="' + entry['phase'] + '"\n                     '
+            gbk += '/source="' + entry['source'] + '"\n'
+
+        for entry in entries['RNA']:
+            gbk += '     ' + entry['type'] + \
+                '                '[:-len(entry['type'])]
+            if final_coords:
+                gbk += final_coords
+            else:
+                gbk += gene_coords
+            gbk += '/locus_tag="' + alias + '"\n                     ' 
+
+            if product:
+                gbk += '/product="' + product + '"\n                     '
+            if entry['phase'] != '.':
+                gbk += '/phase="' + entry['phase'] + '"\n                     '
+            gbk += '/source="' + entry['source'] + '"\n'
+            gbk += '                     /transcript_id="' + id_ + '"\n'
+
         if entries['CDS']:
             entry = entries['CDS'][0]
             strand = entry['strand']
             cds_coords = ''
             if strand == '+':
                 for cds in entries['CDS']:
-                    coords = [cds['start'], cds['end']]
+                    coords = [cds['start'] - init_startTest, 
+                              cds['end'] - init_startTest]
                     max_c, min_c = max(coords), min(coords)
                     cds_coords += str(min_c) + '..' + str(max_c) + ','
             else:
@@ -167,52 +216,6 @@ def contig2gbk(ome, row, contig, contig_dict,
             else:
                 gbk += '"\n'
 
-        for entry in entries['gene']:
-            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
-            if '|' in alias: # alternately spliced gene
-                if alias in used_aliases:
-                    continue
-                else:
-                    used_aliases.add(alias)
-            id_ = re.search(gff3Comps()['id'], entry['attributes'])[1]
-
-            try:
-                product = re.search(product_search, entry['attributes'])[1]
-            except TypeError: # no product
-                product = ''
-            start, end = sorted([int(entry['start']), int(entry['end'])])
-            gbk += '     ' + entry['type'] + \
-                '                '[:-len(entry['type'])]
-            if entry['strand'] == '+':
-                gene_coords = str(start-init_startTest) + '..' \
-                    + str(end-init_startTest) + '\n                     '
-            else:
-                gene_coords = 'complement(' + str(start-init_startTest) \
-                    + '..' + str(end-init_startTest) + ')\n                     '
-            gbk += gene_coords
-            gbk += '/locus_tag="' + alias + '"\n                     ' 
-
-            if product:
-                gbk += '/product="' + product + '"\n                     '
-            if entry['phase'] != '.':
-                gbk += '/phase="' + entry['phase'] + '"\n                     '
-            gbk += '/source="' + entry['source'] + '"\n'
-
-        for entry in entries['RNA']:
-            gbk += '     ' + entry['type'] + \
-                '                '[:-len(entry['type'])]
-            if final_coords:
-                gbk += final_coords
-            else:
-                gbk += gene_coords
-            gbk += '/locus_tag="' + alias + '"\n                     ' 
-
-            if product:
-                gbk += '/product="' + product + '"\n                     '
-            if entry['phase'] != '.':
-                gbk += '/phase="' + entry['phase'] + '"\n                     '
-            gbk += '/source="' + entry['source'] + '"\n'
-            gbk += '                     /transcript_id="' + id_ + '"\n'
 
 
     total_coords = []
