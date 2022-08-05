@@ -201,7 +201,7 @@ def main(gff_list, accs, plusminus = 10, mycotools = False,
             if 'RNA' in entry['type']:
                 try:
                     gene = re.search(gff3Comps()['Alias'],
-                                     entry['attributes'][1])
+                                     entry['attributes'])[1]
                     for acc, genes in gene_sets.items():
                         if gene in genes:
                             geneGffs_prep[acc][gene] = entry
@@ -215,8 +215,8 @@ def main(gff_list, accs, plusminus = 10, mycotools = False,
             for gene in out_indices[acc]:
                 try:
                     geneGffs[acc].append(geneGffs_prep[acc][gene])
-                except KeyError: # gene without RNA
-                    raise KeyError('gene without RNA')
+                except KeyError: # gene without rna
+                    raise KeyError('gene without RNA: ' + gene)
 #                    todel.append((acc, gene))
         for acc, gene in todel:
             del out_indices[acc][gene]

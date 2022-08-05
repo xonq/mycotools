@@ -138,7 +138,7 @@ def check_fa_size(fas, max_size):
 def run_fa2clus(
     fa_path, db, focal_gene, minseq, maxseq, output, out_name,
     minid = 0.05, clus_param = 0.65, direction = -1, cpus = 1,
-    verbose = False, interval = 0.1
+    verbose = False, interval = 0.1, spacer = '\t\t\t'
     ):
 
     dmnd_dir = output + 'dmnd/'
@@ -147,14 +147,15 @@ def run_fa2clus(
     output_path = output + str(focal_gene) 
     log_path = output + '.' + str(focal_gene) + '.log'   
     try:
-        tree, clusters, distanceMatrix, ot, ocl = fa2clus(
+        tree, clusters, distanceMatrix, ot, ocl, overshot = fa2clus(
             fa_path, minid, clus_param, minseq, maxseq,
             searchProg = 'diamond', linkage = 'single', cpus = cpus,
             iterative = focal_gene, interval = interval, output = output_path,
-            verbose = verbose, log_path = log_path, refine = True, dmnd_dir = dmnd_dir
+            verbose = verbose, log_path = log_path, refine = True, 
+            dmnd_dir = dmnd_dir, spacer = spacer
             )
     except KeyError: # query not in adjacency matrix
-        return False
+        return False, False
     
     cluster_dict = {}
     for gene, index in clusters.items():
@@ -163,18 +164,24 @@ def run_fa2clus(
         cluster_dict[index].append(gene)
 
     geneModule = cluster_dict[clusters[focal_gene]]
-    fa_dict = acc2fa(db, geneModule)
+    try:
+        fa_dict = acc2fa(db, geneModule)
+    except KeyError:
+        eprint('\t\t\tWARNING: some hits not in database', flush = True)
+        db_omes = set(db['ome'])
+        geneModule = [x for x in geneModule if x[:x.find('_')] in db_omes]
+        fa_dict = acc2fa(db, geneModule)
 # need to implement some method to choose if the max and min parameters couldn't be met
     print('\t\t\t' + str(len(fa_dict)) + ' genes in group', flush = True)
     with open(output + '../' + str(out_name) + '.fa', 'w') as out:
         out.write(dict2fa(fa_dict))
     writeData(None, distanceMatrix, clusters, output_path)
-    return True
+    return True, overshot
 
 def outgroup_mngr(
     db, focal_gene, minseq, maxseq, clus_dir,
     minid = 0.05, direction = -1, cpus = 1, interval = 0.1,
-    verbose = False, spacer = '\t\t\t'
+    verbose = False, spacer = '\t\t\t\t'
     ):
 
     fa_path = clus_dir + focal_gene + '.fa'
@@ -195,11 +202,11 @@ def outgroup_mngr(
     # sequence so that we can decrease efficiently
     if prev_size > maxseq:
         prev_size = maxseq
-    if prevIndex > 0:
-        res = run_fa2clus(
+    if prevIndex > 0: # an index exists
+        res, overshot = run_fa2clus(
             fa_path, db, focal_gene, minseq, prev_size - 1, clus_dir, out_name,
             minid, float(new_info['cluster_parameter']), direction,
-            cpus, verbose, None
+            cpus, verbose, 0.01, spacer = spacer
             )
     elif 1-float(iterations[prevIndex-1]['cluster_parameter']) - minid < 0:
         eprint(
@@ -209,12 +216,12 @@ def outgroup_mngr(
     else: # can cluster further than what's been done, need to run iterative
         clus_param = float(new_info['cluster_parameter'])
         minseq = int(new_info['size'] + 1)
-        res = run_fa2clus(
+        res, overshot = run_fa2clus(
             fa_path, db, focal_gene, minseq, prev_size - 1, clus_dir, out_name,
-            minid, clus_param, direction, cpus, verbose, 0.01
+            minid, clus_param, direction, cpus, verbose, 0.01, spacer = spacer
             )
 
-    return res
+    return res, overshot
     
 
 def make_output(base_dir, new_log):
@@ -519,14 +526,13 @@ def parseLog(logPath, new_log, out_dir):
     except FileNotFoundError:
         oldLog = None
 
+    rereun_search = False
     if oldLog:
         try:
             with open(oldLog['db_path'], 'rb') as raw:
                 db5 = hashlib.md5(raw.read()).hexdigest()
             if db5 != oldLog['db']:
-                if os.path.isdir(out_dir):
-                    shutil.rmtree(out_dir)
-                return
+                rerun_search = True
             elif oldLog['search'] != new_log['search']:
                 if os.path.isdir(out_dir):
                     shutil.rmtree(out_dir)
@@ -689,7 +695,7 @@ def og_main(
             print('\t\tOutgroup detection', flush = True)
             if os.path.isfile(clus_dir + query + '.fa'):
                 if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
-                    res = outgroup_mngr(
+                    res, overshot = outgroup_mngr(
                         db, query, minseq, max_size, clus_dir,
                         minid = minid, cpus = cpus, interval = interval,
                         verbose = False
@@ -719,7 +725,7 @@ def og_main(
         print('\tQuery: ' + str(query), flush = True)
         print('\t\tHierarchical agglomerative clustering', flush = True)
         out_keys = None
-        res = run_fa2clus(
+        res, overshot = run_fa2clus(
             clus_dir + query + '.fa', db, query, minseq, max_size, clus_dir,
             query, minid, clus_param, cpus = cpus, verbose = verbose, interval = interval
             )
@@ -727,10 +733,10 @@ def og_main(
             print('\t\t\tQuery failed, sequence not in diamond matrix',
                   flush = True)
             continue
-        if outgroups:
+        if outgroups and not overshot:
             print('\t\tOutgroup detection', flush = True)
             if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
-                res = outgroup_mngr(
+                res, overshot = outgroup_mngr(
                     db, query, minseq, max_size, clus_dir,
                     minid = minid, cpus = cpus,
                     interval = interval, verbose = False
@@ -757,9 +763,10 @@ def og_main(
 
 
 def search_main(
-    db, input_genes, query_fa, query_gff, binary = 'mmseqs', fast = True, out_dir = None,
-    minid = 0.05, clus_param = 0.65, minseq = 3, max_size = 250, cpus = 1, reoutput = True,
-    plusminus = 10000, evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
+    db, input_genes, query_fa, query_gff, binary = 'mmseqs', fast = True, 
+    out_dir = None, minid = 0.05, clus_param = 0.65, minseq = 3, 
+    max_size = 250, cpus = 1, reoutput = True, plusminus = 10000, 
+    evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
     midpoint = True
     ):
@@ -774,17 +781,25 @@ def search_main(
 
     if query_gff:
         print('\tCleaning input GFF', flush = True)
-        par_dict, prot_hits, RNA, query_gff = prep_gff(query_gff, set(input_genes), gff3Comps())
+        par_dict, prot_hits, RNA, query_gff = prep_gff(query_gff, set(input_genes), 
+                                                       gff3Comps())
         count = 0
         while par_dict and count < 4:
             count += 1
-            par_dict, prot_hits, RNA, query_gff = prep_gff(query_gff, set(input_genes), gff3Comps(), prot_hits, par_dict)
+            par_dict, prot_hits, RNA, query_gff = prep_gff(query_gff, set(input_genes),
+                                                           gff3Comps(), prot_hits, 
+                                                           par_dict)
         if par_dict:
             eprint('\nIncorrectly formatted GFF', flush = True)
             sys.exit(5)
         elif set(input_genes).difference(prot_hits):
             eprint('\nProteins missing from GFF', flush = True)
-            eprint('\t' + ','.join([str(x) for x in list(set(input_genes).difference(prot_hits))]))
+            eprint('\t' + ','.join([
+                                str(x) for x in list(
+                                   set(input_genes).difference(prot_hits)
+                                   )
+                              ])
+                    )
             sys.exit(6)
         clean_gff = [x for x in query_gff if ';SearchQuery=' in x['attributes'] and 'RNA' in x['type']]
         for query in input_genes:
@@ -865,7 +880,7 @@ def search_main(
             print('\t\tOutgroup detection', flush = True)
             if os.path.isfile(clus_dir + query + '.fa'):
                 if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
-                    res = outgroup_mngr(
+                    res, overshot = outgroup_mngr(
                         db, query, minseq, max_size, clus_dir,
                         minid = minid, cpus = cpus, 
                         interval = interval, verbose = False
@@ -900,25 +915,26 @@ def search_main(
         print('\tQuery: ' + str(query), flush = True)
         print('\t\tHierarchical agglomerative clustering', flush = True)
         out_keys = None
-        res = run_fa2clus(
+        res, overshot = run_fa2clus(
             clus_dir + str(query) + '.fa', 
             db, query, minseq, max_size, 
-            clus_dir, query, minid, clus_param, cpus = clus_cpus, verbose = verbose, interval = interval
+            clus_dir, query, minid, clus_param, cpus = clus_cpus, 
+            verbose = verbose, interval = interval
             )
         if not res:
-             print('\t\t\tQuery failed, sequence not in diamond matrix',
+             print('\t\t\tFAILED: query not in diamond matrix',
                   flush = True)
              continue
-        if outgroups:
+        if outgroups and not overshot:
             print('\t\tOutgroup detection', flush = True)
             if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
-                res = outgroup_mngr(
+                res, overshot = outgroup_mngr(
                     db, query, minseq, max_size, clus_dir,
                     minid = minid, cpus = cpus, 
                     interval = interval, verbose = False
                     )
                 if not res:
-                    print('\t\t\tQuery failed, query not in ' \
+                    print('\t\t\tFAILED: query not in ' \
                          + 'diamond output.', flush = True)
                     continue
 
@@ -966,6 +982,12 @@ if __name__ == "__main__":
         '-p', '--plusminus',
         help = 'Bases up-/downstream query hits for homolog search; DEFAULT: 20,000',
         default = 20000, type = int
+        )
+    parser.add_argument(
+        '--minseq',
+        help = 'Min sequences for trees/cluster size; ' \
+             + 'DEFAULT: 3',
+        default = 3, type = int
         )
     parser.add_argument(
         '--maxseq', 
@@ -1070,6 +1092,7 @@ if __name__ == "__main__":
         'Search binary': args.search,
         'Locus +/-': args.plusminus,
         'Tree': tree,
+        'Minimum seq': args.minseq,
         'Maximum seq': args.maxseq,
         'Bitscore': args.bitscore,
         'GFF': args.gff,
@@ -1106,8 +1129,10 @@ if __name__ == "__main__":
         og_main(
             db, input_genes, args.orthogroups, fast = fast, 
             out_dir = out_dir, 
-            minid = 0.05, clus_param = 0.65, minseq = 3, max_size = args.maxseq, cpus = args.cpu,
-            verbose = args.verbose, plusminus = args.plusminus, interval = 0.1, labels = not args.no_label,
+            minid = 0.05, clus_param = 0.65, minseq = args.minseq, 
+            max_size = args.maxseq, cpus = args.cpu,
+            verbose = args.verbose, plusminus = args.plusminus, 
+            interval = 0.1, labels = not args.no_label,
             outgroups = not args.no_outgroup, 
             midpoint = not bool(args.no_midpoint)
             )
@@ -1119,12 +1144,14 @@ if __name__ == "__main__":
         print('\nPreparing output directory', flush = True)
         out_dir, wrk_dir, gff_dir, tre_dir = make_output(output, new_log)
         search_main(
-            db, input_genes, input_fa, input_GFF, binary = args.search, fast =
-            fast, out_dir = out_dir,
-            minid = 0.05, clus_param = 0.65, minseq = 3, max_size = args.maxseq, cpus = 1,
-            plusminus = args.plusminus, bitscore = args.bitscore, pident = 0,
-            mem = None, verbose = args.verbose, interval = 0.1, 
+            db, input_genes, input_fa, input_GFF, 
+            binary = args.search, fast = fast, out_dir = out_dir,
+            minid = 0.05, clus_param = 0.65, minseq = args.minseq, 
+            max_size = args.maxseq, cpus = 1, plusminus = args.plusminus, 
+            bitscore = args.bitscore, pident = 0, mem = None, 
+            verbose = args.verbose, interval = 0.1, 
             midpoint = not bool(args.no_midpoint),
-            outgroups = not args.no_outgroup, conversion_dict = conversion_dict, labels = not args.no_label
+            outgroups = not args.no_outgroup, conversion_dict = conversion_dict, 
+            labels = not args.no_label
             )
     outro(start_time)

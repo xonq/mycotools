@@ -7,6 +7,7 @@
 # fix output
 # NEED to avoid rerunning already ran values, only when necessary
 # NEED to archive old runs'
+# NEED to implement linclus
 
 import os
 import re
@@ -314,8 +315,8 @@ def iterativeRun(
 
         if oldDirection: # if there is an older iteration
             if direction != oldDirection: # if the direction switched
-                eprint(spacer + 'WARNING: Overshot. ' \
-                     + 'Could not find parameters using current interval.', 
+                eprint(spacer + 'WARNING: Overshot - ' \
+                     + 'could not find parameters using current interval', 
                        flush = True)
                 vprint(spacer + 'Outputting Iterations ' + str(attempt) \
                      + ' & ' + str(attempt - 1), flush = True, v = verbose)
@@ -358,7 +359,7 @@ def reiterativeRun(
         # find the length of the cluster with the gene
         vprint('\nITERATION ' + str(attempt) + ': ' + focalGene \
              + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
-        vprint('\tMinimum connection: ' + str(mincon) + \
+        vprint('\tMinimum connection: ' + str(mincon) \
              + '; Maximum Distance ' + str(clusParam), flush = True, v = verbose)
         if log_path: # output the log
             iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
@@ -407,7 +408,7 @@ def main(
     fastaPath, mincon, clusParam, minseq, maxseq, 
     searchProg = 'diamond', linkage = 'single',
     iterative = False, interval = 0.1, output= None, cpus = 1,
-    verbose = False, spacer = '\t', log_path = None,
+    verbose = False, spacer = '\t\t', log_path = None,
     refine = False, pid = True, dmnd_dir = None
     ):
 
@@ -417,6 +418,7 @@ def main(
     from scipy.spatial.distance import squareform
     minval, maxval = 0, 1
 
+    overshot = False
     log_dict = {
         'algorithm': searchProg, 'fasta': fastaPath, 'minimum_id': mincon, 'cluster_parameter': clusParam,
         'minimum_sequences': minseq, 'maximum_sequences': maxseq, 'search_program': searchProg,
@@ -499,11 +501,12 @@ def main(
                 spacer + 'WARNING: Overshot parameters',
                 v = verbose, flush = True
                 )
+            overshot = True
     else:
         oldClusters, oldTree = None, None
         clusters, tree = scipyaggd(distanceMatrix, float(clusParam), linkage)
 
-    return distanceMatrix, clusters, tree, oldClusters, oldTree
+    return distanceMatrix, clusters, tree, oldClusters, oldTree, overshot
 
 def writeData(tree, distanceMatrix, clusters, output):
 
@@ -612,12 +615,13 @@ if __name__ == '__main__':
         dmnd_dir = mkOutput(os.getcwd() + '/', 'fa2clus')
         output = dmnd_dir + os.path.basename(fastaPath)
 
-    distanceMatrix, clusters, tree, ocl, ot = main(
+    distanceMatrix, clusters, tree, ocl, ot, overshot = main(
         fastaPath, args.mincon, clusParam, args.minseq, args.maxseq, 
         searchProg = args.alignment, linkage = args.linkage, verbose = args.verbose,
-        iterative = args.iterative, interval = interval, output = output, spacer = '\n',
+        iterative = args.iterative, interval = interval, output = output,
         log_path = dmnd_dir + '.' + os.path.basename(fastaPath) + '.fa2clus.json',
-        refine = args.refine, pid = pid, dmnd_dir = dmnd_dir, cpus = args.cpus
+        refine = args.refine, pid = pid, dmnd_dir = dmnd_dir, cpus = args.cpus,
+        spacer = '\n'
         )
 
     if ocl:

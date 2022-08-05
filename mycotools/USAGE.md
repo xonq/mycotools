@@ -22,7 +22,8 @@ how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-
 - **MYCOTOOLSDB TOOLS**
 	- [Initializing MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#initialization)
 	- [Updating MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#updating)
-	- [Interfacing with the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
+	- [Connecting to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
+	- [Querying the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#querying)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
 	- [Adding local genomes to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#adding-local-genomes)
@@ -107,13 +108,6 @@ mtdb
 /home/xonq/mtdb/mtdb/20210125.mtdb
 ```
 
-If you want to use the path of the master database you can use basic bash functionality to work with the output, 
-e.g. to open in a text editor or to grep the file:
-```bash
-vim $(mtdb)
-grep 'Psilocybe' $(mtdb)
-```
-
 To add interfacing with a fungal/prokaryote master MTDB:
 ```bash
 mtdb -i <DATABASE_BASE_DIRECTORY>
@@ -125,9 +119,28 @@ mtdb -f
 mtdb -p
 ```
 
-
 <br /><br />
 
+## Querying
+`mtdb` has querying functions. To obtain the whole row for an ome code, simply:
+```bash
+mtdb <OME>
+```
+
+To obtain the specific file path for an ome file, append `.fna` (assembly),
+`.faa` (proteome), or `.gff3` (gene coordinates) to the ome:
+```bash
+mtdb <OME>.<EXTENSION>
+```
+
+Because you can obtain PATHs using `mtdb`, you can use basic bash functionality to work with the output, 
+e.g. to open in a text editor or to grep the file:
+```bash
+vim $(mtdb)
+grep 'Psilocybe' $(mtdb)
+```
+
+<br /><br />
 
 ## Creating modular databases
 ### extractDB.py

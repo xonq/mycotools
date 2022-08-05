@@ -146,6 +146,10 @@ def read_predb(predb_path, spacer = '\t'):
 
 def predb2mtdb(predb):
     infdb = mtdb()
+    if not 'assemblyPath' in predb and 'fna' in predb:
+        predb['assemblyPath'] = predb['fna']
+    if not 'gffPath' in predb and 'gff3' in predb:
+        predb['gffPath'] = predb['gff3']
     for i, code in enumerate(predb['genus']):
         if predb['published'][i]:
             toAdd = {
