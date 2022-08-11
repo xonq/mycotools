@@ -732,6 +732,7 @@ def mtdb_connect(config, dbtype,
                  mtdb_config_file= format_path('~/.mycotools/config.json')):
     config['active'] = dbtype
     write_json(config, mtdb_config_file)
+    config = read_json(mtdb_config_file)
     for var, env in config[config['active']].items():
         os.environ[var] = env
 
