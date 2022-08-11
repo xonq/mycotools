@@ -1,0 +1,104 @@
+#! /usr/bin/env python3
+
+# NEED to add option to export NCBI/JGI credentials
+
+import os
+import re
+import sys
+import subprocess
+from mycotools.lib.kontools import format_path, read_json, write_json, eprint
+from mycotools.lib.dbtools import masterDB, mtdb_connect, mtdb_initialize, mtdb
+
+
+def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
+    config_dir = format_path('~/.mycotools/')
+    if not os.path.isdir(config_dir):
+        os.mkdir(config_dir)
+        config_dir += '/'
+
+    if os.path.isfile(mtdb_config_file):
+        config = read_json(mtdb_config_file)
+    else:
+        config = {}
+    return config
+
+
+if __name__ == '__main__':
+
+    description = 'MycotoolsDB (MTDB) utility' \
+        + '\n\nmtdb: <PATH> print master MTDB path' \
+        + '\nmtdb <OME>[.gff3|.fna|.faa]: [PATH] print ome/ome code path' \
+        + '\n[-i DBPATH]\t[--init       ]\tInitialize MTDB connection' \
+        + '\n[-f]\t\t[--fungi      ]\tConnect to fungal MTDB' \
+        + '\n[-p]\t\t[--prokaryote ]\tConnect to prokaryote MTDB'
+    set_argv = set(sys.argv)
+    if {'-h', '--help'}.intersection(set_argv):
+        print('\n' + description + '\n', flush = True)
+        sys.exit(0)
+
+    config = parse_config()
+    if len([x for x in sys.argv if x.startswith('-')]) > 1:
+        print('\nERROR: one argument allowed.\n' + description, flush = True)
+        sys.exit(2)
+    if {'-i', '--init'}.intersection(set_argv):
+        if '-i' in set_argv:
+            coord = '-i'
+        else:
+            coord = '--init'
+        try:
+            mycodb_loc_prep = sys.argv[sys.argv.index(coord) + 1]
+            if isinstance(mycodb_loc_prep, str):
+                if mycodb_loc_prep.startswith('-'):
+                    raise IndexError
+                else:
+                    mycodb_loc = format_path(mycodb_loc_prep)
+                    if not os.path.isdir(mycodb_loc):
+                        raise FileNotFoundError('invalid MTDB path')
+                    elif not os.path.isdir(mycodb_loc + 'mycodb'):
+                        raise FileNotFoundError('invalid MTDB path')
+        except IndexError:
+            raise ValueError('--init requires a path')
+        mtdb_initialize(mycodb_loc)
+    elif {'-f', '--fungal'}.intersection(set_argv):
+        if '-f' in set_argv:
+            coord = '-f'
+        else:
+            coord = '--fungi'
+        if 'fungi' not in config:
+            raise ValueError('fungal MTDB not connected')
+        else:
+            mtdb_connect(config, 'fungi')
+    elif {'-p', '--prokaryote'}.intersection(set_argv):
+        if '-p' in set_argv:
+            coord = '-p'
+        else:
+            coord = '--prokaryote'
+        if 'prokaryote' not in config:
+            raise ValueError('prokaryote MTDB not connected')
+        else:
+            mtdb_connect(config, 'prokaryote')
+    elif len(sys.argv) > 1:
+        omes = sys.argv[1].replace('"','').replace("'",'').split()
+        for ome_prep in omes:
+            db = mtdb(masterDB()).set_index()
+            if ome_prep in db:
+                print(ome_prep + '\t' \
+                    + '\t'.join([str(db[ome_prep][x]) \
+                      for x in db[ome_prep]]))
+                sys.exit(0)
+            ome = re.sub(r'\.\w+[\w\d]$', '', ome_prep)
+            extension = re.sub(r'^.+?\d+\.(.+)$', r'\1', ome_prep)
+            try:
+                if db[ome][extension]:
+                    print(db[ome][extension])
+            except KeyError:
+                raise KeyError(ome + '/' + extension + ' is not a valid extension/ome')
+        sys.exit(0)
+
+
+    path = masterDB()
+    if path:
+        print(path)
+        sys.exit(0)
+    else:
+        sys.exit(1)
