@@ -55,7 +55,7 @@ If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, then
 ```bash
 mtdb --init <PATH>
 ```
-Fungi: `/fs/project/PAS1046/databases/mycodb/`
+Fungi: `/fs/project/PAS1046/databases/mycotoolsdb/`
 Prokaryote: `/fs/ess/PAS1568/mycotools/`
 
 

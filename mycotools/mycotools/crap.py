@@ -313,14 +313,18 @@ def compile_genesXome4queries(search_fas, conversion_dict, omes = set()):
 
 
 def extract_locus_og(gff3, ome, genesTograb, ogs, ome_gene2og, plusminus, og2color, wrk_dir, labels = True):
-    gff_list = gff2list(gff3)
+    try:
+        gff_list = gff2list(gff3)
+    except FileNotFoundError:
+        eprint('\t\t\tWARNING: ' + ome + ' mycotoolsdb entry without GFF3', flush = True)
+        return
     genesTograb = [x for x in genesTograb if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
     try:
         out_indices, geneGffs = acc2locus(gff_list, genesTograb, 
                                           plusminus, mycotools = True, 
                                           geneGff = True, nt = True)
     except KeyError:
-        eprint('\t\t\t' + ome + ' incorrectly formatted GFF3', flush = True)
+        eprint('\t\t\tWARNING: ' + ome + ' incorrectly formatted GFF3', flush = True)
         return
 
     extractedGenes = {}    
@@ -356,14 +360,18 @@ def extract_locus_og(gff3, ome, genesTograb, ogs, ome_gene2og, plusminus, og2col
 
 
 def extract_locus_gene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_dir, labels = True):
-    gff_list = gff2list(gff3)
+    try:
+        gff_list = gff2list(gff3)
+    except FileNotFoundError:
+        eprint('\t\t\tWARNING: ' + ome + ' mycotoolsdb entry without GFF3', flush = True)
+        return
     accs = [x for x in accs if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
     try:
         out_indices, geneGffs = acc2locus(gff_list, accs, 
                                           plusminus, mycotools = True, 
                                           geneGff = True, nt = True)
     except KeyError:
-        eprint('\t\t\t' + ome + ' incorrectly formatted GFF3', flush = True)
+        eprint('\t\t\tWARNING: ' + ome + ' incorrectly formatted GFF3', flush = True)
         return
 
     extractedGenes = {}
@@ -412,7 +420,7 @@ def svg2node(node):
         except TypeError:
             pass
 
-def svgs2tree(input_gene, og, tree_data, 
+def svgs2tree(input_gene, og, tree_data, db,
               out_dir, root_key = None, midpoint = True):#svg_dir, out_dir):
     tree = Tree(tree_data)
     if root_key:
@@ -424,6 +432,9 @@ def svgs2tree(input_gene, og, tree_data,
         adj = 'midpoint'
     else:
         adj = 'nonrooted'
+    new_tree = ome2name(db, tree.write(), True, True, True, True, False)
+
+    tree = Tree(new_tree)
     ts = TreeStyle()
     ts.layout_fn = svg2node
     ts.show_branch_support = True
@@ -434,9 +445,11 @@ def svgs2tree(input_gene, og, tree_data,
     for n in tree.traverse():
         n.set_style(nstyle)
     if og is not None:
-        tree.render(out_dir + input_gene + '_OG' + str(og) + '.' + adj + '.svg', w=800, tree_style = ts)
+        tree.render(out_dir + input_gene + '_OG' + str(og) + '.' + adj + '.svg', 
+                    w=800, tree_style = ts)
     else:
-        tree.render(out_dir + input_gene + '.' + adj + '.svg', w=800, tree_style = ts)
+        tree.render(out_dir + input_gene + '.' + adj + '.svg', 
+                    w=800, tree_style = ts)
 
 def merge_color_palette(merges, query2color):
     for merge in merges:
@@ -601,18 +614,21 @@ def crap_mngr(
     tree_file = tre_dir + query + tree_suffix
     with open(tree_file, 'r') as raw:
         raw_tree = raw.read()
-    name_tree = ome2name(db, raw_tree, True, True, True, True, False)
+#    name_tree = ome2name(db, raw_tree, True, True, True, True, False)
 
     if out_keys:
-        root_key = ome2name(
-            db, random.choice(out_keys), True, True, True, True, False
-            )
+#        root_key = ome2name(
+ #           db, random.choice(out_keys), True, True, True, True, False
+  #          )
+        root_key = random.choice(out_keys)
         svgs2tree(
-            query, None, name_tree, out_dir, root_key, midpoint = midpoint #svg_dir, out_dir
+            query, None, raw_tree, db,
+            out_dir, root_key, midpoint = midpoint #svg_dir, out_dir
             )
     else:
         svgs2tree(
-            query, None, name_tree, out_dir, midpoint = midpoint #svg_dir, out_dir
+            query, None, raw_tree, db,
+            out_dir, midpoint = midpoint #svg_dir, out_dir
             )
 
 def og_main(

@@ -91,7 +91,7 @@ if __name__ == '__main__':
         '\nInput file to regex sub omes with their name.\n' + \
         'optional mycotools db, string of forbidden characters\n' + \
         '"o" no ome | "g" no genus | "s" no species | "v" no strain' + \
-        ' | "a" no alternative ome'
+        ' | "a" no source accession'
     args = sys_start( sys.argv, usage, 2, files = [sys.argv[1]] )
     db, data_input, g, sp, st, ome_code, alt = parseArgs(args)
     data_output = main(db, data_input, g, sp, st, ome_code, alt)

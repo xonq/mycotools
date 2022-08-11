@@ -1,16 +1,82 @@
 #! /usr/bin/env python3
 
+import os
+import re
+import sys
+import glob
+import gzip
+import json
+import shutil
+import tarfile
+import subprocess
 from datetime import datetime
-import sys, glob, os, re, subprocess, gzip, shutil, json, tarfile
-import numpy as np
 
+def stdin2str():
+    data = ''
+    for line in sys.stdin:
+        data += line.rstrip() + '\n'
+    data = data.rstrip()
+    return data
+
+def hex2rgb(hexCode):
+    return tuple(int(hexCode.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+
+
+def getColors(size, ignore = [], rgb = False):
+    if size < 16:
+        colors = [
+            "#000000","#004949","#009292","#ff6db6","#ffb6db",
+            "#490092","#006ddb","#b66dff","#6db6ff","#b6dbff",
+            "#920000","#924900","#db6d00","#24ff24","#ffff6d"
+            ]
+    elif size < 27:
+        colors = [
+            "#F0A3FF", "#0075DC", "#993F00", "#4C005C", "#191919",
+            "#005C31", "#2BCE48", "#FFCC99", "#808080", "#94FFB5",
+            "#8F7C00", "#9DCC00", "#C20088", "#003380", "#FFA405",
+            "#FFA8BB", "#426600", "#FF0010", "#5EF1F2", "#00998F",
+            "#E0FF66", "#740AFF", "#990000", "#FFFF80", "#FFFF00",
+            "#FF5005"
+            ]
+    else:
+        colors = [
+            '#000000', '#010067', '#d5ff00', '#ff0056', '#9e008e', 
+            '#0e4ca1', '#ffe502', '#005f39', '#00ff00', '#95003a', 
+            '#ff937e', '#a42400', '#001544', '#91d0cb', '#620e00', 
+            '#6b6882', '#0000ff', '#007db5', '#6a826c', '#00ae7e', 
+            '#c28c9f', '#be9970', '#008f9c', '#5fad4e', '#ff0000', 
+            '#ff00f6', '#ff029d', '#683d3b', '#ff74a3', '#968ae8', 
+            '#98ff52', '#a75740', '#01fffe', '#ffeee8', '#fe8900', 
+            '#bdc6ff', '#01d0ff', '#bb8800', '#7544b1', '#a5ffd2', 
+            '#ffa6fe', '#774d00', '#7a4782', '#263400', '#004754', 
+            '#43002c', '#b500ff', '#ffb167', '#ffdb66', '#90fb92', 
+            '#7e2dd2', '#bdd393', '#e56ffe', '#deff74', '#00ff78', 
+            '#009bff', '#006401', '#0076ff', '#85a900', '#00b917', 
+            '#788231', '#00ffc6', '#ff6e41', '#e85ebe'
+            ]
+    if rgb:
+        rgbColors = []
+        for color in colors:
+            rgbColors.append(hex2rgb(color))
+        colors = rgbColors
+
+    if ignore:
+        if isinstance(ignore, str):
+            ignore = [ignore]
+        for ig in ignore:
+            try:
+                colors.pop(colors.index(ig))
+            except ValueError:
+                pass
+
+    return colors
 
 def tardir(dir_, rm = True):
     
-    if not os.path.isdir(formatPath(dir_)):
+    if not os.path.isdir(format_path(dir_)):
         return False
-    with tarfile.open(formatPath(dir_)[:-1] + '.tar.gz', 'w:gz') as tar:
-        tar.add(dir_, arcname = os.path.basename(formatPath(dir_)[:-1]))
+    with tarfile.open(format_path(dir_)[:-1] + '.tar.gz', 'w:gz') as tar:
+        tar.add(dir_, arcname = os.path.basename(format_path(dir_)[:-1]))
     shutil.rmtree(dir_)
 
 def untardir(dir_, rm = False, to = None):
@@ -25,7 +91,7 @@ def untardir(dir_, rm = False, to = None):
 def checkdir(dir_, unzip = False, to = None, rm = False):
     if os.path.isdir(dir_):
         return True
-    elif os.path.isfile(formatPath(dir_) + '.tar.gz'):
+    elif os.path.isfile(format_path(dir_) + '.tar.gz'):
         if unzip:
             if dir_.endswith('/'):
                 dir_ = dir_[:-1]
@@ -58,36 +124,44 @@ def vprint( toPrint, v = False, e = False , flush = True):
             print( toPrint, flush = True)
 
 
-def readJson( config_path ):
+def read_json( config_path, compress = False ):
 
-    with open( config_path, 'r' ) as json_raw:
-        json_dict = json.load( json_raw )
+    if compress or config_path.endswith('.gz'):
+        with gzip.open( config_path, 'rt' ) as json_raw:
+            json_dict = json.load( json_raw )
+    else:
+        with open( config_path, 'r' ) as json_raw:
+            json_dict = json.load( json_raw )
 
     return json_dict
    
 
-def writeJson(json_path, obj, **kwargs):
-    with open(json_path, 'w') as json_out:
-        json.dump(obj, json_out, **kwargs)
+def write_json(obj, json_path, compress = False, indent = 1, **kwargs):
+    if compress or json_path.endswith('.gz'):
+        with gzip.open(json_path, 'wt') as json_out:
+            json.dump(obj, json_out, indent = indent, **kwargs)
+    else:
+        with open(json_path, 'w') as json_out:
+            json.dump(obj, json_out, indent = indent, **kwargs)
 
 
 def gunzip( gzip_file, remove = True, spacer = '\t' ):
     '''gunzips gzip_file and removes if successful'''
 
-    new_file = re.sub( r'\.gz$', '', formatPath(gzip_file) )
+    new_file = re.sub( r'\.gz$', '', format_path(gzip_file) )
     try:
-        with gzip.open(formatPath(gzip_file), 'rb') as f_in:
-            with open(new_file, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
+        with gzip.open(format_path(gzip_file), 'rt') as f_in:
+            with open(new_file, 'w') as f_out:
+                for line in f_in:
+                    f_out.write(line)
         if remove:
             os.remove( gzip_file )
         return new_file
     except:
-        eprint('\n' + spacer + 'ERROR: gunzip ' + str(gzip_file) + ' failed.', flush = True)
         if os.path.isfile( new_file ):
             if os.path.isfile( gzip_file ):
                 os.remove( new_file )
-        return False
+        raise IOError('gunzip ' + str(gzip_file) + ' failed')
 
 
 def fmt_float(val, sig_dig = None):
@@ -227,40 +301,35 @@ def findEnvs( envs, exit = set(), verbose = True ):
 def expandEnvVar( path ):
     '''Expands environment variables by regex substitution'''
 
-    if path.startswith( '/$' ):
-        path = '/' + path
-    env_comp = re.compile( r'/\$([^/]+)' )
-    if not env_comp.search( path ):
-        env_comp = re.compile( r'^\$([^/]+)' )
-    var_search = env_comp.search( path )
-    if var_search:
-        var = var_search[1]
-        pathChange = os.environ[ var ]
-        path = env_comp.sub( pathChange, path )
+    envs = re.findall(r'\$[^/]+', path)
+    for env in envs:
+        path = path.replace(env, os.environ[env.replace('$','')])
 
-    return path
+    return path.replace('//','/')
 
 
-def formatPath( path, isdir = None ):
+def format_path(path):
     '''Goal is to convert all path types to absolute path with explicit dirs'''
-   
+
+#    path = path.replace('//','/') 
+#    except AttributeError: # not a string
+ #       return None # removed this because let it be handled on the other end
+ #   try: 
     if path:
         path = os.path.expanduser( path )
         path = expandEnvVar( path )
-        path = os.path.abspath( path )
-        if isdir:
-            if not path.endswith('/'):
-                path += '/'
+    #    path = os.path.abspath( path )
+    #    except TypeError:
+      #      return None again, let this be handled on the other end to increase
+      #      throughput
+    
+        if path.endswith('/'):
+            if not os.path.isdir( path ):
+                path = path[:-1]
         else:
-            if path.endswith( '/' ):
-                if path.endswith( '//' ):
-                    path = path[:-1]
-                if not os.path.isdir( path ):
-                    path = path[:-1]
-            elif not path.endswith( '/' ):
-                if os.path.isdir( path ):
-                    path += '/'
-
+            if os.path.isdir( path ):
+                path += '/'
+    
     return path
 
 
@@ -280,7 +349,7 @@ def collect_files( directory = './', filetype = '*', recursive = False ):
     else:
         filetypes = [filetype]
 
-    directory = formatPath( directory )
+    directory = format_path( directory )
     filelist = []
     for filetype in filetypes:
         if recursive:
@@ -302,7 +371,7 @@ def collect_folders( directory, recursive = False ):
     Get folders via os, recursively extend output list if True.
     '''
 
-    directory = formatPath( directory )
+    directory = format_path( directory )
     folders_prep = os.listdir( directory )
     folders = [ 
         directory + '/' + folder + '/' for folder in folders_prep \
@@ -345,7 +414,12 @@ def dictSplit( Dict, factor ):
     return list_dict
 
 
-def sysStart( args, usage, min_len, dirs = [], files = [] ):
+def sys_start( args, usage, min_len, dirs = [], files = [] ):
+    """args is a sys.argv typically, or a list of arguments.
+    usage is the usage statement without formatting.
+    min_len is the minimum number of arguments that should exist.
+    dirs is a list of items that should be directories
+    files is a list of items that should be files"""
 
     if '-h' in args or '--help' in args:
         print( '\n' + usage + '\n' , flush = True)
@@ -353,11 +427,11 @@ def sysStart( args, usage, min_len, dirs = [], files = [] ):
     elif len( args ) < min_len:
         print( '\n' + usage + '\n' , flush = True)
         sys.exit( 2 )
-    elif not all( os.path.isfile( formatPath(x) ) for x in files ):
+    elif not all( os.path.isfile( format_path(x) ) for x in files ):
         print( '\n' + usage , flush = True)
         eprint( 'ERROR: input file(s) do not exist\n' , flush = True)
         sys.exit( 3 )
-    elif not all( os.path.isfile( formatPath(x) ) for x in dirs ):
+    elif not all( os.path.isfile( format_path(x) ) for x in dirs ):
         print( '\n' + usage , flush = True)
         eprint( 'ERROR: input directory does not exist\n' , flush = True)
         sys.exit( 4 )
@@ -425,7 +499,7 @@ def prep_output(output, mkdir = True, require_newdir = False, cd = False):
     formatted path
     '''
 
-    output = formatPath( output )
+    output = format_path( output )
     if os.path.isdir( output ):
         if require_newdir:
             eprint('\nERROR: directory exists.', flush = True)
@@ -444,9 +518,9 @@ def prep_output(output, mkdir = True, require_newdir = False, cd = False):
     return output
 
 def mkOutput(base_dir, program, reuse = True, suffix = datetime.now().strftime('%Y%m%d')):
-    if not os.path.isdir(formatPath(base_dir)):
+    if not os.path.isdir(format_path(base_dir)):
         raise FileNotFoundError(base_dir + ' does not exist')
-    out_dir = formatPath(base_dir) + program + '_' + suffix
+    out_dir = format_path(base_dir) + program + '_' + suffix
 
     if not reuse:
         count, count_dir = 1, out_dir
@@ -484,7 +558,7 @@ def checkDep( dep_list = [], var_list = [], exempt = set() ):
         sys.exit( 135 )
 
 
-def file2list( file_, types = '', sep = '\n', col = None, compress = False):
+def file2list(file_, types = '', sep = None, col = None, compress = False):
     '''
     Inputs: `file_` path, separator string, column integer index
     Outputs: reads file and returns a list given arguments
@@ -503,12 +577,25 @@ def file2list( file_, types = '', sep = '\n', col = None, compress = False):
 
     if col:
         check = data.split('\n')
-        check_col = check[0].split(sep).index( col )
-        data1_list = [ 
-            x[check_col].rstrip() for x in [ y.split(sep) for y in check[1:] ] if len(x) >= check_col + 1 
-        ]
+        if sep:
+            check_col = check[0].split(sep).index( col )
+            data1_list = [ 
+                x[check_col].rstrip() \
+                for x in [y.split(sep) for y in check[1:]] \
+                if len(x) >= check_col + 1 
+            ]
+        else:
+            check_col = check[0].split().index(col)
+            data1_list = [ 
+                x[check_col].rstrip() \
+                for x in [y.split() for y in check[1:]] \
+                if len(x) >= check_col + 1 
+            ]
     elif types:
-        data_list = data.split(sep = sep)
+        if sep:
+            data_list = data.split(sep = sep)
+        else:
+            data_list = data.split()
         if types == 'int':
             try:
                 data1_list = [int(x.rstrip()) for x in data_list if x]
@@ -517,13 +604,16 @@ def file2list( file_, types = '', sep = '\n', col = None, compress = False):
         elif types == 'float':
             data_list = [float(x.rstrip()) for x in data_list if x]
     else:
-        data_list = data.split( sep = sep )
+        if sep:
+            data_list = data.split( sep = sep )
+        else:
+            data_list = data.split()
         data1_list = [ x.rstrip() for x in data_list if x ]
 
     return data1_list
 
 
-def multisub( args_lists, processes = 1, shell = False, stdout = None, rm = False ):
+def multisub(args_lists, processes = 1, shell = False, stdout = None, rm = False):
     '''
     Inputs: list of arguments, integer of processes, subprocess `shell` bool
     Outputs: launches and monitors subprocesses and returns list of exit 
@@ -550,7 +640,7 @@ def multisub( args_lists, processes = 1, shell = False, stdout = None, rm = Fals
         while args_lists:
             while len( running ) < processes and args_lists:
                 cmd = args_lists[ 0 ]
-                run_temp = subprocess.Popen( cmd, stdout = subprocess.DEVNULL, \
+                run_temp = subprocess.Popen( cmd , stdout = subprocess.DEVNULL, \
                     stderr = subprocess.DEVNULL, shell = shell )
                 running.append( [run_temp, cmd ] )
                 del args_lists[ 0 ]
@@ -586,7 +676,7 @@ def multisub( args_lists, processes = 1, shell = False, stdout = None, rm = Fals
                     cmd, args_lists[0][1], 
                     open(args_lists[0][1], 'wb')
                     ])
-                run_temp = subprocess.Popen( cmd, stdout = running[-1][2], \
+                run_temp = subprocess.Popen( cmd, stdout = running[-1][2],
                     stderr = subprocess.DEVNULL, shell = shell )
                 running[-1].append(run_temp)
                 if rm:
@@ -598,10 +688,6 @@ def multisub( args_lists, processes = 1, shell = False, stdout = None, rm = Fals
                     handle[3].poll()
                     returncode = handle[3].returncode
                     if returncode is not None:
-#                        output = handle[0].stdout
- #                       with open(handle[2], 'wb') as out:
-  #                          for line in output:
-   #                             out.write(line)
                         if rm:
                             os.remove(handle[4])
                         handle[2].close()
@@ -618,14 +704,9 @@ def multisub( args_lists, processes = 1, shell = False, stdout = None, rm = Fals
                     handle[3].poll()
                     returncode = handle[3].returncode
                     if returncode is not None:
-#                        output = handle[0].stdout
- #                       with open(handle[2], 'wb') as out:
-  #                          for line in output:
-   #                             out.write(line)
                         handle[2].close()
                         if rm:
                             os.remove(handle[4])
-    #                        handle[2] = handle[2][0]
                         outputs.append( {
                             'stdin': handle[0], 'code': returncode,
                             'output': handle[1]

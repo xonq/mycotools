@@ -68,6 +68,13 @@ class mtdb(dict):
 
     def pd2mtdb(df): # legacy integration
         df = df.fillna('')
+        for i, row in df.iterrows():
+            if not row['gff3']:
+                row['gff3'] = os.environ['MYCOGFF3'] + row['ome'] + '.gff3'
+            if not row['faa']:
+                row['faa'] = os.environ['MYCOFAA'] + row['ome'] + '.faa'
+            if not row['fna']:
+                row['fna'] = os.environ['MYCOFNA'] + row['ome'] + '.fna'
         db = mtdb({
             x: list(df[x]) for x in mtdb.columns
             })

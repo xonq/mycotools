@@ -12,9 +12,8 @@ from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps
 from mycotools.acc2gff import dbMain as acc2gff
 
-def col_CDS(gff_list, 
-            types = {'gene', 'CDS', 'exon', 'mRNA', 
-                     'tRNA', 'rRNA', 'RNA', 'pseudogene'}):
+def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
+                               'tRNA', 'rRNA', 'RNA', 'pseudogene'}):
     '''Collect all CDS entries from a `gff` and store them into cds_dict. If the gene found in the CDS
     is in the set of `ids` then add that type to the CDS dict for that protein
     header.'''
@@ -40,24 +39,35 @@ def col_CDS(gff_list,
 
 def contig2gbk(ome, row, contig, contig_dict, 
                contig_seq, faa, product_search = r'product=([^;]+)'):
+    """Generate a genbank string for a contig_dict, which contains a dictionary
+    of protein keys and list of each gff entry associated with the protein. 
+    ome: ome_code
+    row: mtdb row
+    contig: contig name
+    contig_dict: {prot: [gff_entries]}
+    contig_seq: contig sequence string
+    faa: proteome
+    product_search: product regular expression"""
 
-    seq_coords = []
+    seq_coords = [] # a list of all the coordinates from the contig
     for prot, prot_list in contig_dict.items():
         for entry in prot_list:
             t_start, t_end = int(entry['start']), int(entry['end'])
             seq_coords.append(sorted([t_start, t_end]))
 
+    # sort the coordinates
     seq_coords.sort(key = lambda x: x[0])
-    init_startTest = int(seq_coords[0][0]) - 1
-    init_endTest = int(seq_coords[-1][1])
-    endTest = init_endTest - init_startTest
-    startTest = 1
+    # the starting index
+    init_start_test = int(seq_coords[0][0]) - 1
+    init_end_test = int(seq_coords[-1][1])
+    end_test = init_end_test - init_start_test # relative end
+    start_test = 1 # relative start
 
     # specify the contig edge - may cause parsers (BiG-SCAPE/antiSMASH) to fail
-    edge = '/contig_edge=' + str(init_startTest) + '-;' \
-         + str(len(contig_seq) - init_endTest) + '+'
+    edge = '/contig_edge=' + str(init_start_test) + '-;' \
+         + str(len(contig_seq) - init_end_test) + '+'
     name = ome + '_' + contig
-    relativeEnd = seq_coords[-1][1] - seq_coords[0][0]
+    relative_end = seq_coords[-1][1] - seq_coords[0][0]
     gbk = "LOCUS       " + name + '\n' + \
         "DEFINITION  " + name + '\n' + \
         "ACCESSION   " + contig + '\n' + \
@@ -65,24 +75,16 @@ def contig2gbk(ome, row, contig, contig_dict,
         "KEYWORDS    .\nSOURCE    " + row['source'] + "\n  ORGANISM  " + \
         str(row['genus']) + '_' + str(row['species']) + '_' + \
         str(row['strain']) + '_' + ome + '\n' + \
-        "COMMENT     coordinates are relative to adjustment: " + str(init_startTest) + \
+        "COMMENT     coordinates are relative to adjustment: " + str(init_start_test) + \
         '\n            .\nFEATURES             Location/Qualifiers\n' + \
-        '     region          ' + str(startTest) + '..' + str(endTest) + '\n' + \
+        '     region          ' + str(start_test) + '..' + str(end_test) + '\n' + \
         '                     ' + str(edge) + '\n'
-#        '     region          1..' + str(relativeEnd) + '\n' + \
+#        '     region          1..' + str(relative_end) + '\n' + \
         # this should be
         # related to the start of the contig
 
-#        '                     /product="' + product + '"\n'
-
     used_aliases = set() # to address alternate splicing and 1 entry per gene
     for prot, prot_list in contig_dict.items():
-        # make products unique
-#        prot_dict['products'] = set(prot_dict['products'])
- #       if len(prot_dict['products']) > 1:
-  #          product = '|'.join(sorted(prot_dict['products']))
-   #     else:
-    #        product = list(prot_dict['products'])[0]
         final_coords = ''
         entries = defaultdict(list)
         for entry in prot_list:
@@ -113,11 +115,11 @@ def contig2gbk(ome, row, contig, contig_dict,
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
             if entry['strand'] == '+':
-                gene_coords = str(start-init_startTest) + '..' \
-                    + str(end-init_startTest) + '\n                     '
+                gene_coords = str(start-init_start_test) + '..' \
+                    + str(end-init_start_test) + '\n                     '
             else:
-                gene_coords = 'complement(' + str(start-init_startTest) \
-                    + '..' + str(end-init_startTest) + ')\n                     '
+                gene_coords = 'complement(' + str(start-init_start_test) \
+                    + '..' + str(end-init_start_test) + ')\n                     '
             gbk += gene_coords
             gbk += '/locus_tag="' + alias + '"\n                     ' 
 
@@ -149,14 +151,14 @@ def contig2gbk(ome, row, contig, contig_dict,
             cds_coords = ''
             if strand == '+':
                 for cds in entries['CDS']:
-                    coords = [cds['start'] - init_startTest, 
-                              cds['end'] - init_startTest]
+                    coords = [cds['start'] - init_start_test, 
+                              cds['end'] - init_start_test]
                     max_c, min_c = max(coords), min(coords)
                     cds_coords += str(min_c) + '..' + str(max_c) + ','
             else:
                 for cds in entries['CDS']:
-                    coords = [cds['start'] - init_startTest, 
-                              cds['end'] - init_startTest]
+                    coords = [cds['start'] - init_start_test, 
+                              cds['end'] - init_start_test]
                     max_c, min_c = max(coords), min(coords)
                     cds_coords += 'complement(' + str(min_c) + '..' \
                                + str(max_c) + '),'
@@ -215,8 +217,6 @@ def contig2gbk(ome, row, contig, contig_dict,
                 gbk += '                     ' + lines[-1] + '"\n'
             else:
                 gbk += '"\n'
-
-
 
     total_coords = []
     for coord in seq_coords:
