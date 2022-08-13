@@ -16,7 +16,57 @@ import pandas as pd
 from Bio import Entrez
 from datetime import datetime
 from mycotools.lib.kontools import intro, outro, format_path, prep_output, eprint, vprint, findExecs
-from mycotools.lib.dbtools import log_editor, loginCheck, db2df
+from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
+
+def db2df(data, stdin = False):
+    import pandas as pd, pandas
+    columns = mtdb.columns
+    if isinstance(data, mtdb):
+        db_df = pd.DataFrame(data.reset_index())
+    elif not stdin:
+        data = format_path( data )
+        db_df = pd.read_csv( data, sep='\t' )
+        if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
+            db_df = pd.read_csv( data, sep = '\t', header = None )
+    else:
+        db_df = pd.read_csv( StringIO(data), sep='\t' )
+        if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
+            db_df = pd.read_csv( StringIO(data), sep = '\t', header = None )
+
+    db_df = db_df.fillna('')
+
+    if len(db_df.keys()) == 16: # legacy conversion TO BE DEPRECATED
+        eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
+        db_df.columns = [
+            'ome', 'genus', 'species', 'strain', 'version',
+            'biosample', 'fna', 'faa', 'gff3', 'taxonomy', 'ecology',
+            'eco_conf',
+            'source', 'published', 'assembly_acc', 'acquisition_date'
+            ]
+    else:
+        db_df.columns = columns
+    for i, row in db_df.iterrows():
+        db_df.at[i, 'taxonomy'] = read_tax(
+            row['taxonomy']
+            )
+        db_df.at[i, 'taxonomy']['genus'] = row['genus']
+        db_df.at[i, 'taxonomy']['species'] = \
+            row['genus'] + ' ' + row['species']
+        # if malformatted due to decreased entries in some lines, this will raise an IndexError
+        if row['fna'] or row['fna'] == row['ome'] + '.fna': # abbreviated line w/o file coordinates
+           db_df.at[i, 'fna'] = os.environ['MYCOFNA'] + row['ome'] + '.fna'
+           db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + row['ome'] + '.faa'
+           db_df.at[i, 'gff3'] = os.environ['MYCOGFF3'] + row['ome'] + '.gff3'
+        else: # has file coordinates
+           db_df.at[i, 'fna'] = format_path(row['fna'])
+           db_df.at[i, 'faa'] = format_path(row['faa'])
+           db_df.at[i, 'gff3'] = format_path(row['gff3'])
+
+    if len(db_df) == 16: # LEGACY conversion to be deprecated
+        del db_df['ecology']
+        del db_df['eco_conf']
+
+    return db_df
 
 
 def prepare_folders( output_path, gff, prot, assem, transcript ):
@@ -593,7 +643,6 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', required = True, \
     help = 'Space delimited accession; tab delimited file with -c')
@@ -647,8 +696,8 @@ if __name__ == "__main__":
             goSRA(pd.DataFrame({'sra': [args.input.rstrip()]}), output, pe = args.paired)
     else:
         if os.path.isfile(format_path(args.input)):
-            df = db2df(args.input) # db2df is deprecated, so this needs to change. move out of pandas in general
-            if not column:
+            ncbi_df = db2df(args.input) # db2df is deprecated, so this needs to change. move out of pandas in general
+            if not args.column:
                 if 'assembly_acc' in ncbi_df.keys():
                     column = 'assembly_acc'
                     ncbi_column = 'Assembly Accession'
@@ -660,7 +709,7 @@ if __name__ == "__main__":
             try:
                 column = ncbi_df.columns[int(column)]
                 ncbi_column = column
-            except TypeError: # not an integer
+            except ValueError: # not an integer
                 pass
             if not args.ncbi_column:
                 if column.lower() in {'assembly'}:
@@ -675,12 +724,15 @@ if __name__ == "__main__":
             else:
                 ncbi_column = args.ncbi_column.lower()
         else:
-            df = pd.DataFrame({'assembly_acc': args.input.replace('"','').replace("'",'').split()})
+            ncbi_df = pd.DataFrame({'assembly_acc': args.input.replace('"','').replace("'",'').split()})
+            column = 'assembly_acc'
+            ncbi_column = 'assembly'
     
         new_df, failed = main( 
-            assembly = args.assembly, column = column, ncbi_column = ncbi_column,
-            proteome = args.proteome, gff3 = args.gff3, transcript = args.transcript,
-            ncbi_df = df, output_path = output, verbose = True, spacer = ''
+            assembly = args.assembly, column = column, 
+            ncbi_column = ncbi_column, proteome = args.proteome, 
+            gff3 = args.gff3, transcript = args.transcript, ncbi_df = ncbi_df,
+            output_path = output, verbose = True, spacer = '\n'
             )
         new_df.to_csv( args.input + '_dwnld', sep = '\t' )
 

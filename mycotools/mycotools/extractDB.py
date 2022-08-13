@@ -82,7 +82,7 @@ def main(
         new_db = extract_tax(db, lineage_list, rank)
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif omes_set:
-        extract_ome(db, omes)
+        new_db = extract_ome(db, omes)
     # if none of these are specified then create a `new_db` variable to work for later
     else:
         new_db = db

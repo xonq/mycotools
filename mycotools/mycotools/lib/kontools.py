@@ -329,6 +329,8 @@ def format_path(path):
         else:
             if os.path.isdir( path ):
                 path += '/'
+        if not path.startswith('/'):
+            path = os.getcwd() + '/' + path
     
     return path
 

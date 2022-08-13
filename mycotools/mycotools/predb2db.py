@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
-# NEED to curate assembly and gff references to ome_contig
-
 import os
 import re
 import sys
 import copy
 import shutil
 import multiprocessing as mp
-from collections import Counter
+from collections import Counter, defaultdict
 from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gff3Comps, gff2Comps
@@ -87,23 +85,25 @@ def gen_predb():
 
 def read_predb(predb_path, spacer = '\t'):
 
-    predb, headers = {}, None
+#    predb, headers = {}, None
+    predb = defaultdict(list)
     with open(predb_path, 'r') as raw:
         for line in raw:
-            if line.startswith('#'):
-                if not headers:
-                    predb = {x: [] for x in line.rstrip()[1:].split('\t')}
-                    headers = list(predb.keys())
-            elif line.rstrip():
+#            if line.startswith('#'):
+ #               if not headers:
+  #                  predb = {x: [] for x in line.rstrip()[1:].split('\t')}
+   #                 headers = list(predb.keys())
+            if not line.startswith('#') and line.rstrip():
+#            if line.rstrip():
                 entry = line.split('\t')
-                if len(entry) != len(headers):
+                if len(entry) != len(predb_headers):
                     eprint(spacer + 'ERROR: all columns must have an entry.', flush = True)
-                    eprint(headers, '\n', entry, flush = True)
+                    eprint(predb_headers, '\n', entry, flush = True)
                     sys.exit(3)
                 for i, v in enumerate(entry):
-                    predb[headers[i]].append(v.rstrip())
-#                (predb[headers[i]].append(v.rstrip()) for i,v in enumerate(entry)) 
+                    predb[predb_headers[i]].append(v.rstrip())
 
+    predb = dict(predb)
     try:
         predb['assembly_acc'] = predb['assembly_accession']
         del predb['assembly_accession']
@@ -130,7 +130,7 @@ def read_predb(predb_path, spacer = '\t'):
 
     if any(x.lower() not in {'jgi', 'ncbi', 'new'} \
         for x in predb['source']):
-        eprint(spacer + 'ERROR: genoemSource entries must be in {jgi, ncbi, new}', flush = True)
+        eprint(spacer + 'ERROR: genomeSource entries must be in {jgi, ncbi, new}', flush = True)
         sys.exit(5)
     for i, path in enumerate(predb['assemblyPath']):
         predb['assemblyPath'][i] = format_path(predb['assemblyPath'][i])
@@ -275,11 +275,15 @@ def cur_fna(cur_raw_fna_path, uncur_raw_fna_path, ome):
 
 def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir, 
             source, assembly_accession, exit = False,
-            remove = False, spacer = '\t'):
+            remove = False, spacer = '\t\t\t', verbose = False):
+
+    predb_dir = os.path.basename(os.path.dirname(wrk_dir[:-1])) + '/working/'
 
     # assembly FNAs
+    vprint('\t' + ome, v = verbose, flush = True)
     uncur_fna_path = wrk_dir + 'fna/' + ome + '.fna.uncur'
     cur_fna_path = wrk_dir + 'fna/' + ome + '.fna'
+    vprint('\t\t' + predb_dir + 'fna/' + ome + '.fna', v = verbose, flush = True)
     if not os.path.isfile(cur_fna_path):
         try:
             uncur_fna_path = move_biofile(raw_fna_path, ome, 'fa', wrk_dir + 'fna/',
@@ -287,12 +291,15 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
         except IOError:
             eprint(spacer + ome + '|' + assembly_accession \
                  + ' failed FNA parsing', flush = True)
+            if exit:
+                raise IOError
             return ome, False, 'fna'
         cur_fna(cur_fna_path, uncur_fna_path, ome)
 
     # gene coordinate GFF3s
     uncur_gff_path = wrk_dir + 'gff3/' + ome + '.gff3.uncur'
     cur_gff_path = wrk_dir + 'gff3/' + ome + '.gff3'
+    vprint('\t\t' + predb_dir + 'gff3/' + ome + '.gff3', v = verbose, flush = True)
     if not os.path.isfile(cur_gff_path):
         try:
             uncur_gff_path = move_biofile(raw_gff_path, ome, 'gff3', 
@@ -305,24 +312,25 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
         gff = gff2list(uncur_gff_path)
         try:
             gff_mngr(ome, gff, cur_gff_path, source, assembly_accession)
-        except: # catch all errors to continue script
+        except Exception as e: # catch all errors to continue script
             eprint(spacer + ome + '|' + assembly_accession \
                 + ' failed GFF3 curation', flush = True)
             if exit:
-                sys.exit(17)
+                raise e
             return ome, False, 'gff3'
 
     # proteome FAAs
     faa_path = wrk_dir + 'faa/' + ome + '.faa'
+    vprint('\t\t' + predb_dir + 'faa/' + ome + '.faa', v = verbose, flush = True)
     if not os.path.isfile(faa_path):
         try:
-            faa = gff2seq(gff2list(cur_gff_path), fa2dict(uncur_fna_path),
+            faa = gff2seq(gff2list(cur_gff_path), fa2dict(cur_fna_path),
                           spacer = spacer)
-        except: # catch all errors
+        except Exception as e: # catch all errors
             eprint(spacer + ome + '|' + assembly_accession \
                  + ' failed proteome generation', flush  = True)
             if exit:
-                sys.exit(18)
+                raise e
             return ome, False, 'faa'
         with open(faa_path + '.tmp', 'w') as out:
             out.write(dict2fa(faa))
@@ -390,11 +398,12 @@ def add2failed(row):
 
 def main(
     predb, refdb, wrk_dir, 
-    verbose = False, spacer = '\t', forbidden = set(), 
+    verbose = False, spacer = '\t\t\t', forbidden = set(), 
     cpus = 1, exit = False, remove = False
     ):
 
     infdb = predb2mtdb(predb)
+    vprint('\nGenerating omes', v = verbose, flush = True)
     omedb, failed = gen_omes(infdb, refdb, ome_col = 'ome', forbidden = forbidden,
                      spacer = spacer)
     
@@ -404,8 +413,10 @@ def main(
         cur_cmds.append([
             ome, row['fna'], row['gff3'], 
             wrk_dir, row['source'], row['assembly_acc'],
-            exit, remove, spacer
+            exit, remove, spacer, verbose
             ])
+
+    vprint('\nCurating data', v = verbose, flush = True)
     with mp.Pool(processes = cpus) as pool:
         cur_data = pool.starmap(cur_mngr, cur_cmds)
 
@@ -445,12 +456,15 @@ if __name__ == '__main__':
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
+    eprint('\nPreparing run', flush = True)
     predb = read_predb(format_path(sys.argv[1]), spacer = '\t')
     out_dir, wrk_dir = prep_output(os.path.dirname(format_path(sys.argv[1])))
-    omedb, failed = main(predb, refDB, wrk_dir, exit = True)
+
+
+    omedb, failed = main(predb, refDB, wrk_dir, exit = True, verbose = True)
 
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
     tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
     outdb = assimilate_tax(omedb, tax_dicts)
-    outdb.df2db(out_dir + 'predb2db.db')
+    outdb.df2db(out_dir + 'predb2db.mtdb')
     sys.exit(0)
