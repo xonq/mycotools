@@ -2,6 +2,17 @@
 
 # NEED to curate CDS parents to ensure they relate to the RNA
 # NEED to curate protein ids to be a uniform title
+# NEED to fix mobile_genetic_element conversion from NCBI
+    # entries contain a gene, mRNA, exon
+# NEED to restrict passing types [mobile_genetic_element], 
+    # or make them conform
+        # change alias to accomodate these edge cases:
+            # Long_terminal_repeat, mobile_genetic_element
+                # MRNA should not include a CDS here
+# NEED to fix standalone gene alias
+    # an alias is applied like "Alias" with nothing else
+    # only sometimes
+        # if followed by unreviewed type
 
 import os
 import re

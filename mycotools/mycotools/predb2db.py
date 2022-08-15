@@ -119,7 +119,7 @@ def read_predb(predb_path, spacer = '\t'):
     try:
         predb['restriction'] = predb['useRestriction (yes/no)']
         del predb['useRestriction (yes/no)']
-        if any(x.lower() not in {'y', 'n', 'yes', 'no', ''} for x in predb['restriction']):
+        if any(x.lower() not in {'y', 'n', 'yes', 'no', '', 'true', 'false'} for x in predb['restriction']):
             eprint(spacer + 'ERROR: useRestriction entries must be in {y, n, yes, no}', flush = True)
             sys.exit(4)
     except KeyError:
@@ -135,13 +135,12 @@ def read_predb(predb_path, spacer = '\t'):
     for i, path in enumerate(predb['assemblyPath']):
         predb['assemblyPath'][i] = format_path(predb['assemblyPath'][i])
         predb['gffPath'][i] = format_path(predb['gffPath'][i])
-        if predb['restriction'][i].lower() in {'y', 'yes'}:
+        if predb['restriction'][i].lower() in {'y', 'yes', 'true'}:
             predb['restriction'][i] = True
+        elif predb['restriction'][i].lower() in {'n', 'no', 'false'}:
+            predb['restriction'][i] = ''
         if not predb['species'][i]:
             predb['species'][i] = 'sp.'
-        for col in predb.keys():
-            if predb[col][i].lower() in {'n', 'no'}:
-                predb[col][i] = ''
     return predb
 
 def predb2mtdb(predb):
@@ -207,9 +206,25 @@ def gen_omes(
         else:
             tax_count[abb] = num
     tax_count = Counter(tax_count)
-    todel, tax_count = [], Counter()
+
+    todel, refdb_aas = [], refdb.set_index('assembly_acc')
+    refdb_accs = set([x for x in list(refdb['assembly_acc']) if x])
     for i, ome in enumerate(newdb['ome']):
         if not ome: # if there isn't an ome for this entry yet
+            if newdb['assembly_acc'][i] in refdb_accs: # if this is an
+            # established assembly accession; maybe make sure this works for
+            # changed MycoCosm or NCBI assembly accs
+                ome = refdb_aas[newdb['assembly_acc'][i]]['ome']
+                v_search = re.search(r'\.(\d+)$', ome)
+                if v_search:
+                    v = int(v_search[1]) + 1 # new version
+                    new_ome = re.sub(r'\.\d+$', '.' + str(v), ome)
+                else:
+                    new_ome = ome + '.1' # first modified version
+                eprint(spacer + ome + ' update -> ' + new_ome, flush = True)
+                newdb['ome'][i] = new_ome
+                continue
+               
             try:
                 name = newdb['genus'][i][:3].lower() + newdb['species'][i][:3].lower()
             except TypeError:
@@ -437,7 +452,7 @@ if __name__ == '__main__':
     usage = 'Generate a predb file:\npredb2db.py\n\nCreate a mycotoolsdb ' + \
     'from a predb file:\npredb2db.py <PREDBFILE>\n\nCreate a mycotoolsdb ' + \
     'referencing an alternative master database:\npredb2db.py <PREDBFILE> ' + \
-    '<REFERENCEDB>'
+    '<REFERENCEDB>\nSkip failing genomes:\npredb2db.py <PREDBFILE> -s'
 
     if any(x in {'-h', '--help', '-help'} for x in sys.argv):
         eprint('\n' + usage + '\n', flush = True)
@@ -445,10 +460,20 @@ if __name__ == '__main__':
     elif len(sys.argv) == 1:
         print(gen_predb())
         sys.exit(0)
-    elif len(sys.argv) == 3:
-        refDB = mtdb(format_path(sys.argv[2]))
+    elif len(sys.argv) >= 3:
+        if sys.argv[2] not in {'-s', '--skip'}:
+            refDB = mtdb(format_path(sys.argv[2]))
+        elif len(sys.argv) > 3:
+            refDB = mtdb(format_path(sys.argv[3]))
+        else:
+            refDB = mtdb(masterDB())
     else:
         refDB = mtdb(masterDB())
+
+    if set(sys.argv).intersection({'-s', '--skip'}):
+        exit = False
+    else:
+        exit = True
 
     from Bio import Entrez
     ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False)
@@ -461,7 +486,7 @@ if __name__ == '__main__':
     out_dir, wrk_dir = prep_output(os.path.dirname(format_path(sys.argv[1])))
 
 
-    omedb, failed = main(predb, refDB, wrk_dir, exit = True, verbose = True)
+    omedb, failed = main(predb, refDB, wrk_dir, exit = exit, verbose = True)
 
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
     tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)

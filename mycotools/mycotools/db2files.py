@@ -4,46 +4,49 @@ import os
 import re
 import sys
 import argparse
-import pandas as pd
 from shutil import copy as cp
-from mycotools.lib.dbtools import db2df, df2db, masterDB
-from mycotools.lib.kontools import format_path, prep_output
+from mycotools.lib.dbtools import masterDB, mtdb
+from mycotools.lib.kontools import format_path, prep_output, eprint
 
 
-def softMain( filetypes, envtypes, db, output_path, print_link = False ):
+def softMain(filetypes, db, output_path, print_link = False):
+    """Symlink or print files from each file_type"""
 
+    db = db.set_index('ome')
     filetypes = {x: filetypes[x] for x in filetypes if filetypes[x]}
     if not print_link:
         for ftype in filetypes:
             if not os.path.isdir(output_path + ftype):
                 os.mkdir(output_path + ftype)
-        for ftype in filetypes:
-            check_db = db[~db[ftype].isnull()]
-            check_db.apply(
-                lambda x: os.symlink(envtypes[ftype] + '/' + x[ftype],
-                output_path + ftype + '/' + x[ftype]), axis = 1
-                )
-        
-    else:
-        for i, row in db.iterrows():
+        for ome, row in db.items():
             for ftype in filetypes:
-                if not pd.isnull( row[ ftype ] ):
-                    fpath = format_path( '$' + envtypes[ftype] + '/' + row[ftype] )
-                    print( fpath , flush = True)
+                if os.path.isfile(row[ftype]):
+                    os.symlink(row[ftype], output_path + ftype \
+                             + '/' + ome + '.' + ftype)
+                else:
+                    eprint('\tERROR: ' + ome + ' ' + ftype, flush = True)
+    else:
+        for ome, row in db.items():
+            for ftype in filetypes:
+                print(row[ftype], flush = True)
 
 
-def hardMain( filetypes, envtypes, db, output_path ):
+def hardMain(filetypes, db, output_path):
+    """Hard copy files from filetypes to their filetype output directory"""
 
+    db = db.set_index('ome')
     filetypes = {x: filetypes[x] for x in filetypes if filetypes[x]}
     for ftype in filetypes:
-        if not os.path.isdir( output_path + ftype ):
-            os.mkdir( output_path + ftype )
+        if not os.path.isdir(output_path + ftype):
+            os.mkdir(output_path + ftype)
 
-    for i, row in db.iterrows():
+    for ome, row in db.items():
         for ftype in filetypes:
-            if not pd.isnull( row[ ftype ] ):
-                fpath = format_path( '$' + envtypes[ftype] + '/' + row[ftype] )
-                cp( fpath, output_path + ftype + '/' + os.path.basename( fpath ) ) 
+            try:
+                cp(row[ftype], output_path + ftype + '/' \
+                + os.path.basename(row[ftype])) 
+            except FileNotFoundError:
+                eprint('\tERROR: ' + ome + ' ' + ftype, flush = True)
 
 if __name__ == '__main__':
 
@@ -61,8 +64,8 @@ if __name__ == '__main__':
         print('\nERROR: no file type (-a, -g, -p) selected', flush = True)
         sys.exit(4)
 
-    db_path = format_path( args.database )
-    output_path = prep_output( format_path( args.output ), cd = False )
+    db_path = format_path(args.database)
+    output_path = prep_output(format_path( args.output ), cd = False)
     args_dict = {
         'DATABASE': db_path, 'OUTPUT': output_path,
         'ASSEMBLY': args.assembly, 'PROTEOME': args.proteome,
@@ -70,18 +73,14 @@ if __name__ == '__main__':
         }
 
     filetypes = { 
-        'assembly': args.assembly, 'proteome': args.proteome,
+        'fna': args.assembly, 'faa': args.proteome,
         'gff3': args.gff
         }
-    envtypes = { 
-        'assembly': 'MYCOFNA', 'proteome': 'MYCOFAA',
-        'gff3': 'MYCOGFF3'
-        }
 
-    db = db2df( db_path )
+    db = mtdb(db_path)
     if args.print or not args.hard:
-        softMain(filetypes, envtypes, db, output_path, print_link = args.print)
+        softMain(filetypes, db, output_path, print_link = args.print)
     else:
-        hardMain( filetypes, envtypes, db, output_path )
+        hardMain(filetypes, db, output_path)
 
-    sys.exit( 0 )
+    sys.exit(0)

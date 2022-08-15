@@ -435,20 +435,19 @@ def dwnld_mngr(
         count, remove = remove, spacer = spacer
         )
     count = wait_for_ncbi(count, api)
+    t_acc = acc
     try:
         if exits['assembly'] != 0:
             if '$' in acc:
                 t_acc = acc[:acc.find('$')]
-            else:
-                t_acc = acc
             fail = [t_acc, ncbi_df['version'][t_acc]]
             return fail, count
     except KeyError:
         pass
     try:
         if exits['gff3'] != 0:
-             fail = [t_acc, ncbi_df['version'][t_acc]]
-             return fail, count
+            fail = [t_acc, ncbi_df['version'][t_acc]]
+            return fail, count
     except KeyError:
         pass
     return fail, count
@@ -525,7 +524,7 @@ def main(
 
     ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
     # preserve the original column, but index ncbi_df on it as well
-    eprint(spacer + 'Assembling NCBI ftp directories', flush = True)
+    vprint('\n' + spacer + 'Assembling NCBI ftp directories', v = verbose, flush = True)
     ass_prots, failed, ncbi_df = collect_ftps( 
             ncbi_df, ass_prots, remove = remove,
             ncbi_column = ncbi_column, column = column, api_key=api,
@@ -540,7 +539,7 @@ def main(
             }
     new_df = pd.DataFrame()
 
-    eprint(spacer + 'Downloading NCBI files', flush = True)
+    vprint('\n' + spacer + 'Downloading NCBI files', v = verbose, flush = True)
     count = 0
     if check_MD5:
         for acc, data in ass_prots.items():
@@ -732,7 +731,7 @@ if __name__ == "__main__":
             assembly = args.assembly, column = column, 
             ncbi_column = ncbi_column, proteome = args.proteome, 
             gff3 = args.gff3, transcript = args.transcript, ncbi_df = ncbi_df,
-            output_path = output, verbose = True, spacer = '\n'
+            output_path = output, verbose = True, spacer = ''
             )
         new_df.to_csv( args.input + '_dwnld', sep = '\t' )
 
