@@ -102,7 +102,8 @@ updateDB.py -u
 
 ## Interfacing
 ### mtdb
-`mtdb` is a utility that initializes interfacing with an established master database or just prints the path of the master database, which can then be used with other shell commands. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
+`mtdb` is a utility that initializes interfacing with an established master
+database or just prints the path of the master database. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
 mtdb
 /home/xonq/mtdb/mtdb/20210125.mtdb
@@ -139,6 +140,12 @@ e.g. to open in a text editor or to grep the file:
 vim $(mtdb)
 grep 'Psilocybe' $(mtdb)
 ```
+
+NOTE: `grep` may yield non-specific taxonomy results, e.g. `grep Athelia
+$(mtdb)` will not only yield the genus *Athelia*, but also all members of the
+family Atheliaceae. See
+[extractDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
+to extract based on taxonomy.
 
 <br /><br />
 
@@ -599,34 +606,29 @@ View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 <br /><br />
 
 
-## Hierarchical agglomerative clustering
+## Sequence clustering
 ### fa2clus.py
-Hierarchical agglomerative clustering is a useful systematic approach to
-clustering groups of sequences for phylogenetic analysis via percent identity.
 Some gene families (e.g. P450s) yield 10,000s of results for BLAST searches against the
 MycotoolsDB. `fa2clus.py` allows the user to truncate these sets without constructing a
-phylogeny using a minimum percent identity cutoff. `fa2clus.py` optionally implements
-an automated iterative approach to obtaining a cluster of minimum - maximum size
+phylogeny by clustering via hierarchical agglomerative clustering, or linclust. 
+`fa2clus.py` optionally implements an automated iterative approach to obtaining a 
+cluster of minimum - maximum size
 with the gene of interest.
 
-`fa2clus.py` will either take a `fasta` and generate a distance matrix using 
-`usearch calc_distmx` by default or the % identity of `needle` alignments.
+For hierarchical agglomerative clustering: `fa2clus.py` will either take a `fasta` and generate a distance matrix using 
+`usearch calc_distmx` by default or the % identity of `diamond` alignments.
 Then, cluster sequences via hierarchical agglomerative clustering and output a
 `.clus` file of cluster assignments and `.newick` dendrogram. 
 
-Currently, using `needle` is slow, so it is recommended to acquire a
-free license for `usearch` and use that instead. The limitations of the free
-license are sufficient for distance matrix calculation even on large datasets. 
-
-e.g. Calculate a distance matrix and cluster from a fasta with a minimum
-identity 0.3 and maximum distance 0.7 (1 - identity) to consider a connection:
+Linear time cluster `linclust` a fasta with a minimum percent identity of 70%
+and minimum query coverage 20%:
 ```bash
-fa2clus.py -f <FASTA>.fa -m 0.2 -x 0.7
+fa2clus.py -f <FASTA>.fa -m 0.2 -x 0.7 -l
 ```
 
 Iteratively cluster until a cluster size of 50-200 genes is achieved:
 ```bash
-fa2clus.py -f <FASTA> -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
+fa2clus.py -f <FASTA> -l -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
 ```
 
 
@@ -826,3 +828,4 @@ optional arguments:
 - fa2hmmer2fa annotation
 - update crap information
 - eggnog to synteny diagram
+- overview of mycotools scripts functions, e.g. resume on -o
