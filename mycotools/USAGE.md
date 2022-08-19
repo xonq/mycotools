@@ -27,7 +27,7 @@ how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
 	- [Adding local genomes to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#adding-local-genomes)
-	- [Substitute organism name for MycotoolsDB organism code](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#ome2name.py)
+	- [Substitute organism name for MycotoolsDB organism code](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#ome2namepy)
 
 <br />
 
@@ -49,13 +49,13 @@ how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-
 	- [MycotoolsDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycotoolsdb)
 	- [MycotoolsDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#tree-building)
-	- [Hierarchical agglomerative clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hierarchical-agglomerative-clustering)
+	- [Sequence clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-clustering)
 
 <br />
 
 - **MYCOTOOLS PIPELINES**
 	- [Phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
-	- [Cluster Reconstruction and Phylogenetic Analysis (CRAP)](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crap.py)
+	- [Cluster Reconstruction and Phylogenetic Analysis (CRAP)](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crappy)
 
 
 ---
@@ -728,12 +728,11 @@ acc2fa.py -i <FILEWITHACCESSIONS>
 <br />
 
 4b. If there are greater than 10,000 sequences, trees - even fasttrees can be
-intractable at this quantity. Therefore, try hierarchical agglomerative
-clustering. Adjust the % identity for both arguments as needed. You may need to
+intractable at this quantity. Therefore, try clustering. Adjust the % identity for both arguments as needed. You may need to
 submit this as a job
 
 ```bash
-fa2clus.py -f <FASTA>.fa -m 0.3 -x 0.7
+fa2clus.py -f <FASTA>.fa -m 0.3 -x 0.7 -l
 ```
 
 <br />
@@ -829,3 +828,4 @@ optional arguments:
 - update crap information
 - eggnog to synteny diagram
 - overview of mycotools scripts functions, e.g. resume on -o
+- update phylogenetic pipeline with fa2clus renovations
