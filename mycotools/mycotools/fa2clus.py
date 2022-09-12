@@ -7,12 +7,13 @@
 # fix output
 # NEED to avoid rerunning already ran values, only when necessary
 # NEED to archive old runs'
-# NEED to implement linclus
+# NEED to implement linclust
 
 import os
 import re
 import sys
 import copy
+import shutil
 import string
 import random
 import tempfile
@@ -20,9 +21,65 @@ import argparse
 import itertools
 import subprocess
 import pandas as pd
-from mycotools.lib.kontools import multisub, findExecs, format_path, eprint, vprint, read_json, write_json, mkOutput
+from collections import defaultdict
+from mycotools.lib.kontools import multisub, findExecs, format_path, \
+    eprint, vprint, read_json, write_json, mkOutput, fmt_float
 from mycotools.lib.biotools import fa2dict, dict2fa
 sys.setrecursionlimit(1000000)
+
+class LinclustError(Exception):
+    pass
+
+def run_linclust(fa_path, res_base, wrk_dir, mmseqs = 'mmseqs',
+                 min_id = 0.3, min_cov = 0.5, cpus = 1, verbose = False):
+    res_path = res_base + '_cluster.tsv'
+    tmp_dir = os.path.dirname(res_path) + '/tmp/'
+    if verbose:
+        stdout, stderr = None, None
+    else:
+        stdout = subprocess.DEVNULL
+        stderr = subprocess.DEVNULL
+    mmseqs_cmd = [mmseqs, 'easy-linclust',
+                  fa_path, res_base, tmp_dir,
+                  '--min-seq-id', fmt_float(min_id), '--threads',
+                  str(cpus), '--compressed', '1',
+                  '--cov-mode', '0', '-c', str(min_cov),
+                  '-e', '0.1']
+    mmseqs_exit = subprocess.call(mmseqs_cmd,
+                                  stdout = stdout,
+                                  stderr = stderr)
+    if mmseqs_exit:
+        raise LinclustError('linclust failed: ' + str(mmseqs_exit) \
+                            + ' ' + str(mmseqs_cmd))
+    if os.path.isfile(res_base + '_all_seqs.fasta'):
+        os.remove(res_base + '_all_seqs.fasta')
+    if os.path.isfile(res_base + '_rep_seq.fasta'):
+        os.remove(res_base + '_rep_seq.fasta')
+    if os.path.isdir(tmp_dir):
+        shutil.rmtree(tmp_dir)
+    return res_path
+
+def parse_linclust(res_path):
+    derivations = defaultdict(list)
+    with open(res_path, 'r') as raw:
+        for line in raw:
+            k, v = line.rstrip().split() # all white space
+            derivations[k].append(v)
+
+    hg_list = []
+    for k, v in derivations.items():
+        v.append(k)
+        hg_list.append(sorted(set(v)))
+
+    hg2gene = {i: v for i, v in enumerate(
+                    sorted(hg_list, key = lambda x: len(x),
+                    reverse = True)
+                    )}
+    gene2hg = {}
+    for hg, genes in hg2gene.items():
+        for gene in genes:
+            gene2hg[gene] = hg
+    return hg2gene, gene2hg
 
 def makeDmndDB(diamond, queryFile, output_dir, cpus = 1):
     """create a diamond database:
@@ -65,7 +122,7 @@ def runDmnd(
             )
     return outputFile, dmndCode
 
-def readDmndDist( outputFile, minVal, pid = True ):
+def rd_dmnd_distmtx( outputFile, minVal, pid = True ):
     """Read a diamond output as a distance matrix"""
 
     dist_dict = {}
@@ -85,7 +142,7 @@ def readDmndDist( outputFile, minVal, pid = True ):
                         dist_dict[s][s] = 0.0
                     dist_dict[q][s] = 100 - v
                     dist_dict[s][q] = 100 - v
-            distanceMatrix = pd.DataFrame(dist_dict).sort_index(1).sort_index(0).fillna(100)
+            distance_matrix = pd.DataFrame(dist_dict).sort_index(1).sort_index(0).fillna(100)
         else:
              for line in raw:
                 q, s, v0 = line.rstrip().split('\t')
@@ -99,47 +156,47 @@ def readDmndDist( outputFile, minVal, pid = True ):
                     if s not in dist_dict:
                         dist_dict[s] = {}
                         dist_dict[s][s] = 0.0
-             distanceMatrix = pd.DataFrame(dist_dict).sort_index(1).sort_index(0).fillna(0)
+             distance_matrix = pd.DataFrame(dist_dict).sort_index(1).sort_index(0).fillna(0)
 
 
     if pid:
-        distanceMatrix /= 100
+        distance_matrix /= 100
     else:
-        minV, maxV = min(distanceMatrix), max(distanceMatrix)
+        minV, maxV = min(distance_matrix), max(distance_matrix)
         denom = maxV - minV
-        distanceMatrix -= minV
-        distanceMatrix /= denom
-        distanceMatrix = 1 - distanceMatrix
+        distance_matrix -= minV
+        distance_matrix /= denom
+        distance_matrix = 1 - distance_matrix
 
-    return distanceMatrix #, outMatrix
+    return distance_matrix #, outMatrix
 
-def runUsearch( fasta, output, clusParam, cpus = 1, verbose = False ):
+def runUsearch( fasta, output, clus_parameter, cpus = 1, verbose = False ):
 
     if verbose:
         subprocess.call([
             'usearch', '-calc_distmx', fasta,
-            '-tabbedout', output, '-clusParam',
-            clusParam, '-threads', str(cpus)
+            '-tabbedout', output, '-clus_parameter',
+            clus_parameter, '-threads', str(cpus)
             ] #stdout = subprocess.PIPE,
             #stderr = subprocess.PIPE
             )
     else:
         subprocess.call([
             'usearch', '-calc_distmx', fasta,
-            '-tabbedout', output, '-clusParam',
-            clusParam, '-threads', str(cpus)
+            '-tabbedout', output, '-clus_parameter',
+            clus_parameter, '-threads', str(cpus)
             ], stdout = subprocess.DEVNULL,
             stderr = subprocess.DEVNULL
             )
 
-def importDist( dis_path, sep = '\t' ):
+def rd_usrch_distmtx( dis_path, sep = '\t' ):
     '''Imports a distance matrix with each line formatted as `organism $SEP organism $SEP distance`.
     - this is equivalent to the `-tabbedout` argument in `usearch -calc_distmx`. The function 
     compiles a dictionary with the information and reciprocal information for each organism in each
     line, then converts this dictionary of dictionaries into a pandas dataframe. As a distance matrix,
     NA values are converted to maximum distance (1).'''
 
-    distanceMatrix = pd.DataFrame()
+    distance_matrix = pd.DataFrame()
     with open( dis_path, 'r' ) as raw:
         data = raw.read()
     prepData = [ x.rstrip() for x in data.split('\n') if x != '' ]
@@ -154,11 +211,11 @@ def importDist( dis_path, sep = '\t' ):
         dist_dict[ vals[0] ][ vals[1] ] = float(vals[2])
         dist_dict[ vals[1] ][ vals[0] ] = float(vals[2])
 
-    distanceMatrix = pd.DataFrame( dist_dict ).sort_index(0).sort_index(1)
+    distance_matrix = pd.DataFrame( dist_dict ).sort_index(0).sort_index(1)
 
-    return distanceMatrix.fillna( 1.0 )
+    return distance_matrix.fillna( 1.0 )
 
-def scikitaggd( distanceMatrix, maxDist = 0.6, linkage = 'single' ):
+def scikitaggd( distance_matrix, maxDist = 0.6, linkage = 'single' ):
     '''Performs agglomerative clustering and extracts the cluster labels, then sorts according to
     cluster number. In the future, this will also extract a Newick tree.'''
 
@@ -167,9 +224,9 @@ def scikitaggd( distanceMatrix, maxDist = 0.6, linkage = 'single' ):
         distance_threshold = maxDist,
         n_clusters = None,
         linkage = linkage
-        ).fit( distanceMatrix )
+        ).fit( distance_matrix )
 
-    i = iter( distanceMatrix.columns )
+    i = iter( distance_matrix.columns )
     clusters = { next( i ): x for x in clustering.labels_ }
     clusters = { k: v for k, v in sorted( clusters.items(), key = lambda item: item[1] ) }
 
@@ -226,21 +283,21 @@ def scipyaggd( distMat, maxDist, method = 'single' ):
 
     return clusters, tree
 
-def dmndMain(fastaPath, minVal, output_dir, distFile, pid = True, verbose = False, cpus = 1):
-    queryDB, makeDBcode = makeDmndDB('diamond', fastaPath, output_dir, cpus = cpus)
+def dmnd_main(fasta_path, minVal, output_dir, distFile, pid = True, verbose = False, cpus = 1):
+    queryDB, makeDBcode = makeDmndDB('diamond', fasta_path, output_dir, cpus = cpus)
     dmndOut, dmndCode = runDmnd(
-        'diamond', fastaPath, queryDB, distFile + '.tmp', pid = pid,
+        'diamond', fasta_path, queryDB, distFile + '.tmp', pid = pid,
         cpus = cpus, verbose = verbose, blast = 'blastp'
         )
-    os.rename(distFile + '.tmp', distFile)
-    distanceMatrix = readDmndDist( distFile, minVal, pid = pid )
-    return distanceMatrix
+    shutil.move(distFile + '.tmp', distFile)
+    distance_matrix = rd_dmnd_distmtx( distFile, minVal, pid = pid )
+    return distance_matrix
     
-def usearchMain(fasta, min_id, output, cpus = 1, verbose = False):
+def usrch_main(fasta, min_id, output, cpus = 1, verbose = False):
     vprint('\nusearch aligning', flush = True, v = verbose)
     runUsearch(fasta, output + '.dist', str(1 - min_id), cpus, verbose)
-    distanceMatrix = importDist( output + '.dist' )
-    return distanceMatrix
+    distance_matrix = rd_usrch_distmtx( output + '.dist' )
+    return distance_matrix
 
 def readLog(log_path, newLog):
     oldLog = read_json(log_path)
@@ -248,67 +305,80 @@ def readLog(log_path, newLog):
         oldLog['minimum_id'] == newLog['minimum_id'] and \
         oldLog['search_program'] == newLog['search_program']:
         newLog['iterations'] = oldLog['iterations']
-    elif os.path.isfile(newLog['distance_matrix']):
-        os.remove(newLog['distance_matrix'])
+    elif newLog['distance_matrix']:
+        if os.path.isfile(newLog['distance_matrix']):
+            os.remove(newLog['distance_matrix'])
     return newLog
 
-def iterativeRun(
-    minseq, maxseq, clusParam, mincon, distanceMatrix, focalGene, linkage = 'single', interval = 0.1,
-    log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False, spacer = '\t'
+def run_iterative(
+    minseq, maxseq, clus_parameter, mincon, params, focal_gene, 
+    interval = 0.1, log_dict = None, log_path = None, minval = 0, 
+    maxval = 1, verbose = False, spacer = '\t', cpus = 1
     ):
     """
     Iteratively clusters until input parameters are met.
 
     minseq: int(minimum sequences in a cluster)
     maxseq: int(maximum sequences in a cluster)
-    clusParam: float(maximum_distance for agglomerative)
+    clus_parameter: float(maximum_distance for agglomerative), float(minimum
+        coverage for linclust)
     mincon: minimum connection value
-    distanceMatrix: distanceMatrix generated from fa2clus functions
-    focalGene: str(gene to cluster around)
+    distance_matrix: distance_matrix generated from fa2clus functions
+    focal_gene: str(gene to cluster around)
     linkage: agglomerative clustering linkage parameter
-    interval: interval to adjust clusParam per iteration
+    interval: interval to adjust clus_parameter per iteration
     log_dict: log
     log_path: log_file path
-    minval: int(minimum clusParam value)
-    maxval: int(maximum clusParam value)
+    minval: int(minimum clus_parameter value)
+    maxval: int(maximum clus_parameter value)
     verbose: bool(verbosity)
     spacer: str(stderr/stdout spacer)
     """
 
-    exitCode = 1 # default exit code is failure
+    exit_code = 1 # default exit code is failure
     attempt, direction, clusters, tree = 0, None, None, None
     oldDirection, oldClusters, oldTree = None, None, None
-    while clusParam >= minval and clusParam <= maxval and 1 - clusParam >= mincon:
+    while clus_parameter >= minval and clus_parameter <= maxval:
         attempt += 1 # keep track of iterations for output details
-        oldClusters, oldTree = clusters, tree
-        clusters, tree = scipyaggd(distanceMatrix, float(clusParam), linkage)
-        # cluster
-        cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
-        for gene, index in clusters.items(): # create a dictionary clusID:
-        # [genes]
-            if index not in cluster_dict:
-                cluster_dict[index] = []
-            cluster_dict[index].append(gene)
-        focalLen = len(cluster_dict[clusters[focalGene]]) 
-        # size of cluster with focalGene
-        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene \
+        if 'dist' in params: # hierarchical clustering
+            if 1 - clus_parameter < mincon:
+                break
+            oldClusters, oldTree = clusters, tree
+            clusters, tree = scipyaggd(params['distance_matrix'],
+                                       float(clus_parameter), 
+                                       params['linkage']) # cluster
+            cluster_dict = defaultdict(list) # could be more efficient by grabbing in getClusterLabels
+            for gene, index in clusters.items(): # create a dictionary clusID:
+            # [genes]
+                cluster_dict[index].append(gene)
+        else:
+            res_base = params['dir'] + focal_gene
+            res_path = run_linclust(params['fa'], res_base, params['dir'], 
+                                    mmseqs = params['bin'],
+                                    min_id = clus_parameter, 
+                                    min_cov = params['min_cov'], cpus = cpus)
+            cluster_dict, clusters = parse_linclust(res_path)
+        focalLen = len(cluster_dict[clusters[focal_gene]]) 
+        # size of cluster with focal_gene
+
+        vprint('\nITERATION ' + str(attempt) + ': ' + focal_gene \
              + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
-        vprint('Cluster parameter: ' + str(clusParam), flush = True, v = verbose)
+        vprint('Cluster parameter: ' + str(clus_parameter), flush = True, v = verbose)
         if log_path: # output the iteration details to the log
-            iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
+            iteration_dict = {'size': focalLen, 'cluster_parameter': clus_parameter}
             log_dict['iterations'].append(iteration_dict)
             write_json(log_dict, log_path)
         if focalLen >= minseq: # if greater than minimum sequences
             if maxseq: # if there is a max set of sequences
                 if focalLen <= maxseq: # if less than max sequences
                     vprint(spacer + '\tSUCCESS!', flush = True, v = verbose)
-                    exitCode = 0
+                    exit_code = 0
                     break
                 else: # descend
                     direction = 1
             else: # no max sequences, minimum is met, this was successful
                 vprint(spacer + '\tSUCCESS!', flush = True, v = verbose)
-                exitCode = 0
+                exit_code = 0
                 break
         else: # need to increase cluster size
             direction = -1
@@ -320,49 +390,71 @@ def iterativeRun(
                        flush = True)
                 vprint(spacer + 'Outputting Iterations ' + str(attempt) \
                      + ' & ' + str(attempt - 1), flush = True, v = verbose)
-                exitCode = 2
+                exit_code = 2
                 break
         else: # set the old iteration direction detail
             oldDirection = direction
 #         mincon += (interval*direction)
 
-        oclusParam = copy.copy(clusParam)
-        clusParam -= (interval*direction) 
-        # adjust the clusParameter based on the direction it should change
-        if oclusParam != minval and oclusParam != maxval:
-            if clusParam < minval: # set as minimum value if it descends below
-                clusParam = minval
-            elif clusParam > maxval: # set as maximum if it ascends above
-                clusParam = maxval
+        oclus_parameter = copy.copy(clus_parameter)
+        if 'dist' in params:
+            clus_parameter -= (interval*direction) 
+        else:
+            clus_parameter += (interval*direction)
 
-    return clusters, tree, oldClusters, oldTree, log_dict, exitCode
+        # clus_parameter should be to 3 significant figures
+        clus_parameter = round(clus_parameter * 100)/100
+        # adjust the clus_parametereter based on the direction it should change
+        if oclus_parameter != minval and oclus_parameter != maxval:
+            if clus_parameter < minval: # set as minimum value if it descends below
+                clus_parameter = minval
+            elif clus_parameter > maxval: # set as maximum if it ascends above
+                clus_parameter = maxval
 
-def reiterativeRun(
-    minseq, maxseq, clusParam, mincon, distanceMatrix, focalGene, linkage = 'single', interval = 0.01,
-    log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False
+    return clusters, tree, oldClusters, oldTree, log_dict, exit_code
+
+def run_reiterative(
+    minseq, maxseq, clus_parameter, mincon, params, focal_gene, interval = 0.01,
+    log_dict = None, log_path = None, minval = 0, maxval = 1, verbose = False,
+    cpus = 1
     ):
     """Goal is to refine cluster size as close to maxseq as much as possible"""
 
+    print(minval, maxval)
     attempt, direction, clusters, tree = 0, None, None, None
     oldDirection, refines = None, []
-    while clusParam >= minval and clusParam <= maxval: # while a valid cluster
+    while clus_parameter >= minval and clus_parameter <= maxval: # while a valid cluster
     # parameter
         attempt += 1 # log attempts
-        clusters, tree = scipyaggd(distanceMatrix, float(clusParam), linkage)
-        # recluster
-        cluster_dict = {} # could be more efficient by grabbing in getClusterLabels
-        for gene, index in clusters.items():
-            if index not in cluster_dict:
-                cluster_dict[index] = []
-            cluster_dict[index].append(gene)
-        focalLen = len(cluster_dict[clusters[focalGene]])
+        if 'dist' in params: # hierarchical clustering
+            oldClusters, oldTree = clusters, tree
+            clusters, tree = scipyaggd(params['distance_matrix'],
+                                       float(clus_parameter), 
+                                       params['linkage']) # cluster
+            cluster_dict = defaultdict(list) # could be more efficient by grabbing in getClusterLabels
+            for gene, index in clusters.items(): # create a dictionary clusID:
+            # [genes]
+                cluster_dict[index].append(gene)
+            focalLen = len(cluster_dict[clusters[focal_gene]])
+            vprint('\nITERATION ' + str(attempt) + ': ' + focal_gene \
+                 + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
+            vprint('\tMinimum connection: ' + str(mincon) \
+                 + '; Maximum cluster parameter' + str(clus_parameter), flush = True, v = verbose)
+        else: # linclust
+            res_base = params['dir'] + focal_gene
+            res_path = run_linclust(params['fa'], res_base, params['dir'], 
+                                    mmseqs = params['bin'],
+                                    min_id = clus_parameter, 
+                                    min_cov = params['min_cov'], cpus = cpus)
+            cluster_dict, clusters = parse_linclust(res_path)
+            focalLen = len(cluster_dict[clusters[focal_gene]])
+            vprint('\nITERATION ' + str(attempt) + ': ' + focal_gene \
+                 + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
+            vprint('\tMinimum coverage: ' + str(mincon) \
+                 + '; Minimum identity: ' + str(clus_parameter), flush = True, v = verbose)
         # find the length of the cluster with the gene
-        vprint('\nITERATION ' + str(attempt) + ': ' + focalGene \
-             + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
-        vprint('\tMinimum connection: ' + str(mincon) \
-             + '; Maximum Distance ' + str(clusParam), flush = True, v = verbose)
         if log_path: # output the log
-            iteration_dict = {'size': focalLen, 'cluster_parameter': clusParam}
+            iteration_dict = {'size': focalLen, 'cluster_parameter': clus_parameter}
             log_dict['iterations'].append(iteration_dict)
             write_json(log_dict, log_path)
         if focalLen >= minseq: # if the focal cluster is > minimum size
@@ -392,37 +484,47 @@ def reiterativeRun(
         else:
             oldDirection = direction
 
-        oclusParam = copy.copy(clusParam)
-        clusParam -= (interval*direction)
+        oclus_parameter = copy.copy(clus_parameter)
+        if 'dist' in params: # if hierachical agglomerative clustering
+            clus_parameter -= (interval*direction)
+        else:
+            clus_parameter += (interval*direction)
 
-        if oclusParam != minval and oclusParam != maxval:
-            if clusParam < minval:
-                clusParam = minval
-            elif clusParam > maxval:
-                clusParam = maxval
+        # clus_parameter should be to 3 significant figures
+        clus_parameter = round(clus_parameter * 100)/100
+
+        if oclus_parameter != minval and oclus_parameter != maxval:
+            if clus_parameter < minval:
+                clus_parameter = minval
+            elif clus_parameter > maxval:
+                clus_parameter = maxval
 
     return refines[-1][0], refines[-1][1], None, None, log_dict
 
 
 def main(
-    fastaPath, mincon, clusParam, minseq, maxseq, 
-    searchProg = 'diamond', linkage = 'single',
+    fasta_path, mincon, clus_parameter, minseq, maxseq, 
+    search_program = 'diamond', linkage = 'single',
     iterative = False, interval = 0.1, output= None, cpus = 1,
     verbose = False, spacer = '\t\t', log_path = None,
     refine = False, pid = True, dmnd_dir = None
     ):
 
-    global hierarchy
-    global squareform
-    from scipy.cluster import hierarchy
-    from scipy.spatial.distance import squareform
-    minval, maxval = 0, 1
+    if search_program in {'usearch', 'diamond'}:
+        algorithm = 'hierarchical'
+        dist_path = output + '.dist'
+    else:
+        algorithm = 'linclust'
+        dist_path = None
 
+    minval, maxval = 0, 1
     overshot = False
     log_dict = {
-        'algorithm': searchProg, 'fasta': fastaPath, 'minimum_id': mincon, 'cluster_parameter': clusParam,
-        'minimum_sequences': minseq, 'maximum_sequences': maxseq, 'search_program': searchProg,
-        'distance_matrix': output + '.dist', 'linkage': linkage, 'focal_gene': iterative,
+        'algorithm': algorithm, 'fasta': fasta_path, 
+        'minimum_id': mincon, 'cluster_parameter': clus_parameter,
+        'minimum_sequences': minseq, 'maximum_sequences': maxseq, 
+        'search_program': search_program, 'distance_matrix': dist_path, 
+        'linkage': linkage, 'focal_gene': iterative,
         'iterations': []
         }
     if log_path:
@@ -430,68 +532,93 @@ def main(
             log_dict = readLog(log_path, log_dict)
         write_json(log_dict, log_path)
 
-    if os.path.isfile(log_dict['distance_matrix']):
-        if searchProg == 'usearch':
-            distanceMatrix = importDist(log_dict['distance_matrix'])
+    if algorithm == 'hierarchical':
+        global hierarchy
+        global squareform
+        from scipy.cluster import hierarchy
+        from scipy.spatial.distance import squareform
+        param_dict = {'dist': None, 'link': linkage}
+        if os.path.isfile(log_dict['distance_matrix']):
+            if search_program == 'usearch':
+                param_dict['dist'] = rd_usrch_distmtx(log_dict['distance_matrix'])
+            else:
+                param_dict['dist'] = rd_dmnd_distmtx(log_dict['distance_matrix'], mincon, pid = pid)
         else:
-            distanceMatrix = readDmndDist(log_dict['distance_matrix'], mincon, pid = pid)
+            if search_program == 'diamond': #elif if above lines not highlighted
+                if not dmnd_dir:
+                    dmnd_dir = os.path.dirname(log_dict['distance_matrix']) + '/'
+                param_dict['dist'] = dmnd_main(
+                    fasta_path, mincon, dmnd_dir, 
+                    log_dict['distance_matrix'], pid = pid, 
+                    verbose = verbose, cpus = cpus
+                    )
+            elif search_program == 'usearch':
+                param_dict['dist'] = usrch_main(fasta_path, mincon, output, cpus, verbose)
     else:
-        if searchProg == 'diamond': #elif if above lines not highlighted
-            if not dmnd_dir:
-                dmnd_dir = os.path.dirname(log_dict['distance_matrix']) + '/'
-            distanceMatrix = dmndMain(
-                fastaPath, mincon, dmnd_dir, 
-                log_dict['distance_matrix'], pid = pid, 
-                verbose = verbose, cpus = cpus
-                )
-        elif searchProg == 'usearch':
-            distanceMatrix = usearchMain(fastaPath, mincon, output, cpus, verbose)
+        param_dict = {'fa': fasta_path, 'dir': os.path.dirname(output) + '/',
+                      'bin': search_program, 'min_cov': mincon}
 
-    vprint('\nClustering\n', flush = True, v = verbose)
+    vprint('\nClustering', flush = True, v = verbose)
     if iterative:
-        clusters, tree, oldClusters, oldTree, log_dict, exitCode = iterativeRun(
-            minseq, maxseq, clusParam, mincon, distanceMatrix, 
-            iterative , linkage = linkage, interval = interval, 
+        clusters, tree, oldClusters, oldTree, log_dict, exit_code = run_iterative(
+            minseq, maxseq, clus_parameter, mincon, param_dict,
+            iterative, interval = interval, 
             log_dict = log_dict, log_path = log_path, minval = minval, maxval = maxval,
-            verbose = verbose, spacer = spacer
+            verbose = verbose, spacer = spacer, cpus = cpus
             )
         if refine:
-            if exitCode == 0 or exitCode == 2: # parameters were met/overshot
+            if exit_code == 0 or exit_code == 2: # parameters were met/overshot
                 if len(log_dict['iterations']) > 1: # if there's room to work
                 # with
-                    finalIter = log_dict['iterations'][-1]
-                    compIter = log_dict['iterations'][-2]
-                    interval = 0.005
-                    minval = min([
-                            compIter['cluster_parameter'], finalIter['cluster_parameter']
-                            ]) 
-                    maxval = max([
-                            compIter['cluster_parameter'],
-                            finalIter['cluster_parameter']
-                            ])
-                    clusters, tree, oldClusters, oldTree, log_dict = reiterativeRun(
-                        minseq, maxseq, minval, mincon, distanceMatrix, iterative, 
-                        linkage = linkage, interval = interval, log_dict = log_dict, 
+                    vprint('\nMaximizing cluster size', v = verbose, flush = True)
+                    beyond_iters = [x for x in log_dict['iterations'] \
+                                  if int(x['size']) > maxseq]
+                    sorted_beyonds = sorted(beyond_iters, key = lambda x: \
+                                            (x['size'], x['cluster_parameter']))
+                    beyonds = [x for x in sorted_beyonds \
+                               if x['size'] == sorted_beyonds[0]['size']]
+                    final_iteration = log_dict['iterations'][-1]
+#                    compIter = log_dict['iterations'][-2]
+                    if algorithm == 'hierarchical':
+                        minval = final_iteration['cluster_parameter']
+                        new_cp = minval
+                        if beyonds:
+                            interval = 0.005
+                            maxval = float(beyonds[0]['cluster_parameter'])
+                        else:
+                            interval = 0.05
+                            if pid:
+                                maxval = 1 - mincon # max is relative to % ID cutoff
+                            else:
+                                maxval = 1
+                    else: # linclust
+                        if beyonds:
+                            interval = 0.01
+                            minval = float(beyonds[-1]['cluster_parameter'])
+                        else:
+                            interval = 0.05
+                            minval = 0.0
+                        maxval = final_iteration['cluster_parameter']
+                        new_cp = maxval
+                    clusters, tree, oldClusters, oldTree, log_dict = run_reiterative(
+                        minseq, maxseq, new_cp, mincon, param_dict, iterative, 
+                        interval = interval, log_dict = log_dict, 
                         log_path = log_path, minval = minval,
-                        maxval = maxval, verbose = verbose
+                        maxval = maxval, verbose = verbose, cpus = cpus
                         )
                     if oldTree:
                         vprint(
                             spacer + 'WARNING: Cluster does not exist within parameters', 
                             v = verbose, flush = True
                             )
-                    else:
-                        vprint(
-                            spacer + 'SUCCESS!', v = verbose, flush = True
-                            )
             else: # parameters were not met
                 vprint(
                     spacer + 'WARNING: Could not find a cluster that meets parameters', 
                     v = verbose, flush = True
                     )
-        elif exitCode == 0:
+        elif exit_code == 0:
             vprint(spacer + 'SUCCESS!', v = verbose, flush = True)
-        elif exitCode == 1:
+        elif exit_code == 1:
             vprint(
                 spacer + 'WARNING: Could not find a cluster that meets parameters', 
                 v = verbose, flush = True
@@ -504,21 +631,31 @@ def main(
             overshot = True
     else:
         oldClusters, oldTree = None, None
-        clusters, tree = scipyaggd(distanceMatrix, float(clusParam), linkage)
+        if algorithm == 'hierarchical':
+            clusters, tree = scipyaggd(distance_matrix, clus_parameter, linkage)
+        else:
+            res_base = output
+            res_path = run_linclust(fasta_path, output, 
+                                    os.path.dirname(output) + '/', 
+                                    mmseqs = 'mmseqs', min_id = clus_parameter, 
+                                    min_cov = mincon, cpus = cpus)
+            null_dict, clusters = parse_linclust(res_path)
 
-    return distanceMatrix, clusters, tree, oldClusters, oldTree, overshot
+    if algorithm == 'hierarchical':
+        return distance_matrix, clusters, tree, oldClusters, oldTree, overshot
+    else:
+        return None, clusters, None, oldClusters, None, overshot
 
-def writeData(tree, distanceMatrix, clusters, output):
+def write_data(tree, distance_matrix, clusters, output):
 
-    #clusters = scikitaggd( distanceMatrix, float(args.max_dist), args.linkage )
+    #clusters = scikitaggd( distance_matrix, float(args.max_dist), args.linkage )
 
-    out_str = '\n'.join( [i + '\t' + str(clusters[i]) for i in clusters] )
-    with open( output + '.clus', 'w' ) as out:
+    out_str = '\n'.join([i + '\t' + str(clusters[i]) for i in clusters])
+    with open(output + '.clus', 'w') as out:
         out.write( out_str )
     if tree:
-        newick = getNewick(tree, "", tree.dist, list(distanceMatrix.index))
-
-        with open( output + '.newick', 'w' ) as out:
+        newick = getNewick(tree, "", tree.dist, list(distance_matrix.index))
+        with open(output + '.newick', 'w') as out:
             out.write(newick)
 
 
@@ -527,53 +664,60 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser( 
         description = "Sequence clustering with iterative search option." 
         )
-    parser.add_argument( '-f', '--fasta', required = True )
+    parser.add_argument('-f', '--fasta', required = True)
+    parser.add_argument('-l', '--linclust', action = 'store_true',
+        help = 'mmseqs linclust')
+    parser.add_argument('-a', '--aggclus', action = 'store_true',
+        help = 'Hierarchical agglomerative clustering')
+    parser.add_argument('-m', '--mincon', help = 'Minimum connection' \
+        + ' for alignment; DEFAULT: [-l]: 0.1 percent query coverage, '  \
+        + '[-a]: 0.2 percent identity, [-a]: 30 bitscore', 
+        type = float)
+    parser.add_argument('-x', '--cluster_parameter', 
+        help = '[-l]: Minimum identity; DEFAULT: 0.3; ' \
+            +  '[-a]: Maximum distance; DEFAULT: 0.75', 
+            type = float)
+    parser.add_argument('-i', '--iterative', 
+        help = '[--minseq]: Gene to iteratively cluster for; '  \
+            + 'eliminates -x')
+    parser.add_argument('--minseq', type = int, help = '[-i]: Iteratively adjust -m and -x until a cluster ' \
+        + ' of minimum sequences is obtained; DEFAULT: 2', default = 2)
+    parser.add_argument('--maxseq', type = int, 
+        help = '[-i]: Maximum sequences for iterative clustering; ' \
+            + 'DEFAULT 100', default = 100)
+    parser.add_argument('-r', '--refine', action = 'store_true', 
+        help = '[--maxseq]: Refine cluster to maximize sequences within parameters.')
+#    parser.add_argument('-i', '--inflation', type = float, default = 1.5,
+ #       help = 'Inflation value for MCL; DEFAULT: 1.5')
     parser.add_argument( 
-        '-a', '--alignment', help = 'Alignment software '
-        + '{"diamond", "usearch"}', default = 'diamond' 
+        '-al', '--alignment', 
+        help = '[-a]: Alignment software {"diamond", "usearch"}; DEFAULT: diamond', 
+        default = 'diamond' 
         )
     parser.add_argument(
-        '-d', '--distance_type', help = '{"identity", "bitscore"} ' + \
+        '-d', '--distance_type', help = '[-a]: {"identity", "bitscore"} ' + \
         'bitscore is normalized 0-1 following -m and -x should be 0-1; DEFAULT: identity',
         default = 'identity'
         )
-    parser.add_argument( '-o', '--output', help = 'Alternative output directory')
-    parser.add_argument( '-m', '--mincon', help = 'Minimum connection'
-        + ' for alignment; DEFAULT: 0.2 for identity, 30 for bitscore', type = float)
-#    parser.add_argument( '--aggclus', help = 'Hierarchical agglomerative clustering', action = 'store_true')
-    parser.add_argument('--minseq', type = int, help = 'Iteratively adjust -m and -x until a cluster ' \
-        + ' of minimum sequences is obtained. Requires --iterative. DEFAULT: 2', default = 2)
-    parser.add_argument('--maxseq', type = int, help = 'Maximum sequences for iterative clustering. ' \
-        + 'Requires --iterative. DEFAULT 1000', default = 1000)
-    parser.add_argument('--iterative', help = 'Gene to iteratively cluster for. Requires ' \
-        + ' --minseq, eliminates --maxdist')
-    parser.add_argument('-r', '--refine', action = 'store_true', 
-        help = 'Refine cluster to maximize sequences within parameters.')
-#    parser.add_argument('-i', '--inflation', type = float, default = 1.5,
- #       help = 'Inflation value for MCL; DEFAULT: 1.5')
-    parser.add_argument( '-x', '--maxdist', help = 'Maximum distance'
-        + ' for hierarchical clustering (1 - connection). DEFAULT: 0.75', type =
-        float, default = 0.75)
-    parser.add_argument( '-l', '--linkage', default = 'single', help = "Linkage criterion " \
-        + "for hierarchical clustering: 'complete' (maximum distance), 'average', 'weighted', " \
-        + "'centroid', or 'single' (minimum distance) DEFAULT: 'single' (minimum)" )
-    parser.add_argument( '-c', '--cpus', default = 1, type = int, \
-        help = 'Cores for alignment during distance matrix construction' )
-    parser.add_argument( '-v', '--verbose', action = 'store_true' )
+
+    parser.add_argument('--linkage', default = 'single', 
+        help = "[-a]: Linkage criterion: " \
+        + "'complete' (maximum distance), 'average', 'weighted', " \
+        + "'centroid', or 'single' (minimum distance) DEFAULT: 'single' (minimum)")
+    parser.add_argument('-o', '--output')
+    parser.add_argument('-c', '--cpus', default = 1, type = int)
+    parser.add_argument('-v', '--verbose', action = 'store_true')
     args = parser.parse_args()
 
-
-    if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
-        eprint('\nERROR: Invalid linkage criterium', flush = True)
-        sys.exit( 1 )
-    elif args.alignment not in {'diamond', 'usearch'}:
-        eprint('\nERROR: Invalid alignment method', flush = True)
-        sys.exit( 2 )
-    elif args.distance_type not in {'identity', 'bitscore'}:
-        eprint('\nERROR: Invalid distance type', flush = True)
-        sys.exit( 3 )
-    else:
-        findExecs( [args.alignment], exit = set(args.alignment) )
+    if args.refine and not args.maxseq:
+        eprint('\nERROR: --maxseq required for refinement', flush = True)
+    if args.alignment in {'diamond', 'usearch'} and not args.linclust:
+        if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
+            eprint('\nERROR: Invalid linkage criterium', flush = True)
+            sys.exit( 1 )
+        elif args.distance_type not in {'identity', 'bitscore'}:
+            eprint('\nERROR: Invalid distance type', flush = True)
+            sys.exit( 3 )
         if args.distance_type == 'identity':
             pid = True
             if not args.mincon:
@@ -582,53 +726,66 @@ if __name__ == '__main__':
             pid = False
             if not args.mincon:
                 args.mincon = 30
-        interval = 0.1
-        if not args.maxdist:
-            args.maxdist = 0.75
+        if not args.cluster_parameter:
+            args.cluster_parameter = 0.75
+    elif args.linclust and not args.aggclus:
+        args.alignment = 'mmseqs'
+        if not args.mincon:
+            args.mincon = 0.1
+            pid = None
+        if not args.cluster_parameter:
+            args.cluster_parameter = 0.3
+    else:
+        eprint('\nERROR: Invalid input parameters', flush = True)
+        sys.exit( 2 )
 
-    if args.iterative:
-        clusParam = 1 - args.mincon
-    elif 1 - args.maxdist <= mincon:
+    findExecs([args.alignment], exit = set(args.alignment))
+    interval = 0.1
+
+    if args.iterative and args.aggclus:
+        clus_parameter = 1 - args.mincon
+    elif 1 - args.cluster_parameter <= args.mincon \
+        and args.alignment != 'mmseqs':
         eprint('\nWARNING: 1 - maximum distance exceeds minimum connection, clustering is ineffective', flush = True)
     else:
-        clusParam = args.maxdist
+        clus_parameter = args.cluster_parameter
  #   else:
-#        clusParam = args.inflation
+#        clus_parameter = args.inflation
 
-    fastaPath = format_path(args.fasta)
-    fa = fa2dict(fastaPath)
+    fasta_path = format_path(args.fasta)
+    fa = fa2dict(fasta_path)
     if args.iterative:
-        focalGene = args.iterative
+        focal_gene = args.iterative
         if len(fa) < args.minseq:
             eprint('\nERROR: minimum sequences is greater than fasta input', flush = True)
             sys.exit(5)
-        elif focalGene not in fa:
-            eprint('\nERROR: ' + focalGene + ' not in ' + fastaPath, flush = True)
+        elif focal_gene not in fa:
+            eprint('\nERROR: ' + focal_gene + ' not in ' + fasta_path, flush = True)
             sys.exit(6)
 
     if args.output:
         if not os.path.isdir(format_path(args.output)):
             os.mkdir(format_path(args.output))
         dmnd_dir = format_path(args.output)
-        output = dmnd_dir + os.path.basename(fastaPath)
+        output = dmnd_dir + os.path.basename(fasta_path)
     else:
         dmnd_dir = mkOutput(os.getcwd() + '/', 'fa2clus')
-        output = dmnd_dir + os.path.basename(fastaPath)
+        output = dmnd_dir + os.path.basename(fasta_path)
 
-    distanceMatrix, clusters, tree, ocl, ot, overshot = main(
-        fastaPath, args.mincon, clusParam, args.minseq, args.maxseq, 
-        searchProg = args.alignment, linkage = args.linkage, verbose = args.verbose,
+    distance_matrix, clusters, tree, ocl, ot, overshot = main(
+        fasta_path, args.mincon, clus_parameter, args.minseq, args.maxseq, 
+        search_program = args.alignment, linkage = args.linkage, verbose = args.verbose,
         iterative = args.iterative, interval = interval, output = output,
-        log_path = dmnd_dir + '.' + os.path.basename(fastaPath) + '.fa2clus.json',
+        log_path = dmnd_dir + '.' + os.path.basename(fasta_path) + '.fa2clus.json',
         refine = args.refine, pid = pid, dmnd_dir = dmnd_dir, cpus = args.cpus,
         spacer = '\n'
         )
 
     if ocl:
-        writeData(tree, distanceMatrix, clusters, output + '.0')
-        writeData(ot, distanceMatrix, ocl, output + '.1')
+        write_data(tree, distance_matrix, clusters, output + '.0')
+        write_data(ot, distance_matrix, ocl, output + '.1')
     else:
-        writeData(tree, distanceMatrix, clusters, output)
+        write_data(tree, distance_matrix, clusters, output)
 
     if args.iterative:
         cluster_dict = {}
@@ -637,11 +794,11 @@ if __name__ == '__main__':
                 cluster_dict[index] = []
             cluster_dict[index].append(gene)
     
-        geneModule = cluster_dict[clusters[focalGene]]
-        input_fa = fa2dict(fastaPath)
-        output_fa = {x: input_fa[x] for x in geneModule}
+        gene_module = cluster_dict[clusters[focal_gene]]
+        input_fa = fa2dict(fasta_path)
+        output_fa = {x: input_fa[x] for x in gene_module}
    
         with open(output + '.fa', 'w') as out:
             out.write(dict2fa(output_fa)) 
 
-    sys.exit( 0 )
+    sys.exit(0)

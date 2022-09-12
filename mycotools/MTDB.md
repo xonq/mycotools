@@ -190,6 +190,6 @@ may result with downstream scripts.
 
 ## TODO:
 
-- ensure exon/CDS numbering
-- unify protein id
-- add plant and animal functions.
+    - [ ] ensure exon/CDS numbering
+    - [ ] unify protein id
+    - [ ] add plant and animal functions.

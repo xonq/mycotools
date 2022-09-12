@@ -603,8 +603,8 @@ def getSRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
                     fastqdump, '--gzip', '--split-3', srr], 
                     stdout = subprocess.PIPE)
                 if os.path.isfile(srr + '_1.fastq.gz'):
-                    os.rename(srr + '_1.fastq.gz', assembly_acc + '_' + srr + '_1.fq.gz')
-                    os.rename(srr + '_2.fastq.gz', assembly_acc + '_' + srr + '_2.fq.gz')
+                    shutil.move(srr + '_1.fastq.gz', assembly_acc + '_' + srr + '_1.fq.gz')
+                    shutil.move(srr + '_2.fastq.gz', assembly_acc + '_' + srr + '_2.fq.gz')
                 else:
                     print('\t\t\tERROR: file failed', flush = True)
             else:
@@ -612,7 +612,7 @@ def getSRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
                     fastqdump, '--gzip', srr],
                     stdout = subprocess.PIPE)
                 if os.path.isfile(srr + '.fastq.gz'):
-                    os.rename(srr + '.fastq.gz', assembly_acc + '_' + srr + '.fq.gz')
+                    shutil.move(srr + '.fastq.gz', assembly_acc + '_' + srr + '.fq.gz')
                 else:
                     print('\t\t\tERROR: file failed', flush = True)
 

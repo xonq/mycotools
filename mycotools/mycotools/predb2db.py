@@ -88,16 +88,18 @@ def read_predb(predb_path, spacer = '\t'):
 #    predb, headers = {}, None
     predb = defaultdict(list)
     with open(predb_path, 'r') as raw:
-        for line in raw:
+        for i, line in enumerate(raw):
 #            if line.startswith('#'):
  #               if not headers:
   #                  predb = {x: [] for x in line.rstrip()[1:].split('\t')}
    #                 headers = list(predb.keys())
             if not line.startswith('#') and line.rstrip():
 #            if line.rstrip():
+                line = line.replace('\n','')
                 entry = line.split('\t')
                 if len(entry) != len(predb_headers):
-                    eprint(spacer + 'ERROR: all columns must have an entry.', flush = True)
+                    eprint(spacer + 'ERROR: Incorrect columns, line ' + str(i),
+                           flush = True)
                     eprint(predb_headers, '\n', entry, flush = True)
                     sys.exit(3)
                 for i, v in enumerate(entry):
@@ -199,7 +201,10 @@ def gen_omes(
     tax_count = {}
     for tax in tax_list:
         abb = tax[:6]
-        num = int(tax[6:])
+        try:
+            num = int(tax[6:])
+        except ValueError: # version included in number
+            num = int(re.search(r'(^\d+)', tax[6:])[1])
         if abb in tax_count:
             if tax_count[abb] < num:
                 tax_count[abb] = num
@@ -286,7 +291,7 @@ def cur_fna(cur_raw_fna_path, uncur_raw_fna_path, ome):
                         out.write(line)
                 else:
                     out.write(line)
-    os.rename(cur_raw_fna_path + '.tmp', cur_raw_fna_path)
+    shutil.move(cur_raw_fna_path + '.tmp', cur_raw_fna_path)
 
 def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir, 
             source, assembly_accession, exit = False,
@@ -349,7 +354,7 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
             return ome, False, 'faa'
         with open(faa_path + '.tmp', 'w') as out:
             out.write(dict2fa(faa))
-        os.rename(faa_path + '.tmp', faa_path)
+        shutil.move(faa_path + '.tmp', faa_path)
 
     if remove:
         if os.path.isfile(uncur_gff_path):
@@ -403,7 +408,7 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
 
     with open(cur_path + '.tmp', 'w') as out:
         out.write(list2gff(gff))
-    os.rename(cur_path + '.tmp', cur_path)
+    shutil.move(cur_path + '.tmp', cur_path)
 
 def add2failed(row):
     if isinstance(row['assembly_acc'], float) or not row['assembly_acc']:

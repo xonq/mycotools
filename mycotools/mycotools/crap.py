@@ -1,13 +1,16 @@
 #! /usr/bin/env python3
 
+# NEED run input order option
 # NEED to run all-v-all blast on failed diamonds
 # NEED intelligent resume
+    # edit gffs if conversion dict is added
 # NEED to check for multiple instances of a single orthogroup/query, and use all genes as focal
 # NEED to update og_main with conversion function
 # NEED root to be based off the furthest in outgroup % ID from focal gene
     # dont know if possible since diamond doesnt calc all pairwise if low enough
-# NEED assembly reference method
-# NEED to pull distance matrix from blast results
+# NEED assembly reference method, i.e. tblastn
+# NEED aggclus option
+# NEED to fix why rerunning can switch outgroup to midpoint
 
 import os
 import re
@@ -27,7 +30,7 @@ from mycotools.lib.kontools import eprint, format_path, findExecs, intro, outro,
     read_json, write_json
 from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Comps
 from mycotools.acc2fa import dbmain as acc2fa
-from mycotools.fa2clus import writeData, main as fa2clus
+from mycotools.fa2clus import write_data, main as fa2clus
 from mycotools.fa2tree import main as fa2tree, PhyloError
 from mycotools.acc2locus import main as acc2locus
 from mycotools.gff2svg import main as gff2svg
@@ -137,7 +140,7 @@ def check_fa_size(fas, max_size):
 
 def run_fa2clus(
     fa_path, db, focal_gene, minseq, maxseq, output, out_name,
-    minid = 0.05, clus_param = 0.65, direction = -1, cpus = 1,
+    mincon = 0.05, clus_param = 0.3, direction = -1, cpus = 1,
     verbose = False, interval = 0.1, spacer = '\t\t\t'
     ):
 
@@ -147,13 +150,19 @@ def run_fa2clus(
     output_path = output + str(focal_gene) 
     log_path = output + '.' + str(focal_gene) + '.log'   
     try:
-        tree, clusters, distanceMatrix, ot, ocl, overshot = fa2clus(
-            fa_path, minid, clus_param, minseq, maxseq,
-            searchProg = 'diamond', linkage = 'single', cpus = cpus,
-            iterative = focal_gene, interval = interval, output = output_path,
-            verbose = verbose, log_path = log_path, refine = True, 
-            dmnd_dir = dmnd_dir, spacer = spacer
-            )
+#        tree, clusters, distanceMatrix, ot, ocl, overshot = fa2clus(
+ #           fa_path, mincon, clus_param, minseq, maxseq,
+  #          search_program = 'diamond', linkage = 'single', cpus = cpus,
+   #         iterative = focal_gene, interval = interval, output = output_path,
+    #        verbose = verbose, log_path = log_path, refine = True, 
+     #       dmnd_dir = dmnd_dir, spacer = spacer
+      #      )
+        null, clusters, null, null, ocl, overshot = fa2clus(
+            fa_path, mincon, clus_param, minseq, maxseq,
+            search_program = 'mmseqs', iterative = focal_gene,
+            interval = interval, output = output_path,
+            verbose = verbose, log_path = log_path, refine = True,
+            spacer = spacer) # linclust status
     except KeyError: # query not in adjacency matrix
         return False, False
     
@@ -171,16 +180,19 @@ def run_fa2clus(
         db_omes = set(db['ome'])
         geneModule = [x for x in geneModule if x[:x.find('_')] in db_omes]
         fa_dict = acc2fa(db, geneModule)
+
 # need to implement some method to choose if the max and min parameters couldn't be met
     print('\t\t\t' + str(len(fa_dict)) + ' genes in group', flush = True)
     with open(output + '../' + str(out_name) + '.fa', 'w') as out:
         out.write(dict2fa(fa_dict))
-    writeData(None, distanceMatrix, clusters, output_path)
+#    write_data(None, distanceMatrix, clusters, output_path)
+    write_data(None, None, clusters, output_path)
+
     return True, overshot
 
 def outgroup_mngr(
     db, focal_gene, minseq, maxseq, clus_dir,
-    minid = 0.05, direction = -1, cpus = 1, interval = 0.1,
+    mincon = 0.05, direction = -1, cpus = 1, interval = 0.1,
     verbose = False, spacer = '\t\t\t\t'
     ):
 
@@ -192,9 +204,22 @@ def outgroup_mngr(
         clusLog['iterations'], key = lambda x: x['size'], reverse = True
         )
     prev_size = len(fa2dict(clus_dir + '../' + str(focal_gene) + '.fa'))
+    try:
+        prev_index = [int(v['size']) for i,v in enumerate(iterations)].index(prev_size)
+    except ValueError: # some hits were not in the database (re: run_fa2clus)
+        prev_sizes = {int(v['size']): i for i,v in enumerate(iterations)}
+        hit_sizes = {k: v for k, v in prev_sizes.items() \
+                     if k > minseq and k < maxseq}
+        if not hit_sizes: # nothing in bound
+            hit_sizes = {k: v for k, v in prev_sizes.items() \
+                         if k > minseq}
+            if not hit_sizes: # nothing over minimum, skip
+                return False, False
+        prev_index_1 = max(hit_sizes.keys())
+        prev_index = hit_sizes[prev_index_1]
 
-    prevIndex = [int(v['size']) for i,v in enumerate(iterations)].index(prev_size)
-    new_info = iterations[prevIndex-1]
+    new_info = iterations[prev_index-1]
+    
 
     # we are trying to make it smaller than the previous size because the
     # previous size is refined to the maximum number of sequences
@@ -202,13 +227,13 @@ def outgroup_mngr(
     # sequence so that we can decrease efficiently
     if prev_size > maxseq:
         prev_size = maxseq
-    if prevIndex > 0: # an index exists
+    if prev_index > 0: # an index exists
         res, overshot = run_fa2clus(
             fa_path, db, focal_gene, minseq, prev_size - 1, clus_dir, out_name,
-            minid, float(new_info['cluster_parameter']), direction,
+            mincon, float(new_info['cluster_parameter']), direction,
             cpus, verbose, 0.01, spacer = spacer
             )
-    elif 1-float(iterations[prevIndex-1]['cluster_parameter']) - minid < 0:
+    elif 1-float(iterations[prev_index-1]['cluster_parameter']) - mincon < 0:
         eprint(
             spacer + 'WARNING: cannot find outgroups with minimum ID', flush = True
             )
@@ -217,8 +242,8 @@ def outgroup_mngr(
         clus_param = float(new_info['cluster_parameter'])
         minseq = int(new_info['size'] + 1)
         res, overshot = run_fa2clus(
-            fa_path, db, focal_gene, minseq, prev_size - 1, clus_dir, out_name,
-            minid, clus_param, direction, cpus, verbose, 0.01, spacer = spacer
+            fa_path, db, focal_gene, minseq, maxseq, clus_dir, out_name,
+            mincon, clus_param, direction, cpus, verbose, 0.01, spacer = spacer
             )
 
     return res, overshot
@@ -377,11 +402,13 @@ def extract_locus_gene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_
     extractedGenes = {}
     for locusID, genes in out_indices.items():
         if os.path.isfile(wrk_dir + 'svg/' + locusID + '.locus.svg'):
+            # NEED to rerun if there's a change in output parameters
             continue
         startI, endI = None, None
         for i, gene in enumerate(genes):
             if gene in gene2query:
                 geneGffs[locusID][i]['attributes'] += ';SearchQuery=' + '|'.join(gene2query[gene])
+                print(gene2query[gene])
                 if startI is None:
                     startI = i
                 else:
@@ -420,7 +447,7 @@ def svg2node(node):
         except TypeError:
             pass
 
-def svgs2tree(input_gene, og, tree_data, db,
+def svgs2tree(input_gene, og, tree_data, db, tree_path,
               out_dir, root_key = None, midpoint = True):#svg_dir, out_dir):
     tree = Tree(tree_data)
     if root_key:
@@ -433,6 +460,9 @@ def svgs2tree(input_gene, og, tree_data, db,
     else:
         adj = 'nonrooted'
     new_tree = ome2name(db, tree.write(), True, True, True, True, False)
+    tree_info = re.search(r'(.*\.)([^\.]+)$', tree_path)
+    with open(tree_info[1] + adj + '.' + tree_info[2], 'w') as out:
+        out.write(new_tree)
 
     tree = Tree(new_tree)
     ts = TreeStyle()
@@ -622,18 +652,18 @@ def crap_mngr(
   #          )
         root_key = random.choice(out_keys)
         svgs2tree(
-            query, None, raw_tree, db,
+            query, None, raw_tree, db, tree_file,
             out_dir, root_key, midpoint = midpoint #svg_dir, out_dir
             )
     else:
         svgs2tree(
-            query, None, raw_tree, db,
+            query, None, raw_tree, db, tree_file,
             out_dir, midpoint = midpoint #svg_dir, out_dir
             )
 
 def og_main(
     db, input_genes, ogtag, fast = True, out_dir = None,
-    minid = 0.05, clus_param = 0.65, minseq = 3, max_size = 250, cpus = 1,
+    mincon = 0.05, clus_param = 0.65, minseq = 3, max_size = 250, cpus = 1,
     plusminus = 10000, verbose = False, reoutput = True, interval = 0.1,
     outgroups = True, labels = True, midpoint = True
     ):
@@ -694,7 +724,7 @@ def og_main(
             if not os.path.isfile(clus_fa_path):
                 with open(clus_fa_path, 'w') as out:
                     out.write(dict2fa(fa))
-        print('\nRunning hierarchical agglomerative clustering on ' + str(len(fas4clus)) + ' fastas', flush = True)
+        print('\nRunning clustering on ' + str(len(fas4clus)) + ' fastas', flush = True)
 
     print('\nCRAP', flush = True)
     ome_gene2og = gene2og2ome2og(gene2og)
@@ -713,12 +743,12 @@ def og_main(
                 if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
                     res, overshot = outgroup_mngr(
                         db, query, minseq, max_size, clus_dir,
-                        minid = minid, cpus = cpus, interval = interval,
+                        mincon = mincon, cpus = cpus, interval = interval,
                         verbose = False
                         )
                     if not res:
-                        print('\t\t\tQuery failed, query not in ' \
-                             + 'diamond output.', flush = True)
+                        print('\t\t\tERROR: query not in ' \
+                             + 'diamond output/clusters are granular', flush = True)
                         continue
                 in_keys = set(query_hits)
                 out_query = query + '.outgroup'
@@ -739,14 +769,14 @@ def og_main(
 
     for query in fas4clus:
         print('\tQuery: ' + str(query), flush = True)
-        print('\t\tHierarchical agglomerative clustering', flush = True)
+        print('\t\tSequence clustering', flush = True)
         out_keys = None
         res, overshot = run_fa2clus(
             clus_dir + query + '.fa', db, query, minseq, max_size, clus_dir,
-            query, minid, clus_param, cpus = cpus, verbose = verbose, interval = interval
+            query, mincon, clus_param, cpus = cpus, verbose = verbose, interval = interval
             )
         if not res:
-            print('\t\t\tQuery failed, sequence not in diamond matrix',
+            print('\t\t\tERROR: sequence not in diamond matrix',
                   flush = True)
             continue
         if outgroups and not overshot:
@@ -754,12 +784,12 @@ def og_main(
             if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
                 res, overshot = outgroup_mngr(
                     db, query, minseq, max_size, clus_dir,
-                    minid = minid, cpus = cpus,
+                    mincon = mincon, cpus = cpus,
                     interval = interval, verbose = False
                     )
                 if not res:
-                    print('\t\t\tQuery failed, query not in ' \
-                         + 'diamond output.', flush = True)
+                    print('\t\t\tERROR: query not in ' \
+                         + 'diamond output/clusters are granular', flush = True)
                     continue
             out_query = query + '.outgroup'
             out_query_fa = fa2dict(wrk_dir + out_query + '.fa')
@@ -780,7 +810,7 @@ def og_main(
 
 def search_main(
     db, input_genes, query_fa, query_gff, binary = 'mmseqs', fast = True, 
-    out_dir = None, minid = 0.05, clus_param = 0.65, minseq = 3, 
+    out_dir = None, mincon = 0.05, clus_param = 0.65, minseq = 3, 
     max_size = 250, cpus = 1, reoutput = True, plusminus = 10000, 
     evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
@@ -880,7 +910,7 @@ def search_main(
             if not os.path.isfile(clus_fa_path):
                 with open(clus_fa_path, 'w') as out:
                     out.write(dict2fa(fa))
-        print('\tRunning hierarchical agglomerative clustering on ' + str(len(fas4clus)) + ' fastas', flush = True)
+        print('\tRunning clustering on ' + str(len(fas4clus)) + ' fastas', flush = True)
 
     print('\nCRAP', flush = True)
     if fast:
@@ -898,12 +928,12 @@ def search_main(
                 if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
                     res, overshot = outgroup_mngr(
                         db, query, minseq, max_size, clus_dir,
-                        minid = minid, cpus = cpus, 
+                        mincon = mincon, cpus = cpus, 
                         interval = interval, verbose = False
                         )
                     if not res:
-                        print('\t\t\tQuery failed, query not in ' \
-                             + 'diamond output.', flush = True)
+                        print('\t\t\tERROR: query not in ' \
+                             + 'diamond output/clusters are granular', flush = True)
                         continue
                 in_keys = set(query_hits)
                 out_query = query + '.outgroup'
@@ -929,12 +959,12 @@ def search_main(
 
     for query in fas4clus:
         print('\tQuery: ' + str(query), flush = True)
-        print('\t\tHierarchical agglomerative clustering', flush = True)
+        print('\t\tSequence clustering', flush = True)
         out_keys = None
         res, overshot = run_fa2clus(
             clus_dir + str(query) + '.fa', 
             db, query, minseq, max_size, 
-            clus_dir, query, minid, clus_param, cpus = clus_cpus, 
+            clus_dir, query, mincon, clus_param, cpus = clus_cpus, 
             verbose = verbose, interval = interval
             )
         if not res:
@@ -946,12 +976,12 @@ def search_main(
             if not os.path.isfile(wrk_dir + query + '.outgroup.fa'):
                 res, overshot = outgroup_mngr(
                     db, query, minseq, max_size, clus_dir,
-                    minid = minid, cpus = cpus, 
+                    mincon = mincon, cpus = cpus, 
                     interval = interval, verbose = False
                     )
                 if not res:
                     print('\t\t\tFAILED: query not in ' \
-                         + 'diamond output.', flush = True)
+                         + 'diamond output/clusters are granular', flush = True)
                     continue
 
             query_hits = list(fa2dict(wrk_dir + query + '.fa').keys())
@@ -1012,7 +1042,7 @@ if __name__ == "__main__":
         default = 250, type = int
         )
 #    parser.add_argument(
- #       '--minid', 
+ #       '--mincon', 
   #      help = 'Minimum identity for fa2clus.py. DEFAULT: 0.2', 
    #     default = 0.2, type = float
     #    )
@@ -1022,14 +1052,6 @@ if __name__ == "__main__":
         '--conversion',
         help = 'Tab delimited conversion file for annotations: Query\tConversion'
         )
-#    parser.add_argument(
- #       '-r', '--reoutput', action = 'store_true',
-  #      help = 'Reoutput - permits replacing tree file, e.g. w/a rooted version'
-   #     )
-#    parser.add_argument(
- #       '--outgroup',
-  #      help = 'Stepback agglomerative clustering on query to include outgroups'
-   #     )
     parser.add_argument(
         '--no_outgroup',
         help = 'Do not detect outgroups, do not root trees', 
@@ -1145,7 +1167,7 @@ if __name__ == "__main__":
         og_main(
             db, input_genes, args.orthogroups, fast = fast, 
             out_dir = out_dir, 
-            minid = 0.05, clus_param = 0.65, minseq = args.minseq, 
+            mincon = 0.05, clus_param = 0.65, minseq = args.minseq, 
             max_size = args.maxseq, cpus = args.cpu,
             verbose = args.verbose, plusminus = args.plusminus, 
             interval = 0.1, labels = not args.no_label,
@@ -1162,7 +1184,7 @@ if __name__ == "__main__":
         search_main(
             db, input_genes, input_fa, input_GFF, 
             binary = args.search, fast = fast, out_dir = out_dir,
-            minid = 0.05, clus_param = 0.65, minseq = args.minseq, 
+            mincon = 0.05, clus_param = 0.65, minseq = args.minseq, 
             max_size = args.maxseq, cpus = 1, plusminus = args.plusminus, 
             bitscore = args.bitscore, pident = 0, mem = None, 
             verbose = args.verbose, interval = 0.1, 

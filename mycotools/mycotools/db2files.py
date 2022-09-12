@@ -6,14 +6,13 @@ import sys
 import argparse
 from shutil import copy as cp
 from mycotools.lib.dbtools import masterDB, mtdb
-from mycotools.lib.kontools import format_path, prep_output, eprint
+from mycotools.lib.kontools import format_path, prep_output, eprint, vprint
 
 
-def softMain(filetypes, db, output_path, print_link = False):
+def soft_main(filetypes, db, output_path, print_link = False, verbose = False):
     """Symlink or print files from each file_type"""
 
     db = db.set_index('ome')
-    filetypes = {x: filetypes[x] for x in filetypes if filetypes[x]}
     if not print_link:
         for ftype in filetypes:
             if not os.path.isdir(output_path + ftype):
@@ -21,21 +20,25 @@ def softMain(filetypes, db, output_path, print_link = False):
         for ome, row in db.items():
             for ftype in filetypes:
                 if os.path.isfile(row[ftype]):
-                    os.symlink(row[ftype], output_path + ftype \
-                             + '/' + ome + '.' + ftype)
+                    try:
+                        os.symlink(row[ftype], output_path + ftype \
+                                 + '/' + ome + '.' + ftype)
+                    except FileExistsError:
+                        vprint('\t' + ome + ' ' + ftype + ' exists',
+                               v = verbose, flush = True)
                 else:
-                    eprint('\tERROR: ' + ome + ' ' + ftype, flush = True)
+                    vprint('\tERROR: ' + ome + ' ' + ftype, flush = True,
+                           v = verbose)
     else:
         for ome, row in db.items():
             for ftype in filetypes:
                 print(row[ftype], flush = True)
 
 
-def hardMain(filetypes, db, output_path):
+def hard_main(filetypes, db, output_path):
     """Hard copy files from filetypes to their filetype output directory"""
 
     db = db.set_index('ome')
-    filetypes = {x: filetypes[x] for x in filetypes if filetypes[x]}
     for ftype in filetypes:
         if not os.path.isdir(output_path + ftype):
             os.mkdir(output_path + ftype)
@@ -72,15 +75,18 @@ if __name__ == '__main__':
         'GFF3': args.gff, 'Print links': args.print, 'Hard copy': args.hard
         }
 
-    filetypes = { 
-        'fna': args.assembly, 'faa': args.proteome,
-        'gff3': args.gff
-        }
+    filetypes = []
+    if args.proteome:
+        filetypes.append('faa')
+    if args.gff:
+        filetypes.append('gff')
+    if args.assembly:
+        filetypes.append('fna')
 
     db = mtdb(db_path)
     if args.print or not args.hard:
-        softMain(filetypes, db, output_path, print_link = args.print)
+        soft_main(filetypes, db, output_path, print_link = args.print)
     else:
-        hardMain(filetypes, db, output_path)
+        hard_main(filetypes, db, output_path)
 
     sys.exit(0)

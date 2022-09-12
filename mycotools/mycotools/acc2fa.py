@@ -4,9 +4,13 @@ import os
 import re
 import sys
 import argparse
+from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
 from mycotools.lib.dbtools import mtdb, masterDB
 from mycotools.lib.kontools import format_path, eprint, stdin2str
+
+def extract_mtdb_accs_exp(fa_dict, accs):
+    return {acc: fa_dict[acc] for acc in accs}
 
 def extract_mtdb_accs(fa_dict, accs):
     """extract MTDB accessions from fa_dict using a list `accs`; can 
@@ -46,8 +50,8 @@ def extract_mtdb_accs(fa_dict, accs):
             
 
 def extractHeaders(fasta_file, accessions, ome = None):
-    '''searches headers for "[]", which indicate coordinate-based extraction.
-    otherwise, just retrieves the accession from the fasta dictionary'''
+    """searches headers for "[]", which indicate coordinate-based extraction.
+    otherwise, just retrieves the accession from the fasta dictionary"""
 
     fasta = fa2dict(fasta_file)
     out_fasta = {}
@@ -88,23 +92,52 @@ def extractHeaders(fasta_file, accessions, ome = None):
     return out_fasta
    
 
-def dbmain(db, accs):
-    '''takes in mtdb, takes accessions ome by ome from accs'''
+def dbmain(db, accs, error = True, spacer = '\t\t\t', coord_check = True):
+    """takes in mtdb, takes accessions ome by ome from accs;
+    error will exit if set to true, report to stderr if not;
+    coord_check will check entries for coordinate signatures in accession names
+    but will bypass if false (throughput increase). Returns a fa_dict of the
+    accessions and coordinates if applicable"""
 
-    fa_dict = {}
+    # set the db index
     db = db.set_index( 'ome' )
-    omes = set([x[:x.find('_')] for x in accs])
-    for ome in omes:
-        if ome:
-            ome_accs = [x for x in accs if x.startswith(ome + '_')]
-            ome_fasta = fa2dict(db[ome]['faa'])
+    # create a dict to populate for each ome
+    ome_data = defaultdict(list)
+    # organize accession by ome
+    for acc in accs:
+        ome = acc[:acc.find('_')]
+        ome_data[ome].append(acc)
+
+    # populate the fasta dict with the accession information by referencing the
+    # mycotools proteome entry for each ome
+    fa_dict = {}
+    if coord_check:
+        for ome, ome_accs in ome_data.items():
+            try:
+                ome_fasta = fa2dict(db[ome]['faa'])
+            except KeyError: # if there is a missing ome
+                if error:
+                    raise KeyError
+                else:
+                    eprint(spacer + ome + ' not in database', flush = True)
             fa_dict = {**fa_dict, **extract_mtdb_accs(ome_fasta, ome_accs)}
-    
+    else:
+        for ome, ome_accs in ome_data.items():
+            try:
+                ome_fasta = fa2dict(db[ome]['faa'])
+            except KeyError: # if there is a missing ome
+                if error:
+                    raise KeyError
+                else:
+                    eprint(spacer + ome + ' not in database', flush = True)
+            fa_dict = {**fa_dict, **extract_mtdb_accs_exp(ome_fasta, ome_accs)}
+ 
+
     return fa_dict
 
 
 def famain( accs, fa, ome = None ):
-    '''takes in accessions, fasta, and retrieves accessions'''
+    """takes in accessions, fasta, and retrieves accessions"""
 
     fa_dict = {}
     fa_dict = {**fa_dict, **extractHeaders(fa, accs, ome)}

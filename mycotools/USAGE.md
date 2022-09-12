@@ -820,12 +820,12 @@ optional arguments:
 <br /><br /><br /><br /><br /><br /><br /><br /><br />
 
 ## TODO
-- add ncbiAcc2fa
-- separate better/organize into wiki
-- document clinker pipeline
-- add images of pipeline output
-- fa2hmmer2fa annotation
-- update crap information
-- eggnog to synteny diagram
-- overview of mycotools scripts functions, e.g. resume on -o
-- update phylogenetic pipeline with fa2clus renovations
+    - [ ] add ncbiAcc2fa
+    - [ ] separate better/organize into wiki
+    - [ ] document clinker pipeline
+    - [ ] add images of pipeline output
+    - [ ] fa2hmmer2fa annotation
+    - [ ] update crap information
+    - [ ] eggnog to synteny diagram
+    - [ ] overview of mycotools scripts functions, e.g. resume on -o
+    - [ ] update phylogenetic pipeline with fa2clus renovations

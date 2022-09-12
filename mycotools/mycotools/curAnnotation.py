@@ -623,11 +623,11 @@ def addExons( gff ):
 def main(gff_path, prefix, fail = True, cur_seqids = False):
 
     if isinstance(gff_path, str):
-        gff = gff2list( gff_path )
+        gff = gff2list(gff_path)
     elif isinstance(gff_path, list):
         gff = gff_path
 
-    if gff_path.endswith( 'gtf' ) or re.search(gtfComps()['id'], gff[0]['attributes']) is not None:
+    if re.search(gtfComps()['id'], gff[0]['attributes']) is not None:
         exonGtf = intron2exon( gff )
         exonGtfCur = curCDS( exonGtf )
         exonGtfCurGenes, failed, flagged = addGenes( exonGtfCur, safe = fail )
