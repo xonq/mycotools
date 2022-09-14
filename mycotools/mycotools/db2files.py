@@ -79,7 +79,7 @@ if __name__ == '__main__':
     if args.proteome:
         filetypes.append('faa')
     if args.gff:
-        filetypes.append('gff')
+        filetypes.append('gff3')
     if args.assembly:
         filetypes.append('fna')
 

@@ -27,10 +27,10 @@ from mycotools.lib.kontools import multisub, findExecs, format_path, \
 from mycotools.lib.biotools import fa2dict, dict2fa
 sys.setrecursionlimit(1000000)
 
-class LinclustError(Exception):
+class ClusteringError(Exception):
     pass
 
-def run_linclust(fa_path, res_base, wrk_dir, mmseqs = 'mmseqs',
+def run_mmseqs(fa_path, res_base, wrk_dir, algorithm = 'mmseqs easy-linclust',
                  min_id = 0.3, min_cov = 0.5, cpus = 1, verbose = False):
     res_path = res_base + '_cluster.tsv'
     tmp_dir = os.path.dirname(res_path) + '/tmp/'
@@ -39,17 +39,17 @@ def run_linclust(fa_path, res_base, wrk_dir, mmseqs = 'mmseqs',
     else:
         stdout = subprocess.DEVNULL
         stderr = subprocess.DEVNULL
-    mmseqs_cmd = [mmseqs, 'easy-linclust',
+    mmseqs_cmd = algorithm.split(' ').extend([
                   fa_path, res_base, tmp_dir,
                   '--min-seq-id', fmt_float(min_id), '--threads',
                   str(cpus), '--compressed', '1',
                   '--cov-mode', '0', '-c', str(min_cov),
-                  '-e', '0.1']
+                  '-e', '0.1'])
     mmseqs_exit = subprocess.call(mmseqs_cmd,
                                   stdout = stdout,
                                   stderr = stderr)
     if mmseqs_exit:
-        raise LinclustError('linclust failed: ' + str(mmseqs_exit) \
+        raise ClusteringError('Clustering failed: ' + str(mmseqs_exit) \
                             + ' ' + str(mmseqs_cmd))
     if os.path.isfile(res_base + '_all_seqs.fasta'):
         os.remove(res_base + '_all_seqs.fasta')
@@ -59,7 +59,7 @@ def run_linclust(fa_path, res_base, wrk_dir, mmseqs = 'mmseqs',
         shutil.rmtree(tmp_dir)
     return res_path
 
-def parse_linclust(res_path):
+def parse_mmseqs_clus(res_path):
     derivations = defaultdict(list)
     with open(res_path, 'r') as raw:
         for line in raw:
@@ -353,11 +353,11 @@ def run_iterative(
                 cluster_dict[index].append(gene)
         else:
             res_base = params['dir'] + focal_gene
-            res_path = run_linclust(params['fa'], res_base, params['dir'], 
-                                    mmseqs = params['bin'],
+            res_path = run_mmseqs(params['fa'], res_base, params['dir'], 
+                                    algorithm = params['bin'],
                                     min_id = clus_parameter, 
                                     min_cov = params['min_cov'], cpus = cpus)
-            cluster_dict, clusters = parse_linclust(res_path)
+            cluster_dict, clusters = parse_mmseqs_clus(res_path)
         focalLen = len(cluster_dict[clusters[focal_gene]]) 
         # size of cluster with focal_gene
 
@@ -440,13 +440,13 @@ def run_reiterative(
                  + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
             vprint('\tMinimum connection: ' + str(mincon) \
                  + '; Maximum cluster parameter' + str(clus_parameter), flush = True, v = verbose)
-        else: # linclust
+        else: # mmseqs
             res_base = params['dir'] + focal_gene
-            res_path = run_linclust(params['fa'], res_base, params['dir'], 
-                                    mmseqs = params['bin'],
+            res_path = run_mmseqs(params['fa'], res_base, params['dir'], 
+                                    algorithm = params['bin'],
                                     min_id = clus_parameter, 
                                     min_cov = params['min_cov'], cpus = cpus)
-            cluster_dict, clusters = parse_linclust(res_path)
+            cluster_dict, clusters = parse_mmseqs_clus(res_path)
             focalLen = len(cluster_dict[clusters[focal_gene]])
             vprint('\nITERATION ' + str(attempt) + ': ' + focal_gene \
                  + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
@@ -514,7 +514,7 @@ def main(
         algorithm = 'hierarchical'
         dist_path = output + '.dist'
     else:
-        algorithm = 'linclust'
+        algorithm = search_program
         dist_path = None
 
     minval, maxval = 0, 1
@@ -591,7 +591,7 @@ def main(
                                 maxval = 1 - mincon # max is relative to % ID cutoff
                             else:
                                 maxval = 1
-                    else: # linclust
+                    else: # mmseqs
                         if beyonds:
                             interval = 0.01
                             minval = float(beyonds[-1]['cluster_parameter'])
@@ -635,11 +635,11 @@ def main(
             clusters, tree = scipyaggd(distance_matrix, clus_parameter, linkage)
         else:
             res_base = output
-            res_path = run_linclust(fasta_path, output, 
+            res_path = run_mmseqs(fasta_path, output, 
                                     os.path.dirname(output) + '/', 
-                                    mmseqs = 'mmseqs', min_id = clus_parameter, 
+                                    algorithm = algorithm, min_id = clus_parameter, 
                                     min_cov = mincon, cpus = cpus)
-            null_dict, clusters = parse_linclust(res_path)
+            null_dict, clusters = parse_mmseqs_clus(res_path)
 
     if algorithm == 'hierarchical':
         return distance_matrix, clusters, tree, oldClusters, oldTree, overshot
@@ -665,17 +665,22 @@ if __name__ == '__main__':
         description = "Sequence clustering with iterative search option." 
         )
     parser.add_argument('-f', '--fasta', required = True)
+    parser.add_argument( 
+        '-a', '--alignment', 
+        help = 'Alignment software {"mmseqs", "diamond", "usearch"}; ' \
+             + 'diamond and usearch call hierarchical clustering. ' \
+             + 'DEFAULT: mmseqs', 
+        default = 'mmseqs' 
+        )
     parser.add_argument('-l', '--linclust', action = 'store_true',
-        help = 'mmseqs linclust')
-    parser.add_argument('-a', '--aggclus', action = 'store_true',
-        help = 'Hierarchical agglomerative clustering')
+        help = 'Use linclust instead of mmseqs cluster (faster, less sensitive)')
     parser.add_argument('-m', '--mincon', help = 'Minimum connection' \
-        + ' for alignment; DEFAULT: [-l]: 0.1 percent query coverage, '  \
-        + '[-a]: 0.2 percent identity, [-a]: 30 bitscore', 
+        + ' for alignment; DEFAULT: [mmseqs]: 0.1 percent query coverage, '  \
+        + '[aggclus]: 0.2 percent identity, [aggclus]: 30 bitscore', 
         type = float)
     parser.add_argument('-x', '--cluster_parameter', 
-        help = '[-l]: Minimum identity; DEFAULT: 0.3; ' \
-            +  '[-a]: Maximum distance; DEFAULT: 0.75', 
+        help = '[mmseqs]: Minimum identity; DEFAULT: 0.3; ' \
+            +  '[aggclus]: Maximum distance; DEFAULT: 0.75', 
             type = float)
     parser.add_argument('-i', '--iterative', 
         help = '[--minseq]: Gene to iteratively cluster for; '  \
@@ -689,19 +694,14 @@ if __name__ == '__main__':
         help = '[--maxseq]: Refine cluster to maximize sequences within parameters.')
 #    parser.add_argument('-i', '--inflation', type = float, default = 1.5,
  #       help = 'Inflation value for MCL; DEFAULT: 1.5')
-    parser.add_argument( 
-        '-al', '--alignment', 
-        help = '[-a]: Alignment software {"diamond", "usearch"}; DEFAULT: diamond', 
-        default = 'diamond' 
-        )
     parser.add_argument(
-        '-d', '--distance_type', help = '[-a]: {"identity", "bitscore"} ' + \
+        '-d', '--distance_type', help = '[aggclus]: {"identity", "bitscore"} ' + \
         'bitscore is normalized 0-1 following -m and -x should be 0-1; DEFAULT: identity',
         default = 'identity'
         )
 
     parser.add_argument('--linkage', default = 'single', 
-        help = "[-a]: Linkage criterion: " \
+        help = "[aggclus]: Linkage criterion: " \
         + "'complete' (maximum distance), 'average', 'weighted', " \
         + "'centroid', or 'single' (minimum distance) DEFAULT: 'single' (minimum)")
     parser.add_argument('-o', '--output')
@@ -711,7 +711,7 @@ if __name__ == '__main__':
 
     if args.refine and not args.maxseq:
         eprint('\nERROR: --maxseq required for refinement', flush = True)
-    if args.alignment in {'diamond', 'usearch'} and not args.linclust:
+    if args.alignment in {'diamond', 'usearch'}:
         if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
             eprint('\nERROR: Invalid linkage criterium', flush = True)
             sys.exit( 1 )
@@ -728,21 +728,24 @@ if __name__ == '__main__':
                 args.mincon = 30
         if not args.cluster_parameter:
             args.cluster_parameter = 0.75
-    elif args.linclust and not args.aggclus:
-        args.alignment = 'mmseqs'
+    elif args.algnment == 'mmseqs':
+        if args.linclust:
+            args.alignment = 'mmseqs easy-linclust'
+        else:
+            args.alignment = 'mmseqs easy-cluster'
         if not args.mincon:
             args.mincon = 0.1
             pid = None
         if not args.cluster_parameter:
             args.cluster_parameter = 0.3
     else:
-        eprint('\nERROR: Invalid input parameters', flush = True)
+        eprint('\nERROR: Invalid alignment software', flush = True)
         sys.exit( 2 )
 
     findExecs([args.alignment], exit = set(args.alignment))
     interval = 0.1
 
-    if args.iterative and args.aggclus:
+    if args.iterative and args.alignment in {'diamond', 'usearch'}:
         clus_parameter = 1 - args.mincon
     elif 1 - args.cluster_parameter <= args.mincon \
         and args.alignment != 'mmseqs':

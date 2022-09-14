@@ -752,13 +752,18 @@ select the clade of interest as described in step 6a.
 
 ## Cluster Reconstrunction and Phylogenetic Analysis (CRAP)
 ### crap.py
+
+<img align="left"
+src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
+alt="Extracted clade of CRAP pipeline">
+
 CRAP (originally created by Jason Slot) is a simple, elegant pipeline for
 studying the evolution of a gene cluster on a gene-by-gene basis. CRAP 
 will 1) input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
-or orthogroup-based approach to find homologs in the MycotoolsDB; 2) use 
-hierarchical clustering to truncate the sequence set and detect outgroups;
-3) construct phylogenies of each query sequence; and 4) map locus synteny 
-diagrams  onto the leaves of the phylogenies.
+or orthogroup-based approach to find homologs in the MycotoolsDB; 2) 
+implement sequence similarity clustering to truncate the sequence set 
+and detect outgroups; 3) construct phylogenies of each query sequence; and 
+4) map locus synteny diagrams  onto the leaves of the phylogenies.
 
 `crap.py` can operate on a query of MycotoolsDB accessions or a standalone
 multifasta input of external accessions. Following homolog acquisition,
@@ -773,6 +778,8 @@ different genes is a good window into the evolution. Alternatively, CRAP can
 also construct 1000 bootstrap iterations
 of IQTree with the ModelFinder module by specifying `-i`/`--iqtree`.
 
+<br /><br />
+
 To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
 ```bash
 extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
@@ -782,10 +789,6 @@ crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
 <br />
 
 ```bash
-usage: crap.py [-h] -q QUERY [-d DATABASE] [-s SEARCH] [-b BITSCORE] [-og ORTHOGROUPS] [-p PLUSMINUS]
-               [--maxseq MAXSEQ] [-i] [--conversion CONVERSION] [--ingroup] [--no_label] [-g GFF]
-               [-o OUTPUT] [-c CPU] [-v]
-
 Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
 
 optional arguments:
@@ -794,23 +797,27 @@ optional arguments:
                         Fasta or white-space delimited file/string of cluster genes
   -d DATABASE, --database DATABASE
   -s SEARCH, --search SEARCH
-                        Search binary {mmseqs, blastp} for search-based CRAP
+                        Search binary {mmseqs, diamond, blastp} for search-based CRAP
   -b BITSCORE, --bitscore BITSCORE
                         Bitscore minimum for search algorithm. DEFAULT: 30
   -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
                         MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
   -p PLUSMINUS, --plusminus PLUSMINUS
-                        Genes up-/downstream to analyze from loci. DEFAULT: 10
-  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py. Outgroup detection may exceed this
-                        number. DEFAULT: 250
-  -i, --iqtree          IQTree2 1000 bootstrap iterations. DEFAULT: fasttree
+                        Bases up-/downstream query hits for homolog search; DEFAULT: 20,000
   --conversion CONVERSION
-                        Tab delimited conversion file for annotations: Query Conversion
-  --ingroup             Do not detect outgroups, do not root trees
+                        Tab delimited alternative annotation file: "query,name"
+  --minseq MINSEQ       Min sequences for trees/cluster size; DEFAULT: 3
+  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py; DEFAULT: 250
+  -l, --linclust        Cluster large gene sets via mmseqs linclust; fastest, less sensitive
+  -a, --agg_clus        Cluster large gene sets via hierarchical clustering NONFUNCTIONAL
+  -f, --fail            Do not fallback to alternative clustering method upon failure NONFUNCTIONAL
+  -i, --iqtree          IQTree2 1000 bootstrap iterations. DEFAULT: fasttree
+  --no_outgroup         Do not detect outgroups, do not root trees
+  --no_midpoint         Do not infer midpoint roots for outgroup failures
   --no_label            Do not label synteny diagrams
   -g GFF, --gff GFF     GFF for non-mycotools locus diagram. Requires -s and a fasta for -i
   -o OUTPUT, --output OUTPUT
-                        Output base dir. Will rerun if previous director exists.
+                        Output base dir - will rerun if previous directory exists
   -c CPU, --cpu CPU
   -v, --verbose
 ```
@@ -825,7 +832,8 @@ optional arguments:
 - [ ] document clinker pipeline
 - [ ] add images of pipeline output
 - [ ] fa2hmmer2fa annotation
-- [ ] update crap information
+- [x] update crap information
 - [ ] eggnog to synteny diagram
 - [ ] overview of mycotools scripts functions, e.g. resume on -o
 - [ ] update phylogenetic pipeline with fa2clus renovations
+

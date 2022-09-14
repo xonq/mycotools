@@ -87,12 +87,29 @@ if __name__ == '__main__':
                       for x in db[ome_prep]]))
                 sys.exit(0)
             ome = re.sub(r'\.\w+[\w\d]$', '', ome_prep)
-            extension = re.sub(r'^.+?\d+\.(.+)$', r'\1', ome_prep)
-            try:
-                if db[ome][extension]:
-                    print(db[ome][extension])
-            except KeyError:
-                raise KeyError(ome + '/' + extension + ' is not a valid extension/ome')
+            extension_srch = re.search(r'^\d+\.?\d*\.(.*$)', ome_prep[6:])
+            if extension_srch is not None:
+                extension = extension_srch[1]
+            else:
+                extension = None
+            if ome in db:
+                try:
+                    if extension:
+                        print(db[ome][extension])
+                    else:
+                        print({**{'ome': ome}, **db[ome]})
+                except KeyError:
+                    raise KeyError('Invalid extension ' + extension)
+            else:
+                for ref_ome, row in db.items():
+                    if ref_ome.startswith(ome + '.'):
+                        if extension:
+                            print(row[extension])
+                        else:
+                            print({**{'ome': ome}, **row}) 
+                        break
+                else:
+                    raise KeyError('Invalid ome ' + ome)
         sys.exit(0)
 
 

@@ -17,8 +17,8 @@ from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.gff2seq import aamain as gff2seq
 
 predb_headers = [
-    'assembly_accession', 'genus', 'species', 'strain',
-    'version', 'biosample',
+    'assembly_accession', 'previous_ome', 
+    'genus', 'species', 'strain', 'version', 'biosample',
     'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
     'useRestriction (yes/no)', 'published'
     ]
@@ -71,13 +71,12 @@ def gen_predb():
         '1.0', 'n', '<PATH/TO/ASSEMBLY>', '<PATH/TO/GFF3>', 'jgi',
         'no', '2018'
         ]
-    eprint('INSTRUCTIONS: fill in each column with the relevant information and ' + \
-        'separate each column by a tab. The predb can be filled in ' + \
-        'via spreadsheet software and exported as a tab delimited `.tsv`. ' + \
-        'Alternatively, use a plain text editor and separate by tabs. ' + \
-        'De novo annotations produced by Funannotate/Orthofiller must be ' + \
-        'filled in as "new" for the genomeSource column. The row below is an ' + \
-        'example', flush = True)
+    eprint('INSTRUCTIONS: fill in each column with the relevant information and \
+        separate each column by a tab. The predb can be filled in \
+        via spreadsheet software and exported as a tab delimited `.tsv`. \
+        ASSEMBLY ACCESSIONS and PREVIOUS_OME fields must be unique to the \
+        genome; otherwise predb2db will update the corresponding database entry. \
+        Novel data must be filled in as "new" for the genomeSource column.', flush = True)
     outputStr = '#' + '\t'.join(predb_headers)
     outputStr += '\n#' + '\t'.join(example) + '\n'
 
@@ -151,10 +150,16 @@ def predb2mtdb(predb):
         predb['assemblyPath'] = predb['fna']
     if not 'gffPath' in predb and 'gff3' in predb:
         predb['gffPath'] = predb['gff3']
+    if not 'previous_ome' in predb and 'ome' in predb:
+        predb['previous_ome'] = predb['ome']
+    elif not 'previous_ome' in predb:
+        predb['previous_ome'] = \
+            [None for x in predb['ome']]
     for i, code in enumerate(predb['genus']):
         if predb['published'][i]:
             toAdd = {
                 'assembly_acc': predb['assembly_acc'][i],
+                'ome': predb['previous_ome'][i],
                 'genus': predb['genus'][i],
                 'species': predb['species'][i],
                 'strain': predb['strain'][i],
@@ -168,6 +173,7 @@ def predb2mtdb(predb):
         else:
             toAdd = {
                 'assembly_acc': predb['assembly_acc'][i],
+                'ome': predb['previous_ome'][i],
                 'genus': predb['genus'][i],
                 'species': predb['species'][i],
                 'strain': predb['strain'][i],
@@ -212,15 +218,17 @@ def gen_omes(
             tax_count[abb] = num
     tax_count = Counter(tax_count)
 
-    todel, refdb_aas = [], refdb.set_index('assembly_acc')
+    todel = []
+    refdb_aas = refdb.set_index('assembly_acc')
     refdb_accs = set([x for x in list(refdb['assembly_acc']) if x])
+    refdb_omes = set([x for x in list(refdb['ome'])])
     for i, ome in enumerate(newdb['ome']):
         if not ome: # if there isn't an ome for this entry yet
             if newdb['assembly_acc'][i] in refdb_accs: # if this is an
             # established assembly accession; maybe make sure this works for
             # changed MycoCosm or NCBI assembly accs
                 ome = refdb_aas[newdb['assembly_acc'][i]]['ome']
-                v_search = re.search(r'\.(\d+)$', ome)
+                v_search = re.search(r'\.(\d+)$', ome[6:])
                 if v_search:
                     v = int(v_search[1]) + 1 # new version
                     new_ome = re.sub(r'\.\d+$', '.' + str(v), ome)
@@ -258,14 +266,14 @@ def gen_omes(
             new_ome = name + str(tax_count[name])
             newdb['ome'][i] = new_ome
         elif ome:
-            format_search = re.search(r'^[^\d_,\'";:\\\|\[\]\{\}\=\+\!@#\$\%\^' 
-                                      + r'&\*\(\)]{6}\d+[^-_+=\\\|\{\[\}\]\:;'
-                                      + r'\'\"\,\<\>\?/\`\~\!\@\#\$\%\^\&\*\('
-                                      + r'\)]+', ome) # crude format check
+            format_search = re.search(r'^[^\d_,\'";:\\\|\[\]\{\}\=\+\!@#\$\%\^' \
+                                    + r'&\*\(\)]{6}\d+[^-_+=\\\|\{\[\}\]\:;' \
+                                    + r'\'\"\,\<\>\?/\`\~\!\@\#\$\%\^\&\*\(' \
+                                    + r'\)\w\W]*$', ome) # crude format check
             if not format_search:
                 raise ValueError('invalid ome ' + ome)
-            if ome in tax_set: # it's an update
-                v_search = re.search(r'\.(\d+)$', ome)
+            if ome in refdb_omes: # it's an update
+                v_search = re.search(r'\.(\d+)$', ome[6:])
                 if v_search:
                     v = int(v_search[1]) + 1 # new version
                     new_ome = re.sub(r'\.\d+$', '.' + str(v), ome)

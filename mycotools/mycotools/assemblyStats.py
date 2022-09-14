@@ -1,4 +1,7 @@
 #! /usr/bin/env python3
+
+# NEED to come up with more clever way of detecting mtdb
+
 '''
 Takes a database as argument 1 and an output for the .tsv as argument 2.
 Calculates basic genome statistics.
@@ -113,7 +116,7 @@ def main(in_path, log_path = None, cpus = 1):
 
     stats = {}
 
-    if in_path.endswith('.db'):
+    if in_path.endswith('db'):
         head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
             '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
 

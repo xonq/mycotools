@@ -2,6 +2,7 @@
 
 # NEED TO DEFAULT CHEKC FOR INTRONS FOR PREDB2DB
 # NEED to arrive at a consensus for protein IDs
+# NEED to name tRNAs, pseudogenes, etc. similar to curGFF.py
 
 import os
 import re
