@@ -35,7 +35,7 @@ from mycotools.lib.kontools import eprint, format_path, findExecs, intro, outro,
     read_json, write_json
 from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Comps
 from mycotools.acc2fa import dbmain as acc2fa
-from mycotools.fa2clus import write_data, ClusteringError, main as fa2clus
+from mycotools.fa2clus import write_data, ClusteringError, RefineError, main as fa2clus
 from mycotools.fa2tree import main as fa2tree, PhyloError
 from mycotools.acc2locus import main as acc2locus
 from mycotools.gff2svg import main as gff2svg
@@ -143,6 +143,30 @@ def check_fa_size(fas, max_size):
 
     return fas4clus, fas4trees
 
+def write_seq_clus(clusters, focal_gene, db, output_path, out_fa):
+    cluster_dict = {}
+    for gene, index in clusters.items():
+        if index not in cluster_dict:
+            cluster_dict[index] = []
+        cluster_dict[index].append(gene)
+
+    geneModule = cluster_dict[clusters[focal_gene]]
+    try:
+        fa_dict = acc2fa(db, geneModule)
+    except KeyError:
+        eprint('\t\t\tWARNING: some hits not in database', flush = True)
+        db_omes = set(db['ome'])
+        geneModule = [x for x in geneModule if x[:x.find('_')] in db_omes]
+        fa_dict = acc2fa(db, geneModule)
+
+# need to implement some method to choose if the max and min parameters couldn't be met
+    print('\t\t\t' + str(len(fa_dict)) + ' genes in group', flush = True)
+    with open(out_fa, 'w') as out:
+        out.write(dict2fa(fa_dict))
+#    write_data(None, distanceMatrix, clusters, output_path)
+    write_data(None, None, clusters, output_path)
+
+
 def run_fa2clus(
     fa_path, db, focal_gene, minseq, maxseq, output, out_name,
     mincon = 0.05, clus_param = 0.3, direction = -1, cpus = 1,
@@ -170,12 +194,12 @@ def run_fa2clus(
             interval = interval, output = output_path,
             verbose = verbose, log_path = log_path, refine = True,
             spacer = spacer, cpus = cpus
-            ) # linclust status
+            ) # mmseqs
     except KeyError: # query not in adjacency matrix
         return False, False
-    except ClusteringError as le: # if linclust error, try aggclus
+    except ClusteringError as le: # if cluster error, try aggclus
         if not error:
-            eprint(spacer + 'linclust failed, attempting hierarchical ' + \
+            eprint(spacer + 'mmseqs failed, attempting hierarchical ' + \
                    'clustering', flush = True)
             try:
                 null, clusters, null, null, ocl, overshot = fa2clus(
@@ -189,28 +213,9 @@ def run_fa2clus(
                 return False, False
         else:
             raise le
-        
-    cluster_dict = {}
-    for gene, index in clusters.items():
-        if index not in cluster_dict:
-            cluster_dict[index] = []
-        cluster_dict[index].append(gene)
 
-    geneModule = cluster_dict[clusters[focal_gene]]
-    try:
-        fa_dict = acc2fa(db, geneModule)
-    except KeyError:
-        eprint('\t\t\tWARNING: some hits not in database', flush = True)
-        db_omes = set(db['ome'])
-        geneModule = [x for x in geneModule if x[:x.find('_')] in db_omes]
-        fa_dict = acc2fa(db, geneModule)
-
-# need to implement some method to choose if the max and min parameters couldn't be met
-    print('\t\t\t' + str(len(fa_dict)) + ' genes in group', flush = True)
-    with open(output + '../' + str(out_name) + '.fa', 'w') as out:
-        out.write(dict2fa(fa_dict))
-#    write_data(None, distanceMatrix, clusters, output_path)
-    write_data(None, None, clusters, output_path)
+    write_seq_clus(clusters, focal_gene, db, 
+                   output_path, output + '../' + str(out_name) + '.fa')
 
     return True, overshot
 
@@ -222,6 +227,7 @@ def outgroup_mngr(
 
     fa_path = clus_dir + focal_gene + '.fa'
     out_name = str(focal_gene) + '.outgroup'
+    output_path = output + str(focal_gene) 
     log_path = clus_dir + '.' + str(focal_gene) + '.log'
     clusLog = read_json(log_path)
     algorithm = clusLog['search_program'] # use previous search algorithm
@@ -252,17 +258,57 @@ def outgroup_mngr(
     if prev_size > maxseq:
         prev_size = maxseq
     if prev_index > 0: # an index exists
-        res, overshot = run_fa2clus(
-            fa_path, db, focal_gene, minseq, prev_size - 1, clus_dir, out_name,
-            mincon, float(new_info['cluster_parameter']), direction,
-            cpus, verbose, 0.01, spacer = spacer, error = error,
-            algorithm = algorithm
-            )
+        try:
+            res, overshot = run_fa2clus(
+                fa_path, db, focal_gene, minseq, prev_size - 1, clus_dir, 
+                out_name, mincon, float(new_info['cluster_parameter']), 
+                direction, cpus, verbose, 0.01, spacer = spacer, 
+                error = error, algorithm = algorithm
+                )
+        except RefineError: # adjusting percent ID doesnt have reliable
+        # direction in terms of cluster size
+            passing_iters = [x for x in iterations \
+                             if x['size'] < maxseq and x['size'] > minseq]
+            sizes = sorted(set([x['size'] for x in passing_iters]),
+                           reverse = True)[:2]
+            if len(sizes) > 1:
+                out_iter = passing_iters[0]['cluster_parameter']
+                for i in passing_iters[1:]:
+                    if i['size'] == sizes[1]:
+                        in_iter = i['cluster_parameter']
+                        break
+                null, in_clusters, null, null, ocl, overshot = fa2clus(
+                    fa_path, mincon, in_iter, minseq, maxseq,
+                    search_program = algorithm,
+                    output = output_path,
+                    verbose = verbose, log_path = log_path,
+                    spacer = spacer, cpus = cpus
+                    )
+                write_seq_clus(in_clusters, focal_gene, db, 
+                               clus_dir + str(focal_gene), 
+                               clus_dir + '../' + focal_gene + '.fa')
+                null, out_clusters, null, null, ocl, overshot = fa2clus(
+                    fa_path, mincon, out_iter, minseq, maxseq,
+                    search_program = algorithm,
+                    output = output_path,
+                    verbose = verbose, log_path = log_path,
+                    spacer = spacer, cpus = cpus
+                    )
+                write_seq_clus(out_clusters, focal_gene, db, 
+                               clus_dir + str(focal_gene) + '.outgroup', 
+                               clus_dir + '../' + out_name + '.fa')
+                res, overshot = True, False # mitigate downstream error check
+            else:
+                eprint(
+                    spacer + 'WARNING: cannot find outgroups with minimum \
+                    ID', flush = True
+                    )
+                return False, False        
     elif 1-float(iterations[prev_index-1]['cluster_parameter']) - mincon < 0:
         eprint(
             spacer + 'WARNING: cannot find outgroups with minimum ID', flush = True
             )
-        return False # can't go any further in the clusters
+        return False, False # can't go any further in the clusters
     else: # can cluster further than what's been done, need to run iterative
         clus_param = float(new_info['cluster_parameter'])
         minseq = int(new_info['size'] + 1)
@@ -775,7 +821,7 @@ def og_main(
                         )
                     if not res:
                         print('\t\t\tERROR: query not in ' \
-                             + 'diamond output/clusters are granular', flush = True)
+                             + 'output/clusters are granular', flush = True)
                         continue
                 in_keys = set(query_hits)
                 out_query = query + '.outgroup'
@@ -1035,7 +1081,8 @@ if __name__ == "__main__":
         )
     parser.add_argument(
         '-q', '--query', 
-        help = 'Fasta or white-space delimited file/string of cluster genes',
+        help = 'Fasta, white-space delimited file/string of cluster genes, \
+                "-" for stdin',
         required = True
         )
     parser.add_argument('-d', '--database', default = masterDB())
@@ -1080,7 +1127,8 @@ if __name__ == "__main__":
     #    )
     parser.add_argument(
         '-l', '--linclust',
-        help = 'Cluster large gene sets via mmseqs linclust; fastest, less sensitive',
+        help = 'Cluster large gene sets via mmseqs linclust; DEFAULT: \
+                easy-cluster',
         action = 'store_true'
         )
     parser.add_argument(
@@ -1135,7 +1183,12 @@ if __name__ == "__main__":
     findExecs(execs, exit = set(execs))
 
     input_fa, input_GFF = False, False
-    if os.path.isfile(args.query):
+    if args.query == '-':
+        if args.gff:
+            eprint('\nERROR: GFF input requires fasta input', flush = True)
+            sys.exit(3)
+        input_genes = stdin2str().replace('"','').replace("'",'').split()
+    elif os.path.isfile(args.query):
         if args.query.lower().endswith((
             '.fasta', '.fa', '.faa', '.fna', '.fsa'
             )):

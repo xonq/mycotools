@@ -30,6 +30,9 @@ sys.setrecursionlimit(1000000)
 class ClusteringError(Exception):
     pass
 
+class RefineError(Exception):
+    pass
+
 def run_mmseqs(fa_path, res_base, wrk_dir, algorithm = 'mmseqs easy-linclust',
                  min_id = 0.3, min_cov = 0.5, cpus = 1, verbose = False):
     res_path = res_base + '_cluster.tsv'
@@ -39,12 +42,12 @@ def run_mmseqs(fa_path, res_base, wrk_dir, algorithm = 'mmseqs easy-linclust',
     else:
         stdout = subprocess.DEVNULL
         stderr = subprocess.DEVNULL
-    mmseqs_cmd = algorithm.split(' ').extend([
-                  fa_path, res_base, tmp_dir,
-                  '--min-seq-id', fmt_float(min_id), '--threads',
-                  str(cpus), '--compressed', '1',
-                  '--cov-mode', '0', '-c', str(min_cov),
-                  '-e', '0.1'])
+    mmseqs_cmd = algorithm.split(' ')
+    mmseqs_cmd.extend([fa_path, res_base, tmp_dir,
+                       '--min-seq-id', fmt_float(min_id), '--threads',
+                       str(cpus), '--compressed', '1',
+                       '--cov-mode', '0', '-c', str(min_cov),
+                       '-e', '0.1'])
     mmseqs_exit = subprocess.call(mmseqs_cmd,
                                   stdout = stdout,
                                   stderr = stderr)
@@ -355,7 +358,7 @@ def run_iterative(
             res_base = params['dir'] + focal_gene
             res_path = run_mmseqs(params['fa'], res_base, params['dir'], 
                                     algorithm = params['bin'],
-                                    min_id = clus_parameter, 
+                                    min_id = clus_parameter, verbose = verbose,
                                     min_cov = params['min_cov'], cpus = cpus)
             cluster_dict, clusters = parse_mmseqs_clus(res_path)
         focalLen = len(cluster_dict[clusters[focal_gene]]) 
@@ -420,7 +423,6 @@ def run_reiterative(
     ):
     """Goal is to refine cluster size as close to maxseq as much as possible"""
 
-    print(minval, maxval)
     attempt, direction, clusters, tree = 0, None, None, None
     oldDirection, refines = None, []
     while clus_parameter >= minval and clus_parameter <= maxval: # while a valid cluster
@@ -444,7 +446,7 @@ def run_reiterative(
             res_base = params['dir'] + focal_gene
             res_path = run_mmseqs(params['fa'], res_base, params['dir'], 
                                     algorithm = params['bin'],
-                                    min_id = clus_parameter, 
+                                    min_id = clus_parameter, verbose = verbose,
                                     min_cov = params['min_cov'], cpus = cpus)
             cluster_dict, clusters = parse_mmseqs_clus(res_path)
             focalLen = len(cluster_dict[clusters[focal_gene]])
@@ -569,16 +571,18 @@ def main(
         if refine:
             if exit_code == 0 or exit_code == 2: # parameters were met/overshot
                 if len(log_dict['iterations']) > 1: # if there's room to work
-                # with
                     vprint('\nMaximizing cluster size', v = verbose, flush = True)
                     beyond_iters = [x for x in log_dict['iterations'] \
-                                  if int(x['size']) > maxseq]
+                                    if int(x['size']) > maxseq]
+                                    # iterations with too many sequences
                     sorted_beyonds = sorted(beyond_iters, key = lambda x: \
                                             (x['size'], x['cluster_parameter']))
+                                            # sort smallest to largest
                     beyonds = [x for x in sorted_beyonds \
                                if x['size'] == sorted_beyonds[0]['size']]
+                               # grab all iterations of the fewest of too
+                               # many
                     final_iteration = log_dict['iterations'][-1]
-#                    compIter = log_dict['iterations'][-2]
                     if algorithm == 'hierarchical':
                         minval = final_iteration['cluster_parameter']
                         new_cp = minval
@@ -595,10 +599,14 @@ def main(
                         if beyonds:
                             interval = 0.01
                             minval = float(beyonds[-1]['cluster_parameter'])
+                            # smallest value surpassing max sequences
                         else:
                             interval = 0.05
                             minval = 0.0
                         maxval = final_iteration['cluster_parameter']
+                        # the working value
+                        if minval > maxval:
+                            raise RefineError('Cannot refine mmseqs cluster')
                         new_cp = maxval
                     clusters, tree, oldClusters, oldTree, log_dict = run_reiterative(
                         minseq, maxseq, new_cp, mincon, param_dict, iterative, 
@@ -637,6 +645,7 @@ def main(
             res_base = output
             res_path = run_mmseqs(fasta_path, output, 
                                     os.path.dirname(output) + '/', 
+                                    verbose = verbose,
                                     algorithm = algorithm, min_id = clus_parameter, 
                                     min_cov = mincon, cpus = cpus)
             null_dict, clusters = parse_mmseqs_clus(res_path)
