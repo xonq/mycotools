@@ -54,7 +54,7 @@ def hard_main(filetypes, db, output_path):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( description = 'Symlinks/copies selected files from database' )
-    parser.add_argument( '-d', '--database', default = masterDB(), help = 'DEFAULT: masterDB' )
+    parser.add_argument( '-d', '--mtdb', default = masterDB(), help = 'DEFAULT: masterDB' )
     parser.add_argument( '-a', '--assembly', action = 'store_true', help = 'Grab assemblies' )
     parser.add_argument( '-p', '--proteome', action = 'store_true', help = 'Grab proteomes' )
     parser.add_argument( '-g', '--gff', action = 'store_true', help = 'Grab gff`s' )
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         print('\nERROR: no file type (-a, -g, -p) selected', flush = True)
         sys.exit(4)
 
-    db_path = format_path(args.database)
+    db_path = format_path(args.mtdb)
     output_path = prep_output(format_path( args.output ), cd = False)
     args_dict = {
         'DATABASE': db_path, 'OUTPUT': output_path,

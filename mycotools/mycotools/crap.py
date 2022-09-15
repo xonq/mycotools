@@ -1085,7 +1085,7 @@ if __name__ == "__main__":
                 "-" for stdin',
         required = True
         )
-    parser.add_argument('-d', '--database', default = masterDB())
+    parser.add_argument('-d', '--mtdb', default = masterDB())
     parser.add_argument(
         '-s', '--search',
         help = 'Search binary {mmseqs, diamond, blastp} for search-based CRAP'
@@ -1233,7 +1233,7 @@ if __name__ == "__main__":
     output = format_path(args.output)
     args_dict = {
         'Input': ','.join(input_genes), 
-        'Database': args.database,
+        'Database': args.mtdb,
         'Orthogroup Tag': args.orthogroups,
         'Search binary': args.search,
         'Locus +/-': args.plusminus,
@@ -1252,7 +1252,7 @@ if __name__ == "__main__":
 
     start_time = intro('Mycotools OHCrap', args_dict, 'Jason Slot, Zachary Konkel')
 
-    db = mtdb(args.database)
+    db = mtdb(args.mtdb)
     gene0 = input_genes[0]
     ome = input_genes[0][:input_genes[0].find('_')]
     if not ome in set(db['ome']):
@@ -1268,7 +1268,7 @@ if __name__ == "__main__":
 
     if args.orthogroups:
         new_log = init_log(
-            args.database, input_genes, 'orthogroups', args.bitscore,
+            args.mtdb, input_genes, 'orthogroups', args.bitscore,
             args.maxseq, args.plusminus, not args.no_label
             )
         print('\nPreparing output directory', flush = True)
@@ -1285,7 +1285,7 @@ if __name__ == "__main__":
             )
     else:
         new_log = init_log(
-            args.database, input_genes, args.search, args.bitscore,
+            args.mtdb, input_genes, args.search, args.bitscore,
             args.maxseq, args.plusminus, not args.no_label
             )
         print('\nPreparing output directory', flush = True)

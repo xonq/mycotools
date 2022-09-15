@@ -260,7 +260,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gff', help = 'Input GFF file')
     parser.add_argument('-f', '--faa', help = 'Input protein fasta file')
     parser.add_argument('-s', '--sep', help = 'Separator for input file.', default = '\n')
-    parser.add_argument('-d', '--database', default = masterDB(), help = 'MTDB; DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = masterDB(), help = 'MTDB; DEFAULT: master')
     parser.add_argument('--cpu', type = int, default = 1)
     args = parser.parse_args()
 
@@ -287,13 +287,13 @@ if __name__ == '__main__':
         gff = gff2list(format_path(args.gff))
         out_indices = main(gff, acc, args.plusminus, nt = args.bybase)
     else:
-        db = mtdb(format_path(args.database)).set_index('ome')
+        db = mtdb(format_path(args.mtdb)).set_index('ome')
         out_indices = mycotools_main(db, accs, plusminus = 10, 
                                      cpus = args.cpu, nt = args.bybase)
 
     if args.output:
         if not db:
-            db = mtdb(format_path(args.database)).set_index('ome')
+            db = mtdb(format_path(args.mtdb)).set_index('ome')
         for acc in out_indices:
             if args.gff:
                 gff = format_path(args.gff)

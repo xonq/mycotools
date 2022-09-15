@@ -87,7 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--column', default = 1, 
         help = 'Accssions column for -i (1 indexed). DEFAULT: 1')
     parser.add_argument('-o', '--ome', action = 'store_true', help = 'Output files by ome code')
-    parser.add_argument('-d', '--database', default = masterDB(), help = 'mycodb DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = masterDB(), help = 'mycodb DEFAULT: master')
     parser.add_argument('--cpu', type = int, default = mp.cpu_count())
     args = parser.parse_args()
 
@@ -109,9 +109,9 @@ if __name__ == '__main__':
     else:
         cpu = mp.cpu_count()
 
-    db_path = format_path( args.database )
+    db_path = format_path( args.mtdb )
     if not args.gff:
-        db = mtdb( format_path(args.database) )
+        db = mtdb( format_path(args.mtdb) )
         gff_lists = dbMain( db, accs, cpus = args.cpu )
     else:
         gff_path = format_path( args.gff )

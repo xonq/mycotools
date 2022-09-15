@@ -643,13 +643,18 @@ fa2clus.py -f <FASTA> -l -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 2
 src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
 alt="Extracted clade of CRAP pipeline" height="550" width="707">
 
-CRAP (originally created by Jason Slot) is a simple, elegant pipeline for
-studying the evolution of a gene cluster on a gene-by-gene basis. CRAP 
-will 1) input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
-or orthogroup-based approach to find homologs in the MycotoolsDB; 2) 
-implement sequence similarity clustering to truncate the sequence set 
-and detect outgroups; 3) construct phylogenies of each query sequence; and 
-4) map locus synteny diagrams  onto the leaves of the phylogenies.
+CRAP (adopted and expanded from [Slot & Rokas
+implementation](https://doi.org/10.1016/j.cub.2010.12.020)) reconstructs
+and visualizes gene cluster phylogenies to study gene cluster evolution on a gene-by-gene basis. CRAP 
+will: 
+-   - Input a cluster/locus query and use a search algorithm (BLAST/mmseqs/Diamond)
+or orthogroup-based approach to find homologs in the MycotoolsDB; 
+-   - Implement sequence similarity clustering to truncate the sequence set 
+and detect outgroups; 
+-   - Construct phylogenies of each query sequence; and 
+-   - Map locus synteny diagrams onto the tips of the phylogenies.
+
+<br />
 
 `crap.py` can operate on a query of MycotoolsDB accessions or a standalone
 multifasta input of external accessions. Following homolog acquisition,
@@ -657,12 +662,59 @@ multifasta input of external accessions. Following homolog acquisition,
 agglomerative clustering if the number of sequences exceeds the inputted maximum 
 (`-m`).
 
+<br />
+
 By default, `crap.py` will construct trees using fasttree. Fasttree is usually
 sufficient to get an idea of how the cluster is evolving because CRAP builds
 phylogenies for all query genes within a cluster, so congruent topology across
 different genes is a good window into the evolution. Alternatively, CRAP can
 also construct 1000 bootstrap iterations
 of IQTree with the ModelFinder module by specifying `-i`/`--iqtree`.
+
+<br/>
+
+To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
+```bash
+extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
+crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
+```
+
+<br />
+
+```bash
+Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -q QUERY, --query QUERY
+                        Fasta or white-space delimited file/string of cluster genes
+  -d DATABASE, --database DATABASE
+  -s SEARCH, --search SEARCH
+                        Search binary {mmseqs, diamond, blastp} for search-based CRAP
+  -b BITSCORE, --bitscore BITSCORE
+                        Bitscore minimum for search algorithm. DEFAULT: 30
+  -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
+                        MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
+  -p PLUSMINUS, --plusminus PLUSMINUS
+                        Bases up-/downstream query hits for homolog search; DEFAULT: 20,000
+  --conversion CONVERSION
+                        Tab delimited alternative annotation file: "query,name"
+  --minseq MINSEQ       Min sequences for trees/cluster size; DEFAULT: 3
+  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py; DEFAULT: 250
+  -l, --linclust        Cluster large gene sets via mmseqs linclust; fastest, less sensitive
+  -a, --agg_clus        Cluster large gene sets via hierarchical clustering NONFUNCTIONAL
+  -f, --fail            Do not fallback to alternative clustering method upon failure NONFUNCTIONAL
+  -i, --iqtree          IQTree2 1000 bootstrap iterations. DEFAULT: fasttree
+  --no_outgroup         Do not detect outgroups, do not root trees
+  --no_midpoint         Do not infer midpoint roots for outgroup failures
+  --no_label            Do not label synteny diagrams
+  -g GFF, --gff GFF     GFF for non-mycotools locus diagram. Requires -s and a fasta for -i
+  -o OUTPUT, --output OUTPUT
+                        Output base dir - will rerun if previous directory exists
+  -c CPU, --cpu CPU
+  -v, --verbose
+```
+
 
 
 
@@ -695,7 +747,7 @@ cluster locus. Now, we can generate a locus for each of those files and create a
 genbank of the loci for clinker.
 
 ```bash
-for acc in <INPUT_FILE>; do acc2locus.py -a $acc | acc2gbk.py -a - > $acc.locus.gbk; done
+for acc in $(cat <INPUT_FILE>); do acc2locus.py -a $acc | acc2gbk.py -a - > $acc.locus.gbk; done
 ```
 
 Understanding these principals of Mycotools is how you will get the most
@@ -814,49 +866,6 @@ select the clade of interest as described in step 6a.
 6b. Repeat the analysis at step 4a until a final phylogeny is obtained.
 
 
-<br /><br />
-
-To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
-```bash
-extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
-crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
-```
-
-<br />
-
-```bash
-Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -q QUERY, --query QUERY
-                        Fasta or white-space delimited file/string of cluster genes
-  -d DATABASE, --database DATABASE
-  -s SEARCH, --search SEARCH
-                        Search binary {mmseqs, diamond, blastp} for search-based CRAP
-  -b BITSCORE, --bitscore BITSCORE
-                        Bitscore minimum for search algorithm. DEFAULT: 30
-  -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
-                        MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
-  -p PLUSMINUS, --plusminus PLUSMINUS
-                        Bases up-/downstream query hits for homolog search; DEFAULT: 20,000
-  --conversion CONVERSION
-                        Tab delimited alternative annotation file: "query,name"
-  --minseq MINSEQ       Min sequences for trees/cluster size; DEFAULT: 3
-  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py; DEFAULT: 250
-  -l, --linclust        Cluster large gene sets via mmseqs linclust; fastest, less sensitive
-  -a, --agg_clus        Cluster large gene sets via hierarchical clustering NONFUNCTIONAL
-  -f, --fail            Do not fallback to alternative clustering method upon failure NONFUNCTIONAL
-  -i, --iqtree          IQTree2 1000 bootstrap iterations. DEFAULT: fasttree
-  --no_outgroup         Do not detect outgroups, do not root trees
-  --no_midpoint         Do not infer midpoint roots for outgroup failures
-  --no_label            Do not label synteny diagrams
-  -g GFF, --gff GFF     GFF for non-mycotools locus diagram. Requires -s and a fasta for -i
-  -o OUTPUT, --output OUTPUT
-                        Output base dir - will rerun if previous directory exists
-  -c CPU, --cpu CPU
-  -v, --verbose
-```
 
 <img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
 

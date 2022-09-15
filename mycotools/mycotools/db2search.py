@@ -515,7 +515,7 @@ if __name__ == '__main__':
         type = float, help = 'Identity minimum, e.g. 0.6')
     #parser.add_argument( '-c', '--coverage', type = float, help = 'Query coverage +/-, e.g. 0.5' )
     parser.add_argument('-m', '--maxhits', type = int, help = 'Max hits for each organism')
-    parser.add_argument('-db', '--database', default = masterDB(), 
+    parser.add_argument('-db', '--mtdb', default = masterDB(), 
         help = 'DEFAULT: masterdb')
     parser.add_argument('-o', '--output', default = os.getcwd() )
     parser.add_argument('--cpu', default = mp.cpu_count(), type = int, help = 'DEFAULT: all')
@@ -523,7 +523,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--force', action = 'store_true', help = 'Force ome-by-ome blast')
     args = parser.parse_args()
 
-    db_path = format_path( args.database )
+    db_path = format_path( args.mtdb )
     if args.cpu > mp.cpu_count():
         cpus = mp.cpu_count()
     else:

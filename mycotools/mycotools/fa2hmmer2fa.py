@@ -154,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--fasta', required = True, help = 'Input .fasta')
     parser.add_argument('--hmm', required = True, help = 'Input .hmm')
     parser.add_argument('-b', '--binary', required = True, help = "{'hmmsearch', 'nhmmer'}")
-    parser.add_argument('-d', '--database', default = masterDB(), help = 'MycoDB. DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = masterDB(), help = 'MycoDB. DEFAULT: master')
     parser.add_argument('-q', '--query', help = 'Query [acc if -a] from .hmm, or new line delimited file')
     parser.add_argument('-c', '--coverage', type = float, help = 'Decimal minimum percent hmm coverage')
     parser.add_argument('-w', '--whole', action = 'store_true', help = 'Extract entire hit sequence' )
@@ -188,7 +188,7 @@ if __name__ == '__main__':
 
     args_dict = {
         'Fasta': format_path(args.fasta), 'Hmm': format_path(args.hmm), 'Binary': args.binary,
-        'MycoDB': format_path(args.database), 'Hmm Acc': args.query, 'Min Coverage': args.coverage,
+        'MycoDB': format_path(args.mtdb), 'Hmm Acc': args.query, 'Min Coverage': args.coverage,
         'Max E-value': evalue, 'Accessions': args.accession, 'Full Seq': args.whole, 'Output': out_dir, 'CPU': args.cpu
         }
     start_time = intro('fa2hmmer2fa', args_dict)
@@ -200,7 +200,7 @@ if __name__ == '__main__':
     #        accs = args.query
 
     output_fas = main(
-        mtdb(format_path(args.database)), args.binary, args.fasta, args.hmm, out_dir, args.query,
+        mtdb(format_path(args.mtdb)), args.binary, args.fasta, args.hmm, out_dir, args.query,
         cov_threshold = args.coverage, evalue = args.evalue, cpu = args.cpu,
         accession_search = args.accession, subhit = not args.whole
         )

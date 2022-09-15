@@ -125,10 +125,10 @@ if __name__ == '__main__':
     parser.add_argument('-ll', '--lineages', help = 'File w/list of lineages (same rank)' )
     parser.add_argument('--headers', action = 'store_true')
     parser.add_argument('-', '--stdin', action = 'store_true')
-    parser.add_argument('-d', '--database', default = masterDB())
+    parser.add_argument('-d', '--mtdb', default = masterDB())
     parser.add_argument('-o', '--output' )
     args = parser.parse_args()
-    db_path = format_path( args.database )
+    db_path = format_path( args.mtdb )
 
 
     if (args.lineage or args.lineages) and not args.rank:

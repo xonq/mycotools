@@ -156,7 +156,7 @@ if __name__ == '__main__':
         help = 'Accessions column for -i (1 indexed). DEFAULT: 1', type = int)
     parser.add_argument('-s', '--start', help = 'Start index column (1 indexed)', type = int)
     parser.add_argument('-e', '--end', help = 'End index column (1 indexed)', type = int)
-    parser.add_argument('-d', '--database', default = masterDB(), help = 'MTDB DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = masterDB())
     args = parser.parse_args()
 
     if args.input: # input file
@@ -180,7 +180,7 @@ if __name__ == '__main__':
         else:
             accs = [args.accession]
        
-    db_path = format_path(args.database)
+    db_path = format_path(args.mtdb)
     if not args.fasta: # MTDB run
         db = mtdb(db_path)
         fa_dict = dbmain(db, accs)

@@ -275,8 +275,8 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seqid', action = 'store_true',
         help = 'Output files by sequence ID (contig/scaffold/chromosome)'
         )
-    parser.add_argument('-d', '--database',
-        help = "MTDB; DEFAULT: master", default = masterDB())
+    parser.add_argument('-d', '--mtdb',
+        help = "DEFAULT: master", default = masterDB())
     parser.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 
@@ -308,7 +308,7 @@ if __name__ == '__main__':
             regex += char
 
     # import database and set index
-    db = mtdb(format_path(args.database))
+    db = mtdb(format_path(args.mtdb))
     db = db.set_index() 
 
     gbk_dict = {}
