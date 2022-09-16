@@ -13,10 +13,10 @@ from datetime import datetime
 
 def checksum(path, cmd = 'sha256', ref = ''):
     if not isinstance(path, list):
-        hash_cmd = subprocess.call([cmd + 'sum', path],
+        hash_res = subprocess.call([cmd + 'sum', path],
                                  stdout = subprocess.PIPE)
-        hash_res.stdout.decode('utf-8')
-        hash_find = re.search(r'\w+', hash_res)
+        hash_info = hash_res.stdout.decode('utf-8')
+        hash_find = re.search(r'\w+', hash_info)
         hash_ = hash_find[0]
         if ref:
             if hash_ == 'ref':
