@@ -12,7 +12,7 @@ import subprocess
 from datetime import datetime
 
 def checksum(path, cmd = 'sha256', ref = ''):
-    if not path.isinstance(list):
+    if not isinstance(path, list):
         hash_cmd = subprocess.call([cmd + 'sum', path],
                                  stdout = subprocess.PIPE)
         hash_res.stdout.decode('utf-8')
