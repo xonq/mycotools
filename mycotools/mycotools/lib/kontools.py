@@ -11,6 +11,26 @@ import tarfile
 import subprocess
 from datetime import datetime
 
+def checksum(path, cmd = 'sha256', ref = ''):
+    if not path.isinstance(list):
+        hash_cmd = subprocess.call([cmd + 'sum', path],
+                                 stdout = subprocess.PIPE)
+        hash_res.stdout.decode('utf-8')
+        hash_find = re.search(r'\w+', hash_res)
+        hash_ = hash_find[0]
+        if ref:
+            if hash_ == 'ref':
+                return True
+            else:
+                return False
+        else:
+            return hash_
+    else:
+        path0, path1 = path[0], path[1]
+        hash_cmd = subprocess.call([cmd + 'sum', path0, path1])
+        return bool(not hash_cmd)
+
+
 def stdin2str():
     data = ''
     for line in sys.stdin:

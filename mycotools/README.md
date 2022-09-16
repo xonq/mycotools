@@ -46,6 +46,7 @@ in your shell (if not, try `conda activate base` or `source activate base`):
 ```bash
 conda create -n mycotools mycotools -c xonq
 conda activate mycotools
+mtdb -u
 ```
 
 NOTE: if you are having trouble on install, run the `conda config` commands
