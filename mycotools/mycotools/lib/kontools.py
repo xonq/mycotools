@@ -16,6 +16,7 @@ def checksum(path, cmd = 'sha256', ref = ''):
         hash_res = subprocess.run([cmd + 'sum', path],
                                  stdout = subprocess.PIPE)
         hash_info = hash_res.stdout.decode('utf-8')
+        print(hash_info)
         hash_find = re.search(r'\w+', hash_info)
         hash_ = hash_find[0]
         if ref:
