@@ -1079,97 +1079,109 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description = 'Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline'
         )
-    parser.add_argument(
+
+    i_opt = parser.add_argument_group('Inputs')
+    i_opt.add_argument(
         '-q', '--query', 
         help = 'Fasta, white-space delimited file/string of cluster genes, \
                 "-" for stdin',
         required = True
         )
-    parser.add_argument('-d', '--mtdb', default = masterDB())
-    parser.add_argument(
+    i_opt.add_argument('-d', '--mtdb', default = masterDB())
+    i_opt.add_argument(
+        '-g', '--gff',
+        help = 'GFF for non-mycotools locus diagram. Requires -q fasta input'
+        )
+
+
+    hg_opt = parser.add_argument_group('Homolog inference')
+    hg_opt.add_argument(
         '-s', '--search',
         help = 'Search binary {mmseqs, diamond, blastp} for search-based CRAP'
         )
-    parser.add_argument(
+    hg_opt.add_argument(
         '-b', '--bitscore', type = float,
         default = 30, help = 'Bitscore minimum for search algorithm. DEFAULT: 30'
         )
-    parser.add_argument(
+    hg_opt.add_argument(
         '-og', '--orthogroups', 
         help = 'MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum',
         default = 'P'
         )
-    parser.add_argument(
-        '-p', '--plusminus',
-        help = 'Bases up-/downstream query hits for homolog search; DEFAULT: 20,000',
-        default = 20000, type = int
-        )
-    parser.add_argument(
-        '--conversion',
-        help = 'Tab delimited alternative annotation file: "query,name"'
-        )
-    parser.add_argument(
+
+    clus_opt = parser.add_argument_group('Phylogeny size management')
+    clus_opt.add_argument(
         '--minseq',
         help = 'Min sequences for trees/cluster size; ' \
              + 'DEFAULT: 3',
         default = 3, type = int
         )
-    parser.add_argument(
+    clus_opt.add_argument(
         '--maxseq', 
         help = 'Max sequences for trees/min for fa2clus.py; ' \
              + 'DEFAULT: 250', 
         default = 250, type = int
         )
-#    parser.add_argument(
+#    clus_opt.add_argument(
  #       '--mincon', 
   #      help = 'Minimum identity for fa2clus.py. DEFAULT: 0.2', 
    #     default = 0.2, type = float
     #    )
-    parser.add_argument(
+    clus_opt.add_argument(
         '-l', '--linclust',
         help = 'Cluster large gene sets via mmseqs linclust; DEFAULT: \
                 easy-cluster',
         action = 'store_true'
         )
-    parser.add_argument(
+    clus_opt.add_argument(
         '-a', '--agg_clus',
         help = 'Cluster large gene sets via hierarchical clustering ' \
              + 'NONFUNCTIONAL',
         action = 'store_true'
         ) # NOT IMPLEMENTED
-    parser.add_argument(
+    clus_opt.add_argument(
         '-f', '--fail',
         help = 'Do not fallback to alternative clustering method upon ' \
              + 'failure NONFUNCTIONAL',
         action = 'store_true'
         ) # NOT IMPLEMENTED
-    parser.add_argument('-i', '--iqtree', action = 'store_true', 
+
+
+    phy_opt = parser.add_argument_group('Phylogeny annotation')
+    phy_opt.add_argument(
+        '-p', '--plusminus',
+        help = 'Bases up-/downstream query hits for homolog search; DEFAULT: 20,000',
+        default = 20000, type = int
+        )
+    phy_opt.add_argument(
+        '--conversion',
+        help = 'Tab delimited alternative annotation file: "query,name"'
+        )
+    phy_opt.add_argument('-i', '--iqtree', action = 'store_true', 
         help = 'IQTree2 1000 bootstrap iterations. DEFAULT: fasttree')
-    parser.add_argument(
+    phy_opt.add_argument(
         '--no_outgroup',
         help = 'Do not detect outgroups, do not root trees', 
         action = 'store_true'
         )
-    parser.add_argument(
+    phy_opt.add_argument(
         '--no_midpoint',
         help = 'Do not infer midpoint roots for outgroup failures',
         action = 'store_true'
         )
-    parser.add_argument(
+    phy_opt.add_argument(
         '--no_label',
         help = 'Do not label synteny diagrams',
         action = 'store_true'
         )
-    parser.add_argument(
-        '-g', '--gff',
-        help = 'GFF for non-mycotools locus diagram. Requires -s and a fasta for -i'
-        )
-    parser.add_argument(
+
+    run_opt = parser.add_argument_group('Runtime options')
+    run_opt.add_argument(
         '-o', '--output', 
         help = 'Output base dir - will rerun if previous directory exists'
         )
-    parser.add_argument('-c', '--cpu', default = 1, type = int)
-    parser.add_argument('-v', '--verbose', default = False, action = 'store_true')
+    run_opt.add_argument('-c', '--cpu', default = 1, type = int)
+    run_opt.add_argument('-v', '--verbose', default = False, action = 'store_true')
     args = parser.parse_args()
 
     execs = ['diamond', 'clipkit', 'mafft', 'iqtree']
