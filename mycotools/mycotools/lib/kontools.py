@@ -367,26 +367,15 @@ def collect_files( directory = './', filetype = '*', recursive = False ):
     return filelist
 
 
-def collect_folders( directory, recursive = False ):
+def collect_folders(input_glob, recursive = False):
     '''
     Inputs: directory path, recursive search boolean
     Outputs: list of folders
     Get folders via os, recursively extend output list if True.
     '''
 
-    directory = format_path( directory )
-    folders_prep = os.listdir( directory )
-    folders = [ 
-        directory + '/' + folder + '/' for folder in folders_prep \
-        if os.path.isdir( directory + '/' + folder ) 
-    ]
-
-    if recursive:
-        for folder in folders:
-            folders.extend(collect_folders( folder, recursive ))
-
-    return folders
-
+    in_dirs = glob.glob(input_glob, recursive = recursive)
+    return [dir_ for dir_ in in_dirs if os.path.isdir(dir_)]
 
 def dictSplit( Dict, factor ):
     '''

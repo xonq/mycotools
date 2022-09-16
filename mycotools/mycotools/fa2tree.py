@@ -339,7 +339,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( 
         description = 'Takes in a multifasta, or directory/list of fastas [partition]  ' + \
-        ' aligns (mafft), trims (clipkit), and infers phylogeny (iqtree/fastree).'
+        ' aligns (mafft), trims (clipkit), and infers phylogeny \
+        (iqtree/fastree). When using non-Mycotools fastas for multigene \
+        partition analysis, all accessions must be formatted as \
+        "<GENOME>_<ACCESSION>" and each <GENOME> needs to be in ALL fastas'
         )
 
     io_opt = parser.add_argument_group('Input/Output')
