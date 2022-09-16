@@ -19,8 +19,7 @@ pip install mycotools --upgrade
 
 # INSTALL
 ## Installing miniconda and bioconda
-Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. If you are using the Ohio Supercomputer Center (OSC) you can access conda by creating an environment as described at the top of [this link](https://www.osc.edu/resources/getting_started/howto/howto_add_python_packages_using_the_conda_package_manager). Then proceed to step 2.
-Otherwise, pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered. 
+Miniconda3 is an environment manager, which will give you access to your own python installations and isolate software from eachother. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered. 
 
 ```bash
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/miniconda3.sh
@@ -34,6 +33,11 @@ conda config --add channels conda-forge
 conda config --set channel_priority strict
 ```
 
+```bash
+source activate base # if this fails run conda activate base
+conda init
+```
+
 <br />
 
 ## Installing mycotools
@@ -45,15 +49,14 @@ conda activate mycotools
 ```
 
 NOTE: if you are having trouble on install, run the `conda config` commands
-mentioned above; if you had to run `conda activate base`/`source activate base`
-then you will need to add the respective command to your profile, e.g. `echo
-"<CMD> activate base" >> ~/.bash_profile`, to automatically call conda.
+above
 
 <br />
 
 ## Integrate with installed MycotoolsDB 
 #### OSC
-If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, then simply run this command with the respective path to integrate your installation with the fungal or prokaryote database:
+If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, you can use the preinstalled fungal and prokaryote databases respectively without reinitializing. Otherwise, change the `<PATHS>` to your database administrators path. Initializing databases is covered in the [usage guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md).
+Run this command with the respective path to integrate your installation with the fungal or prokaryote database:
 ```bash
 mtdb --init <PATH>
 ```
