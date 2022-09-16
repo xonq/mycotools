@@ -18,7 +18,7 @@ pip install mycotools --upgrade
 <br />
 
 # INSTALL
-## 1) Install miniconda3
+## Installing miniconda and bioconda
 Miniconda3 is an environment manager that allows you to install your own `python` and isolate it from the system `python`. If you are using the Ohio Supercomputer Center (OSC) you can access conda by creating an environment as described at the top of [this link](https://www.osc.edu/resources/getting_started/howto/howto_add_python_packages_using_the_conda_package_manager). Then proceed to step 2.
 Otherwise, pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered. 
 
@@ -27,29 +27,31 @@ curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/m
 bash ~/miniconda3.sh
 ```
 
-Restart your shell and create a new conda environment; `(base)` should appear
-in your shell:
 ```bash
-conda create -n mycotools python=3.8
+conda config --add channels defaults
+conda config --add channels bioconda
+conda config --add channels conda-forge
+conda config --set channel_priority strict
+```
+
+<br />
+
+## Installing mycotools
+Restart your shell and create a new conda environment; `(base)` should appear
+in your shell (if not, try `conda activate base` or `source activate base`):
+```bash
+conda create -n mycotools mycotools -c xonq
 conda activate mycotools
 ```
 
-<br />
-
-## 2) Install Mycotools
-With your environment activated (`(mycotools)` should appear in your shell):
-```bash
-pip install mycotools
-```
-
-To upgrade to the latest version:
-```bash
-pip install mycotools --upgrade
-```
+NOTE: if you are having trouble on install, run the `conda config` commands
+mentioned above; if you had to run `conda activate base`/`source activate base`
+then you will need to add the respective command to your profile, e.g. `echo
+"<CMD> activate base" >> ~/.bash_profile`, to automatically call conda.
 
 <br />
 
-## 3) Integrate with installed MycotoolsDB 
+## Integrate with installed MycotoolsDB 
 #### OSC
 If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, then simply run this command with the respective path to integrate your installation with the fungal or prokaryote database:
 ```bash
@@ -69,20 +71,17 @@ MycotoolsDB will be available September, 2022.
 ### A NOTE ON THE CODE
 Each standalone script is written with `__name__ == '__main__'`, designed to
 handle running the script from the command line, as well as `main` function(s),
-which are importable modules that run the analysis. This enables Mycotools
+which are importable modules executing the purpose of the script. This enables Mycotools
 to be a pipelining-friendly software suite, both from a command line and
 python scripting standpoint,  while also emphasizing the Unix
 philosophy for each script to *do one thing and do it well*. 
 
 I *primarily* abide by the [functional
-programming paradigm](https://docs.python.org/3/howto/functional.html), i.e. I avoid implicit state changes and my code seldom incorporates novel classes.
-I am not a purist, as you will find the `mtdb` class for the 
-Mycotools Database objects (in the future there will be several more classes),
-but only because it is 1) used frequently, 2) requires rigid formatting, and 3) *needs
-specific manipulations* that are cumbersome in default classes alone. 
-*I will continue functional programming*, striving to format 
-in accord with PEP-8 with minimal deviance - while there is still work to be done any code edits should 
-favor the functional paradigm, unless a demonstrated need for a class (above) exists.
+programming paradigm](https://docs.python.org/3/howto/functional.html).
+I only create new class objects if 1) used frequently, 2) requires rigid formatting, 
+and 3) *needs specific manipulations* that are cumbersome in default classes alone. 
+Any code edits should follow this guideline and implement the functional paradigm.
+
 
 <img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
 
