@@ -367,7 +367,7 @@ def collect_files( directory = './', filetype = '*', recursive = False ):
     return filelist
 
 
-def collect_folders(input_glob, recursive = False):
+def collect_dirs(input_glob, recursive = False):
     '''
     Inputs: directory path, recursive search boolean
     Outputs: list of folders
