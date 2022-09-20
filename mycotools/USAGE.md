@@ -226,9 +226,9 @@ First, generate a predb spreadsheet:
 predb2db.py > predb.tsv
 ```
 
-The resulting `predb.tsv` can be filled in via spreadsheet software and exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and separate by tabs. De novo annotations produced by Funannotate/Orthofiller must be filled in as "new" for the genomeSource column. If using a plain-text editor, export with UTF-8 formatting and account for blank entries with a tab.
+The resulting `predb.tsv` can be filled in via spreadsheet software and exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and separate by tabs. De novo annotations produced by Funannotate/Orthofiller must be filled in as "new" for the genomeSource column; *annotations directly derived from NCBI/JGI data need to be specified in genomeSource.
 
-Finally, generate a mycotoolsDB file from your predb, and notify your database manager that it is ready for integration:
+Finally, generate a mycotoolsDB file from your completed predb, and notify your database manager that it is ready for integration:
 ```bash
 predb2db.py <PREDB.TSV>
 ```
