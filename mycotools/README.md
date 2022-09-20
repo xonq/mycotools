@@ -10,6 +10,14 @@ If Mycotools contribute to your analysis, please cite this git repository (gitla
 
 <br />
 
+# UPDATING
+Mycotools is currently in an advanced beta state with frequent updates. It is
+recommended to run the following in your conda environment before analyses:
+
+```bash
+conda update mycotools -c xonq
+```
+
 # INSTALL
 ## Installing miniconda
 Miniconda3 is a software environment manager. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`).
