@@ -409,7 +409,7 @@ Extract coordinates from antisense strand: coords2fa.py test.fna scaffold_20 69 
 
 
 Bulk extraction tab delimitted row format:
-fasta   sequence_id     start_coordinate        end_coordinate  strand_sense
+#fasta_path   sequence_id     start_coordinate        end_coordinate  strand_sense
 
 coords2fa.py coords.tsv
 ```
