@@ -50,7 +50,7 @@ how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-
 	- [MycotoolsDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
 	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#tree-building)
 	- [Sequence clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-clustering)
-    - [Gene cluster phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crappy)
+	- [Gene cluster phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crappy)
 
 
 <br />
@@ -625,25 +625,32 @@ fa2clus.py -f <FASTA> -m 0.2 -x 0.3 --iterative <FOCAL_GENE> --minseq 50 --maxse
 src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
 alt="Extracted clade of CRAP pipeline" height="450" width="578">
 
-CRAP (originally created by Jason Slot) is a simple, elegant pipeline for
-studying the evolution of a gene cluster on a gene-by-gene basis. CRAP 
-will 1) input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
-or orthogroup-based approach to find homologs in the MycotoolsDB; 2) 
-implement sequence similarity clustering to truncate the sequence set 
-and detect outgroups; 3) construct phylogenies of each query sequence; and 
-4) map locus synteny diagrams  onto the leaves of the phylogenies.
+CRAP, adopted and expanded from [Slot & Rokas implementation](https://doi.org/10.1016/j.cub.2010.12.020)),
+reconstructs and visualizes gene cluster phylogenies to study gene cluster
+evolution on a gene-by-gene basis. CRAP will: 
+
+1) input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
+or orthogroup-based approach to find homologs in the MycotoolsDB
+
+2) implement sequence similarity clustering to truncate the sequence set 
+and detect outgroups
+
+3) construct phylogenies of each query sequence
+
+4) map locus synteny diagrams onto the tips of the phylogenies.
 
 `crap.py` can operate on a query of MycotoolsDB accessions or a standalone
 multifasta input of external accessions. Following homolog acquisition,
-`crap.py` will submit each set of hits for tree building or hierarchical 
-agglomerative clustering if the number of sequences exceeds the inputted maximum 
+`crap.py` will submit each set of hits for tree building or sequence similarity
+clustering if the number of sequences exceeds the inputted maximum 
 (`-m`).
 
-By default, `crap.py` will construct trees using fasttree. Fasttree is usually
+By default, `crap.py` will construct trees using fasttree. Fasttree is often
 sufficient to get an idea of how the cluster is evolving because CRAP builds
 phylogenies for all query genes within a cluster, so congruent topology across
-different genes is a good window into the evolution. Alternatively, CRAP can
-also construct a robust IQ-TREE 1000 boostrap iterations by specifying `-i`/`--iqtree`.
+different genes is corroborative. Alternatively, CRAP can
+also construct a robust IQ-TREE with 1000 boostrap iteration support values
+by specifying `-i`/`--iqtree`.
 
 <br />
 
