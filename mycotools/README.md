@@ -18,6 +18,8 @@ recommended to run the following in your conda environment before analyses:
 conda update mycotools -c xonq
 ```
 
+<br />
+
 # INSTALL
 ## Installing miniconda
 Miniconda3 is a software environment manager. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`).
@@ -26,6 +28,13 @@ Miniconda3 is a software environment manager. Pay attention to the installation 
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/miniconda3.sh
 bash ~/miniconda3.sh
 ```
+
+Activate miniconda and initialize it so it starts up automatically
+```bash
+source activate base # if this fails run conda activate base
+conda init
+```
+
 
 <br />
 
@@ -40,16 +49,12 @@ conda config --add channels conda-forge
 conda config --set channel_priority strict
 ```
 
-```bash
-source activate base # if this fails run conda activate base
-conda init
-```
-
 <br />
 
 ## Installing mycotools
-Restart your shell and create a new conda environment; `(base)` should appear
-in your shell (if not, try `conda activate base` or `source activate base`):
+Create a new conda environment; `(base)` should appear
+in your shell before running - if not, try `conda activate base` or `source activate base`.
+
 ```bash
 conda create -n mycotools mycotools -c xonq
 conda activate mycotools
@@ -57,7 +62,7 @@ mtdb -d
 ```
 
 NOTE: if you are having trouble on install, run the `conda config` commands
-above. To upgrade, run `conda update mycotools`.
+above
 
 <br />
 
@@ -84,14 +89,11 @@ Each standalone script is written with `__name__ == '__main__'`, designed to
 handle running the script from the command line, as well as `main` function(s),
 which are importable modules executing the purpose of the script. This enables Mycotools
 to be a pipelining-friendly software suite, both from a command line and
-python scripting standpoint,  while also emphasizing the Unix
-philosophy for each script to *do one thing and do it well*. 
+python scripting standpoint.
 
 I *primarily* abide by the [functional
 programming paradigm](https://docs.python.org/3/howto/functional.html).
-I only create new class objects if 1) used frequently, 2) requires rigid formatting, 
-and 3) *needs specific manipulations* that are cumbersome in default classes alone. 
-Any code edits should follow this guideline and implement the functional paradigm.
+Furthermore, I only create new class objects if a task *needs specific manipulations* that are cumbersome in default classes alone. Any code edits should follow this guideline and adhere to the functional paradigm i.e. no hidden state changes.
 
 
 <img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
