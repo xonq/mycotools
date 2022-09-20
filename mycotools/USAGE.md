@@ -153,7 +153,7 @@ to extract based on taxonomy.
 
 ## Creating modular databases
 ### extractDB.py
-If you are only interested in a subset of lineages in the master mycotoolsDB, then extract the portion you want, run `extractDB.py -h` to see all options:
+If you are only interested in a subset of lineages in the master mycotoolsDB, then extract the portion you want. By default, this script will ignore use-restricted data - run `-n` to include if you are aware of and will respect the limitations of use-restricted data. Run `extractDB.py -h` to see all options.
 
 e.g. grab a database of a taxonomic order: 
 ```bash
@@ -165,48 +165,31 @@ grab all NCBI Aspergilli accessions:
 extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.mtdb_ncbi
 ``` 
 
-grab the inverse of your arguments: 
-```bash
-extractDB.py -s ncbi -l aspergillus -r genus -i > notAspergullis.mtdb_notNcbi
-```
-
 grab a list of orders from a file:
 ```bash
 extractDB.py -ll <TAX_FILE> -r order > taxa.mtdb
 ```
 
-grab a list of `ome`s in a new line delimited file: 
 ```bash
-extractDB.py ---ome <OME_FILE>
-```
+Extracts a MycotoolsDB from arguments. E.g. `extractDB.py -l Atheliaceae -r family`
 
-```bash
-extractDB.py --help
-usage: extractDB.py [-h] [-d DATABASE] [-l LINEAGE] [-r RANK] [-s SOURCE] [-n]
-                    [-u] [--unique_strains] [-i] [--headers] [-o OUTPUT] [-]
-                    [-ol OME] [-ll LINEAGES]
-
-Extracts a MycotoolsDB from arguments. E.g. `extractDB.py -l Atheliaceae -r
-family`
-
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -d DATABASE, --database DATABASE
-                        DEFAULT: masterdb
   -l LINEAGE, --lineage LINEAGE
   -r RANK, --rank RANK  Taxonomy rank
   -s SOURCE, --source SOURCE
-                        Data source
-  -n, --nonpublished    Include restricted-use
-  -u, --unique          Unique species
-  --unique_strains
-  -i, --inverse         Inverse arguments
-  --headers             Include header
-  -o OUTPUT, --output OUTPUT
-  -, --stdin            Pipe MycotoolsDB from stdin
+  -n, --nonpublished    Include restricted
+  -u, --unique_strain
+  -a ALLOWED_SP, --allowed_sp ALLOWED_SP
+                        Replicate species allowed
+  -i, --inverse         Inverse [source|lineage(s)|nonpublished]
   -ol OME, --ome OME    File w/list of omes
   -ll LINEAGES, --lineages LINEAGES
                         File w/list of lineages (same rank)
+  --headers
+  -, --stdin
+  -d MTDB, --mtdb MTDB
+  -o OUTPUT, --output OUTPUT
 ```
 
 <br /><br />
@@ -610,27 +593,26 @@ View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 
 ## Sequence clustering
 ### fa2clus.py
-Some gene families (e.g. P450s) yield 10,000s of results for BLAST searches against the
-MycotoolsDB. `fa2clus.py` allows the user to truncate these sets without constructing a
-phylogeny by clustering via hierarchical agglomerative clustering, or linclust. 
-`fa2clus.py` optionally implements an automated iterative approach to obtaining a 
-cluster of minimum - maximum size
-with the gene of interest.
+Some gene families (e.g. P450s) yield many results when searching across a large set
+of genomes. `fa2clus.py` allows the user to truncate these sets to closely related homologs 
+without constructing a phylogeny. `fa2clus.py` optionally implements an automated iterative 
+approach to obtaining a cluster of minimum - maximum size with the gene of interest. `fa2clus.py`
+implements mmseqs cluster, mmseqs linclust, and hierarchical agglomerative clustering.
 
 For hierarchical agglomerative clustering: `fa2clus.py` will either take a `fasta` and generate a distance matrix using 
 `usearch calc_distmx` by default or the % identity of `diamond` alignments.
 Then, cluster sequences via hierarchical agglomerative clustering and output a
 `.clus` file of cluster assignments and `.newick` dendrogram. 
 
-Linear time cluster `linclust` a fasta with a minimum percent identity of 70%
-and minimum query coverage 20%:
+To run `mmseqs cluster` on a faster with minimum 20% query coverage and minimum 30% AA identity
+
 ```bash
-fa2clus.py -f <FASTA>.fa -m 0.2 -x 0.7 -l
+fa2clus.py -f <FASTA>.fa -m 0.2 -x 0.3
 ```
 
 Iteratively cluster until a cluster size of 50-200 genes is achieved:
 ```bash
-fa2clus.py -f <FASTA> -l -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 200
+fa2clus.py -f <FASTA> -m 0.2 -x 0.3 --iterative <FOCAL_GENE> --minseq 50 --maxseq 200
 ```
 
 <br /><br />
@@ -641,20 +623,15 @@ fa2clus.py -f <FASTA> -l -m 0.2 -x 0.7 --iterative <GENE> --minseq 50 --maxseq 2
 
 <img align="left"
 src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
-alt="Extracted clade of CRAP pipeline" height="550" width="707">
+alt="Extracted clade of CRAP pipeline" height="450" width="578">
 
-CRAP (adopted and expanded from [Slot & Rokas
-implementation](https://doi.org/10.1016/j.cub.2010.12.020)) reconstructs
-and visualizes gene cluster phylogenies to study gene cluster evolution on a gene-by-gene basis. CRAP 
-will: 
--   - Input a cluster/locus query and use a search algorithm (BLAST/mmseqs/Diamond)
-or orthogroup-based approach to find homologs in the MycotoolsDB; 
--   - Implement sequence similarity clustering to truncate the sequence set 
-and detect outgroups; 
--   - Construct phylogenies of each query sequence; and 
--   - Map locus synteny diagrams onto the tips of the phylogenies.
-
-<br />
+CRAP (originally created by Jason Slot) is a simple, elegant pipeline for
+studying the evolution of a gene cluster on a gene-by-gene basis. CRAP 
+will 1) input a cluster query and use a search algorithm (BLAST/mmseqs/Diamond)
+or orthogroup-based approach to find homologs in the MycotoolsDB; 2) 
+implement sequence similarity clustering to truncate the sequence set 
+and detect outgroups; 3) construct phylogenies of each query sequence; and 
+4) map locus synteny diagrams  onto the leaves of the phylogenies.
 
 `crap.py` can operate on a query of MycotoolsDB accessions or a standalone
 multifasta input of external accessions. Following homolog acquisition,
@@ -662,16 +639,13 @@ multifasta input of external accessions. Following homolog acquisition,
 agglomerative clustering if the number of sequences exceeds the inputted maximum 
 (`-m`).
 
-<br />
-
 By default, `crap.py` will construct trees using fasttree. Fasttree is usually
 sufficient to get an idea of how the cluster is evolving because CRAP builds
 phylogenies for all query genes within a cluster, so congruent topology across
 different genes is a good window into the evolution. Alternatively, CRAP can
-also construct 1000 bootstrap iterations
-of IQTree with the ModelFinder module by specifying `-i`/`--iqtree`.
+also construct a robust IQ-TREE 1000 boostrap iterations by specifying `-i`/`--iqtree`.
 
-<br/>
+<br />
 
 To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
 ```bash
@@ -679,47 +653,51 @@ extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
 crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
 ```
 
-<br />
-
 ```bash
 Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
 
 optional arguments:
   -h, --help            show this help message and exit
+
+Inputs:
   -q QUERY, --query QUERY
-                        Fasta or white-space delimited file/string of cluster genes
-  -d DATABASE, --database DATABASE
+                        Fasta, white-space delimited file/string of cluster genes, "-" for stdin
+  -d MTDB, --mtdb MTDB
+  -g GFF, --gff GFF     GFF for non-mycotools locus diagram. Requires -q fasta input
+
+Homolog inference:
   -s SEARCH, --search SEARCH
                         Search binary {mmseqs, diamond, blastp} for search-based CRAP
   -b BITSCORE, --bitscore BITSCORE
                         Bitscore minimum for search algorithm. DEFAULT: 30
   -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
                         MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
+
+Phylogeny size management:
+  --minseq MINSEQ       Min sequences for trees/cluster size; DEFAULT: 3
+  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py; DEFAULT: 250
+  -l, --linclust        Cluster large gene sets via mmseqs linclust; DEFAULT: easy-cluster
+  -a, --agg_clus        Cluster large gene sets via hierarchical clustering NONFUNCTIONAL
+  -f, --fail            Do not fallback to alternative clustering method upon failure NONFUNCTIONAL
+
+Phylogeny annotation:
   -p PLUSMINUS, --plusminus PLUSMINUS
                         Bases up-/downstream query hits for homolog search; DEFAULT: 20,000
   --conversion CONVERSION
                         Tab delimited alternative annotation file: "query,name"
-  --minseq MINSEQ       Min sequences for trees/cluster size; DEFAULT: 3
-  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py; DEFAULT: 250
-  -l, --linclust        Cluster large gene sets via mmseqs linclust; fastest, less sensitive
-  -a, --agg_clus        Cluster large gene sets via hierarchical clustering NONFUNCTIONAL
-  -f, --fail            Do not fallback to alternative clustering method upon failure NONFUNCTIONAL
   -i, --iqtree          IQTree2 1000 bootstrap iterations. DEFAULT: fasttree
   --no_outgroup         Do not detect outgroups, do not root trees
   --no_midpoint         Do not infer midpoint roots for outgroup failures
   --no_label            Do not label synteny diagrams
-  -g GFF, --gff GFF     GFF for non-mycotools locus diagram. Requires -s and a fasta for -i
+
+Runtime options:
   -o OUTPUT, --output OUTPUT
                         Output base dir - will rerun if previous directory exists
   -c CPU, --cpu CPU
   -v, --verbose
 ```
 
-
-
-
 <br /><br /><br />
-
 
 # Mycotools Pipelines
 ## Shell Pipelining with Mycotools
@@ -799,58 +777,6 @@ extractDB.py > pub.mtdb
 2. obtain gene homologs using `db2search.py` with an e-value threshold of 10<sup>-2</sup>:
 
 ```bash
-db2search.py -q <QUERYGENE.fasta> -b blastp -e 2 -d pub.mtdb
-```
-
-<br />
-
-3. `db2search.py` created a directory with fasta results. obtain the number of
-genes recovered from the analysis:
-
-```bash
-grep '>' <RESULTS.fasta> | wc -l
-```
-
-<br />
-
-4a. If there are fewer than 10,000 sequences you can proceed directly to robust tree
-building. Otherwise, proceed to the `b` steps. If the sample size is too large
-to finish the analysis, specify `--fast` below. 
-
-```bash
-fa2tree.py -f <BLASTRESULTS.fasta> -s -A
-<PROJECT>
-```
-
-<br />
-
-5a. `fa2tree.py` created a directory, now submit the job
-
-```bash
-sbatch <TREEDIRECTORY>/mafft.sh
-```
-
-<br />
-
-6a. Download the tree (usually `*.contree` for iqtree). Open
-the tree in [figtree](https://github.com/rambaut/figtree/releases). If the
-dataset is too big, identify a highly supported node (no less than 95, ideally
-100), containing your sequences of interest. Change to tip mode at the top of
-the program, click on the node, and copy the sequences highlighted into a plain
-text file. Then, restart the phylogenetic reconstruction by obtaining the
-sequences using `acc2fa.py` and restarting 4a with the output fasta.
-
-```bash
-acc2fa.py -i <FILEWITHACCESSIONS>
-```
-
-<br />
-
-4b. If there are greater than 10,000 sequences, trees - even fasttrees can be
-intractable at this quantity. Therefore, try clustering. Adjust the % identity for both arguments as needed. You may need to
-submit this as a job
-
-```bash
 fa2clus.py -f <FASTA>.fa -m 0.3 -x 0.7 -l
 ```
 
@@ -865,8 +791,6 @@ select the clade of interest as described in step 6a.
 
 6b. Repeat the analysis at step 4a until a final phylogeny is obtained.
 
-
-
 <img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
 
 <br /><br /><br /><br /><br /><br /><br /><br /><br />
@@ -875,7 +799,7 @@ select the clade of interest as described in step 6a.
 - [ ] add ncbiAcc2fa
 - [ ] separate better/organize into wiki
 - [x] document clinker pipeline
-- [ ] add images of pipeline output
+- [x] add images of pipeline output
 - [ ] fa2hmmer2fa annotation
 - [x] update crap information
 - [ ] eggnog to synteny diagram
