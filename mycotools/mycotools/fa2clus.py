@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED an option to run iterative for larger-than sets on the subset generated
+    # by the larger than clustering step
 # NEED to try MCL using the binary
 # NEED to make outgroup detection within the bounds of maximum sequences, optional to do so
     # NEEDs heavy optimization in general

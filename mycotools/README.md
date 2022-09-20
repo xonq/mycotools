@@ -10,21 +10,20 @@ If Mycotools contribute to your analysis, please cite this git repository (gitla
 
 <br />
 
-# UPDATE
-```
-pip install mycotools --upgrade
-```
-
-<br />
-
 # INSTALL
-## Installing miniconda and bioconda
-Miniconda3 is an environment manager, which will give you access to your own python installations and isolate software from eachother. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`- make sure to include `miniconda3`). This keeps your home folder from getting cluttered. 
+## Installing miniconda
+Miniconda3 is a software environment manager. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`).
 
 ```bash
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/miniconda3.sh
 bash ~/miniconda3.sh
 ```
+
+<br />
+
+## Setting up miniconda
+Setup and prioritize channels for your miniconda installation. This step must be
+completed for new and old installs.
 
 ```bash
 conda config --add channels defaults
@@ -46,11 +45,11 @@ in your shell (if not, try `conda activate base` or `source activate base`):
 ```bash
 conda create -n mycotools mycotools -c xonq
 conda activate mycotools
-mtdb -u
+mtdb -d
 ```
 
 NOTE: if you are having trouble on install, run the `conda config` commands
-above
+above. To upgrade, run `conda update mycotools`.
 
 <br />
 

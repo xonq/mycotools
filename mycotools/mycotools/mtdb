@@ -31,7 +31,7 @@ if __name__ == '__main__':
         + '\n[-i DBPATH]\t[--init]       \tInitialize MTDB connection' \
         + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
         + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
-        + '\n[-u]\t\t[--update]    \tUpdate dependencies'
+        + '\n[-d]\t\t[--dependency]\tInstall/update dependencies'
     set_argv = set(sys.argv)
     if {'-h', '--help'}.intersection(set_argv):
         print('\n' + description + '\n', flush = True)
@@ -60,7 +60,7 @@ if __name__ == '__main__':
         except IndexError:
             raise ValueError('--init requires a path')
         mtdb_initialize(mycodb_loc)
-    elif {'-u', '--update'}.intersection(set_argv):
+    elif {'-d', '--dependencies'}.intersection(set_argv):
         pip_deps = ['dna_features_viewer']
         dep_cmds = [['conda', 'install', '-c', '-y', 'jlsteenwyk', 'clipkit'],
                     ['python3', '-m', 'pip', 'install', ' '.join(pip_deps)]]
@@ -69,7 +69,7 @@ if __name__ == '__main__':
             if cmd:
                 print('\nUPDATE failed. Exit ' + str(dep_cmd))
                 sys.exit(cmd)
-    elif {'-f', '--fungal'}.intersection(set_argv):
+    elif {'-f', '--fungi'}.intersection(set_argv):
         if '-f' in set_argv:
             coord = '-f'
         else:

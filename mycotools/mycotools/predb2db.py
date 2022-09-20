@@ -9,7 +9,7 @@ import multiprocessing as mp
 from collections import Counter, defaultdict
 from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
-    gff3Comps, gff2Comps
+    gff3Comps, gff2Comps, gtfComps
 from mycotools.lib.dbtools import mtdb, masterDB, loginCheck
 from mycotools.curAnnotation import main as curRogue
 from mycotools.utils.curGFF3 import main as curGFF3
@@ -222,6 +222,8 @@ def gen_omes(
     refdb_aas = refdb.set_index('assembly_acc')
     refdb_accs = set([x for x in list(refdb['assembly_acc']) if x])
     refdb_omes = set([x for x in list(refdb['ome'])])
+    refdb_nover = {re.sub(r'(^.{6}\d+)\.\d+', r'\1', x): x \
+                   for x in list(refdb['ome'])}
     for i, ome in enumerate(newdb['ome']):
         if not ome: # if there isn't an ome for this entry yet
             if newdb['assembly_acc'][i] in refdb_accs: # if this is an
@@ -281,6 +283,17 @@ def gen_omes(
                     new_ome = ome + '.1' # first modified version
                 eprint(spacer + ome + ' update -> ' + new_ome, flush = True)
                 newdb['ome'][i] = new_ome
+            elif ome in refdb_nover: # has a version, wasn't given in predb
+                version_ome = refdb_nover[ome]
+                v_search = re.search(r'\.(\d+)$', version_ome[6:])
+                if v_search:
+                    v = int(v_search[1]) + 1 # new version
+                    new_ome = ome + '.' + str(v)
+                else:
+                    raise TypeError('unknown error ' + ome)
+                eprint(spacer + ome + ' update -> ' + new_ome, flush = True)
+                newdb['ome'][i] = new_ome
+                    
 
     for i in reversed(todel):
         for key in mtdb.columns:
@@ -289,12 +302,26 @@ def gen_omes(
     return newdb, t_failed
 
 def cur_fna(cur_raw_fna_path, uncur_raw_fna_path, ome):
+    ome_ver = re.search(r'(.{6}\d+).(\d+)$', ome)
+    if ome_ver:
+        less_ome = ome_ver[1]
+        ver_num = ome_ver[2]
+    else:
+        less_ome = ome
+        ver_num = 0
     with open(cur_raw_fna_path + '.tmp', 'w') as out:
         with open(uncur_raw_fna_path, 'r') as in_:
             for line in in_:
                 if line.startswith('>'):
                     if not line.startswith('>' + ome + '_'):
-                        out.write('>' + ome + '_' + line[1:])
+                        if re.search(r'^>' + less_ome + '_', line) is not None:
+                            new_line = line.replace('>' + less_ome + '_', '>' + ome + '_')
+                        elif re.search(r'^>' + less_ome + r'\.\d+_', line) is not None:
+                            new_line = re.sub(r'^>' + less_ome + r'\.\d+_', '>' + ome + '_',
+                                              line)
+                        else:
+                            new_line = '>' + ome + '_' + line[1:]
+                        out.write(new_line)
                     else: # already curated
                         out.write(line)
                 else:
@@ -316,11 +343,11 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
         try:
             uncur_fna_path = move_biofile(raw_fna_path, ome, 'fa', wrk_dir + 'fna/',
                                       suffix = '.uncur')
-        except IOError:
+        except IOError as ie:
             eprint(spacer + ome + '|' + assembly_accession \
                  + ' failed FNA parsing', flush = True)
             if exit:
-                raise IOError
+                raise ie from None
             return ome, False, 'fna'
         cur_fna(cur_fna_path, uncur_fna_path, ome)
 
@@ -332,9 +359,11 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
         try:
             uncur_gff_path = move_biofile(raw_gff_path, ome, 'gff3', 
                                           wrk_dir + 'gff3/', suffix = '.uncur')
-        except IOError:
+        except IOError as ie:
             eprint(spacer + ome + '|' + assembly_accession \
                  + ' failed GFF3 parsing', flush = True)
+            if exit:
+                raise ie from None
             return ome, False, 'gff3'
     
         gff = gff2list(uncur_gff_path)
@@ -344,7 +373,7 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
             eprint(spacer + ome + '|' + assembly_accession \
                 + ' failed GFF3 curation', flush = True)
             if exit:
-                raise e
+                raise e from None
             return ome, False, 'gff3'
 
     # proteome FAAs
@@ -388,9 +417,20 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
         if re.search(gff3Comps()['id'], entry['attributes']):
             gffVer = 3
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])
-            break
+            if alias is not None:
+                if entry['seqid'].startswith(ome + '_'):
+                    alias = True
+                else:
+                    alias = False # remove the old aliases
+                    entry['attributes'] = re.sub(r'Alias=[^;]+', '',
+                                                entry['attributes'])
+            else:
+                break
         elif re.search(gff2Comps()['id'], entry['attributes']):
             gffVer = 2
+            break
+        elif re.search(gtfComps()['id'], entry['attributes']):
+            gffVer = 2.5
             break
 
     if gffVer == 3:
@@ -406,13 +446,30 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                         entry['attributes']
                         )
             else:
-                gff, trans_str, failed, flagged = curRogue(gff, ome,
-                                                           cur_seqids = True)
+                gff, trans_str, failed, flagged = curRogue(gff, ome)
         else:
             gff = curGFF3(gff, ome, cur_seqids = True)
+    elif gffVer == 2.5:
+        gff, trans_str, failed, flagged = curRogue(gff, ome)
     else:
-        gff = gff2gff3(gff, ome, assembly_accession, verbose = False,
-                       cur_seqids = True)
+        gff = gff2gff3(gff, ome, assembly_accession, verbose = False)
+
+    ver_search = re.search(r'(.{6}\d+)\.(\d+)', ome)
+    if ver_search is not None:
+        less_ome = ver_search[1]
+        ome_ver = ver_search[2]
+    else:
+        less_ome = ome
+    for line in gff:
+        seqid = line['seqid']
+        if seqid.startswith(less_ome + '_'):
+            line['seqid'] = re.sub(r'^' + less_ome + '_', 
+                                 ome + '_', seqid)
+        elif re.search(r'^' + less_ome + r'\.\d+_', seqid):
+            line['seqid'] = re.sub(r'^' + less_ome + r'[^_]+_', 
+                                 ome + '_', seqid)
+        else:
+            line['seqid'] = ome + '_' + seqid
 
     with open(cur_path + '.tmp', 'w') as out:
         out.write(list2gff(gff))
@@ -497,7 +554,6 @@ if __name__ == '__main__':
     eprint('\nPreparing run', flush = True)
     predb = read_predb(format_path(sys.argv[1]), spacer = '\t')
     out_dir, wrk_dir = prep_output(os.path.dirname(format_path(sys.argv[1])))
-
 
     omedb, failed = main(predb, refDB, wrk_dir, exit = exit, verbose = True)
 

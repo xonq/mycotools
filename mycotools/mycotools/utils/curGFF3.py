@@ -266,8 +266,7 @@ def acquireFormat( gff_list ):
                 return 'misc_gff3'
     return None
 
-def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
-                 cur_seqids = False):
+def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps()):
 
     genes, pseudogenes, rnas = [], [], {}
     mrnas = defaultdict(list) 
@@ -298,8 +297,6 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
     id_dict, pseudogenes = {}, set(pseudogenes)
     if cur_seqids:
         for i, entry in enumerate(cur_list):
-            if not entry['seqid'].startswith(ome + '_'):
-                entry['seqid'] = ome + '_' + entry['seqid']
             if 'gene' in entry['type']:
                 id_ = re.search(comps['id'], entry['attributes'])[1]
                 id_dict[id_] = {}

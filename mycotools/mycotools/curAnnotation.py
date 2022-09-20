@@ -621,7 +621,7 @@ def addExons( gff ):
     return gff
 
 
-def main(gff_path, prefix, fail = True, cur_seqids = False):
+def main(gff_path, prefix, fail = True):
 
     if isinstance(gff_path, str):
         gff = gff2list(gff_path)
@@ -645,10 +645,6 @@ def main(gff_path, prefix, fail = True, cur_seqids = False):
     crude_sort = sorted( unsortedGff, key = lambda x: \
         int( re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1] ))
     gff = sortGFF(crude_sort, re.compile(gff3Comps()['Alias']))
-    if cur_seqids:
-        for entry in gff:
-            if not entry['seqid'].startswith(prefix + '_'):
-                entry['seqid'] = prefix + '_' + entry['seqid']
 
     return gff, trans_str, failed, flagged
 
