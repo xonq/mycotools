@@ -10,7 +10,7 @@ If Mycotools contribute to your analysis, please cite this git repository (gitla
 
 <br />
 
-# UPDATING
+# UPDATE
 Mycotools is currently in an advanced beta state with frequent updates. It is
 recommended to run the following in your conda environment before analyses:
 
@@ -21,7 +21,7 @@ conda update mycotools -c xonq
 <br />
 
 # INSTALL
-## Installing miniconda
+## 1. Installing miniconda
 Miniconda3 is a software environment manager. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`).
 
 ```bash
@@ -38,7 +38,7 @@ conda init
 
 <br />
 
-## Setting up miniconda
+## 2. Setting up miniconda
 Setup and prioritize channels for your miniconda installation. This step must be
 completed for new and old installs.
 
@@ -51,7 +51,7 @@ conda config --set channel_priority strict
 
 <br />
 
-## Installing mycotools
+## 3. Installing mycotools
 Create a new conda environment; `(base)` should appear
 in your shell before running - if not, try `conda activate base` or `source activate base`.
 
@@ -66,7 +66,7 @@ above
 
 <br />
 
-## Integrate with installed MycotoolsDB 
+## 4. Integrate with installed MycotoolsDB 
 #### OSC
 If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, you can use the preinstalled fungal and prokaryote databases respectively without reinitializing. Otherwise, change the `<PATHS>` to your database administrators path. Initializing databases is covered in the [usage guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md).
 Run this command with the respective path to integrate your installation with the fungal or prokaryote database:
