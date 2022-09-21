@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-# NEED to implement multigene phylogeny
+# NEED to implement different alignment types on the checking for concat step
 # NEED to implement fa2clus?
 
 import os
@@ -54,7 +54,7 @@ def mafftRun(fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t'):
 
 def trimRun(mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
 
-    name2 = os.path.basename(os.path.abspath(re.sub( r'\.mafft$', '.clipkit', mafft)))
+    name2 = mafft + '.clipkit'
     cmd = ['clipkit', mafft, '--output', out_dir + '/' + name2]
     if not hpc:
 
@@ -173,7 +173,7 @@ def main(
     fasta_path, slurm = False, torque = False, fast = False, project = '', 
     output_dir = None, verbose = True, alignment = False, mem = '60GB', cpus = 1,
     spacer = '\t\t', align_stop = False, tree_stop = False, 
-    flag_incomplete = True
+    flag_incomplete = True, start = start
     ):
 
     hpc = False
@@ -212,23 +212,23 @@ def main(
                 if not os.path.isdir(output_dir):
                     os.mkdir(output_dir)
                 out_dir = format_path(output_dir)
-            fastas = collect_files(fasta_path, 'fa')
-            fastas.extend(collect_files(fasta_path, 'faa'))
-            fastas.extend(collect_files(fasta_path, 'fna'))
-            fastas.extend(collect_files(fasta_path, 'fasta'))
-            fastas.extend(collect_files(fasta_path, 'fsa'))
-            if prealigned:
-                fastas.extend(collect_files(fasta_path, 'mafft'))
-                fastas.extend(collect_files(fasta_path, 'clipkit'))
+            files = collect_files(fasta_path, 'x')
+#            fastas.extend(collect_files(fasta_path, 'faa'))
+ #           fastas.extend(collect_files(fasta_path, 'fna'))
+  #          fastas.extend(collect_files(fasta_path, 'fasta'))
+   #         fastas.extend(collect_files(fasta_path, 'fsa'))
+  #          if prealigned:
+#                fastas.extend(collect_files(fasta_path, 'mafft'))
+  #              fastas.extend(collect_files(fasta_path, 'clipkit'))
                 check_fas = set(fastas)
                 new_fas = []
-                for fa in fastas:
-                    if fa + '.clipkit' not in check_fas:
-                        if fa + '.mafft' not in check_fas:
+                for f in files:
+                    if f + '.mafft.clipkit' not in check_fas:
+                        if f + '.mafft' not in check_fas:
                             new_fas.append(fa)
                 fastas = new_fas
     elif len(fasta_path) > 1:
-        vprint('\nMultiple fastas inputted, partition analysis mode',
+        vprint('\nMultiple files inputted, partition analysis mode',
                v = verbose, flush = True)
         partition = True
         if not output_dir:
@@ -237,23 +237,23 @@ def main(
             if not os.path.isdir(output_dir):
                 os.mkdir(output_dir)
             out_dir = format_path(output_dir)
-        fastas = [format_path(x) for x in fasta_path]
+        files = [format_path(x) for x in fasta_path]
 
     if partition: #multigene partition mode
         ome2fa2gene = defaultdict(dict)
         complete_omes = []
-        for fasta in fastas:
-            fa_dict = fa2dict(fasta)
+        for f in file:
+            fa_dict = fa2dict(f)
             for seq in fa_dict:
                 ome = seq[:seq.find('_')]
-                if fasta not in ome2fa2gene[ome]:
-                    ome2fa2gene[ome][fasta] = seq
+                if f not in ome2fa2gene[ome]:
+                    ome2fa2gene[ome][f] = seq
                 else:
                     eprint('\nERROR: multiple sequences for a \
-                            single ome in ' + fasta, flush = True)
+                            single ome in ' + f, flush = True)
                     sys.exit(5)
             incomp_omes = set([x for x, fas in ome2fa2gene.items() \
-                                 if len(fas) != len(fastas)])
+                                 if len(fas) != len(files)])
             if incomp_omes:
                 if flag_incomplete:
                     eprint('\nERROR: omes without sequences in all fastas: ' \
@@ -265,11 +265,12 @@ def main(
                          + ','.join([str(x) for x in list(incomp_omes)]))
 
     trimmed_files = []
-    for fasta in fastas:
-        if not prealigned:
-            fasta_name = os.path.basename(os.path.abspath(fasta))
+    for fasta in files:
+        fasta_name = os.path.basename(os.path.abspath(fasta))
+        clipkit = out_dir + '/' + fasta_name + '.clipkit'
+        if start == 0:
             mafft = out_dir + '/' + fasta_name + '.mafft'
-            clipkit = out_dir + '/' + fasta_name + '.clipkit'
+            clipkit = mafft + '.clipkit'
             
             try:
                 if os.stat(mafft):
@@ -282,7 +283,11 @@ def main(
                                      verbose, cpus, spacer = spacer)
                 else:
                     mafft = fasta_path
-        
+        else:
+            mafft = fasta
+            clipkit = mafft + '.clipkit'
+
+        if start == 0 or start == 1: 
             try:
                 if os.stat(clipkit):
                     vprint('\nTrim exists', v = verbose, flush = True)
@@ -292,6 +297,8 @@ def main(
             except (FileNotFoundError, ValueError) as e:
                 clipkit_out = trimRun(mafft, out_dir, hpc, verbose, spacer = spacer)
             trimmed_files.append(clipkit_out)
+        else:
+            trimmed_files.append(clipkit)
 
     if align_stop:
         vprint(spacer + 'Alignments outputed', v = verbose, flush = True)
@@ -345,11 +352,14 @@ if __name__ == '__main__':
         "<GENOME>_<ACCESSION>" and each <GENOME> needs to be in ALL fastas'
         )
 
-    io_opt = parser.add_argument_group('Input/Output')
+    io_opt = parser.add_argument_group('Input options')
     io_opt.add_argument('-i', '--input', required = True,
         help = 'Fasta or directory of fastas/alignments [partition]. \
                 "-" for stdin')
-    io_opt.add_argument('-o', '--output')
+    io_opt.add_argument('-a', '--align', help = 'Start from alignments',
+                        action = 'store_true')
+    io_opt.add_argument('-t', '--trim', help = 'Start from trimmed alignments',
+                        action = 'store_true')
 
     s_opt = parser.add_argument_group('Single tree options')
     s_opt.add_argument('--fast', action = 'store_true', \
@@ -361,14 +371,18 @@ if __name__ == '__main__':
     s_opt.add_argument('-A', '--project', help = 'HPC project')
 
     m_opt = parser.add_argument_group('Partition tree options')
-    m_opt.add_argument('-a', '--stop_align', action = 'store_true',
+    m_opt.add_argument('-sa', '--stop_align', action = 'store_true',
         help = 'Stop after aligning and trimming')
     m_opt.add_argument('-p', '--prealigned', action = 'store_true',
         help = 'Use alignments')
-    m_opt.add_argument('-c', '--stop_cat', action = 'store_true',
+    m_opt.add_argument('-sc', '--stop_cat', action = 'store_true',
         help = 'Stop after concatenating sequences')
     m_opt.add_argument('-m', '--missing', action = 'store_true',
         help = 'Remove omes with missing sequences')
+
+    r_opt = parser.add_argument_group('Runtime options')
+    r_opt.add_argument('-o', '--output')
+
     args = parser.parse_args()
 
     output = format_path(args.output)
@@ -398,12 +412,19 @@ if __name__ == '__main__':
             stdin2str().replace('"','').replace("'",'').split()
     else:
         args.input = args.input.replace('"','').replace("'",'').split()
+
+
+    start = 0
+    if args.trim:
+        start = 1
+    elif args.alignment:
+        start = 2
     main( 
         args.input, slurm = args.slurm, fast = args.fast,
         torque = args.torque, project = args.project,
         output_dir = output, verbose = True, alignment = args.prealigned,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
-        flag_incomplete = bool(not args.missing)
+        flag_incomplete = bool(not args.missing), start = start
         )
 #    elif os.path.isdir(input_check):
  #       fas = collect_files(input_check, 'fa')

@@ -517,43 +517,43 @@ optional arguments:
 
 
 ## hmmsearch MycotoolsDB
-### db2hmm.py
-`db2hmm.py` will compile hmmsearch results, optionally ouput fasta/hmmalign to original models/trim alignments from a profile hidden markov model. This script supports multiprocessing and uses all detected cores by default.
+### db2hmmer.py
+`db2hmmer.py` will use an evolutionary profile hidden markov model (hmm) to search 
+for proteins in an MTDB, compile hmmsearch results, and ouput results fasta or trimmed 
+hmmalignments.
 
-e.g.: `db2hmm.py -d profile.hmm` will run the master database referencing the inputted hmmdb. 
+e.g.: `db2hmmer.py -d Pfam-A.hmm` will run the master database referencing the Pfam. 
 
-`db2hmm.py -d profile.hmm -b 1 -t 75` takes the best hit from hits with 25 - 100% query coverage
+`db2hmmer.py -d profile.hmm -b 1 -t 75` for each organism, takes the best hit from 
+hits with 25 - 100% query coverage
+
 ```bash
-db2hmm.py --help
-Runs `hmmsearch` v each proteome in a `.mtdb`. For each query, extracts results
-and optionally outputs a compiled fasta, hmmalignment and/or trimmed
-alignment.
+Runs `hmmsearch` v each proteome in a `.db`. For each query, extracts results and optionally outputs a
+compiled fasta, hmmalignment and/or trimmed alignment.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -i INPUT, --input INPUT
-                        Input database `.mtdb`
-  -d HMMDB, --hmmdb HMMDB
-                        Hmm database `.hmm`
-  -o OUTPUT, --output OUTPUT
-                        User-specified output directory
-  -p PREVIOUS, --previous PREVIOUS
-                        Previous db2hmm dir. Be wary of incomplete
-                        outputs from interrupted runs
-  -c CPU, --cpu CPU     Processors to use. Default = All
-  -f, --fasta           Compile fastas for each query
-  -l, --align           Align fastas to original hmm and trim via `trimal`.
-                        Calls `-f`
-  -a, --accession       Extract accessions instead of queries (Pfam, etc).
-                        Requires `-f`
-  -b BEST, --best BEST  # top hits for each organism Requires `-f`
-  -t THRESHOLD, --threshold THRESHOLD
-                        Query percent threshold (+/-). Requires `-f`
+
+Inputs:
+  -d MTDB, --mtdb MTDB
+  --hmm HMM             .hmm database
+
+Search parameters:
+  -b BINARY, --binary BINARY
+                        Search binary {"hmmsearch", "nhmmer"} NONFUNCTIONAL
+  -m MAX_HITS, --max_hits MAX_HITS
+                        Max hits for each organism
+  -q QUERY_THRESH, --query_thresh QUERY_THRESH
+                        Query percent hit threshold (+/-)
   -e EVALUE, --evalue EVALUE
-                        E value threshold, e.g. 10^(-x) where x is the input.
-                        Requires `-f`
-  --trimal TRIMAL       User-specified trimAl commands in "", e.g.:
-                        "-strictplus -fasta"
+                        E value threshold, e.g. 10^(-x) where x is the input
+  -a, --accession       Extract accessions instead of queries (Pfam, etc)
+  -l, --align           Align fastas to original hmm and trim via clipkit
+
+Runtime options:
+  -v, --verbose
+  -o OUTPUT, --output OUTPUT
+  -c CPU, --cpu CPU
 ```
 
 <br /><br />

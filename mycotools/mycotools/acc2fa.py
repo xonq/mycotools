@@ -20,7 +20,7 @@ def extract_mtdb_accs(fa_dict, accs):
 
     out_fa = {}
     for acc in accs:
-        coords = acc[acc.find('['):acc.find(']')]
+        coords = acc[acc.find('[')+1:acc.find(']')]
         if coords: # if there are coordinates
             try: # try splitting by colon
                 start, end = [int(x) for x in coords.split(':')]
@@ -30,7 +30,7 @@ def extract_mtdb_accs(fa_dict, accs):
                 except ValueError: # invalid coordinates, try whole acc
                     out_fa[acc] = fa_dict[acc]
                     continue
-            acc_name = acc[:start]
+            acc_name = acc[:acc.find('[')]
             if start < end:
                 out_fa[acc] = {
                     'sequence': fa_dict[acc_name]['sequence'][start:end+1],

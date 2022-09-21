@@ -625,8 +625,62 @@ def file2list(file_, types = '', sep = None, col = None, compress = False):
     return data1_list
 
 
+class Subqueue():
+    """Run a subqueue of args; can run commands consecutively to avoid shell
+    limitations while maintaining shell injection security"""
+
+    def __init__(self, args, shell = False, verbose = False):
+        if isinstance(args, list) \
+            or isinstance(args, tuple) \
+            or isinstance(args, set):
+            if isinstance(list(args)[0], str):
+                self.args = (tuple(args),)
+            elif isinstance(list(args)[0], list) \
+                or isinstance(list(args)[0], tuple) \
+                or isinstance(list(args)[0], set):
+                self.args = tuple([tuple(x) for x in args])
+            else:
+                raise TypeError('invalid argument subtype: ' \
+                              + str(type(list(args[0]))))
+                   
+        elif isinstance(args, str):
+            self.args = ((args,),)
+        else:
+            raise TypeError('invalid arguments type: ' + str(type(args)))
+        self.complete = False
+        self.shell = shell
+        if verbose:
+            self.verbose = None
+        else:
+            self.verbose = subprocess.DEVNULL
+        self.status = [-1 for x in args]
+        self.exit = -1
+
+    def open(self):
+        for i, arg in enumerate(self.args):
+            if arg[-1] == '&&':
+                failstop = True
+                arg = arg[:-1]
+            else:
+                failstop = False
+            self.status[i] = (subprocess.call(arg, shell = self.shell,
+                                               stdout = self.verbose,
+                                               stderr = self.verbose))
+            if failstop and self.status[i]:
+                break
+        self.exit = any(x for x in self.status)
+        self.complete = True
+        
+
+def run_subqueue(args, shell = False, verbose = False):
+    s = Subqueue(args, shell = shell, verbose = verbose)
+    s.open()
+    return args, s.exit
+
+
 def multisub(args_lists, processes = 1, shell = False, 
              verbose = False):
+    import multiprocess as mp
     '''
     Inputs: list of arguments, integer of processes, subprocess `shell` bool
     Outputs: launches and monitors subprocesses and returns list of exit 
@@ -645,6 +699,11 @@ def multisub(args_lists, processes = 1, shell = False,
         are complete before exiting the function.
     '''
 
+    with mp.Pool(processes = processes) as pool:
+        exit_pre = pool.starmap(run_subqueue, ((x, shell, verbose,) \
+                                                for x in args_lists))
+    return [{'stdin': stdin, 'code': exit} for stdin, exit in exit_pre]
+"""
     if verbose:
         stdout, stderr = None, None
     else:
@@ -659,15 +718,17 @@ def multisub(args_lists, processes = 1, shell = False,
         while len(running) < processes and args_lists: # while not @ max
         # processes
             cmd = args_lists[0]
-            run_temp = subprocess.Popen(cmd , stdout = stdout, \
-                stderr = stderr, shell = shell) # run command
-            running.append([run_temp, cmd]) # add command to running
+#            run_temp = subprocess.Popen(cmd , stdout = stdout, \
+ #               stderr = stderr, shell = shell) # run command
+#            running.append([run_temp, cmd]) # add command to running
+            running.append([subqueue(cmd, shell = shell, verbose = verbose), 
+                            cmd])
+            mp.Process(target = running[-1].open)
             del args_lists[0] # delete from argument list to run
 
         if len(args_lists) > 0: # if there are remaining arguments
-            for index, handle in enumerate(running): # check each status
-                handle[0].poll()
-                returncode = handle[0].returncode
+            for q, cmd in running: # check each status
+                
                 if returncode is not None:
                     outputs.append({
                         'stdin': handle[1], 'code': returncode
@@ -687,3 +748,4 @@ def multisub(args_lists, processes = 1, shell = False,
                     del running[0]
 
     return outputs # [{stdin: '', code: int()}]
+"""
