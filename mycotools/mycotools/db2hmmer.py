@@ -320,9 +320,10 @@ if __name__ == '__main__':
                        help = 'Search binary {"hmmsearch", \
                                "nhmmer"} NONFUNCTIONAL')
     p_arg.add_argument('-m', '--max_hits', type = int, help = 'Max hits for each organism')
-    p_arg.add_argument('-q', '--query_thresh', help = 'Query percent hit threshold (+/-)')
+    p_arg.add_argument('-q', '--query_thresh', type = float,
+        help = 'Query percent hit threshold (+/-)')
     p_arg.add_argument('-e', '--evalue', help = 'E value threshold, e.g. ' \
-        + '10^(-x) where x is the input' )
+        + '10^(-x) where x is the input', type = float)
     p_arg.add_argument('-a', '--accession', action = 'store_true', default = False, \
         help = 'Extract accessions instead of queries (Pfam, etc)' )
     p_arg.add_argument('-l', '--align', default = False, action = 'store_true', \

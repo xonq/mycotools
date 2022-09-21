@@ -42,8 +42,6 @@ def sortContig(contigData):
 
     return outContig
 
-
-
 def sortGFF(unsorted_gff, idComp):
 
     sorting_groups, oldGene = {}, None
@@ -546,8 +544,8 @@ def ntmain(gff_dicts, assem_dict, coding = True,
 
 def aamain( gff_dicts, assem_dict, spacer = '\t' ):
     
-    cdss = grabCDS( gff_dicts, spacer )
-    pos_dict, neg_dict = grabCoords( cdss )
+    cdss = grabCDS(gff_dicts, spacer)
+    pos_dict, neg_dict = grabCoords(cdss)
 
     genes_fa_dict = {}
     for contig in pos_dict:

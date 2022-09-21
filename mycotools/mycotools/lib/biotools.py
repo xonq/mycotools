@@ -204,10 +204,10 @@ def gff2list(gff_info, path = True, error = True):
                 })
     except IndexError:
         raise IndexError(str(len(col_list)) + '/9 expected tab-' \
-                        + 'delimitted fields: ' + str(line))
+                        + 'delimitted fields: ' + str(col_list))
     except ValueError:
         raise ValueError(str(col_list[4:6]) + ' invalid integer ' \
-                        + 'conversion: ' + str(line))
+                        + 'conversion: ' + str(col_list))
             
     return gff_list_dict
 

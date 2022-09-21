@@ -1,0 +1,6 @@
+Approve version 0.27.1 for upload? [y/N]: Traceback (most recent call last):
+  File "/users/PAS1046/osu10393/software/mycotools_repos/mycotools_pypi/./prepUpdate.py", line 115, in <module>
+    version = changeVersion( prevOutput + 'setup.py', args.version, execs )
+  File "/users/PAS1046/osu10393/software/mycotools_repos/mycotools_pypi/./prepUpdate.py", line 44, in changeVersion
+    check = input('Approve version ' + version + ' for upload? [y/N]: ')
+EOFError: EOF when reading a line

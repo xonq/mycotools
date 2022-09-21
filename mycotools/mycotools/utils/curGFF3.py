@@ -266,7 +266,8 @@ def acquireFormat( gff_list ):
                 return 'misc_gff3'
     return None
 
-def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps()):
+def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
+                 cur_seqids = False):
 
     genes, pseudogenes, rnas = [], [], {}
     mrnas = defaultdict(list) 
@@ -295,38 +296,21 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps()):
                 transcripts[par].append(id_)
 
     id_dict, pseudogenes = {}, set(pseudogenes)
-    if cur_seqids:
-        for i, entry in enumerate(cur_list):
-            if 'gene' in entry['type']:
-                id_ = re.search(comps['id'], entry['attributes'])[1]
-                id_dict[id_] = {}
-            elif entry['type'] == 'CDS':
-                try:
-                    par = re.search(comps['par'], entry['attributes'])[1]
-                except TypeError:
-                    continue
-                try:
-                    id_dict[rnas[par]][par] = re.search(comps['Alias'], entry['attributes'])[1]
-                except KeyError: # pseudogene or CDS parent is related to gene, not
-                # RNA
-                    id_dict[par][par] = re.search(comps['Alias'],
-                                                  entry['attributes'])[1]
-    else:
-        for i, entry in enumerate(cur_list):
-            if 'gene' in entry['type']:
-                id_ = re.search(comps['id'], entry['attributes'])[1]
-                id_dict[id_] = {}
-            elif entry['type'] == 'CDS':
-                try:
-                    par = re.search(comps['par'], entry['attributes'])[1]
-                except TypeError:
-                    continue
-                try:
-                    id_dict[rnas[par]][par] = re.search(comps['Alias'], entry['attributes'])[1]
-                except KeyError: # pseudogene or CDS parent is related to gene, not
-                # RNA
-                    id_dict[par][par] = re.search(comps['Alias'],
-                                                  entry['attributes'])[1]
+    for i, entry in enumerate(cur_list):
+        if 'gene' in entry['type']:
+            id_ = re.search(comps['id'], entry['attributes'])[1]
+            id_dict[id_] = {}
+        elif entry['type'] == 'CDS':
+            try:
+                par = re.search(comps['par'], entry['attributes'])[1]
+            except TypeError:
+                continue
+            try:
+                id_dict[rnas[par]][par] = re.search(comps['Alias'], entry['attributes'])[1]
+            except KeyError: # pseudogene or CDS parent is related to gene, not
+            # RNA
+                id_dict[par][par] = re.search(comps['Alias'],
+                                              entry['attributes'])[1]
 
     trna_count, rrna_count, ptrna_count, rna_count, etc_count = 1, 1, 1, 1, 1
     estranged = []
@@ -337,8 +321,16 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps()):
             if id_ in mrnas:
                 rna_check = True
                 if entry['type'] != 'pseudogene':
-                    for rna,alias in id_dict[id_].items():
+                    if id_dict[id_]:
+                        for rna,alias in id_dict[id_].items():
+                            alias_tag += alias + '|'
+                    else: # no CDS associated with mRNA
+                        alias = ome + '_etc' + str(etc_count)
                         alias_tag += alias + '|'
+                        etc_count += 1
+                        for rna in mrnas[id_]:
+                            id_dict[id_][rna] = alias
+                            
                 else:
                     for rna in mrnas[id_]:
                         alias = ome + '_pseudogene' + str(pseudocount)

@@ -446,7 +446,10 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                         entry['attributes']
                         )
             else:
-                gff, trans_str, failed, flagged = curRogue(gff, ome)
+                try:
+                    gff = curGFF3(gff, ome)
+                except:
+                    gff, trans_str, failed, flagged = curRogue(gff, ome)
         else:
             gff = curGFF3(gff, ome, cur_seqids = True)
     elif gffVer == 2.5:
