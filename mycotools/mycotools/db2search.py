@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED accession/standard input
+
 import os
 import re
 import sys
@@ -502,7 +504,7 @@ if __name__ == '__main__':
         )
     parser.add_argument('-s', '--search', required = True, 
         help = 'Search binary {mmseqs, blastn, blastp, tblastn, blastx}')
-    parser.add_argument('-d', '--diamond', action = 'store_true',
+    parser.add_argument('--diamond', action = 'store_true',
         help = 'Use diamond version of --search. Not recommended for ' \
              + 'ome-by-ome')
     parser.add_argument('-st', '--sequencetype', help = 'Subject sequence type {aa, nt} for mmseqs')
@@ -515,7 +517,7 @@ if __name__ == '__main__':
         type = float, help = 'Identity minimum, e.g. 0.6')
     #parser.add_argument( '-c', '--coverage', type = float, help = 'Query coverage +/-, e.g. 0.5' )
     parser.add_argument('-m', '--maxhits', type = int, help = 'Max hits for each organism')
-    parser.add_argument('-db', '--mtdb', default = masterDB(), 
+    parser.add_argument('-d', '--mtdb', default = masterDB(), 
         help = 'DEFAULT: masterdb')
     parser.add_argument('-o', '--output', default = os.getcwd() )
     parser.add_argument('--cpu', default = mp.cpu_count(), type = int, help = 'DEFAULT: all')

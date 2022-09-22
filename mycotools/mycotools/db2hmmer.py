@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-# NEED main function
+# NEED option to fail upon any failures
 # NEED log
 # NEED nhmmer option
 # NEED to .tmp and move files
@@ -57,9 +57,14 @@ def compileextractHmmCmd(db, args, output):
 
 def runExHmm(args, hmmsearch_out, output):
 
-    with open(hmmsearch_out, 'r') as raw:
-        data = raw.read()
     ome = os.path.basename(hmmsearch_out).replace('.out', '')
+
+    try:
+        with open(hmmsearch_out, 'r') as raw:
+            data = raw.read()
+    except FileNotFoundError:
+        eprint('\tWARNING: ' + ome + ' failed', flush = True)
+        return ome, False
     out_dict = None
     if len(data) > 100: # check for data # check for data
         out_dict = exHmm(data, args[0], args[1], args[2], args[3], header = False)
@@ -68,8 +73,9 @@ def runExHmm(args, hmmsearch_out, output):
         # does this overwrite other hits?
     else:
         eprint('\tWARNING: ' + ome + ' empty results', flush = True)
+        return ome, False
 
-    return out_dict
+    return ome, out_dict
     
 
 def compileacc2fa(db, output, q_dict):
@@ -140,8 +146,9 @@ def compile_trim_cmd(output, mod = '', trimmed = None):
         aligns = [x for x in aligns if os.path.basename(x).replace('.phylip','') \
              not in trimmed]
     for align in aligns:
-        trim = output + 'trimmed/' +  \
-            os.path.basename( align ).replace('.phylip','.clipkit')
+        trim = output + 'trimmed/' \
+             + os.path.basename(align).replace('.phylip','.clipkit') \
+             + '.phylip'
         args = ['clipkit', align, '-o', trim]
         if mod_args[0]:
             args.extend(mod_args) 
@@ -241,10 +248,9 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
         print( '\nCompiling fastas' , flush = True)
         # q_dict = {query: ome: alignment}
         q_dict = defaultdict(dict)
-        for hit in hmmAligns:
+        for ome, hit in hmmAligns:
             if hit:
                 for query in hit:
-                    ome = hit[query][0]
                     align = hit[query][1]
                     q_dict[query][ome] = align
 
@@ -267,14 +273,15 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
                 os.mkdir(aln_dir)
 
             
-            hmmAlign_tuples = compile_hmmalign_cmds( output, list(hmm_dict.keys() ) )
+            hmmAlign_tuples = compile_hmmalign_cmds(output,
+                                                    list(hmm_dict.keys()))
             hmmAlign_codes = multisub(hmmAlign_tuples, processes = cpu - 1,
                                       verbose = verbose)
 #            print(hmmAlign_codes)
  #           esl_codes = multisub( hmmAlign_tuples[1], processes = cpu - 1 )
   #          print(esl_codes)
-            for index in range( len (hmmAlign_codes) ):
-                code = hmmAlign_codes[ index ]
+            for index in range(len(hmmAlign_codes)):
+                code = hmmAlign_codes[index]
                 if code['code']:
                     eprint('\tERROR: ' + str(code['stdin']), flush = True)
 #                else:
@@ -287,16 +294,17 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
         print( '\nTrimming alignments' , flush = True)
         trimmed = None
         if os.path.isdir(trm_dir):
-            trimmed = collect_files(trm_dir, 'clipkit')
+            trimmed = collect_files(trm_dir, 'phylip')
         else:
             os.mkdir(trm_dir)
         trim_tuples = compile_trim_cmd(output, mod = trim_mod, trimmed = trimmed)
 
         trim_codes = multisub(trim_tuples, processes = cpu - 1,
                               verbose = verbose)
-        for code in trim_codes:
-            if code['code']:
-                eprint('\tERROR: ' + str(code['stdin']), flush = True)
+        # clipkit or the subsequent command raises an exit error
+#        for code in trim_codes:
+ #           if code['code']:
+  #              eprint('\tERROR: ' + str(code['stdin']), flush = True)
 
 
 
@@ -323,7 +331,7 @@ if __name__ == '__main__':
     p_arg.add_argument('-q', '--query_thresh', type = float,
         help = 'Query percent hit threshold (+/-)')
     p_arg.add_argument('-e', '--evalue', help = 'E value threshold, e.g. ' \
-        + '10^(-x) where x is the input', type = float)
+        + '10^(-x) where x is the input', type = int)
     p_arg.add_argument('-a', '--accession', action = 'store_true', default = False, \
         help = 'Extract accessions instead of queries (Pfam, etc)' )
     p_arg.add_argument('-l', '--align', default = False, action = 'store_true', \
@@ -356,7 +364,7 @@ if __name__ == '__main__':
         'MycotoolsDB': args.mtdb, 'Hmm database': args.hmm, 'Output': output,
         'Align hmms': args.align, 'Use accession': args.accession, 'Hits/ome': args.max_hits, 
         'Threshold': args.query_thresh, 'E-value': args.evalue, 
-        'Output': output,'CPUs': cpu
+        'Output': output, 'CPUs': cpu
         }
     start_time = intro('db2hmmer', args_dict)
     db = mtdb(args.mtdb)

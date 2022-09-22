@@ -12,7 +12,7 @@ from mycotools.lib.kontools import format_path, eprint, stdin2str
 def extract_mtdb_accs_exp(fa_dict, accs):
     return {acc: fa_dict[acc] for acc in accs}
 
-def extract_mtdb_accs(fa_dict, accs):
+def extract_mtdb_accs(fa_dict, accs, spacer = ''):
     """extract MTDB accessions from fa_dict using a list `accs`; can 
     extract coordinates of an accession if labeled 
     `acc[START:END] | acc[START-END]`. If start > end, extract the reverse
@@ -32,22 +32,33 @@ def extract_mtdb_accs(fa_dict, accs):
                     continue
             acc_name = acc[:acc.find('[')]
             if start < end:
-                out_fa[acc] = {
-                    'sequence': fa_dict[acc_name]['sequence'][start:end+1],
-                    'description': fa_dict[acc_name]['description']
-                    }
+                try:
+                    out_fa[acc] = {
+                        'sequence': fa_dict[acc_name]['sequence'][start:end+1],
+                        'description': fa_dict[acc_name]['description']
+                        }
+                except KeyError:
+                    eprint(spacer + 'WARNING: invalid accession ' + acc_name, 
+                           flush = True)
             else:
-                out_fa[acc] = {
-                    'sequence': reverse_complement(
+                try:
+                    out_fa[acc] = {
+                        'sequence': reverse_complement(
                         fa_dict[acc_name]['sequence'][end-1:start+1]
                         ),
-                    'description': fa_dict[acc_name]['description']
-                    }
+                        'description': fa_dict[acc_name]['description']
+                        }
+                except KeyError:
+                    eprint(spacer + 'WARNING: invalid accession ' + acc_name,
+                           flush = True)
         else: # no coordinates
-            out_fa[acc] = fa_dict[acc] # extract the whole accession
+            try:
+                out_fa[acc] = fa_dict[acc] # extract the whole accession
+            except KeyError:
+                eprint(spacer + 'WARNING: invalid accession ' + acc_name,
+                       flush = True)
 
     return out_fa
-            
 
 def extractHeaders(fasta_file, accessions, ome = None):
     """searches headers for "[]", which indicate coordinate-based extraction.
@@ -90,7 +101,6 @@ def extractHeaders(fasta_file, accessions, ome = None):
                 out_fasta[header] = fasta[header]
 
     return out_fasta
-   
 
 def dbmain(db, accs, error = True, spacer = '\t\t\t', coord_check = True):
     """takes in mtdb, takes accessions ome by ome from accs;
@@ -117,7 +127,7 @@ def dbmain(db, accs, error = True, spacer = '\t\t\t', coord_check = True):
                 ome_fasta = fa2dict(db[ome]['faa'])
             except KeyError: # if there is a missing ome
                 if error:
-                    raise KeyError
+                    raise KeyError('invalid ome: ' + ome)
                 else:
                     eprint(spacer + ome + ' not in database', flush = True)
             fa_dict = {**fa_dict, **extract_mtdb_accs(ome_fasta, ome_accs)}
@@ -131,12 +141,10 @@ def dbmain(db, accs, error = True, spacer = '\t\t\t', coord_check = True):
                 else:
                     eprint(spacer + ome + ' not in database', flush = True)
             fa_dict = {**fa_dict, **extract_mtdb_accs_exp(ome_fasta, ome_accs)}
- 
 
     return fa_dict
 
-
-def famain( accs, fa, ome = None ):
+def famain(accs, fa, ome = None):
     """takes in accessions, fasta, and retrieves accessions"""
 
     fa_dict = {}

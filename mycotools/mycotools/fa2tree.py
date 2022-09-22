@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
-# NEED to implement different alignment types on the checking for concat step
 # NEED to implement fa2clus?
+# NEED to ignore non fasta inputs
 
 import os
 import re
@@ -10,7 +10,7 @@ import argparse
 import subprocess
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
-    format_path, intro, outro, findExecs
+    format_path, intro, outro, findExecs, mkOutput
 from mycotools.lib.biotools import fa2dict
 
 class PhyloError(Exception):
@@ -54,8 +54,8 @@ def mafftRun(fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t'):
 
 def trimRun(mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
 
-    name2 = mafft + '.clipkit'
-    cmd = ['clipkit', mafft, '--output', out_dir + '/' + name2]
+    name2 = out_dir + os.path.basename(mafft) + '.clipkit'
+    cmd = ['clipkit', mafft, '--output', name2]
     if not hpc:
 
         print(spacer + 'Trimming', flush = True)
@@ -80,7 +80,7 @@ def trimRun(mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
                     ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nsbatch tree.sh' )
     
-    return out_dir + '/' + name2
+    return name2
 
 
 def run_mf(clipkit_file, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
@@ -173,7 +173,7 @@ def main(
     fasta_path, slurm = False, torque = False, fast = False, project = '', 
     output_dir = None, verbose = True, alignment = False, mem = '60GB', cpus = 1,
     spacer = '\t\t', align_stop = False, tree_stop = False, 
-    flag_incomplete = True, start = start
+    flag_incomplete = True, start = 0, partition = False
     ):
 
     hpc = False
@@ -187,9 +187,8 @@ def main(
         vprint('\nHPC mode, preparing submission scripts (PBS)\n', v = verbose, flush = True)
         hpc = '#PBS -l walltime=10:00:00\n#PBS -l nodes=1:ppn=4\n#PBS -A ' + project
 
-    partition = False
     output_dir_prep = os.getcwd() + '/'
-    if len(fasta_path) == 1:
+    if isinstance(fasta_path, str):
         if os.path.isfile(fasta_path):
             if not output_dir:
                 dir_name = re.sub(r'\..*?$', '_tree', os.path.basename( os.path.abspath(fasta_path)))
@@ -203,54 +202,73 @@ def main(
                 out_dir = format_path(output_dir)
             fastas = [fasta_path]
         elif os.path.isdir(fasta_path):
-            vprint('\nDirectory input, partition analysis mode', 
-                   v = verbose, flush = True)
-            partition = True
             if not output_dir:
                 out_dir = mkOutput(output_dir_prep, 'fa2tree')
             else:
                 if not os.path.isdir(output_dir):
                     os.mkdir(output_dir)
                 out_dir = format_path(output_dir)
-            files = collect_files(fasta_path, 'x')
-#            fastas.extend(collect_files(fasta_path, 'faa'))
- #           fastas.extend(collect_files(fasta_path, 'fna'))
-  #          fastas.extend(collect_files(fasta_path, 'fasta'))
-   #         fastas.extend(collect_files(fasta_path, 'fsa'))
-  #          if prealigned:
-#                fastas.extend(collect_files(fasta_path, 'mafft'))
-  #              fastas.extend(collect_files(fasta_path, 'clipkit'))
-                check_fas = set(fastas)
-                new_fas = []
-                for f in files:
-                    if f + '.mafft.clipkit' not in check_fas:
-                        if f + '.mafft' not in check_fas:
-                            new_fas.append(fa)
-                fastas = new_fas
-    elif len(fasta_path) > 1:
-        vprint('\nMultiple files inputted, partition analysis mode',
-               v = verbose, flush = True)
-        partition = True
+            files = collect_files(fasta_path, '*')
+            check_fas = set(files)
+            new_fas = []
+            for f in files:
+                if f + '.mafft.clipkit' not in check_fas:
+                    if f + '.mafft' not in check_fas:
+                        new_fas.append(f)
+            files = new_fas
+    else:
         if not output_dir:
             out_dir = mkOutput(output_dir_prep, 'fa2tree')
         else:
             if not os.path.isdir(output_dir):
                 os.mkdir(output_dir)
             out_dir = format_path(output_dir)
-        files = [format_path(x) for x in fasta_path]
+        files = []
+        for path in fasta_path:
+            if os.path.isdir(path):
+                files.extend([format_path(x) for x in collect_files(path, '*')])
+            else:
+                files.append(path)
+
+    # check for non fasta inputs
+    if any(f_.endswith(('.nexus', '.nex', '.nxs', 
+                        '.phylip', '.phy', '.ph',
+                        '.clustal', '.clus',)) \
+           for f_ in files):
+        vprint(spacer + 'Converting to fastas', v = verbose, flush = True)
+        from Bio import SeqIO
+        conv_dir = out_dir + 'conv/'
+        if not os.path.isdir(conv_dir):
+            os.mkdir(conv_dir)
+        for i, f_ in enumerate(files):
+            out_name = conv_dir + os.path.basename(
+                re.search(r'(.*)\.[^.]+$', f_)[1] + '.fa'
+                )
+            if f_.endswith(('.nexus', '.nex', '.nxs',)):
+                records = SeqIO.parse(f_, 'nexus')
+                SeqIO.write(records, out_name, 'fasta')
+            elif f_.endswith(('.phylip', '.phy', '.ph',)):
+                records = SeqIO.parse(f_, 'phylip')
+                SeqIO.write(records, out_name, 'fasta')
+            elif f_.endswith(('.clustal', '.clus',)):
+                records = SeqIO.parse(f_, 'clustal')
+                SeqIO.write(records, out_name, 'fasta')
+            else:
+                continue
+            files[i] = out_name
 
     if partition: #multigene partition mode
         ome2fa2gene = defaultdict(dict)
         complete_omes = []
-        for f in file:
+        for f in files:
             fa_dict = fa2dict(f)
             for seq in fa_dict:
                 ome = seq[:seq.find('_')]
                 if f not in ome2fa2gene[ome]:
                     ome2fa2gene[ome][f] = seq
                 else:
-                    eprint('\nERROR: multiple sequences for a \
-                            single ome in ' + f, flush = True)
+                    eprint('\nERROR: multiple sequences for a ' \
+                         + 'single ome in ' + f, flush = True)
                     sys.exit(5)
             incomp_omes = set([x for x, fas in ome2fa2gene.items() \
                                  if len(fas) != len(files)])
@@ -267,11 +285,10 @@ def main(
     trimmed_files = []
     for fasta in files:
         fasta_name = os.path.basename(os.path.abspath(fasta))
-        clipkit = out_dir + '/' + fasta_name + '.clipkit'
+        clipkit = out_dir + fasta_name + '.clipkit'
         if start == 0:
-            mafft = out_dir + '/' + fasta_name + '.mafft'
+            mafft = out_dir + fasta_name + '.mafft'
             clipkit = mafft + '.clipkit'
-            
             try:
                 if os.stat(mafft):
                     vprint('\nAlignment exists', v = verbose, flush = True)
@@ -279,13 +296,14 @@ def main(
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
                 if not alignment:
-                    mafft = mafftRun(os.path.abspath(fasta_path), out_dir, hpc, 
+                    mafft = mafftRun(os.path.abspath(fasta), out_dir, hpc, 
                                      verbose, cpus, spacer = spacer)
                 else:
-                    mafft = fasta_path
+                    mafft = fasta
         else:
             mafft = fasta
             clipkit = mafft + '.clipkit'
+
 
         if start == 0 or start == 1: 
             try:
@@ -354,8 +372,8 @@ if __name__ == '__main__':
 
     io_opt = parser.add_argument_group('Input options')
     io_opt.add_argument('-i', '--input', required = True,
-        help = 'Fasta or directory of fastas/alignments [partition]. \
-                "-" for stdin')
+        help = 'Fasta or directory of fastas/alignments (fasta, phylip, \
+                nexus, or clustal). "-" for stdin')
     io_opt.add_argument('-a', '--align', help = 'Start from alignments',
                         action = 'store_true')
     io_opt.add_argument('-t', '--trim', help = 'Start from trimmed alignments',
@@ -366,14 +384,16 @@ if __name__ == '__main__':
         help = 'Fasttree' )
     s_opt.add_argument('-s', '--slurm', action = 'store_true', \
         help = 'Submit ALL steps to Slurm' )
-    s_opt.add_argument('-t', '--torque', action = 'store_true', \
+    s_opt.add_argument('--torque', action = 'store_true', \
         help = 'Submit ALL steps to Torque.' )
     s_opt.add_argument('-A', '--project', help = 'HPC project')
 
     m_opt = parser.add_argument_group('Partition tree options')
+    m_opt.add_argument('-p', '--partition', action = 'store_true',
+        help = 'Multigene partition mode')
     m_opt.add_argument('-sa', '--stop_align', action = 'store_true',
         help = 'Stop after aligning and trimming')
-    m_opt.add_argument('-p', '--prealigned', action = 'store_true',
+    m_opt.add_argument('-pa', '--prealigned', action = 'store_true',
         help = 'Use alignments')
     m_opt.add_argument('-sc', '--stop_cat', action = 'store_true',
         help = 'Stop after concatenating sequences')
@@ -381,6 +401,7 @@ if __name__ == '__main__':
         help = 'Remove omes with missing sequences')
 
     r_opt = parser.add_argument_group('Runtime options')
+    r_opt.add_argument('-v', '--verbose', action = 'store_true')
     r_opt.add_argument('-o', '--output')
 
     args = parser.parse_args()
@@ -390,7 +411,8 @@ if __name__ == '__main__':
         if not output.endswith('/'):
             output += '/' # bring to mycotools path expectations
     args_dict = {
-        'Fasta': args.input, 'Fast': args.fast, 'Prealigned': args.prealigned,
+        'Fasta': args.input, 'Fast': args.fast, 
+        'Multigene partition': args.partition, 'Prealigned': args.prealigned,
         'Alignment stop': args.stop_align, 'Concatenation stop': args.stop_cat,
         'Ignore missing': args.missing,
         'Torque': args.torque, 'Slurm': args.slurm, 'HPC project': args.project, 'Output': output
@@ -417,14 +439,16 @@ if __name__ == '__main__':
     start = 0
     if args.trim:
         start = 1
-    elif args.alignment:
+    elif args.prealigned:
         start = 2
     main( 
         args.input, slurm = args.slurm, fast = args.fast,
         torque = args.torque, project = args.project,
-        output_dir = output, verbose = True, alignment = args.prealigned,
+        output_dir = output, verbose = not bool(args.verbose), 
+        alignment = args.prealigned,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
-        flag_incomplete = bool(not args.missing), start = start
+        flag_incomplete = bool(not args.missing), start = start,
+        partition = bool(args.partition)
         )
 #    elif os.path.isdir(input_check):
  #       fas = collect_files(input_check, 'fa')
