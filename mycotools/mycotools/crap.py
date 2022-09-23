@@ -988,9 +988,9 @@ def search_main(
 
     print('\nCRAP', flush = True)
     if fast:
-        tree_suffix = '.fa.clipkit.treefile'
+        tree_suffix = '.fa.mafft.clipkit.treefile'
     else:
-        tree_suffix = '.fa.clipkit.contree'
+        tree_suffix = '.fa.mafft.clipkit.contree'
     fas4trees = {k: v for k, v in sorted(fas4trees.items(), key = lambda x: len(x[1]))}
     for query, query_fa in fas4trees.items():
         out_keys = None
