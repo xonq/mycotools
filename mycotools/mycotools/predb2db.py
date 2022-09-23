@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# NEED source to reference the annotation source
+# NEED to error check FAA generation simply by file size
+
 import os
 import re
 import sys
@@ -196,13 +199,13 @@ def gen_omes(
 
     t_failed = []
     ref_ome_check = [k for k,v in Counter(refdb['ome']).items() if v > 1]
-    new_ome_check = [k for k,v in Counter(newdb['ome']).items() if v > 1 and k]
+#    new_ome_check = [k for k,v in Counter(newdb['ome']).items() if v > 1 and k]
     if ref_ome_check:
         raise ValueError('corrupted reference database with non-unique omes: '
                         + str(ref_ome_check))
-    elif new_ome_check:
-        raise ValueError('corrupted pre-database with non-unique omes: '
-                        + str(new_ome_check))
+ #   elif new_ome_check:
+  #      raise ValueError('corrupted pre-database with non-unique omes: '
+   #                     + str(new_ome_check))
     tax_list = list(set(refdb['ome']).union(forbidden))
     tax_count = {}
     for tax in tax_list:
@@ -271,7 +274,7 @@ def gen_omes(
             format_search = re.search(r'^[^\d_,\'";:\\\|\[\]\{\}\=\+\!@#\$\%\^' \
                                     + r'&\*\(\)]{6}\d+[^-_+=\\\|\{\[\}\]\:;' \
                                     + r'\'\"\,\<\>\?/\`\~\!\@\#\$\%\^\&\*\(' \
-                                    + r'\)\w\W]*$', ome) # crude format check
+                                    + r'\)\w\W]*\.{0,1}\d*$', ome) # crude format check
             if not format_search:
                 raise ValueError('invalid ome ' + ome)
             if ome in refdb_omes: # it's an update
@@ -446,10 +449,10 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                         entry['attributes']
                         )
             else:
-                try:
-                    gff = curGFF3(gff, ome)
-                except:
-                    gff, trans_str, failed, flagged = curRogue(gff, ome)
+#                try:
+ #                   gff = curGFF3(gff, ome)
+  #              except:
+                gff, trans_str, failed, flagged = curRogue(gff, ome)
         else:
             gff = curGFF3(gff, ome, cur_seqids = True)
     elif gffVer == 2.5:

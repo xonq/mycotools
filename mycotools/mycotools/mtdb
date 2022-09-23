@@ -62,7 +62,7 @@ if __name__ == '__main__':
         mtdb_initialize(mycodb_loc)
     elif {'-d', '--dependencies'}.intersection(set_argv):
         pip_deps = ['dna_features_viewer']
-        dep_cmds = [['conda', 'install', '-c', '-y', 'jlsteenwyk', 'clipkit'],
+        dep_cmds = [['conda', 'install', '-y', '-c', 'jlsteenwyk', 'clipkit'],
                     ['python3', '-m', 'pip', 'install', ' '.join(pip_deps)]]
         for dep_cmd in dep_cmds:
             cmd = subprocess.call(dep_cmd)

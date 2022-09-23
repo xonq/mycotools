@@ -455,7 +455,7 @@ def curate( gff, prefix, failed = set() ):
             exon_dict[ seq ][ prot ].sort()
         exon_dict[ seq ] = dict(sorted( exon_dict[ seq ].items(), key = lambda e: e[1][0] ))
         for prot in exon_dict[ seq ]:
-            new_prot = re.sub( r'-T.+', '', prot )
+            new_prot = re.sub(r'-T\d+$', '', prot)
             if new_prot not in change_dict:
                 change_dict[ new_prot ] = prefix + '_' + str(count)
             count += 1

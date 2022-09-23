@@ -100,8 +100,11 @@ def fa2dict(fasta_input, file_ = True):
             descrip = ''
 
         seq = val[1]
-        if seq[-1] == '\n' or seq[-1] == '\r':
-            seq = seq.rstrip()
+        if seq:
+            if seq[-1] == '\n' or seq[-1] == '\r':
+                seq = seq.rstrip()
+        else:
+            continue
 
         # prepares dictionaries for each gene with description, seq, rvcmpl_seq, and codons
         fasta_dict[gene] = {}

@@ -680,7 +680,7 @@ def run_subqueue(args, shell = False, verbose = False):
 
 def multisub(args_lists, processes = 1, shell = False, 
              verbose = False):
-    import multiprocess as mp
+    import multiprocessing as mp
     '''
     Inputs: list of arguments, integer of processes, subprocess `shell` bool
     Outputs: launches and monitors subprocesses and returns list of exit 

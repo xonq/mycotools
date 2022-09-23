@@ -11,7 +11,7 @@ import subprocess
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
     format_path, intro, outro, findExecs, mkOutput
-from mycotools.lib.biotools import fa2dict
+from mycotools.lib.biotools import fa2dict, dict2fa
 
 class PhyloError(Exception):
     pass
@@ -100,30 +100,30 @@ def run_mf(clipkit_file, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
 
     return model
 
-def prepare_nexus(concat_fa, models):
+def prepare_nexus(concat_fa, models, spacer = '\t'):
 
     nex_data = '#nexus\nbegin sets;'
     index = 1
     for i, trimmed_f in enumerate(list(models.keys())):
         trim_fa = fa2dict(trimmed_f)
-        len0 = trim_fa[list(trim_fa.keys())[0]]['sequence']
-        if not all(len(x['sequence']) == len0):
-            eprint(spacer + 'ERROR: alignment sequences are not same length ' \
+        len0 = len(trim_fa[list(trim_fa.keys())[0]]['sequence'])
+        if not all(len(x['sequence']) == len0 for x in trim_fa.values()):
+            eprint(spacer + '\tERROR: alignment sequences are not same length ' \
                    + trimmed_f, flush = True)
             sys.exit(17)
         new_index = index + len0
         nex_data += '\n    charset part' + str(i + 1) + ' = ' \
-                  + str(index) + '-' + str(new_index) + ';'
-        index = newindex
+                  + str(index) + '-' + str(new_index - 1) + ';'
+        index = new_index
 
         for seq, data in trim_fa.items():
             ome = seq[:seq.find('_')]
             if ome in concat_fa:
-                concatfa_data[ome]['sequence'] += data['sequence']
+                concat_fa[ome]['sequence'] += data['sequence']
 
     nex_data += '\n    charpartition mine = '
-    for i, model in models.values():
-        nex_data += model + ':part' + str(i +1) + ','
+    for i, model in enumerate(models.values()):
+        nex_data += model + ':part' + str(i+1) + ','
     nex_data = nex_data[:-1] + ';\nend;'
 
     return nex_data, concat_fa 
@@ -200,7 +200,7 @@ def main(
                 if not os.path.isdir(output_dir):
                     os.mkdir(output_dir)
                 out_dir = format_path(output_dir)
-            fastas = [fasta_path]
+            files = [fasta_path]
         elif os.path.isdir(fasta_path):
             if not output_dir:
                 out_dir = mkOutput(output_dir_prep, 'fa2tree')
@@ -235,7 +235,7 @@ def main(
                         '.phylip', '.phy', '.ph',
                         '.clustal', '.clus',)) \
            for f_ in files):
-        vprint(spacer + 'Converting to fastas', v = verbose, flush = True)
+        print(spacer + 'Converting to fastas', flush = True)
         from Bio import SeqIO
         conv_dir = out_dir + 'conv/'
         if not os.path.isdir(conv_dir):
@@ -244,43 +244,64 @@ def main(
             out_name = conv_dir + os.path.basename(
                 re.search(r'(.*)\.[^.]+$', f_)[1] + '.fa'
                 )
-            if f_.endswith(('.nexus', '.nex', '.nxs',)):
-                records = SeqIO.parse(f_, 'nexus')
-                SeqIO.write(records, out_name, 'fasta')
-            elif f_.endswith(('.phylip', '.phy', '.ph',)):
-                records = SeqIO.parse(f_, 'phylip')
-                SeqIO.write(records, out_name, 'fasta')
-            elif f_.endswith(('.clustal', '.clus',)):
-                records = SeqIO.parse(f_, 'clustal')
-                SeqIO.write(records, out_name, 'fasta')
-            else:
-                continue
+            if not os.path.isfile(out_name):
+                if f_.endswith(('.nexus', '.nex', '.nxs',)):
+                    records = SeqIO.parse(f_, 'nexus')
+                    SeqIO.write(records, out_name, 'fasta')
+                elif f_.endswith(('.phylip', '.phy', '.ph',)):
+                    records = SeqIO.parse(f_, 'phylip')
+                    SeqIO.write(records, out_name, 'fasta')
+                elif f_.endswith(('.clustal', '.clus',)):
+                    records = SeqIO.parse(f_, 'clustal')
+                    SeqIO.write(records, out_name, 'fasta')
+                else:
+                    continue
             files[i] = out_name
 
     if partition: #multigene partition mode
         ome2fa2gene = defaultdict(dict)
-        complete_omes = []
+        incomp_omes = {}
         for f in files:
+            if f.endswith('/'):
+                f = f[:-1]
             fa_dict = fa2dict(f)
+            incomp_omes[os.path.basename(f)] = []
             for seq in fa_dict:
                 ome = seq[:seq.find('_')]
                 if f not in ome2fa2gene[ome]:
+                    incomp_omes[os.path.basename(f)].append(ome)
                     ome2fa2gene[ome][f] = seq
                 else:
                     eprint('\nERROR: multiple sequences for a ' \
                          + 'single ome in ' + f, flush = True)
                     sys.exit(5)
-            incomp_omes = set([x for x, fas in ome2fa2gene.items() \
-                                 if len(fas) != len(files)])
-            if incomp_omes:
-                if flag_incomplete:
-                    eprint('\nERROR: omes without sequences in all fastas: ' \
-                         + ','.join([str(x) for x in list(incomp_omes)]))
-                    sys.exit(6)
-                else:
-                    eprint('\nWARNING: omes removed without sequences in all \
-                            fastas: ' \
-                         + ','.join([str(x) for x in list(incomp_omes)]))
+
+        incomp_files, comp_files = {}, []
+        for f, omes in incomp_omes.items():
+            if len(omes) < len(ome2fa2gene):
+                incomp_files[f] = sorted(
+                    set(ome2fa2gene.keys()).difference(set(omes))
+                    )
+            else:
+                comp_files.append(f)
+
+        if incomp_files:
+            incomp_files = {k: v for k,v in sorted(incomp_files.items(), 
+                                                   key = lambda x: len(x[1]))}
+            if flag_incomplete:
+                eprint('\nERROR: omes without sequences in all fastas: ', flush = True)
+            else:
+                eprint('\nWARNING: omes removed without sequences in all \
+                        fastas: ', flush = True)
+            for f, omes in incomp_files.items():
+                eprint('\t' + f + ': ' + ','.join([x for x in omes]), flush = True)
+            if comp_files:
+                eprint('\tComplete files: ' + ','.join(comp_files), flush = True)
+            else:
+                eprint('\tNo complete files', flush = True)
+            if flag_incomplete:
+                sys.exit(6)
+
 
     trimmed_files = []
     for fasta in files:
@@ -319,7 +340,7 @@ def main(
             trimmed_files.append(clipkit)
 
     if align_stop:
-        vprint(spacer + 'Alignments outputed', v = verbose, flush = True)
+        print(spacer + 'Alignments outputed', flush = True)
         sys.exit(0)
 
     if not partition:
@@ -343,8 +364,8 @@ def main(
             out.write(nex_data)
 
         if tree_stop:
-            vprint(spacer + 'Concatenated nexus and fasta outputted', 
-                    v = verbose, flush = True)
+            print(spacer + 'Concatenated nexus and fasta outputted', 
+                  flush = True)
             sys.exit(0)
 
         run_partition_tree(out_dir + 'concatenated.fa', 
@@ -353,8 +374,8 @@ def main(
 
     if hpc:
         if slurm:
-            vprint('\nStart pipeline via `sbatch <STARTSTEP>.sh` in ' + out_dir + '\n',
-                v = verbose)
+            print('\nStart pipeline via `sbatch <STARTSTEP>.sh` in ' \
+                + out_dir + '\n')
         else:
             vprint('\nStart pipeline via `qsub <STARTSTEP>.sh` in ' + out_dir + '\n',
                 v = verbose)
@@ -406,6 +427,16 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    execs = ['mafft', 'clipkit']
+    if args.fast:
+        execs.append('fasttree')
+    else:
+        execs.append('iqtree')
+    if args.torque or args.slurm:
+        findExecs(execs, execs)
+    else:
+        findExecs(execs, execs)
+
     output = format_path(args.output)
     if output:
         if not output.endswith('/'):
@@ -419,15 +450,6 @@ if __name__ == '__main__':
         }
     start_time = intro('Fasta2Tree', args_dict)
 
-    execs = ['mafft', 'clipkit']
-    if args.fast:
-        execs.append('fasttree')
-    else:
-        execs.append('iqtree')
-    if args.torque or args.slurm:
-        findExecs(execs, execs)
-    else:
-        findExecs(execs, execs)
 
     if args.input == '-':
         args.input = \
@@ -444,7 +466,7 @@ if __name__ == '__main__':
     main( 
         args.input, slurm = args.slurm, fast = args.fast,
         torque = args.torque, project = args.project,
-        output_dir = output, verbose = not bool(args.verbose), 
+        output_dir = output, verbose = bool(args.verbose), 
         alignment = args.prealigned,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
         flag_incomplete = bool(not args.missing), start = start,
