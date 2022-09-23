@@ -346,12 +346,12 @@ def run_iterative(
     while clus_parameter >= minval and clus_parameter <= maxval:
         attempt += 1 # keep track of iterations for output details
         if 'dist' in params: # hierarchical clustering
-            if 1 - clus_parameter < mincon:
+            if 100 - round(100*clus_parameter) < round(100*mincon):
                 break
             oldClusters, oldTree = clusters, tree
-            clusters, tree = scipyaggd(params['distance_matrix'],
+            clusters, tree = scipyaggd(params['dist'],
                                        float(clus_parameter), 
-                                       params['linkage']) # cluster
+                                       params['link']) # cluster
             cluster_dict = defaultdict(list) # could be more efficient by grabbing in getClusterLabels
             for gene, index in clusters.items(): # create a dictionary clusID:
             # [genes]
@@ -432,9 +432,9 @@ def run_reiterative(
         attempt += 1 # log attempts
         if 'dist' in params: # hierarchical clustering
             oldClusters, oldTree = clusters, tree
-            clusters, tree = scipyaggd(params['distance_matrix'],
+            clusters, tree = scipyaggd(params['dist'],
                                        float(clus_parameter), 
-                                       params['linkage']) # cluster
+                                       params['link']) # cluster
             cluster_dict = defaultdict(list) # could be more efficient by grabbing in getClusterLabels
             for gene, index in clusters.items(): # create a dictionary clusID:
             # [genes]
@@ -443,7 +443,7 @@ def run_reiterative(
             vprint('\nITERATION ' + str(attempt) + ': ' + focal_gene \
                  + ' cluster size: ' + str(focalLen), flush = True, v = verbose)
             vprint('\tMinimum connection: ' + str(mincon) \
-                 + '; Maximum cluster parameter' + str(clus_parameter), flush = True, v = verbose)
+                 + '; Maximum cluster parameter ' + str(clus_parameter), flush = True, v = verbose)
         else: # mmseqs
             res_base = params['dir'] + focal_gene
             res_path = run_mmseqs(params['fa'], res_base, params['dir'], 
@@ -589,7 +589,7 @@ def main(
                         minval = final_iteration['cluster_parameter']
                         new_cp = minval
                         if beyonds:
-                            interval = 0.005
+                            interval = 0.01
                             maxval = float(beyonds[0]['cluster_parameter'])
                         else:
                             interval = 0.05
@@ -653,7 +653,7 @@ def main(
             null_dict, clusters = parse_mmseqs_clus(res_path)
 
     if algorithm == 'hierarchical':
-        return distance_matrix, clusters, tree, oldClusters, oldTree, overshot
+        return param_dict['dist'], clusters, tree, oldClusters, oldTree, overshot
     else:
         return None, clusters, None, oldClusters, None, overshot
 
@@ -739,7 +739,7 @@ if __name__ == '__main__':
                 args.mincon = 30
         if not args.cluster_parameter:
             args.cluster_parameter = 0.75
-    elif args.algnment == 'mmseqs':
+    elif args.alignment == 'mmseqs':
         if args.linclust:
             args.alignment = 'mmseqs easy-linclust'
         else:

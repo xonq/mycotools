@@ -810,6 +810,8 @@ select the clade of interest as described in step 6a.
 - [ ] fa2hmmer2fa annotation
 - [x] update crap information
 - [ ] eggnog to synteny diagram
-- [ ] overview of mycotools scripts functions, e.g. resume on -o
+- [ ] overview of mycotools scripts functions, e.g. resume on -o, output standards
 - [ ] update phylogenetic pipeline with fa2clus renovations
+- [ ] add partition analysis tutorial
+- [ ] discuss output in crap
 
