@@ -10,17 +10,14 @@ import argparse
 import subprocess
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
-    format_path, intro, outro, findExecs, mkOutput
+    format_path, intro, outro, findExecs, mkOutput, multisub
 from mycotools.lib.biotools import fa2dict, dict2fa
 
 class PhyloError(Exception):
     pass
 
-def mafftRun(fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t'):
+def mafftRun(name, fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t'):
 
-    name = fasta
-    if '/' in fasta:
-        name = os.path.basename(os.path.abspath(fasta)) 
     cmd = [
         'mafft', '--auto', '--thread', '-' + str(cpus), fasta
         ]
@@ -39,20 +36,20 @@ def mafftRun(fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t'):
                 os.remove(out_dir + name + '.mafft')	
             raise PhyloError
     else:
-        with open(out_dir + '/mafft.sh', 'w') as out:
+        with open(out_dir + name + '_mafft.sh', 'w') as out:
             if '#PBS' in hpc:
                 out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
                 ' > ' + out_dir + '/' + name + '.mafft' + \
-                '\ncd ' + out_dir + '\nqsub clipkit.sh')
+                '\ncd ' + out_dir + '\nqsub ' + name + '_clipkit.sh')
             else:
                  out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
 		' > ' + out_dir + '/' + name + '.mafft' + \
-                '\ncd ' + out_dir + '\nsbatch clipkit.sh')
+                '\ncd ' + out_dir + '\nsbatch ' + name + '_clipkit.sh')
         
     return out_dir + '/' + name + '.mafft'
 
 
-def trimRun(mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
+def trimRun(name, mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
 
     name2 = out_dir + os.path.basename(mafft) + '.clipkit'
     cmd = ['clipkit', mafft, '--output', name2]
@@ -72,33 +69,37 @@ def trimRun(mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
             raise PhyloError
 
     else:
-        with open(out_dir + '/clipkit.sh', 'w') as out:
+        with open(out_dir + name + '_clipkit.sh', 'w') as out:
             if '#PBS' in hpc:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nqsub tree.sh' )
+                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir \
+                    + '\nqsub ' + name + '_tree.sh' )
             else:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
-                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir + '\nsbatch tree.sh' )
+                    ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir \
+                    + '\nsbatch ' + name + '_tree.sh' )
     
     return name2
 
 
-def run_mf(clipkit_file, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
-    cmd = ['iqtree', '-m', 'MFP+MERGE', '-T', '1', '-B', '1000', '-s',
-           clipkit_file]
-    vprint(spacer + clipkit_file, v = verbose, flush = True)
-    if verbose:
-        run_mf = subprocess.call(cmd)
-    else:
-        run_mf = subprocess.call(cmd, stdout = subprocess.DEVNULL,
-                                 stderr = subprocess.DEVNULL)
-    with open(clipkit_file + '.log', 'r') as raw:
-        for line in raw:
-            if line.startswith('Best-fit model:'):
-                model = re.search(r'Best-fit model: ([^\W]+)', line)[1]
-                break
+def run_mf(clipkit_files, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
+    cpus_per_cmd = 3
+    concurrent_cmds = round((cpus - 1)/4 - 0.5) # round down
+    cmds = [('iqtree', '-m', 'MFP+MERGE', '--threads-max', 
+             str(cpus_per_cmd), '-B', '1000', '-s', f_,) \
+            for f_ in clipkit_files]
+    multisub(cmds, verbose = verbose, processes = concurrent_cmds)
 
-    return model
+    models = {}
+    for f_ in clipkit_files:
+        with open(f_ + '.log', 'r') as raw:
+            for line in raw:
+                if line.startswith('Best-fit model:'):
+                    model = re.search(r'Best-fit model: ([^\W]+)', line)[1]
+                    models[f_] = model
+                    break
+
+    return models
 
 def prepare_nexus(concat_fa, models, spacer = '\t'):
 
@@ -141,13 +142,12 @@ def run_partition_tree(fa_file, nex_file, verbose, cpus, spacer = '\t'):
 
 
 
-def treeRun(clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, spacer = '\t'):
+def treeRun(name, clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, spacer = '\t'):
 
     if fast:
         cmd = ['fasttree', '-out', clipkit_file + '.treefile', clipkit_file]
     else:
         cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-T', str(cpus)]
-
    
     if not hpc:
         print(spacer + 'Tree building', flush = True)
@@ -165,7 +165,7 @@ def treeRun(clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, spacer 
     else: 
         vprint('\nOutputting bash script `tree.sh`.\n', v = verbose, flush = True)
 
-        with open(out_dir + '/tree.sh', 'w') as out:
+        with open(out_dir + name + '_tree.sh', 'w') as out:
             out.write(hpc + '\n\n' + ' '.join([str(x) for x in cmd]))
 
 
@@ -175,6 +175,7 @@ def main(
     spacer = '\t\t', align_stop = False, tree_stop = False, 
     flag_incomplete = True, start = 0, partition = False
     ):
+
 
     hpc = False
     if slurm:
@@ -305,6 +306,7 @@ def main(
 
     trimmed_files = []
     for fasta in files:
+        name = re.search(r'.*?/*([^/]+)/*$', fasta)[1]
         fasta_name = os.path.basename(os.path.abspath(fasta))
         clipkit = out_dir + fasta_name + '.clipkit'
         if start == 0:
@@ -317,7 +319,7 @@ def main(
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
                 if not alignment:
-                    mafft = mafftRun(os.path.abspath(fasta), out_dir, hpc, 
+                    mafft = mafftRun(name, os.path.abspath(fasta), out_dir, hpc, 
                                      verbose, cpus, spacer = spacer)
                 else:
                     mafft = fasta
@@ -334,10 +336,10 @@ def main(
                 else:
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
-                clipkit_out = trimRun(mafft, out_dir, hpc, verbose, spacer = spacer)
+                clipkit_out = trimRun(name, mafft, out_dir, hpc, verbose, spacer = spacer)
             trimmed_files.append(clipkit_out)
         else:
-            trimmed_files.append(clipkit)
+            trimmed_files.append(fasta)
 
     if align_stop:
         print(spacer + 'Alignments outputed', flush = True)
@@ -345,14 +347,13 @@ def main(
 
     if not partition:
         for trimmed_f in trimmed_files:
-            treeRun(trimmed_f, out_dir, hpc, verbose, fast, cpus, spacer = spacer)
+            name_prep = re.search(r'.*?/*([^/]+)/*$', trimmed_f)[1]
+            name = re.sub(r'\.mafft\.clipkit$', '', name_prep)
+            treeRun(name, trimmed_f, out_dir, hpc, verbose, fast, cpus, spacer = spacer)
     else:
         print(spacer + 'Model finding', flush = True)
-        models = {}
-        for trimmed_f in trimmed_files:
-            model = run_mf(trimmed_f, out_dir, hpc, verbose, cpus,
-                   spacer = spacer + '\t')
-            models[trimmed_f] = model
+        model = run_mf(trimmed_files, out_dir, hpc, verbose, cpus,
+               spacer = spacer + '\t')
 
         print(spacer + 'Concatenating', flush = True)
         concat_fa = {ome: {'description': '', 'sequence': ''}
@@ -414,8 +415,6 @@ if __name__ == '__main__':
         help = 'Multigene partition mode')
     m_opt.add_argument('-sa', '--stop_align', action = 'store_true',
         help = 'Stop after aligning and trimming')
-    m_opt.add_argument('-pa', '--prealigned', action = 'store_true',
-        help = 'Use alignments')
     m_opt.add_argument('-sc', '--stop_cat', action = 'store_true',
         help = 'Stop after concatenating sequences')
     m_opt.add_argument('-m', '--missing', action = 'store_true',
@@ -424,6 +423,7 @@ if __name__ == '__main__':
     r_opt = parser.add_argument_group('Runtime options')
     r_opt.add_argument('-v', '--verbose', action = 'store_true')
     r_opt.add_argument('-o', '--output')
+    r_opt.add_argument('-c', '--cpus', default = 1, type = int)
 
     args = parser.parse_args()
 
@@ -443,10 +443,11 @@ if __name__ == '__main__':
             output += '/' # bring to mycotools path expectations
     args_dict = {
         'Fasta': args.input, 'Fast': args.fast, 
-        'Multigene partition': args.partition, 'Prealigned': args.prealigned,
+        'Multigene partition': args.partition, 'Input alignments': bool(args.align),
+        'Input trimmed': bool(args.trim),
         'Alignment stop': args.stop_align, 'Concatenation stop': args.stop_cat,
-        'Ignore missing': args.missing,
-        'Torque': args.torque, 'Slurm': args.slurm, 'HPC project': args.project, 'Output': output
+        'Ignore missing': args.missing, 'Torque': args.torque, 'Slurm': args.slurm, 
+        'HPC project': args.project, 'Output': output, 'CPUs': args.cpus
         }
     start_time = intro('Fasta2Tree', args_dict)
 
@@ -460,17 +461,17 @@ if __name__ == '__main__':
 
     start = 0
     if args.trim:
-        start = 1
-    elif args.prealigned:
         start = 2
+    elif args.align:
+        start = 1
     main( 
         args.input, slurm = args.slurm, fast = args.fast,
         torque = args.torque, project = args.project,
         output_dir = output, verbose = bool(args.verbose), 
-        alignment = args.prealigned,
+        alignment = args.align,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
         flag_incomplete = bool(not args.missing), start = start,
-        partition = bool(args.partition)
+        partition = bool(args.partition), cpus = args.cpus
         )
 #    elif os.path.isdir(input_check):
  #       fas = collect_files(input_check, 'fa')

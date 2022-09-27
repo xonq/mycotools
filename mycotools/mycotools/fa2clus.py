@@ -723,12 +723,12 @@ if __name__ == '__main__':
     if args.refine and not args.maxseq:
         eprint('\nERROR: --maxseq required for refinement', flush = True)
     if args.alignment in {'diamond', 'usearch'}:
-        if args.linkage not in { 'complete', 'average', 'weighted', 'centroid', 'single' }:
+        if args.linkage not in {'complete', 'average', 'weighted', 'centroid', 'single'}:
             eprint('\nERROR: Invalid linkage criterium', flush = True)
-            sys.exit( 1 )
+            sys.exit(1)
         elif args.distance_type not in {'identity', 'bitscore'}:
             eprint('\nERROR: Invalid distance type', flush = True)
-            sys.exit( 3 )
+            sys.exit(3)
         if args.distance_type == 'identity':
             pid = True
             if not args.mincon:
@@ -744,16 +744,17 @@ if __name__ == '__main__':
             args.alignment = 'mmseqs easy-linclust'
         else:
             args.alignment = 'mmseqs easy-cluster'
+        pid = None
         if not args.mincon:
             args.mincon = 0.1
-            pid = None
         if not args.cluster_parameter:
             args.cluster_parameter = 0.3
     else:
         eprint('\nERROR: Invalid alignment software', flush = True)
-        sys.exit( 2 )
+        sys.exit(2)
 
-    findExecs([args.alignment], exit = set(args.alignment))
+    findExecs([args.alignment.split()[0]], 
+               exit = set(args.alignment.split()[0]))
     interval = 0.1
 
     if args.iterative and args.alignment in {'diamond', 'usearch'}:

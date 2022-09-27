@@ -173,14 +173,15 @@ if __name__ == '__main__':
             with open(input_file, 'r') as raw:
                 accs = []
                 for line in raw:
-                    if not line.startswith('#'):
+                    if not line.startswith('#') and line.rstrip():
                         d = line.rstrip().split('\t')
                         accs.append([
                             d[args.column-1] + '[' + d[args.start-1] + '-' + d[args.end-1] + ']'
                             ])
         else:
             with open(input_file, 'r') as raw:
-                accs = [x.rstrip().split('\t')[args.column-1] for x in raw]
+                accs = [x.rstrip().split('\t')[args.column-1] \
+                        for x in raw if x.rstrip()]
     else: # assume we are using accessions
         if '-' == args.accession: # stdin
             data = stdin2str()
