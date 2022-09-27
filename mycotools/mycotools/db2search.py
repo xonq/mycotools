@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+# NEED percent positive filter
 # NEED accession/standard input
 
 import os

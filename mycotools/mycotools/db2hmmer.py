@@ -44,7 +44,7 @@ def compile_hmm_cmd(db, hmm_path, output, ome_set = set(), cpu = 1):
 def compileextractHmmCmd(db, args, output):
     """
     Inputs: mycotools db, argparse arguments, and output path
-    Outputs: tuples of arguments for `runExHmm`
+    Outputs: tuples of arguments for `run_ex_hmm`
     """
 
     cmd_tuples = []
@@ -55,7 +55,7 @@ def compileextractHmmCmd(db, args, output):
     return tuple(cmd_tuples)
 
 
-def runExHmm(args, hmmsearch_out, output):
+def run_ex_hmm(args, hmmsearch_out, output):
 
     ome = os.path.basename(hmmsearch_out).replace('.out', '')
 
@@ -71,11 +71,11 @@ def runExHmm(args, hmmsearch_out, output):
         out_dict = {x: [ome, out_dict[x][1]] for x in out_dict}
         # out_dict = {query: [ome, alignment]}
         # does this overwrite other hits?
+        return ome, out_dict
     else:
         eprint('\tWARNING: ' + ome + ' empty results', flush = True)
         return ome, False
 
-    return ome, out_dict
     
 
 def compileacc2fa(db, output, q_dict):
@@ -175,7 +175,7 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
         ranQueries = [os.path.basename(fa).replace('.faa','') for fa in fas]
         with open(hmm_path, 'r') as hmm_raw:
             queries = grabAccs(hmm_raw.read())
-        if len(set(queries).intersection(set(ranQueries))) == len(set(ranQueries)):
+        if not set(queries).difference(set(ranQueries)):
             skip1 = True
 
 # was a fail safe that can be avoided with tmp files
@@ -242,7 +242,7 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
         exHmm_args = [accessions, max_hits, query_cov, evalue]
         exHmm_tuples = compileextractHmmCmd(db, exHmm_args, ome_dir)
         with mp.get_context('spawn').Pool(processes = cpu) as pool:
-            hmmAligns = pool.starmap(runExHmm, exHmm_tuples)
+            hmmAligns = pool.starmap(run_ex_hmm, exHmm_tuples)
 
         mp.Process(target=tardir, args=[ome_dir])
         print( '\nCompiling fastas' , flush = True)
@@ -363,7 +363,7 @@ if __name__ == '__main__':
     args_dict = { 
         'MycotoolsDB': args.mtdb, 'Hmm database': args.hmm, 'Output': output,
         'Align hmms': args.align, 'Use accession': args.accession, 'Hits/ome': args.max_hits, 
-        'Threshold': args.query_thresh, 'E-value': args.evalue, 
+        'Coverage threshold': args.query_thresh, 'E-value': args.evalue, 
         'Output': output, 'CPUs': cpu
         }
     start_time = intro('db2hmmer', args_dict)

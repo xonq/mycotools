@@ -482,6 +482,8 @@ def run_reiterative(
             if direction != oldDirection: # if the directions changed it was
             # met/overshot
                 if refines[-2][2]: # if the second to last run was successful
+                    vprint('\nITERATION ' + str(attempt - 1) + ' was successful ' \
+                         + 'and will be outputted.', v = verbose, flush = True)
                     return refines[-2][0], refines[-2][1], None, None, log_dict
                 else: # return the two closest to success
                     return refines[-1][0], refines[-1][1], refines[-2][0], refines[-2][1], log_dict
@@ -686,7 +688,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--linclust', action = 'store_true',
         help = 'Use linclust instead of mmseqs cluster (faster, less sensitive)')
     parser.add_argument('-m', '--mincon', help = 'Minimum connection' \
-        + ' for alignment; DEFAULT: [mmseqs]: 0.1 percent query coverage, '  \
+        + ' for alignment; DEFAULT: [mmseqs]: 0.4 percent query coverage, '  \
         + '[aggclus]: 0.2 percent identity, [aggclus]: 30 bitscore', 
         type = float)
     parser.add_argument('-x', '--cluster_parameter', 
@@ -746,7 +748,7 @@ if __name__ == '__main__':
             args.alignment = 'mmseqs easy-cluster'
         pid = None
         if not args.mincon:
-            args.mincon = 0.1
+            args.mincon = 0.4
         if not args.cluster_parameter:
             args.cluster_parameter = 0.3
     else:

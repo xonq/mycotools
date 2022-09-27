@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-
+# NEED percent positive filter
 # NEED to revert to aggclus when failing linclust
     # provide skip option in arguments
     # provide run aggclus in arguments
@@ -169,7 +169,7 @@ def write_seq_clus(clusters, focal_gene, db, output_path, out_fa):
 
 def run_fa2clus(
     fa_path, db, focal_gene, minseq, maxseq, output, out_name,
-    mincon = 0.05, clus_param = 0.3, direction = -1, cpus = 1,
+    mincon = 0.4, clus_param = 0.3, direction = -1, cpus = 1,
     verbose = False, interval = 0.1, spacer = '\t\t\t', error = False,
     algorithm = 'linclust'
     ):
@@ -221,7 +221,7 @@ def run_fa2clus(
 
 def outgroup_mngr(
     db, focal_gene, minseq, maxseq, clus_dir,
-    mincon = 0.05, direction = -1, cpus = 1, interval = 0.1,
+    mincon = 0.4, direction = -1, cpus = 1, interval = 0.1,
     verbose = False, spacer = '\t\t\t\t', error = False
     ):
 
@@ -884,7 +884,7 @@ def og_main(
 
 def search_main(
     db, input_genes, query_fa, query_gff, binary = 'mmseqs', fast = True, 
-    out_dir = None, mincon = 0.05, clus_param = 0.65, minseq = 3, 
+    out_dir = None, mincon = 0.4, clus_param = 0.65, minseq = 3, 
     max_size = 250, cpus = 1, reoutput = True, plusminus = 10000, 
     evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
@@ -1039,7 +1039,7 @@ def search_main(
             clus_dir + str(query) + '.fa', 
             db, query, minseq, max_size, 
             clus_dir, query, mincon, clus_param, cpus = clus_cpus, 
-            verbose = verbose, interval = interval, algorithm = clus_meth
+            verbose = verbose, interval = interval, algorithm = clus_meth,
             )
         if not res:
              print('\t\t\tFAILED: query had no significant hits',
@@ -1122,11 +1122,11 @@ if __name__ == "__main__":
              + 'DEFAULT: 250', 
         default = 250, type = int
         )
-#    clus_opt.add_argument(
- #       '--mincon', 
-  #      help = 'Minimum identity for fa2clus.py. DEFAULT: 0.2', 
-   #     default = 0.2, type = float
-    #    )
+    clus_opt.add_argument(
+        '--mincov', 
+        help = 'Minimum query coverage; DEFAULT: 0.4', 
+        default = 0.4, type = float
+        )
     clus_opt.add_argument(
         '-l', '--linclust',
         help = 'Cluster large gene sets via mmseqs linclust; DEFAULT: \
@@ -1253,6 +1253,7 @@ if __name__ == "__main__":
         'Tree': tree,
         'Minimum seq': args.minseq,
         'Maximum seq': args.maxseq,
+        'Minimum coverage': args.mincov,
         'Bitscore': args.bitscore,
         'GFF': args.gff,
         'Conversion file': args.conversion,
@@ -1288,7 +1289,7 @@ if __name__ == "__main__":
         og_main(
             db, input_genes, args.orthogroups, fast = fast, 
             out_dir = out_dir, 
-            mincon = 0.05, clus_param = 0.65, minseq = args.minseq, 
+            mincon = args.mincov, clus_param = 0.65, minseq = args.minseq, 
             max_size = args.maxseq, cpus = args.cpu,
             verbose = args.verbose, plusminus = args.plusminus, 
             interval = 0.1, labels = not args.no_label,
@@ -1305,12 +1306,12 @@ if __name__ == "__main__":
         search_main(
             db, input_genes, input_fa, input_GFF, 
             binary = args.search, fast = fast, out_dir = out_dir,
-            mincon = 0.05, clus_param = 0.65, minseq = args.minseq, 
+            mincon = args.mincov, clus_param = 0.65, minseq = args.minseq, 
             max_size = args.maxseq, cpus = 1, plusminus = args.plusminus, 
             bitscore = args.bitscore, pident = 0, mem = None, 
             verbose = args.verbose, interval = 0.1, 
             midpoint = not bool(args.no_midpoint),
             outgroups = not args.no_outgroup, conversion_dict = conversion_dict, 
-            clus_meth = clus_meth, labels = not args.no_label
+            clus_meth = clus_meth, labels = not args.no_label,
             )
     outro(start_time)

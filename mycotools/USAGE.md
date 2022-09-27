@@ -814,4 +814,4 @@ select the clade of interest as described in step 6a.
 - [ ] update phylogenetic pipeline with fa2clus renovations
 - [ ] add partition analysis tutorial
 - [ ] discuss output in crap
-
+- [ ] add caveats to outputs of fa2clus, crap, etc

@@ -6,21 +6,22 @@ import sys
 import argparse
 from mycotools.lib.kontools import intro, outro, file2list
 
-def grabNames( data, query = False ):
+def grab_names(data, query = False):
 
     if query:
-        comp = re.compile( r'Query\:       (.*?)\W+\[M\=\d+\]' )
+        comp = re.compile(r'Query\:       (.*?)\W+\[M\=\d+\]')
     else:
-        comp = re.compile( r'Accession\:   (.*)' )
+        comp = re.compile(r'Accession\:   (.*)')
 
-    namesPrep = comp.finditer( data )
+    namesPrep = comp.finditer(data)
 #    namesPrep = comp.findall(data)
-    names_set = set( x[1] for x in namesPrep )
+    names_set = set(x[1] for x in namesPrep)
 
     return names_set
 
 
-def grabHits( data, threshold = None, evalue = None, top = None, query = False, accession = False ):
+def grab_hits(data, threshold = None, evalue = None, 
+             top = None, query = False, accession = False):
 
     if query:
         comp = re.compile( r'^Query: +' + query + r' +\[M\=(\d+)\]$\n([\s\S]+?\n\n)' \
@@ -159,11 +160,19 @@ def main(
 
     check, out = None, {}
     if accession:
-        if accession == True:
-            check = grabNames( data )
+#        if accession == True:
+        check = grab_names(data)
+        if not check:
+            check = grab_names(data, True)
+            accession = False
+            query = True
     else:
-        if query == True:
-            check = grabNames( data, True )
+#        if query == True:
+        check = grab_names(data, True)
+        if not check:
+            accession = True
+            query = False
+            check = grab_names(data)
 
     if isinstance(check, set):
         for x in check:
@@ -173,10 +182,10 @@ def main(
                 align = '#seq\tdomNum\tincl_thresh\tscore\tbias\tc-Evalue\ti-Evalue\thmmFrom\t' + \
                                     'hmmTo\taliFrom\taliTo\tenvFrom\tenvTo\tacc\n'
             if accession:
-                t_hits, t_aligns = grabHits( data, threshold, evalue = evalue, \
+                t_hits, t_aligns = grab_hits( data, threshold, evalue = evalue, \
                     top = best, accession = x )
             else:
-                t_hits, t_aligns = grabHits( data, threshold, evalue = evalue, \
+                t_hits, t_aligns = grab_hits( data, threshold, evalue = evalue, \
                     top = best, query = x )
             if t_hits:
                 hits += t_hits
@@ -188,7 +197,7 @@ def main(
             hits = '#seq\tseq_e\tseq_score\tseq_bias\tdom_e\tdom_score\tdom_bias\texp\tN\n'
             align = '#seq\tdomNum\tincl_thresh\tscore\tbias\tc-Evalue\ti-Evalue\thmmFrom\t' + \
                             'hmmTo\taliFrom\taliTo\tenvFrom\tenvTo\tacc\n'
-        t_hits, t_aligns = grabHits(data, threshold, top = best, \
+        t_hits, t_aligns = grab_hits(data, threshold, top = best, \
             query = query, accession = accession)
         hits += t_hits
         align += t_aligns
