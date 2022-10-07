@@ -245,6 +245,7 @@ def gff2Comps():
 
     comps = {}
     comps['id'] = r'name "([^"]+)"'
+    # this unfortunately includes "gene_name" from gtf naming
     comps['prot'] = r'proteinId ([^;]+)'
     comps['transcript'] = r'transcriptId ([^;]+)'
     comps['alias'] = r'alias "([^"]+)"'

@@ -15,7 +15,12 @@ def gff2gff3(gff_list, ome, jgi_ome):
     for entry in gff_list:
         if entry['type'] == 'exon':
             name = re.search( comps2['id'], entry['attributes'] )[1]
+  #          try:
             transcript = re.search( comps2['transcript'], entry['attributes'] )[1]
+  
+  #except TypeError:
+ #               print(entry['attributes'], comps2['transcript'], flush = True)
+#                sys.exit()
             if name not in exon_dict:
                 exon_dict[name] = 0
             if name not in gene_dict:

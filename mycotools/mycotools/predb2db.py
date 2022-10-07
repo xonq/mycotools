@@ -429,11 +429,11 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                                                 entry['attributes'])
             else:
                 break
-        elif re.search(gff2Comps()['id'], entry['attributes']):
-            gffVer = 2
-            break
         elif re.search(gtfComps()['id'], entry['attributes']):
             gffVer = 2.5
+            break
+        elif re.search(gff2Comps()['id'], entry['attributes']):
+            gffVer = 2
             break
 
     if gffVer == 3:

@@ -352,7 +352,7 @@ def main(
             treeRun(name, trimmed_f, out_dir, hpc, verbose, fast, cpus, spacer = spacer)
     else:
         print(spacer + 'Model finding', flush = True)
-        model = run_mf(trimmed_files, out_dir, hpc, verbose, cpus,
+        models = run_mf(trimmed_files, out_dir, hpc, verbose, cpus,
                spacer = spacer + '\t')
 
         print(spacer + 'Concatenating', flush = True)

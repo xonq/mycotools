@@ -4,7 +4,7 @@ import os
 import re
 import sys
 import argparse
-from mycotools.lib.kontools import intro, outro, file2list
+from mycotools.lib.kontools import intro, outro, file2list, format_path, mkOutput
 
 def grab_names(data, query = False):
 
@@ -214,7 +214,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser( description = 'Extracts inputted accession hits and alignments from `hmmsearch` ' + \
         'output. Optionally provide a size-based query threshold to only extract alignments of a certain size.' )
     parser.add_argument( '-i', '--input', required = True, help = '`hmmsearch` output' )
-    parser.add_argument( '-o', '--output', required = True, help = 'Output file name/path (extensions automatically applied' )
     parser.add_argument( '-a', '--accession', \
         help = 'Accession to extract or new line delimited list of accessions; `-a`|`-q` required' )
     parser.add_argument( '-q', '--query', \
@@ -225,11 +224,18 @@ if __name__ == '__main__':
         + '10^(-x) where `x` is the input.' )
     parser.add_argument( '--allq', action = 'store_true', help = 'Extract all queries' )
     parser.add_argument( '--alla', action = 'store_true', help = 'Extract all accessions' )
+    parser.add_argument( '-o', '--output', help = 'Output file name/path (extensions automatically applied' )
     args = parser.parse_args()
 
+    # initialize output file structure
+    output = format_path(args.output)
+    if not args.output:
+        output = mkOutput(os.getcwd() + '/', 'extractHmmsearch')
+    elif not os.path.isdir(output):
+        os.mkdir(args.output)
 
     args_dict = { 
-        'Input': args.input, 'Output': args.output, 'Accession': args.accession,
+        'Input': args.input, 'Output': output, 'Accession': args.accession,
         'Query': args.query,  'Best hits': args.best, 'Threshold': args.threshold,
         'E-value': args.evalue
     }
@@ -269,9 +275,6 @@ if __name__ == '__main__':
         out_dict = main( 
             data, args.accession, args.best, args.threshold, args.evalue, query = args.query 
             )
-        output = os.path.abspath( args.output )
-        if not os.path.isdir( output ):
-            os.mkdir( output )
     else:
         for que in ques:
             if args.query:
@@ -286,9 +289,9 @@ if __name__ == '__main__':
         out_dict = synthesizeHits( out_dict )
 
     for name in out_dict:
-        with open( output + '/' + name + '.hits.tsv', 'w' ) as out:
+        with open(output + '/' + name + '.hits.tsv', 'w') as out:
             out.write( out_dict[name][0] )
-        with open( output + '/' + name + '.aligns.tsv', 'w' ) as out:
+        with open(output + '/' + name + '.aligns.tsv', 'w') as out:
             out.write( out_dict[name][1] )
 
     outro( start_time )
