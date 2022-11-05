@@ -65,11 +65,13 @@ def run_ex_hmm(args, hmmsearch_out, output):
     except FileNotFoundError:
         eprint('\tWARNING: ' + ome + ' failed', flush = True)
         return ome, False
-    out_dict = None
     if len(data) > 100: # check for data # check for data
-        out_dict = exHmm(data, args[0], args[1], args[2], args[3], header = False)
-        out_dict = {x: [ome, out_dict[x][1]] for x in out_dict}
-        # out_dict = {query: [ome, alignment]}
+        hmm_data = exHmm(data, args[0], args[1], args[2], args[3], header = False)
+        out_dict = {}
+        for q, data in hmm_data.items(): # parse alignment info
+            hit_info = [x.split('\t') for x in data[1].rstrip().split('\n')]
+            out_dict[q] = tuple([(x[0], int(x[9]), int(x[10]),) for x in hit_info])
+            # hit_accession, coordinate start, coordinate end
         # does this overwrite other hits?
         return ome, out_dict
     else:
@@ -77,36 +79,50 @@ def run_ex_hmm(args, hmmsearch_out, output):
         return ome, False
 
     
-
-def compileacc2fa(db, output, q_dict):
+def compileacc2fa(db, output, q_dict, coords = True):
 
     cmd_tuples = []
     if not os.path.isdir(output):
         os.mkdir(output)
     fa_dict = {ome: row['faa'] for ome, row in db.items()}
     for q in q_dict:
-        cmd_tuples.append((db, q_dict[q], output + '/' + q + '.faa'))
+        cmd_tuples.append((db, q_dict[q], 
+                           output + '/' + q + '.faa', coords,))
 
     return cmd_tuples
 
 
-def runacc2fa(db, q_files, output):
+def runacc2fa(db, q_files, output, coords = False):
 
-  #  fa_str = ''
- #   for ome in q_files:
-#        q = q_files[ome]
-#        df = pd.read_csv(StringIO(q), sep = '\t', header = None)
     accs = []
-    for ome, hit_data in q_files.items():
-        t_accs = [x.split('\t')[0] for x in hit_data.rstrip().split('\n')]
-        accs.extend(t_accs)
+    if coords:
+        for ome, hit_data in q_files.items():
+            t_accs = [f'{x[0]}[{x[1]}:{x[2]}]' for x in hit_data]
+            accs.extend(t_accs)
+    else:
+        for ome, hit_data in q_files.items():
+            t_accs = [x[0] for x in hit_data]
+            accs.extend(t_accs)
 
     fa_str = dict2fa(acc2fa(db, accs))
-#    fa_str = acc2fa(db, 
- #       fa_str += dict2fa(acc2fa(df, header, fa = fa_dict[ome])) + '\n'
     
     with open( output, 'w' ) as out:
         out.write( fa_str )
+
+
+def compile_mafft_cmds(output, faa_dir):
+    fas = collect_files(faa_dir, 'faa') # grab completed fastas
+    cmds = []
+    for fa in fas:
+        acc = os.path.basename(fa)[:-4]
+        align = output + '/aligns/' + acc + '.mafft.fasta'
+        if os.path.isfile(align): # check for data
+            with open(align, 'r') as raw:
+                data = raw.read()
+            if len(data) > 10:
+                continue
+        cmds.append(f'mafft {fa} > {align}')
+    return tuple(cmds)
 
 
 def compile_hmmalign_cmds( output, accessions ):
@@ -116,39 +132,36 @@ def compile_hmmalign_cmds( output, accessions ):
     for acc in accessions:
         fa = output + '/fastas/' + acc + '.faa'
         hmm = output + '/hmms/' + acc + '.hmm'
-        align = output + '/aligns/' + acc + '.a2m'
+        align = output + '/aligns/' + acc + '.stockholm'
         conv = output + '/aligns/' + acc + '.phylip'
-        trim = output + '/trimmed/' + acc + '.trimal'
+        trim = output + '/trimmed/' + acc + '.clipkit.fa'
         if os.path.isfile(conv):
             with open(conv, 'r') as raw:
                 data = raw.read()
             if len(data) > 10:
                 continue
-        cmds.append((('hmmalign', '--outformat', 'A2m', '-o', 
+        cmds.append((('hmmalign', '--trim', '-o', 
                      align, hmm, fa, '&&',),
-                    ('esl-reformat', '-o', conv, 'phylip', align),),)
-   #     hmmalign = ( 'hmmalign', '--outformat', 'A2m', '-o', align, hmm, fa )
- #       esl = ( 'esl-reformat', '-o', conv, 'phylip', align )
-#        cmd_tuples[0].append( hmmalign )
-  #      cmd_tuples[1].append( esl )
+                    ('esl-reformat', '--informat', 'stockholm',
+                     '-o', conv, 'phylip', align),),)
 
     return tuple(cmds)
 
 
-def compile_trim_cmd(output, mod = '', trimmed = None):
+def compile_trim_cmd(output, mod = '', trimmed = None, ex = 'phylip'):
 
-    mod_args = mod.split( ' ' )
+    mod_args = mod.split(' ')
     cmd_tuples = []
-    aligns = collect_files( output + 'aligns/', 'phylip' )
+    aligns = collect_files(output + 'aligns/', ex)
     if trimmed:
-        trimmed = set( os.path.basename(x).replace('.clipkit','') \
+        trimmed = set(os.path.basename(x).replace('.clipkit','') \
             for x in trimmed )
-        aligns = [x for x in aligns if os.path.basename(x).replace('.phylip','') \
+        aligns = [x for x in aligns if os.path.basename(x).replace(ex,'') \
              not in trimmed]
     for align in aligns:
-        trim = output + 'trimmed/' \
-             + os.path.basename(align).replace('.phylip','.clipkit') \
-             + '.phylip'
+        trim = f'{output}trimmed/' \
+             + {os.path.basename(align).replace(ex,'clipkit') \
+             + '.' + ex
         args = ['clipkit', align, '-o', trim]
         if mod_args[0]:
             args.extend(mod_args) 
@@ -158,6 +171,7 @@ def compile_trim_cmd(output, mod = '', trimmed = None):
 
 
 def main(db, hmm_path, output, accessions, max_hits, query_cov,
+         coords = False, hmmalign = True, align = True,
          evalue = 0.01, binary = 'hmmsearch', trim_mod = '', verbose = False):
 
     ome_dir = output + 'omes/'
@@ -166,40 +180,32 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
     hmm_dir = output + 'hmms/'
     trm_dir = output + 'trimmed/'
 
+    if hmmalign:
+        aln_ext = 'phylip'
+    else:
+        aln_ext = 'fasta'
+
     db = db.set_index('ome')
     ome_set, skip1, skip2 = set(), False, False
     if os.path.isdir(faa_dir): # is there a previous run?
         print('\nCompiling previous run', flush = True)
         # check if all fastas are made
-        fas = collect_files(faa_dir, '.faa') # grab completed fastas
+        fas = collect_files(faa_dir, 'faa') # grab completed fastas
         ranQueries = [os.path.basename(fa).replace('.faa','') for fa in fas]
         with open(hmm_path, 'r') as hmm_raw:
             queries = grabAccs(hmm_raw.read())
         if not set(queries).difference(set(ranQueries)):
             skip1 = True
 
-# was a fail safe that can be avoided with tmp files
-#            for fa in fas:
- #               with open(fa, 'r') as raw:
-  #                  data = raw.read()
-   #             if len(data) < 10:
-    #                skip1 = False
-     #               break
         if skip1:
             if os.path.isdir(aln_dir):
                 # check if all alignments are made
-                phylips = collect_files(aln_dir, 'phylip')
-                ranQueries = [os.path.basename(x).replace('.phylip','') \
-                              for x in phylips]
+                aligns = collect_files(aln_dir, aln_ext)
+                ranQueries = [os.path.basename(x).replace(f'.{aln_ext}','') \
+                              for x in aligns]
                 if len(set(queries).intersection(set(ranQueries) \
-                    )) == len(set(ranQueries)):
+                    )) == len(set(queries)):
                     skip2 = True
-#                    for phy in phylips:
- #                       with open(phy, 'r') as raw:
-  #                          data = raw.read()
-   #                     if len(data) < 10:
-    #                        skip2 = False
-     #                       break
             
     if not skip1: # do not skip the first step
         if os.path.isfile(output + 'omes.tar.gz'):
@@ -248,64 +254,51 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
         print( '\nCompiling fastas' , flush = True)
         # q_dict = {query: ome: alignment}
         q_dict = defaultdict(dict)
-        for ome, hit in hmmAligns:
-            if hit:
-                for query in hit:
-                    align = hit[query][1]
-                    q_dict[query][ome] = align
+        for ome, hits in hmmAligns:
+            if hits:
+                for query, hit_info in hits.items():
+#                    align = hit[query][1]
+                    q_dict[query][ome] = hit_info
 
-        acc2fa_tuples = compileacc2fa(db, faa_dir, q_dict)
+        acc2fa_tuples = compileacc2fa(db, faa_dir, q_dict, coords = coords)
         with mp.get_context('spawn').Pool(processes = cpu) as pool:
             pool.starmap(runacc2fa, acc2fa_tuples)        
 
-    if args.align:
+    if align:
         if not skip2:
-            print( '\nAligning fastas to hmms' , flush = True)
-            if not os.path.isdir(hmm_dir):
-                os.mkdir(hmm_dir)
-            with open(hmm_path, 'r' ) as hmm:
-                hmm_dict = absHmm( hmm.read() )
-            for accession in hmm_dict:
-                with open( hmm_dir + accession + '.hmm', 'w' ) as out:
-                    out.write( hmm_dict[ accession ] )
+            print('\nAligning' , flush = True)
 
             if not os.path.isdir(aln_dir):
                 os.mkdir(aln_dir)
 
-            
-            hmmAlign_tuples = compile_hmmalign_cmds(output,
+            if hmmalign:
+                if not os.path.isdir(hmm_dir):
+                    os.mkdir(hmm_dir)
+                with open(hmm_path, 'r' ) as hmm:
+                    hmm_dict = absHmm(hmm.read())
+                for accession in hmm_dict:
+                    with open(hmm_dir + accession + '.hmm', 'w') as out:
+                        out.write(hmm_dict[accession])
+                hmmAlign_tuples = compile_hmmalign_cmds(output,
                                                     list(hmm_dict.keys()))
-            hmmAlign_codes = multisub(hmmAlign_tuples, processes = cpu - 1,
-                                      verbose = verbose)
-#            print(hmmAlign_codes)
- #           esl_codes = multisub( hmmAlign_tuples[1], processes = cpu - 1 )
-  #          print(esl_codes)
-            for index in range(len(hmmAlign_codes)):
-                code = hmmAlign_codes[index]
-                if code['code']:
-                    eprint('\tERROR: ' + str(code['stdin']), flush = True)
-#                else:
- #                   code = esl_codes[ index ]
-  #                  if code['code'] != 0:
-   #                     print( '\tesl-reformat exit ' + str(code['code'], flush = True) + ' ' + \
-    #                        os.path.basename( code['stdin'][-1] ) )
-     #               os.remove( code['stdin'][-1] )
+                align_codes = multisub(hmmAlign_tuples, processes = cpu - 1,
+                                          verbose = verbose)
+            else:
+                mafft_tuples = compile_mafft_cmds(output, faa_dir)
+                align_codes = multisub(mafft_tuples, processes = cpu - 1,
+                                       shell = True, verbose = verbose)
         
         print( '\nTrimming alignments' , flush = True)
         trimmed = None
         if os.path.isdir(trm_dir):
-            trimmed = collect_files(trm_dir, 'phylip')
+            trimmed = collect_files(trm_dir, aln_ext)
         else:
             os.mkdir(trm_dir)
-        trim_tuples = compile_trim_cmd(output, mod = trim_mod, trimmed = trimmed)
+        trim_tuples = compile_trim_cmd(output, mod = trim_mod, 
+                                       trimmed = trimmed, ex = aln_ext)
 
         trim_codes = multisub(trim_tuples, processes = cpu - 1,
                               verbose = verbose)
-        # clipkit or the subsequent command raises an exit error
-#        for code in trim_codes:
- #           if code['code']:
-  #              eprint('\tERROR: ' + str(code['stdin']), flush = True)
-
 
 
 if __name__ == '__main__':
@@ -332,10 +325,16 @@ if __name__ == '__main__':
         help = 'Query percent hit threshold (+/-)')
     p_arg.add_argument('-e', '--evalue', help = 'E value threshold, e.g. ' \
         + '10^(-x) where x is the input', type = int)
+    p_arg.add_argument('--coordinate', help = 'Extract alignment coordinates',
+        action = 'store_true')
     p_arg.add_argument('-a', '--accession', action = 'store_true', default = False, \
         help = 'Extract accessions instead of queries (Pfam, etc)' )
-    p_arg.add_argument('-l', '--align', default = False, action = 'store_true', \
-        help = 'Align fastas to original hmm and trim via clipkit' )
+
+    a_arg = parser.add_argument_group('Alignment parameters')
+    a_arg.add_argument('-l', '--align', default = False, action = 'store_true', \
+        help = 'Align fastas and trim via clipkit')
+    a_arg.add_argument('--mafft', action = 'store_true', 
+        help = 'Align via mafft. DEFAULT: hmmalign')
 
     r_arg = parser.add_argument_group('Runtime options')
     r_arg.add_argument('-v', '--verbose', action = 'store_true')
@@ -345,10 +344,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     deps = ['hmmsearch']
     if args.align:
-        deps.extend(['hmmalign', 'clipkit', 'esl-reformat'])
+        if args.mafft:
+            deps.extend(['mafft', 'clipkit'])
+            align = 'mafft'
+        else:
+            deps.extend(['hmmalign', 'clipkit', 'esl-reformat'])
+            align = 'hmmalign'
+    else:
+        align = False
     findExecs(deps, exit = set(deps))
-#    if args.previous:
- #       args.output = args.previous
 
     if not args.output:
         output = mkOutput(os.getcwd() + '/', 'db2hmmer')
@@ -362,15 +366,17 @@ if __name__ == '__main__':
 
     args_dict = { 
         'MycotoolsDB': args.mtdb, 'Hmm database': args.hmm, 'Output': output,
-        'Align hmms': args.align, 'Use accession': args.accession, 'Hits/ome': args.max_hits, 
+        'Align': align, 'Use accession': args.accession, 'Hits/ome': args.max_hits, 
         'Coverage threshold': args.query_thresh, 'E-value': args.evalue, 
+        'Coordinate extract': args.coordinate,
         'Output': output, 'CPUs': cpu
         }
     start_time = intro('db2hmmer', args_dict)
     db = mtdb(args.mtdb)
 
     main(db, format_path(args.hmm), output, 
-         args.accession, args.max_hits, args.query_thresh,
-         evalue = args.evalue, binary = args.binary, verbose = args.verbose)
+         args.accession, args.max_hits, args.query_thresh, align = args.align,
+         evalue = args.evalue, binary = args.binary, hmmalign = not bool(args.mafft),
+         coords = args.coordinate, verbose = args.verbose)
 
     outro(start_time)

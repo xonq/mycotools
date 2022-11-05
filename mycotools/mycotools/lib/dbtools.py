@@ -657,6 +657,12 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                 break
             except IndexError:
                 lineages = []
+            except HTTPError:
+                time.sleep(1)
+                handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
+                records = Entrez.read(handle)
+                lineages = records[0]['LineageEx']
+                break
 
 # for each lineage, if it is a part of the kingdom, `king`, use that TaxID
 # if there are multiple TaxIDs, use the first one found

@@ -85,8 +85,9 @@ def trimRun(name, mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
 def run_mf(clipkit_files, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
     cpus_per_cmd = 3
     concurrent_cmds = round((cpus - 1)/4 - 0.5) # round down
-    cmds = [('iqtree', '-m', 'MFP+MERGE', '--threads-max', 
-             str(cpus_per_cmd), '-B', '1000', '-s', f_,) \
+    cmds = [('iqtree', '-m', 'MFP+MERGE', '-nt', 'AUTO',
+             '-B', '1000', '-s', f_, '--prefix', 
+             out_dir + os.path.basename(f_)) \
             for f_ in clipkit_files]
     multisub(cmds, verbose = verbose, processes = concurrent_cmds)
 
@@ -130,8 +131,9 @@ def prepare_nexus(concat_fa, models, spacer = '\t'):
     return nex_data, concat_fa 
 
 def run_partition_tree(fa_file, nex_file, verbose, cpus, spacer = '\t'):
-    cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-T', str(cpus),
-           '-B', '1000', '--sampling', 'GENESITE']
+    cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-nt', 'auto',
+           '-B', '1000', '--sampling', 'GENESITE'] # this is not using the
+           # specified CPUs, but instead the most efficient
     print(spacer + 'Tree building', flush = True)
     if verbose:
         run_tree = subprocess.call(cmd)
@@ -147,8 +149,8 @@ def treeRun(name, clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, s
     if fast:
         cmd = ['fasttree', '-out', clipkit_file + '.treefile', clipkit_file]
     else:
-        cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-T', str(cpus)]
-   
+        # the following will identify the optimum number of threads
+        cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-nt', 'auto']
     if not hpc:
         print(spacer + 'Tree building', flush = True)
         if verbose:
@@ -258,6 +260,9 @@ def main(
                 else:
                     continue
             files[i] = out_name
+
+    files = [x for x in files \
+             if x.endswith(('fasta', 'fa', 'fna', 'faa', 'fsa'))]
 
     if partition: #multigene partition mode
         ome2fa2gene = defaultdict(dict)

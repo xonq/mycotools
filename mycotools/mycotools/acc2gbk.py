@@ -14,9 +14,9 @@ from mycotools.acc2gff import dbMain as acc2gff
 
 def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
                                'tRNA', 'rRNA', 'RNA', 'pseudogene'}):
-    '''Collect all CDS entries from a `gff` and store them into cds_dict. If the gene found in the CDS
-    is in the set of `ids` then add that type to the CDS dict for that protein
-    header.'''
+    """Collect all CDS entries from a `gff` and store them into cds_dict. 
+    If the gene found in the CDS is in the set of `ids` then add that type 
+    to the CDS dict for that protein header."""
 
     cds_dict = defaultdict(dict)
     for entry in gff_list:
@@ -97,9 +97,9 @@ def contig2gbk(ome, row, contig, contig_dict,
             elif entry['type'].lower() in {'gene', 'pseudogene'}:
                 entries['gene'].append(entry)
 
-
         for entry in entries['gene']:
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            eprint(alias)
             if '|' in alias: # alternately spliced gene
                 if alias in used_aliases:
                     continue
@@ -132,9 +132,24 @@ def contig2gbk(ome, row, contig, contig_dict,
         for entry in entries['RNA']:
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
+            try:
+                product = re.search(product_search, entry['attributes'])[1]
+            except TypeError: # no product
+                product = ''
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            id_ = re.search(gff3Comps()['par'], entry['attributes'])[1]
+
             if final_coords:
                 gbk += final_coords
             else:
+                start, end = sorted([int(entry['start']),
+                                     int(entry['end'])])
+                if entry['strand'] == '+':
+                    gene_coords = str(start-init_start_test) + '..' \
+                        + str(end-init_start_test) + '\n                     '
+                else:
+                    gene_coords = 'complement(' + str(start-init_start_test) \
+                        + '..' + str(end-init_start_test) + ')\n                     '
                 gbk += gene_coords
             gbk += '/locus_tag="' + alias + '"\n                     ' 
 
@@ -239,7 +254,7 @@ def contig2gbk(ome, row, contig, contig_dict,
     gbk += '//'
     return gbk
 
-def genGBK(ome_dict, row, ome, product_search):
+def gen_gbk(ome_dict, row, ome, product_search):
 
     assembly = fa2dict(row['fna'])
     faa = fa2dict(row['faa'])
@@ -258,7 +273,7 @@ def main(gff_list, db, product_search = r'product=([^;]+)'):
                      'tRNA', 'rRNA', 'RNA', 'pseudogene'})
     ome_gbks = {}
     for ome, ome_dict in cds_dict.items():
-        ome_gbks[ome] = genGBK(ome_dict, db[ome], ome, product_search)
+        ome_gbks[ome] = gen_gbk(ome_dict, db[ome], ome, product_search)
 
     return ome_gbks
 

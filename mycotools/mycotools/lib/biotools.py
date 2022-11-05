@@ -172,7 +172,7 @@ def dict2fa(fasta_dict, description = True):
             fasta_string += '>' + gene.rstrip() + '\n' + \
             fasta_dict[ gene ][ 'sequence' ].rstrip() + '\n'
 
-    return fasta_string.rstrip()
+    return fasta_string
 
 # need to turn these into classes and class functions
 def calc_gc(gene):
@@ -183,8 +183,6 @@ def calc_gc(gene):
     GC_con = '{:.2%}'.format(GC)
 
     return(GC_con)
-
-
 
 # need to change into a class
 def gff2list(gff_info, path = True, error = True):
@@ -257,7 +255,7 @@ def gff2Comps():
 def gtfComps():
 
     comps = {}
-    comps['id'] = r'gene_id "([^"]+)"'
+    comps['id'] = r'gene_id "?([^"]+)"?'
     comps['transcript'] = r'transcript_id "([^"]+)"'
     comps['alias'] = r'alias "([^"]+)"'
     comps['ver'] = 'gtf'

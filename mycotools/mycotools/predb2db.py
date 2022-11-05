@@ -70,7 +70,7 @@ def move_biofile(old_path, ome, typ, wrk_dir, suffix = '' ):
 
 def gen_predb():
     example = [
-        'Fibsp1', 'Fibularhizoctonia', 'psychrophila', 'CBS',
+        'Fibsp1', '', 'Fibularhizoctonia', 'psychrophila', 'CBS',
         '1.0', 'n', '<PATH/TO/ASSEMBLY>', '<PATH/TO/GFF3>', 'jgi',
         'no', '2018'
         ]
@@ -425,7 +425,7 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                     alias = True
                 else:
                     alias = False # remove the old aliases
-                    entry['attributes'] = re.sub(r'Alias=[^;]+', '',
+                    entry['attributes'] = re.sub(r';?Alias=[^;]+', '',
                                                 entry['attributes'])
             else:
                 break

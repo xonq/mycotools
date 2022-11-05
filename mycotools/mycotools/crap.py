@@ -1152,18 +1152,18 @@ if __name__ == "__main__":
                 easy-cluster',
         action = 'store_true'
         )
-#    clus_opt.add_argument(
- #       '-a', '--agg_clus',
-  #      help = 'Cluster large gene sets via hierarchical clustering ' \
-   #          + 'NONFUNCTIONAL',
-    #    action = 'store_true'
-       # ) # NOT IMPLEMENTED
-#    clus_opt.add_argument(
- #       '-f', '--fail',
-  #      help = 'Do not fallback to alternative clustering method upon ' \
-   #          + 'failure NONFUNCTIONAL',
-    #    action = 'store_true'
-     #   ) # NOT IMPLEMENTED
+    clus_opt.add_argument(
+        '-a', '--agg_clus',
+        help = 'Cluster large gene sets via hierarchical clustering ' \
+             + 'NONFUNCTIONAL',
+        action = 'store_true'
+        ) # NOT IMPLEMENTED
+    clus_opt.add_argument(
+        '-f', '--fail',
+        help = 'Do not fallback to alternative clustering method upon ' \
+             + 'failure NONFUNCTIONAL',
+        action = 'store_true'
+        ) # NOT IMPLEMENTED
 
 
     phy_opt = parser.add_argument_group('Phylogeny annotation')
@@ -1272,7 +1272,7 @@ if __name__ == "__main__":
         'Tree': tree,
         'Minimum seq': args.min_seq,
         'Maximum seq': args.max_seq,
-        'Minimum coverage': args.mincov,
+        'Minimum coverage': args.min_cov,
         'Bitscore': args.bitscore,
         'GFF': args.gff,
         'Conversion file': args.conversion,
@@ -1308,7 +1308,7 @@ if __name__ == "__main__":
         og_main(
             db, input_genes, args.orthogroups, fast = fast, 
             out_dir = out_dir, 
-            clus_cons = args.mincov, clus_var = 0.65, min_seq = args.min_seq, 
+            clus_cons = args.min_cov, clus_var = 0.65, min_seq = args.min_seq, 
             max_size = args.max_seq, cpus = args.cpu,
             verbose = args.verbose, plusminus = args.plusminus, 
             interval = 0.1, labels = not args.no_label,
@@ -1325,7 +1325,7 @@ if __name__ == "__main__":
         search_main(
             db, input_genes, input_fa, input_GFF, 
             binary = args.search, fast = fast, out_dir = out_dir,
-            clus_cons = args.mincov, clus_var = 0.65, min_seq = args.min_seq, 
+            clus_cons = args.min_cov, clus_var = 0.65, min_seq = args.min_seq, 
             max_size = args.max_seq, cpus = 1, plusminus = args.plusminus, 
             bitscore = args.bitscore, pident = 0, mem = None, 
             verbose = args.verbose, interval = 0.1, 

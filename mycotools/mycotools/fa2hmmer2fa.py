@@ -39,7 +39,7 @@ def runHmmer(fasta, hmm, output, cpu = 1, binary = 'hmmsearch'):
     return hmm_status
 
 
-def runExtractHmm(
+def run_extract_hmm(
     hmm_out, top_hits, cov_threshold, evalue, query = True, acc = None
     ):
 
@@ -59,7 +59,7 @@ def runExtractHmm(
     return hmm_data
 
 
-def parseHmmData(hmm_data):
+def parse_hmm_data(hmm_data):
 
     output_res = {}
     for query in hmm_data:
@@ -79,7 +79,7 @@ def parseHmmData(hmm_data):
     return output_res
 
 
-def runAcc2fa(db, biotype, output_res, subhit = True, cpu = 1):
+def run_acc2fa(db, biotype, output_res, subhit = True, cpu = 1):
 
     acc2fa_cmds = compAcc2fa(db, biotype, output_res, subhit)
     output_fas = {}
@@ -134,14 +134,14 @@ def main(
         sys.exit(2)
     
     print('\nParsing output', flush = True)
-    hmm_data = runExtractHmm(
+    hmm_data = run_extract_hmm(
         hmmer_out, top_hits, cov_threshold, evalue, 
         not accession_search, accession
         )
-    output_res = parseHmmData(hmm_data)
+    output_res = parse_hmm_data(hmm_data)
 
     print('\nCompiling fastas', flush = True)
-    output_fas = runAcc2fa(db, biotype, output_res, subhit = subhit, cpu = cpu)
+    output_fas = run_acc2fa(db, biotype, output_res, subhit = subhit, cpu = cpu)
 
     return output_fas
 

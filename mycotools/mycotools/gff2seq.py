@@ -90,12 +90,12 @@ def grabCDS(gff_dicts, spacer = '\t'):
         elif entry['type'] == 'gene':
             try:
                 alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+                genes.extend(alias.split('|'))
             except TypeError:
                 if not warning and ome:
                     eprint(spacer + 'WARNING: ' + str(ome) + ' missing aliases', flush = True)
                     warning = True
-#                raise TypeError(str(entry))
-            genes.extend(alias.split('|')) # account for alternate splicing
+                raise TypeError(str(entry))
 
     mrna_set = set([x for x in mrnas if x in set(genes)])
     out_cds = []
@@ -104,7 +104,6 @@ def grabCDS(gff_dicts, spacer = '\t'):
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             if alias in mrna_set:
                 out_cds.append(entry)
-
 
     return out_cds
 
@@ -546,6 +545,7 @@ def aamain( gff_dicts, assem_dict, spacer = '\t' ):
     
     cdss = grabCDS(gff_dicts, spacer)
     pos_dict, neg_dict = grabCoords(cdss)
+
 
     genes_fa_dict = {}
     for contig in pos_dict:

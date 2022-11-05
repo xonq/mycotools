@@ -31,6 +31,10 @@ def addMissing(gff_list, intron, comps, ome):
     rna_changes = {} # a dictionary for changing ambigious rna id names for
     # explicit RNA type references
     for entry in gff_list:
+        entry['attributes'] = \
+            entry['attributes'].replace('proteinId', 'protein_id')
+        entry['attributes'] = \
+            entry['attributes'].replace('transcriptId', 'transcript_id')
         addEntry = None
         id_ = re.search(comps['id'], entry['attributes'])[1]
         if 'gene' in entry['type']: # includes pseudogenes
@@ -143,6 +147,21 @@ def addMissing(gff_list, intron, comps, ome):
 #                out_genes[geneID]['gene'].append(addEntry)
                 entry['attributes'] += ';Parent=' + geneID
                 par = re.search(comps['par'], entry['attributes'])[1]
+
+            search = re.search(comps['prot'], entry['attributes'])
+            if search: # search for protein
+                prot = search.groups()[0] # try the first search
+                if not prot:
+                    prot = search.groups()[1] # try the second
+                if re.search(comps['Alias'], entry['attributes'] ) is None:
+                # is there a mycotools alias or associated alias?
+                    if not entry['attributes'].endswith(';'):
+                        entry['attributes'] += ';'
+                    alias = ome + '_' + prot # create an alias with the found
+                    # protein
+                    entry['attributes'] += 'Alias=' + ome + '_' + prot
+                    alt_alias[id_] = ome + '_' + prot
+
 
             rnas[id_] = par
             out_genes[par]['rna'].append(entry)

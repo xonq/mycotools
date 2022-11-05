@@ -157,21 +157,21 @@ If you are only interested in a subset of lineages in the master mycotoolsDB, th
 
 e.g. grab a database of a taxonomic order: 
 ```bash
-extractDB.py -l Atheliales -r order > atheliales.mtdb
+extractDB.py -l Atheliales > atheliales.mtdb
 ```
 
 grab all NCBI Aspergilli accessions: 
 ```bash
-extractDB.py -s ncbi -l aspergillus -r genus > aspergillus.mtdb_ncbi
+extractDB.py -s ncbi -l aspergillus > aspergillus.mtdb_ncbi
 ``` 
 
 grab a list of orders from a file:
 ```bash
-extractDB.py -ll <TAX_FILE> -r order > taxa.mtdb
+extractDB.py -ll <TAX_FILE> > taxa.mtdb
 ```
 
 ```bash
-Extracts a MycotoolsDB from arguments. E.g. `extractDB.py -l Atheliaceae -r family`
+Extracts a MycotoolsDB from arguments. E.g. `extractDB.py -l Atheliaceae`
 
 options:
   -h, --help            show this help message and exit
@@ -202,7 +202,7 @@ Inputs a MycotoolsDB `.mtdb` file (by default uses the master database), then cr
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```bash
 mkdir pullFiles && cd pullFiles
-extractDB.py -r family -l Atheliaceae > atheliaceae.mtdb
+extractDB.py -l Atheliaceae > atheliaceae.mtdb
 ```
 
 Then, run `db2files.py` to copy the protein fastas into the current directory (call `-h` to see all options):
@@ -279,7 +279,7 @@ These scripts input a MycotoolsDB or can be manually made as shown at the bottom
 Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```bash
 mkdir dwnldFiles && cd dwnldFiles
-extractDB.py -c genus -t aspergillus > aspergillus.mtdb_ncbi
+extractDB.py -l aspergillus > aspergillus.mtdb_ncbi
 ```
 
 If there are organisms you don't want in the extracted `.mtdb`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
@@ -656,7 +656,7 @@ by specifying `-i`/`--iqtree`.
 
 To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
 ```bash
-extractDB.py --rank phylum --lineage Basidiomycota > basi.mtdb
+extractDB.py --lineage Basidiomycota > basi.mtdb
 crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
 ```
 

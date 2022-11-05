@@ -43,7 +43,10 @@ def run_mmseqs(fa_path, res_base, wrk_dir, algorithm = 'mmseqs easy-linclust',
                        '--min-seq-id', fmt_float(min_id), '--threads',
                        str(cpus), '--compressed', '1',
                        '--cov-mode', '0', '-c', str(clus_const),
-                       '-e', '0.1', '-s', '7.5'])
+                       '-e', '0.1', '-s', '7.5', '--createdb-mode', '0'])
+                       # createdb-mode is necessary for how I format fastas due
+                       # to some optimization in mmseqs, they will address in a
+                       # future update
     mmseqs_exit = subprocess.call(mmseqs_cmd,
                                   stdout = stdout,
                                   stderr = stderr)
@@ -316,7 +319,7 @@ def readLog(log_path, newLog):
 
 def extract_closest_cluster(iterations, min_seq, max_seq):
     for i in iterations:
-        if i < min_seq:
+        if i['size'] < min_seq:
             i['discrep'] = min_seq - i['size']
         else:
             i['discrep'] = i['size'] - max_seq

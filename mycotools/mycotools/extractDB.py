@@ -1,5 +1,8 @@
 #! /usr/bin/env python3
 
+# NEED multiple lineages from command line
+# NEED stdin acceptance for most of these arguments
+
 import os
 import sys
 import copy
@@ -8,6 +11,21 @@ import argparse
 from collections import defaultdict
 from mycotools.lib.kontools import file2list, intro, outro, format_path, eprint
 from mycotools.lib.dbtools import mtdb, masterDB
+
+def infer_rank(db, lineage):
+    linlow, rank = lineage.lower(), None
+    for ome, row in db.items():
+        if linlow in set([x.lower() for x in row['taxonomy'].values()]):
+            rev_dict = {k.lower(): v \
+                        for k,v in zip(row['taxonomy'].values(), 
+                                       row['taxonomy'].keys())}
+            rank = rev_dict[lineage]
+
+    if not rank:
+        raise KeyError(f'no entry for {lineage}')
+
+    return rank
+                            
 
 def extract_unique(db, allowed = 1, sp = True):
     keys = copy.deepcopy(list(db.keys()))
@@ -32,17 +50,22 @@ def extract_unique(db, allowed = 1, sp = True):
             found = set(found_prep)
     return prep_db1
 
-def extract_tax(db, lineages, classification):
+def extract_tax(db, lineages):
     if isinstance(lineages, str):
         lineages = [lineages]
     lineages = set(x.lower() for x in lineages)
+    rank_dict = {k: infer_rank(db, k) for k in list(lineages)}
+    ranks = list(set(rank_dict.values()))
+
+
     new_db = mtdb().set_index()
     for ome in db:
-        try:
-            if db[ome]['taxonomy'][classification].lower() in lineages:
-                new_db[ome] = db[ome]
-        except KeyError:
-            pass
+        for rank in ranks:
+            try:
+                if db[ome]['taxonomy'][rank].lower() in lineages:
+                    new_db[ome] = db[ome]
+            except KeyError: # invalid rank key for row
+                pass # probably should standardize tax jsons period
 
     return new_db
 
@@ -67,7 +90,7 @@ def extract_pub(db):
 
 def main( 
     db, unique_strains = False, unique_species = 0, 
-    lineage_list = [], rank = None, omes_set = set(),
+    lineage_list = [], omes_set = set(),
     source = None, nonpublished = False, inverse = False
     ):
 
@@ -79,7 +102,7 @@ def main(
 
     # extract each taxonomic entry based on the classification specified
     if lineage_list:
-        new_db = extract_tax(db, lineage_list, rank)
+        new_db = extract_tax(db, lineage_list)
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif omes_set:
         new_db = extract_ome(db, omes)
@@ -107,12 +130,14 @@ def main(
 
 
 if __name__ == '__main__':
-
+    if {'-r', '--rank'}.intersection(set(sys.argv)):
+        eprint('\nERROR: -r/--rank are no longer necessary')
+        sys.exit(5)
     parser = argparse.ArgumentParser( description = \
        'Extracts a MycotoolsDB from arguments. E.g.\t`extractDB.py ' + \
-       '-l Atheliaceae -r family`' )
+       '-l Atheliaceae`' )
     parser.add_argument('-l', '--lineage')
-    parser.add_argument('-r', '--rank', help = "Taxonomy rank")
+#    parser.add_argument('-r', '--rank', help = "Taxonomy rank")
     parser.add_argument('-s', '--source')
     parser.add_argument('-n', '--nonpublished', action = 'store_true', 
         help = 'Include restricted')
@@ -122,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--inverse', action = 'store_true', 
         help = 'Inverse [source|lineage(s)|nonpublished]')
     parser.add_argument('-ol', '--ome', help = "File w/list of omes" )
-    parser.add_argument('-ll', '--lineages', help = 'File w/list of lineages (same rank)' )
+    parser.add_argument('-ll', '--lineages', help = 'File w/list of lineages' )
     parser.add_argument('--headers', action = 'store_true')
     parser.add_argument('-', '--stdin', action = 'store_true')
     parser.add_argument('-d', '--mtdb', default = masterDB())
@@ -131,11 +156,12 @@ if __name__ == '__main__':
     db_path = format_path( args.mtdb )
 
 
-    if (args.lineage or args.lineages) and not args.rank:
-        eprint('\nERROR: need rank for lineage(s)', flush = True)
-        sys.exit(5)
-    elif args.lineage or args.lineages:
-        eprint("\nWARNING: extracting taxonomy is subject to taxonomic error and errors in NCBI's hiearchy\n")
+#    if (args.lineage or args.lineages) and not args.rank:
+ #       eprint('\nERROR: need rank for lineage(s)', flush = True)
+  #      sys.exit(5)
+    if args.lineage or args.lineages:
+        eprint("\nWARNING: extracting taxonomy is subject to " \
+             + "errors in NCBI's hierarchy\n")
 
     output = 'stdout'
     if args.output:
@@ -153,21 +179,6 @@ if __name__ == '__main__':
                 tag += '_pub'
             output += '/' + os.path.basename( db_path ) + tag
         
-    args_dict = {
-        'database': db_path,
-        'output': output,
-        'lineage': args.lineage,
-        'lineages list': args.lineages,
-        'rank': args.rank,
-        'ome_list': args.ome,
-        'Source': args.source,
-        'unique': args.allowed_sp,
-        'nonpublished': args.nonpublished,
-        'inverse': args.inverse,
-        'headers': bool(args.headers)
-    	}
-#    start_time = intro( 'Abstract Database', args_dict, stdout = args.output )
-
     if args.stdin:
         data = ''
         for line in sys.stdin:
@@ -183,14 +194,14 @@ if __name__ == '__main__':
         omes = set()
 
     if args.lineages:
-        lineage_list = file2list(format_path(lineage_list))
+        lineage_list = file2list(format_path(args.lineages))
     elif args.lineage:
         lineage_list = [args.lineage]
     else:
         lineage_list = []
 
     new_db = main( 
-        db, rank = args.rank, lineage_list = lineage_list,
+        db, lineage_list = lineage_list,
         omes_set = omes, source = args.source, unique_species = args.allowed_sp, 
         nonpublished = args.nonpublished, inverse = args.inverse
         )
@@ -199,5 +210,4 @@ if __name__ == '__main__':
     else:
         new_db.df2db( headers = bool(args.headers) )
 
- #   outro( start_time, stdout = args.output )
     sys.exit(0)
