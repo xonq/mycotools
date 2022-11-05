@@ -93,7 +93,7 @@ def run_mf(clipkit_files, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
 
     models = {}
     for f_ in clipkit_files:
-        with open(f_ + '.log', 'r') as raw:
+        with open(out_dir + os.path.basename(f_) + '.log', 'r') as raw:
             for line in raw:
                 if line.startswith('Best-fit model:'):
                     model = re.search(r'Best-fit model: ([^\W]+)', line)[1]
@@ -203,6 +203,11 @@ def main(
                 if not os.path.isdir(output_dir):
                     os.mkdir(output_dir)
                 out_dir = format_path(output_dir)
+
+            wrk_dir = out_dir + 'working/'
+            if not os.path.isdir(wrk_dir):
+                os.mkdir(wrk_dir)
+
             files = [fasta_path]
         elif os.path.isdir(fasta_path):
             if not output_dir:
@@ -211,6 +216,11 @@ def main(
                 if not os.path.isdir(output_dir):
                     os.mkdir(output_dir)
                 out_dir = format_path(output_dir)
+
+            wrk_dir = out_dir + 'working/'
+            if not os.path.isdir(wrk_dir):
+                os.mkdir(wrk_dir)
+
             files = collect_files(fasta_path, '*')
             check_fas = set(files)
             new_fas = []
@@ -218,6 +228,12 @@ def main(
                 if f + '.mafft.clipkit' not in check_fas:
                     if f + '.mafft' not in check_fas:
                         new_fas.append(f)
+                    else:
+                        shutil.copy(f + '.mafft', wrk_dir + os.path.basename(f) \
+                                                          + '.mafft')
+                else:
+                    shutil.copy(f + '.mafft.clipkit',
+                                wrk_dir + os.path.basename(f) + '.mafft.clipkit')
             files = new_fas
     else:
         if not output_dir:
@@ -226,6 +242,9 @@ def main(
             if not os.path.isdir(output_dir):
                 os.mkdir(output_dir)
             out_dir = format_path(output_dir)
+        wrk_dir = out_dir + 'working/'
+        if not os.path.isdir(wrk_dir):
+            os.mkdir(wrk_dir)
         files = []
         for path in fasta_path:
             if os.path.isdir(path):
@@ -240,7 +259,7 @@ def main(
            for f_ in files):
         print(spacer + 'Converting to fastas', flush = True)
         from Bio import SeqIO
-        conv_dir = out_dir + 'conv/'
+        conv_dir = wrk_dir + 'conv/'
         if not os.path.isdir(conv_dir):
             os.mkdir(conv_dir)
         for i, f_ in enumerate(files):
@@ -308,14 +327,13 @@ def main(
             if flag_incomplete:
                 sys.exit(6)
 
-
     trimmed_files = []
     for fasta in files:
         name = re.search(r'.*?/*([^/]+)/*$', fasta)[1]
         fasta_name = os.path.basename(os.path.abspath(fasta))
-        clipkit = out_dir + fasta_name + '.clipkit'
+        clipkit = wrk_dir + fasta_name + '.clipkit'
         if start == 0:
-            mafft = out_dir + fasta_name + '.mafft'
+            mafft = wrk_dir + fasta_name + '.mafft'
             clipkit = mafft + '.clipkit'
             try:
                 if os.stat(mafft):
@@ -324,7 +342,7 @@ def main(
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
                 if not alignment:
-                    mafft = mafftRun(name, os.path.abspath(fasta), out_dir, hpc, 
+                    mafft = mafftRun(name, os.path.abspath(fasta), wrk_dir, hpc, 
                                      verbose, cpus, spacer = spacer)
                 else:
                     mafft = fasta
@@ -341,7 +359,7 @@ def main(
                 else:
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
-                clipkit_out = trimRun(name, mafft, out_dir, hpc, verbose, spacer = spacer)
+                clipkit_out = trimRun(name, mafft, wrk_dir, hpc, verbose, spacer = spacer)
             trimmed_files.append(clipkit_out)
         else:
             trimmed_files.append(fasta)
@@ -357,7 +375,7 @@ def main(
             treeRun(name, trimmed_f, out_dir, hpc, verbose, fast, cpus, spacer = spacer)
     else:
         print(spacer + 'Model finding', flush = True)
-        models = run_mf(trimmed_files, out_dir, hpc, verbose, cpus,
+        models = run_mf(trimmed_files, wrk_dir, hpc, verbose, cpus,
                spacer = spacer + '\t')
 
         print(spacer + 'Concatenating', flush = True)
