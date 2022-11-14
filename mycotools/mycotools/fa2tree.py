@@ -49,12 +49,13 @@ def mafftRun(name, fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t')
     return out_dir + '/' + name + '.mafft'
 
 
-def trimRun(name, mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
+def trimRun(name, mafft, out_dir, hpc, param, 
+            verbose, cpus = 1, spacer = '\t'):
 
     name2 = out_dir + os.path.basename(mafft) + '.clipkit'
     cmd = ['clipkit', mafft, '--output', name2]
+    cmd = cmd.extend(param)
     if not hpc:
-
         print(spacer + 'Trimming', flush = True)
         if verbose:
             run_clipkit = subprocess.call(cmd, stdout = subprocess.PIPE)
@@ -82,13 +83,16 @@ def trimRun(name, mafft, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
     return name2
 
 
-def run_mf(clipkit_files, out_dir, hpc, verbose, cpus = 1, spacer = '\t'):
+def run_mf(clipkit_files, out_dir, hpc, constraint = False, 
+           verbose = False, cpus = 1, spacer = '\t'):
     cpus_per_cmd = 3
     concurrent_cmds = round((cpus - 1)/4 - 0.5) # round down
-    cmds = [('iqtree', '-m', 'MFP+MERGE', '-nt', 'AUTO',
+    cmds = [['iqtree', '-m', 'MFP+MERGE', '-nt', 'AUTO',
              '-B', '1000', '-s', f_, '--prefix', 
-             out_dir + os.path.basename(f_)) \
+             out_dir + os.path.basename(f_)] \
             for f_ in clipkit_files]
+    if constraint:
+        [x.extend(['-g', constraint]) for x in cmds]
     multisub(cmds, verbose = verbose, processes = concurrent_cmds)
 
     models = {}
@@ -119,7 +123,10 @@ def prepare_nexus(concat_fa, models, spacer = '\t'):
         index = new_index
 
         for seq, data in trim_fa.items():
-            ome = seq[:seq.find('_')]
+            if '_' in seq:
+                ome = seq[:seq.find('_')]
+            else:
+                ome = seq
             if ome in concat_fa:
                 concat_fa[ome]['sequence'] += data['sequence']
 
@@ -130,10 +137,13 @@ def prepare_nexus(concat_fa, models, spacer = '\t'):
 
     return nex_data, concat_fa 
 
-def run_partition_tree(fa_file, nex_file, verbose, cpus, spacer = '\t'):
+def run_partition_tree(fa_file, nex_file, constraint,
+                       verbose, cpus, spacer = '\t'):
     cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-nt', 'auto',
            '-B', '1000', '--sampling', 'GENESITE'] # this is not using the
            # specified CPUs, but instead the most efficient
+    if constraint:
+        cmd.extend(['-g', constraint])
     print(spacer + 'Tree building', flush = True)
     if verbose:
         run_tree = subprocess.call(cmd)
@@ -144,13 +154,18 @@ def run_partition_tree(fa_file, nex_file, verbose, cpus, spacer = '\t'):
 
 
 
-def treeRun(name, clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, spacer = '\t'):
+def treeRun(name, clipkit_file, out_dir, hpc, constraint,
+            verbose, fast = False, cpus = 1, spacer = '\t'):
 
     if fast:
         cmd = ['fasttree', '-out', clipkit_file + '.treefile', clipkit_file]
+        if constraint:
+            cmd.extend(['-constraints', constraint])
     else:
         # the following will identify the optimum number of threads
         cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-nt', 'auto']
+        if constraint:
+            cmd.extend(['-g', constraint])
     if not hpc:
         print(spacer + 'Tree building', flush = True)
         if verbose:
@@ -173,9 +188,10 @@ def treeRun(name, clipkit_file, out_dir, hpc, verbose, fast = False, cpus = 1, s
 
 def main( 
     fasta_path, slurm = False, torque = False, fast = False, project = '', 
-    output_dir = None, verbose = True, alignment = False, mem = '60GB', cpus = 1,
-    spacer = '\t\t', align_stop = False, tree_stop = False, 
-    flag_incomplete = True, start = 0, partition = False
+    output_dir = None, verbose = True, alignment = False, constraint = False,
+    ome_conv = False, mem = '60GB', cpus = 1, spacer = '\t\t', align_stop = False, 
+    tree_stop = False, flag_incomplete = True, start = 0, partition = False,
+    clip_list = []
     ):
 
 
@@ -252,6 +268,10 @@ def main(
             else:
                 files.append(path)
 
+    conv_dir = wrk_dir + 'conv/'
+    if not os.path.isdir(conv_dir):
+        os.mkdir(conv_dir)
+
     # check for non fasta inputs
     if any(f_.endswith(('.nexus', '.nex', '.nxs', 
                         '.phylip', '.phy', '.ph',
@@ -259,9 +279,6 @@ def main(
            for f_ in files):
         print(spacer + 'Converting to fastas', flush = True)
         from Bio import SeqIO
-        conv_dir = wrk_dir + 'conv/'
-        if not os.path.isdir(conv_dir):
-            os.mkdir(conv_dir)
         for i, f_ in enumerate(files):
             out_name = conv_dir + os.path.basename(
                 re.search(r'(.*)\.[^.]+$', f_)[1] + '.fa'
@@ -359,7 +376,8 @@ def main(
                 else:
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
-                clipkit_out = trimRun(name, mafft, wrk_dir, hpc, verbose, spacer = spacer)
+                clipkit_out = trimRun(name, mafft, wrk_dir, hpc, clip_param,
+                                      verbose, spacer = spacer)
             trimmed_files.append(clipkit_out)
         else:
             trimmed_files.append(fasta)
@@ -368,20 +386,35 @@ def main(
         print(spacer + 'Alignments outputed', flush = True)
         sys.exit(0)
 
+    if ome_conv:
+        new_trimmed_files = []
+        for trimmed_f in trimmed_files:
+            new_f = conv_dir + os.path.basename(trimmed_f)
+            in_fa = fa2dict(trimmed_f)
+            out_fa = {}
+            for seq, data in in_fa.items():
+                ome = seq[:seq.find('_')]
+                out_fa[ome] = data
+            with open(new_f, 'w') as out:
+                out.write(dict2fa(out_fa))
+            new_trimmed_files.append(new_f)
+        trimmed_files = new_trimmed_files
+
     if not partition:
         for trimmed_f in trimmed_files:
             name_prep = re.search(r'.*?/*([^/]+)/*$', trimmed_f)[1]
             name = re.sub(r'\.mafft\.clipkit$', '', name_prep)
-            treeRun(name, trimmed_f, out_dir, hpc, verbose, fast, cpus, spacer = spacer)
+            treeRun(name, trimmed_f, out_dir, hpc, constraint,
+                    verbose, fast, cpus, spacer = spacer)
     else:
         print(spacer + 'Model finding', flush = True)
-        models = run_mf(trimmed_files, wrk_dir, hpc, verbose, cpus,
-               spacer = spacer + '\t')
+        models = run_mf(trimmed_files, wrk_dir, hpc, constraint,
+                        verbose, cpus, spacer = spacer + '\t')
 
         print(spacer + 'Concatenating', flush = True)
-        concat_fa = {ome: {'description': '', 'sequence': ''}
+        empty_concat_fa = {ome: {'description': '', 'sequence': ''}
                      for ome in ome2fa2gene if ome not in incomp_omes}
-        nex_data, concat_fa = prepare_nexus(concat_fa, models)
+        nex_data, concat_fa = prepare_nexus(empty_concat_fa, models)
         with open(out_dir + 'concatenated.fa', 'w') as out:
             out.write(dict2fa(concat_fa))
         with open(out_dir + 'concatenated.nex', 'w') as out:
@@ -393,7 +426,7 @@ def main(
             sys.exit(0)
 
         run_partition_tree(out_dir + 'concatenated.fa', 
-                           out_dir + 'concatenated.nex',
+                           out_dir + 'concatenated.nex', constraint,
                            verbose, cpus, spacer = spacer)
 
     if hpc:
@@ -424,8 +457,15 @@ if __name__ == '__main__':
     io_opt.add_argument('-t', '--trim', help = 'Start from trimmed alignments',
                         action = 'store_true')
 
+    gt_opt = parser.add_argument_group('General options')
+    gt_opt.add_argument('--clipkit', 
+        help = 'ClipKIT parameters, e.g. "-m gappy -g 0.7"')
+    gt_opt.add_argument('--constraint', help = 'Topological constraint')
+    gt_opt.add_argument('--ome', help = 'Convert input sequence to mtdb omes',
+                        action = 'store_true')
+
     s_opt = parser.add_argument_group('Single tree options')
-    s_opt.add_argument('--fast', action = 'store_true', \
+    s_opt.add_argument('-f', '--fast', action = 'store_true', \
         help = 'Fasttree' )
     s_opt.add_argument('-s', '--slurm', action = 'store_true', \
         help = 'Submit ALL steps to Slurm' )
@@ -464,10 +504,18 @@ if __name__ == '__main__':
     if output:
         if not output.endswith('/'):
             output += '/' # bring to mycotools path expectations
+    if args.clipkit:
+        clip_param = args.clipkit.replace('"','').replace("'",'')
+        clip_list = clip_param.split()
+    else:
+        clip_list = []
+
+
     args_dict = {
         'Fasta': args.input, 'Fast': args.fast, 
         'Multigene partition': args.partition, 'Input alignments': bool(args.align),
-        'Input trimmed': bool(args.trim),
+        'Input trimmed': bool(args.trim), 'Constraint': args.constraint,
+        'Ome conversion': args.ome, 'ClipKIT parameters': ' '.join(clip_list),
         'Alignment stop': args.stop_align, 'Concatenation stop': args.stop_cat,
         'Ignore missing': args.missing, 'Torque': args.torque, 'Slurm': args.slurm, 
         'HPC project': args.project, 'Output': output, 'CPUs': args.cpus
@@ -491,28 +539,11 @@ if __name__ == '__main__':
         args.input, slurm = args.slurm, fast = args.fast,
         torque = args.torque, project = args.project,
         output_dir = output, verbose = bool(args.verbose), 
-        alignment = args.align,
+        alignment = args.align, constraint = args.constraint,
+        ome_conv = args.ome, clip_list = clip_list,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
         flag_incomplete = bool(not args.missing), start = start,
         partition = bool(args.partition), cpus = args.cpus
         )
-#    elif os.path.isdir(input_check):
- #       fas = collect_files(input_check, 'fa')
-  #      fas.extend(collect_files( input_check, 'fasta' ))
-#        fas.extend(collect_files( input_check, 'fna' ))
- #       fas.extend(collect_files( input_check, 'fsa' ))
-  #      if not fas:
-   #         eprint('\nERROR: no {.fa, .fasta, .fna, .fsa} detected', flush = True)
-    #        sys.exit(2)
-     #   print(flush = True)
-      #  for fa in fas:
-       #     print(fa, flush = True)
-        #    main(
-         #       fa, slurm = args.slurm, torque = args.torque, alignment = alignment, fast = args.fast,
-          #      project = args.project, output_dir = output, verbose = False, spacer = '\n'
-           #     )
-#    else:
- #       eprint('\nERROR: invalid input', flush = True)
-  #      sys.exit(3)
 
     outro(start_time)

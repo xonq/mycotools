@@ -184,7 +184,7 @@ def collect_ftps(
     for accession, row in ncbi_df.iterrows():
         if accession in ass_prots: # add all rows that have indices associated with this
             # query type
-            out_df = out_df.append(row)
+            out_df = pd.concat([out_df, row.to_frame().T])
             icount = 1
             test = str(accession) + '_' + str(icount)
             while test in ass_prots:
@@ -192,7 +192,8 @@ def collect_ftps(
     #                row['assembly_acc'] = ass_prots[test]['genome_id']
                 if 'ome' in row.keys():
                     row['ome'] = None # haven't assigned a mycotools ID yet
-                out_df = out_df.append(row)
+                out_df = pd.concat([out_df, row.to_frame().T])
+                sys.exit()
                 test = str(accession) + '_' + str(icount)
             continue
 
@@ -325,7 +326,7 @@ def collect_ftps(
             if icount:
                 if 'ome' in row:
                     row['ome'] = None
-            out_df = out_df.append(row)
+            out_df = pd.concat([out_df, row.to_frame().T])
             icount += 1
     
     # if no API key is used, we can only generate 3 queries per second, otherwise we can use 10
@@ -357,10 +358,10 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
 
         if os.path.isfile( file_path ):
             count += 1
-            md5_cmd = subprocess.run( [
+            md5_cmd = subprocess.run([
                 'md5sum', file_path],
-                stdout = subprocess.PIPE )
-            md5_res = md5_cmd.stdout.decode( 'utf-8' )
+                stdout = subprocess.PIPE) # check the md5
+            md5_res = md5_cmd.stdout.decode('utf-8')
             md5_find = re.search(r'\w+', md5_res)
             md5 = md5_find[0]
             if md5 == acc_prots[file_type + '_md5']:
@@ -378,7 +379,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
         while True:
             try:
                 esc_count += 1
-                request = requests.get( ftp_link.replace('ftp://','https://' ))
+                request = requests.get(ftp_link.replace('ftp://','https://'))
                 break
             except requests.exceptions.ConnectionError:
                 if esc_count == 20:
@@ -391,7 +392,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
             eprint(spacer + '\t\t' + file_type + ': ERROR, no file exists', flush = True)
             dwnlds[file_type] = 69
             acc_prots[file_type] = ''
-            log_editor( output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
+            log_editor(output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
                 '\t' + str(acc_prots['accession']) + '\t' + str(acc_prots['assembly']) + \
                 '\t' + str(acc_prots['proteome']) + '\t' + str(acc_prots['gff3']) + \
                 '\t' + str(acc_prots['transcript']) + '\t' + \
@@ -399,7 +400,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                 str(acc_prots['proteome_md5']) + '\t' + \
                 str(acc_prots['gff3_md5']) + '\t' + \
                 str(acc_prots['transcript_md5']) + '\t' + \
-                str(','.join([str(x) for x in acc_prots['genacc_id']])))
+                str(','.join([str(x) for x in acc_prots['genome_id']])))
             if remove and file_type in {'assembly', 'gff3'}:
                 break
             continue
@@ -558,7 +559,7 @@ def main(
                         os.path.basename(ass_prots[acc]['proteome'])
                     ncbi_df.at[acc, 'gffPath'] = output_path + 'gff3/' + \
                         os.path.basename(ass_prots[acc]['gff3'])
-                    new_df = new_df.append( ncbi_df.loc[acc] )
+                    new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
             else:
                 check = ncbi_df[ncbi_df[column] == acc[:acc.find('$')]]
                 # check for entries in the inputted table that match the accession
@@ -578,7 +579,7 @@ def main(
                 for file_type in file_types:
                     ncbi_df.at[acc, file_type] = output_path + file_type \
                         + '/' + os.path.basename(data[file_type])
-                new_df = new_df.append( ncbi_df.loc[acc] )
+                new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
 
     if 'assembly' in new_df.keys():
         new_df = new_df.rename(columns = {'assembly': 'assemblyPath'})

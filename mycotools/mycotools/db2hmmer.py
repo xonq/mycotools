@@ -160,7 +160,7 @@ def compile_trim_cmd(output, mod = '', trimmed = None, ex = 'phylip'):
              not in trimmed]
     for align in aligns:
         trim = f'{output}trimmed/' \
-             + {os.path.basename(align).replace(ex,'clipkit') \
+             + os.path.basename(align).replace(ex,'clipkit') \
              + '.' + ex
         args = ['clipkit', align, '-o', trim]
         if mod_args[0]:
