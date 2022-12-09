@@ -445,17 +445,18 @@ optional arguments:
 <br /><br />
 
 ## Curate annotation
-### curAnnotation.py
-`curAnnotation.py` is tailored toward curating OrthoFiller or Funannotate output (more curation available upon request). This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and add an `Alias=<PREFIX>` field for MycotoolsDB compatible accession for each entry.
+### gtf2gff3.py
+This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and 
+optionally adds Alias
 
 ```bash
-curAnnotation.py -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY> -p <CODENAME>
+gtf2gff3.py -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY>
 ```
 
 ### curGFF3.py / gff2gff3.py
 There are several scripts in the `utils` used to curate gene coordinate files
-and proteomes for the MycotoolsDB. `curGFF3.py` is tested with both JGI and
-NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB
+and proteomes for the MycotoolsDB. `curGFF3.py` is tested with, Funannotate, 
+both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB
 compatible `gff3`
 
 <br /><br />

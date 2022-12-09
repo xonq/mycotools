@@ -171,8 +171,8 @@ def compile_trim_cmd(output, mod = '', trimmed = None, ex = 'phylip'):
 
 
 def main(db, hmm_path, output, accessions, max_hits, query_cov,
-         coords = False, hmmalign = True, align = True,
-         evalue = 0.01, binary = 'hmmsearch', trim_mod = '', verbose = False):
+         coords = False, align = False, evalue = 0.01, 
+         binary = 'hmmsearch', trim_mod = '', verbose = False):
 
     ome_dir = output + 'omes/'
     aln_dir = output + 'aligns/'
@@ -180,9 +180,9 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
     hmm_dir = output + 'hmms/'
     trm_dir = output + 'trimmed/'
 
-    if hmmalign:
+    if align == 'hmmalign':
         aln_ext = 'phylip'
-    else:
+    elif align == 'mafft':
         aln_ext = 'fasta'
 
     db = db.set_index('ome')
@@ -271,7 +271,7 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
             if not os.path.isdir(aln_dir):
                 os.mkdir(aln_dir)
 
-            if hmmalign:
+            if align == 'hmmalign':
                 if not os.path.isdir(hmm_dir):
                     os.mkdir(hmm_dir)
                 with open(hmm_path, 'r' ) as hmm:
@@ -283,22 +283,22 @@ def main(db, hmm_path, output, accessions, max_hits, query_cov,
                                                     list(hmm_dict.keys()))
                 align_codes = multisub(hmmAlign_tuples, processes = cpu - 1,
                                           verbose = verbose)
-            else:
+            elif align == 'mafft':
                 mafft_tuples = compile_mafft_cmds(output, faa_dir)
                 align_codes = multisub(mafft_tuples, processes = cpu - 1,
                                        shell = True, verbose = verbose)
         
-        print( '\nTrimming alignments' , flush = True)
-        trimmed = None
-        if os.path.isdir(trm_dir):
-            trimmed = collect_files(trm_dir, aln_ext)
-        else:
-            os.mkdir(trm_dir)
-        trim_tuples = compile_trim_cmd(output, mod = trim_mod, 
-                                       trimmed = trimmed, ex = aln_ext)
+#        print( '\nTrimming alignments' , flush = True)
+ #       trimmed = None
+  #      if os.path.isdir(trm_dir):
+   #         trimmed = collect_files(trm_dir, aln_ext)
+    #    else:
+     #       os.mkdir(trm_dir)
+      #  trim_tuples = compile_trim_cmd(output, mod = trim_mod, 
+       #                                trimmed = trimmed, ex = aln_ext)
 
-        trim_codes = multisub(trim_tuples, processes = cpu - 1,
-                              verbose = verbose)
+        #trim_codes = multisub(trim_tuples, processes = cpu - 1,
+         #                     verbose = verbose)
 
 
 if __name__ == '__main__':
@@ -331,10 +331,10 @@ if __name__ == '__main__':
         help = 'Extract accessions instead of queries (Pfam, etc)' )
 
     a_arg = parser.add_argument_group('Alignment parameters')
-    a_arg.add_argument('-l', '--align', default = False, action = 'store_true', \
-        help = 'Align fastas and trim via clipkit')
+    a_arg.add_argument('--hmmalign', default = False, action = 'store_true', \
+        help = 'Align via hmmalign')
     a_arg.add_argument('--mafft', action = 'store_true', 
-        help = 'Align via mafft. DEFAULT: hmmalign')
+        help = 'Align via mafft')
 
     r_arg = parser.add_argument_group('Runtime options')
     r_arg.add_argument('-v', '--verbose', action = 'store_true')
@@ -343,13 +343,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     deps = ['hmmsearch']
-    if args.align:
-        if args.mafft:
-            deps.extend(['mafft', 'clipkit'])
-            align = 'mafft'
-        else:
-            deps.extend(['hmmalign', 'clipkit', 'esl-reformat'])
-            align = 'hmmalign'
+    if args.hmmalign and args.mafft:
+        eprint('\nERROR: --hmmalign OR --mafft permitted', flush = True)
+    elif args.mafft:
+         deps.extend(['mafft'])
+         align = 'mafft'
+    elif args.hmmalign:
+         deps.extend(['hmmalign', 'esl-reformat'])
+         align = 'hmmalign'
     else:
         align = False
     findExecs(deps, exit = set(deps))
@@ -375,8 +376,8 @@ if __name__ == '__main__':
     db = mtdb(args.mtdb)
 
     main(db, format_path(args.hmm), output, 
-         args.accession, args.max_hits, args.query_thresh, align = args.align,
-         evalue = args.evalue, binary = args.binary, hmmalign = not bool(args.mafft),
+         args.accession, args.max_hits, args.query_thresh, align = align,
+         evalue = args.evalue, binary = args.binary,
          coords = args.coordinate, verbose = args.verbose)
 
     outro(start_time)

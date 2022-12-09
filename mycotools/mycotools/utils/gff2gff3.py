@@ -7,7 +7,7 @@ import sys
 import argparse
 from mycotools.lib.biotools import gff2list, list2gff, gff2Comps, gff3Comps
 from mycotools.lib.kontools import format_path, eprint, vprint
-from mycotools.curAnnotation import addGenes, removeStartStop
+from mycotools.utils.gtf2gff3 import add_genes, remove_start_stop
 
 def gff2gff3(gff_list, ome, jgi_ome):
 
@@ -104,7 +104,7 @@ def gff2gff3(gff_list, ome, jgi_ome):
 
 def main(gff_list, ome, jgi_ome, safe = True, verbose = True):
 
-    gff_prep, failed, flagged = addGenes( gff_list, safe = safe )
+    gff_prep, failed, flagged = add_genes( gff_list, safe = safe )
     if failed:
         vprint( str(len(failed)) + '\tgenes failed', v = verbose , e = True, flush = True)
     if flagged:

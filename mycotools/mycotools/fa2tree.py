@@ -54,7 +54,7 @@ def trimRun(name, mafft, out_dir, hpc, param,
 
     name2 = out_dir + os.path.basename(mafft) + '.clipkit'
     cmd = ['clipkit', mafft, '--output', name2]
-    cmd = cmd.extend(param)
+    cmd.extend(param)
     if not hpc:
         print(spacer + 'Trimming', flush = True)
         if verbose:
@@ -83,8 +83,8 @@ def trimRun(name, mafft, out_dir, hpc, param,
     return name2
 
 
-def run_mf(clipkit_files, out_dir, hpc, constraint = False, 
-           verbose = False, cpus = 1, spacer = '\t'):
+def run_mf(clipkit_files, out_dir, constraint = False, 
+           verbose = False, cpus = 1, spacer = '\t', scripts = False):
     cpus_per_cmd = 3
     concurrent_cmds = round((cpus - 1)/4 - 0.5) # round down
     cmds = [['iqtree', '-m', 'MFP+MERGE', '-nt', 'AUTO',
@@ -93,6 +93,8 @@ def run_mf(clipkit_files, out_dir, hpc, constraint = False,
             for f_ in clipkit_files]
     if constraint:
         [x.extend(['-g', constraint]) for x in cmds]
+    if scripts:
+        return {os.path.basename(v): cmds[i] for i, v in enumerate(clipkit_files)}
     multisub(cmds, verbose = verbose, processes = concurrent_cmds)
 
     models = {}
@@ -195,16 +197,18 @@ def main(
     ):
 
 
-    hpc = False
+    hpc, hpc_prep = False, False
     if slurm:
         vprint('\nHPC mode, preparing submission scripts (Slurm)\n', v = verbose, flush = True)
-        hpc = '#!/bin/bash\n#SBATCH --time=24:00:00\n#SBATCH --nodes=1\n' + \
+        hpc_prep = '#!/bin/bash\n#SBATCH --time=24:00:00\n#SBATCH --nodes=1\n' + \
             '#SBATCH --ntasks-per-node=' + str(cpus) + '\n#SBATCH -A ' + project + '\n' + \
             '#SBATCH --mem=' + str(mem)
 #            '\n\nsource activate ' + source
     elif torque:
         vprint('\nHPC mode, preparing submission scripts (PBS)\n', v = verbose, flush = True)
-        hpc = '#PBS -l walltime=10:00:00\n#PBS -l nodes=1:ppn=4\n#PBS -A ' + project
+        hpc_prep = '#PBS -l walltime=10:00:00\n#PBS -l nodes=1:ppn=4\n#PBS -A ' + project
+    if not partition and hpc_prep:
+        hpc = hpc_prep
 
     output_dir_prep = os.getcwd() + '/'
     if isinstance(fasta_path, str):
@@ -376,15 +380,12 @@ def main(
                 else:
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
-                clipkit_out = trimRun(name, mafft, wrk_dir, hpc, clip_param,
+                clipkit_out = trimRun(name, mafft, wrk_dir, hpc, clip_list,
                                       verbose, spacer = spacer)
             trimmed_files.append(clipkit_out)
         else:
             trimmed_files.append(fasta)
 
-    if align_stop:
-        print(spacer + 'Alignments outputed', flush = True)
-        sys.exit(0)
 
     if ome_conv:
         new_trimmed_files = []
@@ -400,6 +401,8 @@ def main(
             new_trimmed_files.append(new_f)
         trimmed_files = new_trimmed_files
 
+
+
     if not partition:
         for trimmed_f in trimmed_files:
             name_prep = re.search(r'.*?/*([^/]+)/*$', trimmed_f)[1]
@@ -407,8 +410,22 @@ def main(
             treeRun(name, trimmed_f, out_dir, hpc, constraint,
                     verbose, fast, cpus, spacer = spacer)
     else:
+        if align_stop:
+            script_dict = run_mf(trimmed_files, wrk_dir, constraint,
+                            verbose, cpus, spacer = spacer + '\t',
+                            scripts = True)
+            for f, cmd in script_dict.items():
+                with open(out_dir + f + '.sh', 'w') as out:
+                    if hpc_prep:
+                        out.write(f'{hpc_prep}\n#SBATCH --output={f}_tree\n' \
+                                + f'#SBATCH --error={f}_tree\n' \
+                                + f'#SBATCH --job-name={f}_tree\n')
+                    out.write(' '.join(cmd))
+            print(spacer + 'Alignments outputed', flush = True)
+            sys.exit(0)
+
         print(spacer + 'Model finding', flush = True)
-        models = run_mf(trimmed_files, wrk_dir, hpc, constraint,
+        models = run_mf(trimmed_files, wrk_dir, constraint,
                         verbose, cpus, spacer = spacer + '\t')
 
         print(spacer + 'Concatenating', flush = True)
@@ -458,8 +475,8 @@ if __name__ == '__main__':
                         action = 'store_true')
 
     gt_opt = parser.add_argument_group('General options')
-    gt_opt.add_argument('--clipkit', 
-        help = 'ClipKIT parameters, e.g. "-m gappy -g 0.7"')
+    gt_opt.add_argument('-g', '--gappy', 
+        help = 'ClipKIT gappy threshold')
     gt_opt.add_argument('--constraint', help = 'Topological constraint')
     gt_opt.add_argument('--ome', help = 'Convert input sequence to mtdb omes',
                         action = 'store_true')
@@ -477,7 +494,7 @@ if __name__ == '__main__':
     m_opt.add_argument('-p', '--partition', action = 'store_true',
         help = 'Multigene partition mode')
     m_opt.add_argument('-sa', '--stop_align', action = 'store_true',
-        help = 'Stop after aligning and trimming')
+        help = 'Stop after aligning and trimming, output tree scripts')
     m_opt.add_argument('-sc', '--stop_cat', action = 'store_true',
         help = 'Stop after concatenating sequences')
     m_opt.add_argument('-m', '--missing', action = 'store_true',
@@ -504,9 +521,8 @@ if __name__ == '__main__':
     if output:
         if not output.endswith('/'):
             output += '/' # bring to mycotools path expectations
-    if args.clipkit:
-        clip_param = args.clipkit.replace('"','').replace("'",'')
-        clip_list = clip_param.split()
+    if args.gappy:
+        clip_list = ['-m', 'gappy', '-g', args.gappy]
     else:
         clip_list = []
 
@@ -539,7 +555,7 @@ if __name__ == '__main__':
         args.input, slurm = args.slurm, fast = args.fast,
         torque = args.torque, project = args.project,
         output_dir = output, verbose = bool(args.verbose), 
-        alignment = args.align, constraint = args.constraint,
+        alignment = args.align, constraint = format_path(args.constraint),
         ome_conv = args.ome, clip_list = clip_list,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
         flag_incomplete = bool(not args.missing), start = start,

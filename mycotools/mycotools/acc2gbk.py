@@ -306,8 +306,15 @@ if __name__ == '__main__':
         if args.accession == '-':
             data = stdin2str()
             accs = data.split()
-        else: 
-            accs = [args.accession]
+        else:
+            if {'"', "'"}.intersection(set(args.accession)):
+                args.accession = args.accession.replace('"','').replace("'",'')
+            if ',' in args.accession:
+                accs = args.accession.split(',')
+            elif re.search(r'\s', args.accession):
+                accs = args.accession.split()
+            else:
+                accs = [args.accession]
     elif not args.gff:
         raise FileNotFoundError('need input file or accession')
 

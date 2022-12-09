@@ -450,6 +450,36 @@ def sys_start( args, usage, min_len, dirs = [], files = [] ):
 
     return args
 
+
+def inject_args(args, injection_calls):
+    manual_cmds = []
+    for in_call in injection_calls:
+        if in_call in args:
+            prohibited = {';', '&', '&&', '\n', '\r'}
+            man_index = args.index(in_call)
+            for char in args[man_index + 1]:
+                if char == '"' or char == "'":
+                    quote_char = char
+    
+            manual_cmd, start = [], False
+            for i, v in args[man_index + 1:]:
+                if quote_char in v:
+                    if not start:
+                        start = True
+                        manual_cmd.append(v[v.find(quote_char):])
+                    else:
+                        manual_cmd.append(v[:v.find(quote_char)])
+                        break
+                else:
+                    manual_cmd.append(v)
+            for index in reversed(range(man_index, i + 1)):
+                del args[index]
+        else:
+            manual_cmd = []
+        manual_cmds.append(manual_cmd)
+    
+    return args, manual_cmds
+
  
 def intro( script_name, args_dict, credit='', log = False, stdout = True):
     '''
@@ -629,7 +659,17 @@ class Subqueue():
     """Run a subqueue of args; can run commands consecutively to avoid shell
     limitations while maintaining shell injection security"""
 
-    def __init__(self, args, shell = False, verbose = False):
+    def __init__(self, args, shell = False, verbose = False, injectable = False):
+        self.injectable = injectable
+        if verbose == 1 or verbose == True:
+            self.stdout = None
+            self.stderr = None
+        elif verbose == 2:
+            self.stdout = subprocess.DEVNULL
+            self.stderr = None
+        else:
+            self.stdout = subprocess.DEVNULL
+            self.stderr = subprocess.DEVNULL
         if isinstance(args, list) \
             or isinstance(args, tuple) \
             or isinstance(args, set):
@@ -649,37 +689,37 @@ class Subqueue():
             raise TypeError('invalid arguments type: ' + str(type(args)))
         self.complete = False
         self.shell = shell
-        if verbose:
-            self.verbose = None
-        else:
-            self.verbose = subprocess.DEVNULL
         self.status = [-1 for x in args]
         self.exit = -1
 
     def open(self):
         for i, arg in enumerate(self.args):
-            if arg[-1] == '&&':
+            if arg[-1] == '&&' and self.injectable:
                 failstop = True
                 arg = arg[:-1]
             else:
                 failstop = False
             self.status[i] = (subprocess.call(arg, shell = self.shell,
-                                               stdout = self.verbose,
-                                               stderr = self.verbose))
+                                               stdout = self.stdout,
+                                               stderr = self.stderr))
             if failstop and self.status[i]:
                 break
         self.exit = any(x for x in self.status)
         self.complete = True
         
 
-def run_subqueue(args, shell = False, verbose = False):
-    s = Subqueue(args, shell = shell, verbose = verbose)
+def run_subqueue(args, shell = False, verbose = False, injectable = False):
+ #   if args:
+    s = Subqueue(args, shell = shell, 
+                 verbose = verbose, 
+                 injectable = injectable)
     s.open()
     return args, s.exit
+#    return [], -420
 
 
 def multisub(args_lists, processes = 1, shell = False, 
-             verbose = False):
+             verbose = False, injectable = False):
     import multiprocessing as mp
     '''
     Inputs: list of arguments, integer of processes, subprocess `shell` bool
@@ -700,7 +740,7 @@ def multisub(args_lists, processes = 1, shell = False,
     '''
 
     with mp.Pool(processes = processes) as pool:
-        exit_pre = pool.starmap(run_subqueue, ((x, shell, verbose,) \
+        exit_pre = pool.starmap(run_subqueue, ((x, shell, verbose, injectable) \
                                                 for x in args_lists))
     return [{'stdin': stdin, 'code': exit} for stdin, exit in exit_pre]
 """

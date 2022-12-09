@@ -6,7 +6,7 @@ import sys
 from mycotools.lib.kontools import eprint, file2list
 
 
-def grabAccs( db_str ):
+def grabAccs(db_str):
 
     accessions = []
     hmm_search = re.compile( r'HMMER\d\/f \[.*?\]\nNAME(.*?)\nACC +(.*?)\n[^\/]*?\/\/')
@@ -22,7 +22,7 @@ def grabAccs( db_str ):
     return accessions
 
 
-def hmmExtract( accession, db_str ):
+def hmmExtract(accession, db_str):
 
     hmm_search = re.search( 
         r'HMMER\d\/f \[.*?\].*?\n^NAME.*?\n^ACC   ' + accession + r'[\s\S]*?^\/\/', db_str, re.M
@@ -39,7 +39,7 @@ def hmmExtract( accession, db_str ):
     return hmm
 
 
-def main( hmm_db, accessions = False ):
+def main(hmm_db, accessions = False):
 
     if accessions:
         if os.path.isfile( accessions ):

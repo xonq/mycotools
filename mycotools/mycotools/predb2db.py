@@ -14,7 +14,7 @@ from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gff3Comps, gff2Comps, gtfComps
 from mycotools.lib.dbtools import mtdb, masterDB, loginCheck
-from mycotools.curAnnotation import main as curRogue
+from mycotools.utils.gtf2gff3 import main as gtf2gff3
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.gff2seq import aamain as gff2seq
@@ -61,7 +61,7 @@ def move_biofile(old_path, ome, typ, wrk_dir, suffix = '' ):
         if not os.path.isfile(new_path) and os.path.isfile(old_path):
             copy_file(format_path(old_path), new_path)
         elif not os.path.isfile(new_path):
-            raise IOError
+            raise IOError(old_path, new_path)
         else:
             copy_file(format_path(old_path), new_path)
 
@@ -450,13 +450,13 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                         )
             else:
 #                try:
- #                   gff = curGFF3(gff, ome)
+                gff = curGFF3(gff, ome)
   #              except:
-                gff, trans_str, failed, flagged = curRogue(gff, ome)
+#                gff, trans_str, failed, flagged = curRogue(gff, ome)
         else:
             gff = curGFF3(gff, ome, cur_seqids = True)
     elif gffVer == 2.5:
-        gff, trans_str, failed, flagged = curRogue(gff, ome)
+        gff, trans_str, failed, flagged = gtf2gff3(gff, ome)
     else:
         gff = gff2gff3(gff, ome, assembly_accession, verbose = False)
 

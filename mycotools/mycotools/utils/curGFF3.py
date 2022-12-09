@@ -75,7 +75,7 @@ def addMissing(gff_list, intron, comps, ome):
                     prot = search.groups()[1] # try the second
                 if re.search(comps['Alias'], entry['attributes'] ) is None:
                 # is there a mycotools alias or associated alias?
-                    if not entry['attributes'].endswith( ';' ):
+                    if not entry['attributes'].endswith(';'):
                         entry['attributes'] += ';'
                     alias = ome + '_' + prot # create an alias with the found
                     # protein
@@ -334,7 +334,7 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
     trna_count, rrna_count, ptrna_count, rna_count, etc_count = 1, 1, 1, 1, 1
     estranged = []
     for i, entry in enumerate(cur_list):
-        alias_tag, rna_check = ';Alias=', False
+        alias_tag, rna_check = 'Alias=', False
         if 'gene' in entry['type']:
             id_ = re.search(comps['id'], entry['attributes'])[1]
             if id_ in mrnas:
@@ -391,7 +391,10 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                 alias_tag += alias + '|'
                 etc_count += 1
             alias_tag = alias_tag[:-1]
-            entry['attributes'] += alias_tag
+            if entry['attributes'].rstrip().endswith(';'):
+                entry['attributes'] += alias_tag
+            else:
+                entry['atrributes'] += ';' + alias_tag
         else:
             if 'Alias=' not in entry['attributes']:
                 if 'RNA' in entry['type']:
@@ -416,15 +419,25 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
 #                       eprint(re.search(comps['id'], entry['attributes'])[1], entry['type'])
                         estranged.append((i, id_,))
                         continue
-                entry['attributes'] += alias_tag
+                if entry['attributes'].rstrip().endswith(';'):
+                    entry['attributes'] += alias_tag
+                else:
+                    entry['attributes'] += ';' + alias_tag
 
     for i, id_ in estranged:
         if not 'Alias=' in entry['attributes']:
             gene = rnas[id_]
             try: # acquire from the RNA retroactively
-                cur_list[i]['attributes'] += ';Alias=' + id_dict[gene][id_]
+                if cur_list[i]['attributes'].rstrip().endswith(';'):
+                    cur_list[i]['attributes'] += 'Alias=' + id_dict[gene][id_]
+                else:
+                    cur_list[i]['attributes'] += ';Alias=' + id_dict[gene][id_]
             except KeyError: # acquire from the gene
-                cur_list[i]['attributes'] += ';Alias=' + id_dict[gene][gene]
+                if cur_list[i]['attributes'].rstrip().endswith(';'):
+                    cur_list[i]['attributes'] += 'Alias=' + id_dict[gene][gene]
+                else:
+                    cur_list[i]['attributes'] += ';Alias=' \
+                                              +  id_dict[gene][gene]
                 id_dict[gene][id_] = id_dict[gene][gene]
                 # this assumes that for the case where CDSs' parents are genes,
                 # and mRNAs thus aren't related to the CDS alias directly, then

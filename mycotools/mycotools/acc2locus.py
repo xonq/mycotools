@@ -276,7 +276,14 @@ if __name__ == '__main__':
         if args.acc == "-":
             accs = stdin2str().split()
         else:
-            accs = [args.acc]
+            if {'"', "'"}.intersection(set(args.acc)):
+                args.acc = args.acc.replace('"','').replace("'",'')
+            if ',' in args.acc:
+                accs = args.acc.split(',')
+            elif re.search(r'\s', args.acc):
+                accs = args.acc.split()
+            else:
+                accs = [args.acc]
     else:
         print('\nERROR: requires input or acc', flush = True)
         sys.exit(1)

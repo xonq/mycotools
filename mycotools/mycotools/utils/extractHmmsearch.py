@@ -20,7 +20,18 @@ def grab_names(data, query = False):
     return names_set
 
 
-def grab_hits(data, threshold = None, evalue = None, 
+def sort_hits(hit_list, aln_list):
+    hit_dict = {i: v for i, v in enumerate(hit_list)}
+    # sort by bitscore because hmmer doesnt have identity :/
+    sortd_hits = {i: v for i, v in sorted(hit_dict.items(), key = lambda x: \
+                                         float(x[1][2]), reverse = True)}
+    hit_list = list(sortd_hits.values())
+    aln_list = [aln_list[i] for i in sortd_hits]
+    return hit_list, aln_list
+                                        
+
+
+def grab_hits(data, threshold = None, evalue = None, bitscore = None,
              top = None, query = False, accession = False):
 
     if query:
@@ -49,10 +60,10 @@ def grab_hits(data, threshold = None, evalue = None,
 
         hit_str = ''
         for line in outputLines:
-            hit_str += ' '.join(line[8:]) + '\t' + line[0] + '\t' + line[1] + '\t' + line[2] + '\t' + \
-                line[3] + '\t' + line[4] + '\t' + line[5] + '\t' + line[6] + '\t' + line[7] + '\n'
+            hit_str += f"{' '.join(line[8:])}\t{line[0]}\t{line[1]}\t{line[2]}\t" \
+                    + f"{line[3]}\t{line[4]}\t{line[5]}\t{line[6]}\t{line[7]}\n"
 
-        passingSeq, align_str, count = set(), '', 0
+        passingSeq, aln_str, count = set(), '', 0
         aligns = re.findall( r'^\>\> (.*?)\n.*?\n[\W\-]+\n(.*?)\n\n', fullAlign, re.DOTALL | re.MULTILINE )
         for align in aligns:
             seq = align[0].rstrip()
@@ -72,38 +83,47 @@ def grab_hits(data, threshold = None, evalue = None,
                     passingSeq.add( str(seq) )
                     
 
-                align_str += str(seq) + '\t' + outLine[0] + '\t' + outLine[1] + '\t' + outLine[2] + \
+                aln_str += str(seq) + '\t' + outLine[0] + '\t' + outLine[1] + '\t' + outLine[2] + \
                     '\t' + outLine[3] + '\t' + outLine[4] + '\t' + outLine[5] + '\t' + outLine[6] + '\t' + \
                     outLine[7] + '\t' + outLine[8] + '\t' + outLine[9] + '\t' + outLine[10] + '\t' + \
                     outLine[11] + '\t' + outLine[12] + '\n'
 
+        t_hit_list = [hit.split('\t') for hit in hit_str.split('\n') if hit]
         if threshold:
-            hit_list = [ hit for hit in hit_str.split( '\n' ) if hit != '' ]
-            out_hits = []
-            for hit in hit_list:
-                start = re.search(r'^(.*?)\t', hit)[1]
-                if start.rstrip() in passingSeq:
-                    out_hits.append( hit )
-            hit_str = '\n'.join( out_hits )
+            hit_list = []
+            for hit in t_hit_list:
+                if hit[0] in passingSeq:
+                    hit_list.append(hit)
+        else:
+            hit_list = t_hit_list
+        aln_list = [aln.split('\t') for aln in aln_str.split('\n') if aln]
+        hit_list, aln_list = sort_hits(hit_list, aln_list)
 
         if evalue:
             new_passSeq = set()
-            hit_list = [x for x in hit_str.split('\n') if x]
-            align_list = [x for x in align_str.split('\n') if x]
             out_hits, out_aligns = [], []
             for hit in hit_list:
-                if int(10**200 * float( hit.split('\t')[1] )) < int(10**200 * float( '1e-' + str(evalue) )):
-                    out_hits.append( hit )
-                    new_passSeq.add( hit.split('\t')[0] )
-            for align in align_list:
-                if align.split('\t')[0] in new_passSeq:
-                    out_aligns.append( align )
-            hit_str = '\n'.join( out_hits )
-            align_Str = '\n'.join( out_aligns )
+                if int(10**200 * float(hit[1])) < int(10**200 * float(evalue)):
+                    out_hits.append(hit)
+                    new_passSeq.add(hit[0])
+            for align in aln_list:
+                if align[0] in new_passSeq:
+                    out_aligns.append(align)
+            hit_list, aln_list = out_hits, out_aligns
+        if bitscore:
+            new_passSeq = set()
+            out_hits, out_aligns = [], []
+            for hit in hit_list:
+                if float(hit[2]) >= bitscore:
+                    out_hits.append(hit)
+                    new_passSeq.add(hit[0])
+            for align in aln_list:
+                if align[0] in new_passSeq:
+                    out_aligns.append(align)
+            hit_list, aln_list = out_hits, out_aligns
 
         if top:
             count = 0
-            hit_list, align_list = hit_str.split( '\n' ), align_str.split( '\n' )
             out_hits, out_aligns = [], []
             for hit in hit_list:
                 count += 1
@@ -111,19 +131,20 @@ def grab_hits(data, threshold = None, evalue = None,
                     break
                 out_hits.append( hit )
             count = 0
-            for align in align_list:
+            for align in aln_list:
                 count += 1
                 if count > top:
                     break
                 out_aligns.append( align )
-            hit_str = '\n'.join( out_hits )
-            align_str = '\n'.join( out_aligns )
+            hit_list, aln_list = out_hits, out_aligns
+        hit_str = '\n'.join(['\t'.join(x) for x in hit_list])
+        aln_str = '\n'.join(['\t'.join(x) for x in aln_list])
 
     else:
-        hit_str, align_str = None, None
+        hit_str, aln_str = None, None
         print( 'did not work' , flush = True)
 
-    return hit_str, align_str
+    return hit_str, aln_str
 
 
 def synthesizeHits( out_dict ):
@@ -141,21 +162,21 @@ def synthesizeHits( out_dict ):
     
     new_dict = {}
     for hit in out_dict:
-        hit_str, align_str = '', ''
+        hit_str, aln_str = '', ''
         for seq in out_dict[ hit ][ 0 ].split('\n'):
             if seq.split('\t')[0] in passing:
                 hit_str += seq + '\n'
         for seq in out_dict[ hit ][ 1 ].split( '\n' ):
             if seq.split('\t')[0] in passing:
-                align_str += seq + '\n'
-        new_dict[ hit ] = ( hit_str, align_str )
+                aln_str += seq + '\n'
+        new_dict[ hit ] = ( hit_str, aln_str )
 
     return new_dict
 
     
 def main( 
     data, accession, best, threshold, evalue,
-    query = True, header = True 
+    bitscore, query = True, header = True 
     ):
 
     check, out = None, {}
@@ -221,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument( '-b', '--best', type = int, help = '# top hits to take' )
     parser.add_argument( '-t', '--threshold', type = float, help = 'Percent query coverage to consider a hit (float).' )
     parser.add_argument( '-e', '--evalue', help = 'Negative magnitude of E-value, e.g. ' \
-        + '10^(-x) where `x` is the input.' )
+        + '10^(-x) where `x` is the input.', type = float, default = 0 )
     parser.add_argument( '--allq', action = 'store_true', help = 'Extract all queries' )
     parser.add_argument( '--alla', action = 'store_true', help = 'Extract all accessions' )
     parser.add_argument( '-o', '--output', help = 'Output file name/path (extensions automatically applied' )
@@ -273,7 +294,7 @@ if __name__ == '__main__':
 
     if args.allq or args.alla:
         out_dict = main( 
-            data, args.accession, args.best, args.threshold, args.evalue, query = args.query 
+            data, args.accession, args.best, args.threshold, 10**-(args.evalue), query = args.query 
             )
     else:
         for que in ques:
@@ -283,7 +304,7 @@ if __name__ == '__main__':
                 args.accession = que   
             temp_out_dict = main( 
                 data, args.accession, args.best, args.threshold, 
-                args.evalue, header = False, query = args.query 
+                10**-(args.evalue), header = False, query = args.query 
                 )
             out_dict = { **out_dict, **temp_out_dict }
         out_dict = synthesizeHits( out_dict )

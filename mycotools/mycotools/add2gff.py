@@ -28,7 +28,7 @@ def determine_version(toadd_gff, ome = None):
             elif re.search(gff2Comps()['id'], entry['attributes']):
                 return toadd_gff, gff2Comps()
         elif entry['type'] == 'start_codon': # get this shit out
-            from mycotools.curAnnotation import main as curAnn
+            from mycotools.utils.gtf2gff3 import main as curAnn
             if not ome:
                 eprint('\nOme required for gtf input', flush = True)
                 sys.exit(1)

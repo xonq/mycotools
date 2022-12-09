@@ -187,7 +187,14 @@ if __name__ == '__main__':
             data = stdin2str()
             accs = data.split()
         else:
-            accs = [args.accession]
+            if {'"', "'"}.intersection(set(args.accession)):
+                args.accession = args.accession.replace('"','').replace("'",'')
+            if ',' in args.accession:
+                accs = args.accession.split(',')
+            elif re.search(r'\s', args.accession):
+                accs = args.accession.split()
+            else:
+                accs = [args.accession]
        
     db_path = format_path(args.mtdb)
     if not args.fasta: # MTDB run
