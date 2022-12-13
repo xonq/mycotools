@@ -284,7 +284,7 @@ def findExecs( deps, exit = set(), verbose = True ):
     checks = []
     if type(deps) is str:
         deps = [deps]
-    for dep in deps:
+    for dep in sorted(deps):
         check = shutil.which( dep )
         vprint('{:<15}'.format(dep + ':', flush = True) + \
             str(check), v = verbose, e = True)
@@ -738,7 +738,6 @@ def multisub(args_lists, processes = 1, shell = False,
         IF there are not arguments in args_lists, wait until all processes
         are complete before exiting the function.
     '''
-
     with mp.Pool(processes = processes) as pool:
         exit_pre = pool.starmap(run_subqueue, ((x, shell, verbose, injectable) \
                                                 for x in args_lists))

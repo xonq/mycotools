@@ -38,7 +38,7 @@ from mycotools.fa2clus import write_data, ClusteringError, \
 from mycotools.fa2tree import main as fa2tree, PhyloError
 from mycotools.acc2locus import main as acc2locus
 from mycotools.gff2svg import main as gff2svg
-from mycotools.db2search import main as db2search
+from mycotools.db2search import blast_main as db2search
 from mycotools.ome2name import main as ome2name
 from mycotools.utils.og2mycodb import mycodbOGs, extract_ogs
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -134,6 +134,8 @@ def check_fa_size(fas, max_size):
         print('\t' + query + '\t' + str(len(fa)) + ' genes', flush = True)
         if len(fa) > max_size:
             fas4clus[query] = fa
+        elif len(fa) < 3:
+            eprint(f'\t\tWARNING: too few hits ({len(fa)})', flush = True)
         else:
             fas4trees[query] = fa
 
@@ -631,7 +633,8 @@ def tree_mngr(
         return
     else:
         try:
-            fa2tree(query_fa_path, output_dir = tre_dir, fast = fast, cpus = cpus, verbose = verbose)
+            fa2tree(query_fa_path, output_dir = tre_dir, fast = fast, 
+                    cpus = cpus, verbose = verbose)
         except PhyloError:
             return query
 
@@ -905,7 +908,7 @@ def search_main(
     db, input_genes, query_fa, query_gff, binary = 'mmseqs', fast = True, 
     out_dir = None, clus_cons = 0.4, clus_var = 0.65, min_seq = 3, 
     max_size = 250, cpus = 1, reoutput = True, plusminus = 10000, 
-    evalue = None, bitscore = 40, pident = 0, mem = None, verbose = False,
+    evalue = 0, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
     midpoint = True, clus_meth = 'mmseqs easy-linclust'
     ):
@@ -972,7 +975,7 @@ def search_main(
             diamond = False
         search_fas = {**search_fas, **db2search(
             db, binary, query_path, wrk_dir, evalue = evalue, bitscore = bitscore,
-            pident = pident, mem = mem, biotype = 'proteome', force = True,
+            pident = pident, force = True, coverage = clus_cons,
             skip = skips, diamond = diamond
             )}
         for query in search_fas:

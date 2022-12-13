@@ -274,6 +274,7 @@ def comp_blast_tups(
     evalue = None, coverage = None, search_args = None
     ):
 
+    print(query)
     blast_scaf = [
         blast_type, '-query', query,
         '-outfmt', '6'
@@ -426,11 +427,10 @@ def parseOutput(algorithm, ome, file_, bitscore = 0, pident = 0,
             d = sorted(data, key = lambda x: float(x[2]), reverse = True)
             if max_hits:
                 d = d[:max_hits]
-
             for i in d:
                 if int(float(i[-1])) > bitscore \
                   and int(1000*float(i[2])) > 100000 * pident \
-                  and float(i[-2]) < evalue:
+                  and float(i[-2]) <= evalue:
                     ome_results[-1].append(i)
     return ome_results
 
@@ -670,7 +670,7 @@ def ObyOsearch(
     db, rundb, blast, seq_type, report_dir, biotype,
     query, hsps, max_hits, evalue, cpus,
     bitscore, pident, coverage, diamond, search_arg,
-    convert = False, reparse = False
+    reparse = False
     ):
     if len(rundb) > 0:
         print('\nSearching on an ome-by-ome basis', flush = True)
@@ -687,7 +687,6 @@ def ObyOsearch(
             hsps = hsps, evalue = evalue,
             coverage = coverage*100, search_args = search_arg
             )
-
         print(f'\t{len(search_tups)} searches to run', flush = True)
         search_outs = multisub(search_tups, processes = cpus, 
                                verbose = 2, injectable = True)
@@ -910,14 +909,15 @@ def blast_main(
         eprint('\nERROR: invalid search binary: ' + blast, flush = True)
 
     report_dir = prepOutput(out_dir)
+    query_dict = {}
+    for q in query:
+        query_dict = {**query_dict, **fa2dict(q)}
+    with open(out_dir + 'query.fa', 'w') as out:
+        out.write(dict2fa(query_dict))
+    query = out_dir + 'query.fa'
+
     if search_db and not force:
         print('\nSearching using MycotoolsDB searchdb', flush = True)
-        query_dict = {}
-        for q in query:
-            query_dict = {**query_dict, **fa2dict(q)}
-        with open(out_dir + 'query.fa', 'w') as out:
-            out.write(dict2fa(query_dict))
-        query = out_dir + 'query.fa'
         search_exit, search_output = dbBlast(
             search_db, blast, query, evalue, 
             hsps, cpus, report_dir, diamond = diamond
@@ -939,7 +939,7 @@ def blast_main(
             db, rundb, blast, None, report_dir, biotype,
             query, hsps, max_hits, evalue, cpus,
             bitscore, pident, coverage, diamond, search_arg,
-            convert = convert, reparse = reparse
+            reparse = reparse
             )
 
     print('\nCompiling fastas', flush = True)

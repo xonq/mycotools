@@ -102,7 +102,7 @@ def run_mf(clipkit_files, out_dir, constraint = False,
         with open(out_dir + os.path.basename(f_) + '.log', 'r') as raw:
             for line in raw:
                 if line.startswith('Best-fit model:'):
-                    model = re.search(r'Best-fit model: ([^\W]+)', line)[1]
+                    model = re.search(r'Best-fit model: (.+) chosen', line)[1]
                     models[f_] = model
                     break
 
@@ -159,13 +159,14 @@ def run_partition_tree(fa_file, nex_file, constraint,
 def treeRun(name, clipkit_file, out_dir, hpc, constraint,
             verbose, fast = False, cpus = 1, spacer = '\t'):
 
+    tree_file = out_dir + os.path.basename(clipkit_file)
     if fast:
-        cmd = ['fasttree', '-out', clipkit_file + '.treefile', clipkit_file]
+        cmd = ['fasttree', '-out', tree_file + '.treefile', clipkit_file]
         if constraint:
             cmd.extend(['-constraints', constraint])
     else:
         # the following will identify the optimum number of threads
-        cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-nt', 'auto']
+        cmd = ['iqtree', '-s', tree_file, '-B', '1000', '-nt', 'auto']
         if constraint:
             cmd.extend(['-g', constraint])
     if not hpc:
