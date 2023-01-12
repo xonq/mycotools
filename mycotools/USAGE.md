@@ -622,9 +622,9 @@ fa2clus.py -f <FASTA> -m 0.2 -x 0.3 --iterative <FOCAL_GENE> --minseq 50 --maxse
 ## Gene Cluster Reconstrunction and Phylogenetic Analysis (CRAP)
 ### crap.py
 
-<img align="left"
-src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
-alt="Extracted clade of CRAP pipeline" height="450" width="578">
+#<img align="left"
+#src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
+#alt="Extracted clade of CRAP pipeline" height="450" width="578">
 
 CRAP, adopted and expanded from [Slot & Rokas implementation](https://doi.org/10.1016/j.cub.2010.12.020)),
 reconstructs and visualizes gene cluster phylogenies to study gene cluster
