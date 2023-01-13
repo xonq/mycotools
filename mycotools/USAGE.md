@@ -481,80 +481,60 @@ gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
 <br /><br /><br />
 
 # EVOLUTIONARY ANALYSIS TOOLS
-## BLAST MycotoolsDB
+## Homolog search MycotoolsDB
 ### db2search.py
-`db2search.py` will `blastn`, `blastp`, `tblastn`, or `blastx` the MycotoolsDB using a query fasta and compile a results fasta for each accession in the query according to any inputted threshold requirements. It is recommended to keep `--cpu` below the number the number of query organisms.
-
-```bash
-db2search.py --help
-usage: db2search.py [-h] -b BLAST [-q QUERY] [-e EVALUE] [-s BITSCORE] [-i IDENTITY] [-m MAXHITS] [-d DATABASE]
-                   [-o OUTPUT] [-p PREVIOUS] [--cpu CPU]
-
-Blasts a query against a db and compiles output fastas for each query.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -b BLAST, --blast BLAST
-                        Blast type { blastn, blastp, tblastn, blastx }
-  -q QUERY, --query QUERY
-                        Query fasta
-  -e EVALUE, --evalue EVALUE
-                        Negative e-value order max, e.g. 2 for 10^-2
-  -s BITSCORE, --bitscore BITSCORE
-                        Bit score minimum
-  -i IDENTITY, --identity IDENTITY
-                        Identity minimum, e.g. 0.6
-  -m MAXHITS, --maxhits MAXHITS
-                        Max hits for each organism
-  -d DATABASE, --database DATABASE
-                        mycotoolsdb, DEFAULT: masterdb
-  -o OUTPUT, --output OUTPUT
-  -p PREVIOUS, --previous PREVIOUS
-                        Previous run directory
-  --cpu CPU             DEFAULT: all
+`db2search.py` will execute `hmmer`, `blast`, `diamond`, or `mmseqs`, query an input fasta, and output a results fasta for each accession in the query.
 ```
+-bash-4.2$ db2search.py -h
+usage: db2search.py [-h] [-d MTDB] [-q QUERY] [-qd QUERY_DIR] [-qf QUERY_FILE] [-a ALGORITHM]
+                    [-s SEQTYPE] [--diamond] [-e EVALUE] [-bit BITSCORE] [-i IDENTITY] [-m MAX_HITS]
+                    [-qt QUERY_THRESH] [--coordinate] [--convert] [--iterations ITERATIONS]
+                    [--manual MANUAL] [--acc] [-v] [-o OUTPUT] [-c CPU] [--ram RAM]
 
-<br /><br />
-
-
-## hmmsearch MycotoolsDB
-### db2hmmer.py
-`db2hmmer.py` will use an evolutionary profile hidden markov model (hmm) to search 
-for proteins in an MTDB, compile hmmsearch results, and ouput results fasta or trimmed 
-hmmalignments.
-
-e.g.: `db2hmmer.py -d Pfam-A.hmm` will run the master database referencing the Pfam. 
-
-`db2hmmer.py -d profile.hmm -b 1 -t 75` for each organism, takes the best hit from 
-hits with 25 - 100% query coverage
-
-```bash
-Runs `hmmsearch` v each proteome in a `.db`. For each query, extracts results and optionally outputs a
-compiled fasta, hmmalignment and/or trimmed alignment.
+Searches a query sequence or profile database against an mtdb. Compiles output fastas for each query.
 
 optional arguments:
   -h, --help            show this help message and exit
 
 Inputs:
   -d MTDB, --mtdb MTDB
-  --hmm HMM             .hmm database
+  -q QUERY, --query QUERY
+                        Profile database or sequence
+  -qd QUERY_DIR, --query_dir QUERY_DIR
+                        Dir of queries
+  -qf QUERY_FILE, --query_file QUERY_FILE
+                        File of query paths
+
+Search algorithm:
+  -a ALGORITHM, --algorithm ALGORITHM
+                        Search binary ['blastn', 'blastp', 'blastx', 'hmmsearch', 'mmseqs', 'tblastn']
+  -s SEQTYPE, --seqtype SEQTYPE
+                        [mmseqs] Subject sequence type {aa, nt}
+  --diamond             [blast] Use diamond. Not recommended for ome-by-ome
 
 Search parameters:
-  -b BINARY, --binary BINARY
-                        Search binary {"hmmsearch", "nhmmer"} NONFUNCTIONAL
-  -m MAX_HITS, --max_hits MAX_HITS
-                        Max hits for each organism
-  -q QUERY_THRESH, --query_thresh QUERY_THRESH
-                        Query percent hit threshold (+/-)
   -e EVALUE, --evalue EVALUE
                         E value threshold, e.g. 10^(-x) where x is the input
-  -a, --accession       Extract accessions instead of queries (Pfam, etc)
-  -l, --align           Align fastas to original hmm and trim via clipkit
+  -bit BITSCORE, --bitscore BITSCORE
+                        Bit score minimum
+  -i IDENTITY, --identity IDENTITY
+                        [mmseqs|blast] Identity minimum, e.g. 0.6
+  -m MAX_HITS, --max_hits MAX_HITS
+                        Max hits for each ome
+  -qt QUERY_THRESH, --query_thresh QUERY_THRESH
+                        Query percent hit threshold (+/-), e.g. 0.5
+  --coordinate          Extract alignment; DEFAULT: full protein
+  --convert             [mmseqs] Convert query IDs to respective database name (profile search)
+  --iterations ITERATIONS
+                        [mmseqs] --num-iterations in search; DEFAULT: 3
+  --manual MANUAL       [mmseqs] Additional search arguments in quotes
+  --acc                 [hmmer] Extract accessions instead of queries (Pfam)
 
 Runtime options:
   -v, --verbose
   -o OUTPUT, --output OUTPUT
   -c CPU, --cpu CPU
+  --ram RAM             Useful for mmseqs: e.g. 10M or 5G
 ```
 
 <br /><br />
@@ -564,7 +544,7 @@ Runtime options:
 ### fa2tree.py
 `fa2tree.py` will input a fasta file or directory of fasta files, trim, and
 generate trees either via job submission (`slurm` or `torque`) or immediate execution. 
-Note you will need `mafft`, `clipkit`, and `iqtree` installed. 
+Note you will need `mafft`, `clipkit`, and `iqtree` installed.
 If these are not installed, install them into your mycotools conda environment via 
 `conda install mafft iqtree` and `pip install clipkit`.
 
@@ -574,12 +554,17 @@ Information on a complete [phylogenetic pipeline](https://gitlab.com/xonq/mycoto
 
 e.g. Swiftly construct a tree from a fasta
 ```bash
-fa2tree.py -f <FASTA>.fa --fast
+fa2tree.py -i <FASTA>.fa --fast
 ```
 
 Prepare a robust tree for slurm job submission
 ```bash
-fa2tree.py -f <FASTA> -s -A PAS1046
+fa2tree.py -i <FASTA> -s -A PAS1046
+```
+
+Construct a multigene phylogeny with independent evolutionary models for each gene
+```bash
+fa2tree.py -i <FASTA_DIR> -p
 ```
 
 Begin the tree pipeline by navigating into the folder and running `bash
@@ -622,9 +607,9 @@ fa2clus.py -f <FASTA> -m 0.2 -x 0.3 --iterative <FOCAL_GENE> --minseq 50 --maxse
 ## Gene Cluster Reconstrunction and Phylogenetic Analysis (CRAP)
 ### crap.py
 
-#<img align="left"
-#src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
-#alt="Extracted clade of CRAP pipeline" height="450" width="578">
+<img align="left"
+src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
+alt="Extracted clade of CRAP pipeline" height="450" width="578">
 
 CRAP, adopted and expanded from [Slot & Rokas implementation](https://doi.org/10.1016/j.cub.2010.12.020)),
 reconstructs and visualizes gene cluster phylogenies to study gene cluster
