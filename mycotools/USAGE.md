@@ -466,9 +466,10 @@ This script will add new and corrected gene models formatted in an inputted gff 
 Overlapping coordinates can be removed and an update file for `mtdb` is optionally generated.
 
 To add corrected genes from an `exonerate`-derived gff to a MycotoolsDB `gff` and prepare a database update:
+
 `add2gff.py -i <EXONERATE_GFF> -a $(mtdb <OME>.gff3) -u`
 
-NOTE: database managers will need to finalize the database to propagate the data to the master database
+NOTE: database managers will need to finalize the updates to propagate the data to the master database
 
 ```
 add2gff.py [-h] -i INPUT [-a ADDTO] [-o OME] [-r] [-u]
