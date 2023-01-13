@@ -39,15 +39,14 @@ how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-
 	- [Extract fasta coordinates](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#fasta-coordinates)
 	- [Grabbing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-loci)
 	- [GFF to sequence](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#gene-coordinates-to-sequences)
-	- [Visualizing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#visualizing-loci)
 	- [Curating annotation](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#curate-annotation)
-
+	- [Adding corrected gene models](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#adding-corrected-gene-models)
+	- [Visualizing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#visualizing-loci)
 <br />
 
 
 - **EVOLUTIONARY ANALYSES**
-	- [MycotoolsDB BLAST](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#blast-mycotoolsdb)
-	- [MycotoolsDB hidden markov model search](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#hmmsearch-mycoDB)
+	- [MycotoolsDB BLAST/HMM](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#homolog-search-mycotoolsdb)
 	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#tree-building)
 	- [Sequence clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-clustering)
 	- [Gene cluster phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crappy)
@@ -458,6 +457,27 @@ There are several scripts in the `utils` used to curate gene coordinate files
 and proteomes for the MycotoolsDB. `curGFF3.py` is tested with, Funannotate, 
 both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB
 compatible `gff3`
+
+<br /><br />
+
+## Adding corrected gene models
+### add2gff.py
+This script will add new and corrected gene models formatted in an inputted gff to a full genome gff.
+Overlapping coordinates can be removed and an update file for `mtdb` is optionally generated.
+
+```
+add2gff.py [-h] -i INPUT [-a ADDTO] [-o OME] [-r] [-u]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        To add gff
+  -a ADDTO, --addto ADDTO
+                        Add to gff
+  -o OME, --ome OME     Input ome if no [-a]
+  -r, --replace         Replace overlapping accession(s)
+  -u, --update          [-a] Prepare output for mtdb update
+```
 
 <br /><br />
 
