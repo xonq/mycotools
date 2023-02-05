@@ -910,7 +910,7 @@ def search_main(
     max_size = 250, cpus = 1, reoutput = True, plusminus = 10000, 
     evalue = 0, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
-    midpoint = True, clus_meth = 'mmseqs easy-linclust'
+    midpoint = True, clus_meth = 'mmseqs easy-linclust', ppos = 0
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
@@ -976,7 +976,7 @@ def search_main(
         search_fas = {**search_fas, **db2search(
             db, binary, query_path, wrk_dir, evalue = evalue, bitscore = bitscore,
             pident = pident, force = True, coverage = clus_cons,
-            skip = skips, diamond = diamond
+            skip = skips, diamond = diamond, ppos = ppos
             )}
         for query in search_fas:
             search_fas[query][query] = query_fa[query]
@@ -1120,6 +1120,14 @@ if __name__ == "__main__":
     hg_opt.add_argument(
         '-s', '--search',
         help = 'Search binary {mmseqs, diamond, blastp} for search-based CRAP'
+        )
+    hg_opt.add_argument(
+        '-id', '--identity', type = float, default = 0,
+        help = '[0 < -i < 1] Alignment identity minimum'
+        )
+    hg_opt.add_argument(
+        '-pos', '--positives', type = float, default = 0,
+        help = '[0 < -p < 1] Alignment positives minimum'
         )
     hg_opt.add_argument(
         '-b', '--bitscore', type = float,
@@ -1276,7 +1284,9 @@ if __name__ == "__main__":
         'Minimum seq': args.min_seq,
         'Maximum seq': args.max_seq,
         'Minimum coverage': args.min_cov,
-        'Bitscore': args.bitscore,
+        'Minimum identity': args.identity,
+        'Minimum positives': args.positives,
+        'Minimum Bitscore': args.bitscore,
         'GFF': args.gff,
         'Conversion file': args.conversion,
         'Labels': not args.no_label,
@@ -1330,8 +1340,8 @@ if __name__ == "__main__":
             binary = args.search, fast = fast, out_dir = out_dir,
             clus_cons = args.min_cov, clus_var = 0.65, min_seq = args.min_seq, 
             max_size = args.max_seq, cpus = 1, plusminus = args.plusminus, 
-            bitscore = args.bitscore, pident = 0, mem = None, 
-            verbose = args.verbose, interval = 0.1, 
+            bitscore = args.bitscore, pident = args.identity, mem = None, 
+            verbose = args.verbose, interval = 0.1, ppos = args.positives,
             midpoint = not bool(args.no_midpoint),
             outgroups = not args.no_outgroup, conversion_dict = conversion_dict, 
             clus_meth = clus_meth, labels = not args.no_label,

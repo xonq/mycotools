@@ -1,13 +1,15 @@
 #! /usr/bin/env python3
 
 # NEED to add option to export NCBI/JGI credentials
+# NEED to import updatedb (u), predb2db, extract (x), init (i) function
+# NEED to pay attention to old ome versions
 
 import os
 import re
 import sys
 import subprocess
 from mycotools.lib.kontools import format_path, read_json, write_json, eprint
-from mycotools.lib.dbtools import masterDB, mtdb_connect, mtdb_initialize, mtdb
+from mycotools.lib.dbtools import masterDB, mtdb_connect, mtdb_initialize, mtdb, loginCheck
 
 
 def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
@@ -78,6 +80,9 @@ if __name__ == '__main__':
             raise ValueError('fungal MTDB not connected')
         else:
             mtdb_connect(config, 'fungi')
+            if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
+                loginCheck()
+
     elif {'-p', '--prokaryote'}.intersection(set_argv):
         if '-p' in set_argv:
             coord = '-p'
@@ -87,6 +92,8 @@ if __name__ == '__main__':
             raise ValueError('prokaryote MTDB not connected')
         else:
             mtdb_connect(config, 'prokaryote')
+            if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
+                loginCheck()
     elif len(sys.argv) > 1:
         omes = sys.argv[1].replace('"','').replace("'",'').split()
         for ome_prep in omes:

@@ -102,7 +102,8 @@ def extractHeaders(fasta_file, accessions, ome = None):
 
     return out_fasta
 
-def dbmain(db, accs, error = True, spacer = '\t\t\t', coord_check = True):
+def dbmain(db, accs, error = True, 
+           spacer = '\t\t\t', coord_check = True):
     """takes in mtdb, takes accessions ome by ome from accs;
     error will exit if set to true, report to stderr if not;
     coord_check will check entries for coordinate signatures in accession names
@@ -143,6 +144,7 @@ def dbmain(db, accs, error = True, spacer = '\t\t\t', coord_check = True):
             fa_dict = {**fa_dict, **extract_mtdb_accs_exp(ome_fasta, ome_accs)}
 
     return fa_dict
+
 
 def famain(accs, fa, ome = None):
     """takes in accessions, fasta, and retrieves accessions"""

@@ -272,8 +272,7 @@ def getLogin( ncbi, jgi ):
 
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
-def loginCheck( info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True ):
-
+def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
     salt = b'D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118'
     #NEED to make this store a password
     if os.path.isfile( format_path(info_path) ):

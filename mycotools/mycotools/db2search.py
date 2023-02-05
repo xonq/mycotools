@@ -274,10 +274,8 @@ def comp_blast_tups(
     evalue = None, coverage = None, search_args = None
     ):
 
-    print(query)
     blast_scaf = [
-        blast_type, '-query', query,
-        '-outfmt', '6'
+        blast_type, '-query', query
         ]
     if evalue:
         blast_scaf.extend(['-evalue', str(evalue)])
@@ -289,14 +287,16 @@ def comp_blast_tups(
         blast_scaf.extend(['-qcov_hsp_perc', str(coverage)])
     if search_args:
         blast_scaf.extend(search_args)
+    blast_scaf.extend(['-outfmt', 
+                      '"6 qseqid sseqid pident ppos sstart send evalue bitscore"'])
 
     blast_cmds = []
     for i, ome in enumerate(seq_db['ome']):
         if seq_db[biotype][i]:
-            blast_cmds.append( compileBlastCmd(
+            blast_cmds.append( ' '.join(compileBlastCmd(
                 ome, seq_db[biotype][i],
                 out_dir, blast_scaf
-                ) )
+                )))
     return blast_cmds
 
 def compileDiamondCmd(ome, dmnd_db, out_dir, blast_scaf):
@@ -313,7 +313,6 @@ def comp_diamond_tups(
         os.mkdir(out_dir + 'dmnd/')
     blast_scaf = [
         diamond, blast_type, '-query', query,
-        '--outfmt', '6'
         ]
     if evalue:
         blast_scaf.extend(['--evalue', str(evalue)])
@@ -325,6 +324,9 @@ def comp_diamond_tups(
         blast_scaf.extend(['--query-cover', str(coverage)])
     if search_args:
         blast_scaf.extend(search_args)
+    blast_scaf.extend('--outfmt', '6', 'qseqid', 'sseqid', 'pident',
+        'ppos', 'sstart', 'send', 'evalue', 'bitscore')
+
 
     blast_cmds, db_cmds = [], []
     for i, ome in enumerate(seq_db['ome']):
@@ -411,9 +413,30 @@ def run_mmseq(
         results_out = subprocess.call(results_cmd, stderr = subprocess.DEVNULL,
                                       stdout = subprocess.DEVNULL)
 
-
 def parseOutput(algorithm, ome, file_, bitscore = 0, pident = 0, 
-                evalue = 0, max_hits = None):
+                evalue = 0, max_hits = None, ppos = 0, scale = 1000):
+
+    ome_results = [ome, []]
+    if os.path.exists( file_ ):
+        with open( file_, 'r' ) as raw:
+            data = [x.rstrip().split('\t') for x in raw if x.rstrip()]
+        byq = defaultdict(list)
+        for d in data:
+            byq[d[0]].append(d)
+        # sort by percent identity (we denote everything before here as a homolog)
+        for q, data in byq.items():
+            d = sorted(data, key = lambda x: float(x[2]), reverse = True)
+            if max_hits:
+                d = d[:max_hits]
+            for i in d:
+                if int(float(i[-1])) > bitscore \
+                  and int(1000*float(i[2])) > scale * pident \
+                  and float(i[-2]) <= evalue and int(1000*float(i[3])) > scale * ppos:
+                    ome_results[-1].append(i)
+    return ome_results
+
+def parseOutput_mmseqs(algorithm, ome, file_, bitscore = 0, pident = 0, 
+                evalue = 0, max_hits = None, ppos = None):
 
     ome_results = [ome, []]
     if os.path.exists( file_ ):
@@ -535,12 +558,11 @@ def prepOutput(out_dir):
 
 
 def run_denovo(report_dir, log_list0, log_name):
-    count = 0
-    while os.path.isdir(report_dir):
-        count += 1
-        if not report_dir.endswith('/'):
-            report_dir += '/'
-        report_dir = re.sub(r'\d+$', str(count), report_dir[:-1])
+    if os.path.isdir(report_dir):
+        count = 0
+        while os.path.isdir(report_dir[:-1] + str(count)):
+            count += 1
+        report_dir = report_dir[:-1] + str(count) + '/'
     log_list0[0] = report_dir
     os.mkdir(report_dir)
     with open(log_name, 'w') as out:
@@ -548,10 +570,11 @@ def run_denovo(report_dir, log_list0, log_name):
     return log_list0, report_dir
 
 def db2searchLog(report_dir, blast, query, max_hits,
-                 evalue, bit, pident, coverage, out_dir):
+                 evalue, bit, pident, coverage, out_dir,
+                 ppos):
     log_list0 = [
         report_dir, blast, query, str(max_hits), str(evalue),
-        str(bit), str(pident), str(coverage)
+        str(bit), str(pident), str(coverage), str(ppos)
         ]
     
     prev, reparse = False, False
@@ -578,7 +601,7 @@ def db2searchLog(report_dir, blast, query, max_hits,
                     os.remove(r)
                 reparse = True
             prev = True
-        elif log_list1[:5] != log_list0[:5]:
+        elif log_list1[1:5] != log_list0[1:5]:
             eprint('\tInconsistent thresholds, rerunning', flush = True)
             log_list0, report_dir = run_denovo(report_dir, log_list0, log_name)
         else:
@@ -590,15 +613,16 @@ def db2searchLog(report_dir, blast, query, max_hits,
 def prepare_search_run(
     db, report_dir, blast, query, 
     max_hits, evalue, out_dir, bit, pident,
-    coverage
+    coverage, ppos
     ):
 
     prev, finished, rundb = False, set(), db
     if isinstance(query, list):
         query = ','.join(query)
     log_list0, log_list1, prev, reparse = db2searchLog(report_dir, blast, query, max_hits, 
-                                              evalue, bit, pident, coverage, out_dir)
-
+                                              evalue, bit, pident, coverage, out_dir,
+                                              ppos)
+    report_dir = log_list0[0]
     if prev:
   #      reparse = False
         reports = collect_files(report_dir, 'tsv')
@@ -613,7 +637,7 @@ def prepare_search_run(
         rundb = rundb.reset_index()
  #       if log_list0[-3:] != log_list1[-3:]: # bitscore discrepancy
 #            reparse = True
-    return rundb, reparse
+    return rundb, reparse, report_dir
 
 
 def prep_mmseq_output(rundb, report_dir, queries, convert = False):
@@ -670,7 +694,7 @@ def ObyOsearch(
     db, rundb, blast, seq_type, report_dir, biotype,
     query, hsps, max_hits, evalue, cpus,
     bitscore, pident, coverage, diamond, search_arg,
-    reparse = False
+    reparse = False, ppos = 0
     ):
     if len(rundb) > 0:
         print('\nSearching on an ome-by-ome basis', flush = True)
@@ -678,26 +702,32 @@ def ObyOsearch(
             db_tups, search_tups = comp_diamond_tups(
                 rundb, diamond, blast, seq_type, report_dir, biotype, query,
                 hsps = hsps, evalue = evalue,
-                coverage = coverage*100, search_args = search_arg
+                coverage = coverage*100, search_args = search_arg,
                 )
             db_outs = multisub(db_tups, processes = cpus)
-        search_tups = comp_blast_tups(
-            rundb, blast, seq_type, 
-            report_dir, biotype, query, 
-            hsps = hsps, evalue = evalue,
-            coverage = coverage*100, search_args = search_arg
-            )
-        print(f'\t{len(search_tups)} searches to run', flush = True)
-        search_outs = multisub(search_tups, processes = cpus, 
-                               verbose = 2, injectable = True)
-    
+            print(f'\t{len(search_tups)} searches to run', flush = True)
+            search_outs = multisub(search_tups, processes = cpus, 
+                                    verbose = 2, injectable = True)
+            scale = 100000
+        else:
+            search_tups = comp_blast_tups(
+                rundb, blast, seq_type, 
+                report_dir, biotype, query, 
+                hsps = hsps, evalue = evalue,
+                coverage = coverage*100, search_args = search_arg
+                )
+            search_outs = multisub(search_tups, processes = cpus, 
+                                    verbose = 2, shell = True, injectable = True)
+            scale = 100000
+   
     # prepare report parsing commands for multiprocessing
     parse_tups = []
     for i, ome in enumerate(db['ome']):
         if db[biotype][i]:
             parse_tups.append([blast, ome,
                 report_dir + ome + '.tsv',
-                bitscore, pident, evalue, max_hits])
+                bitscore, pident, evalue, max_hits,
+                ppos, scale])
 
     print('\nParsing reports', flush = True)
     with mp.get_context('spawn').Pool(processes = cpus) as pool:
@@ -732,7 +762,7 @@ def mmseqs_mngr(
                 bitscore, pident, evalue, max_hits])
 
     with mp.get_context('spawn').Pool(processes = cpus) as pool:
-        results = pool.starmap(parseOutput, tuple(parse_tups))
+        results = pool.starmap(parseOutput_mmseqs, tuple(parse_tups))
     results_dict = {x[0]: x[1] for x in results}
 
     return results_dict
@@ -818,14 +848,17 @@ def dbmmseq(
     return cmd_call, out_file
 
 
-def parseDBout( db, file_, bitscore = 0, pident = 0, max_hits = None ):
+def parseDBout(db, file_, bitscore = 0, pident = 0, 
+               ppos = 0, max_hits = None):
 
     ome_results = {}
     with open( file_, 'r' ) as raw:
         for line in raw:
             data = [x for x in line.rstrip().split('\t')]
             ome = re.search(r'(^[^_]*)', data[1])[1]
-            if int(float(data[-1])) > bitscore and int(1000*float(data[2])) > 100000 * pident:
+            if int(float(data[-1])) > bitscore \
+                and int(1000*float(data[2])) > 100000 * pident \
+                and int(1000*float(data[3])) > 100000 * ppos:
                 if ome not in ome_results:
                     ome_results[ome] = []
                 ome_results[ome].append(data)
@@ -853,7 +886,7 @@ def mmseqs_main(
     pident = 0, mem = None, coverage = None,
     cpus = 1, biotype = None,
     skip = [], coordinate = False,
-    search_arg = [], convert = False, iterations = 3
+    search_arg = [], convert = False, iterations = 3,
     ):
 
     if isinstance(query, str):
@@ -892,7 +925,7 @@ def blast_main(
     pident = 0, coverage = None,
     cpus = 1, force = False,
     skip = [], diamond = None, coordinate = False,
-    search_arg = []
+    search_arg = [], ppos = 0
     ):
 
     if isinstance(query, str):
@@ -927,19 +960,20 @@ def blast_main(
             sys.exit(10)
         results_dict = parseDBout(
             db, search_output, bitscore = bitscore, 
-            pident = pident, max_hits = max_hits
+            pident = pident, max_hits = max_hits,
+            ppos = ppos
             )
     else:
-        rundb, reparse = prepare_search_run(
+        rundb, reparse, report_dir = prepare_search_run(
             db, report_dir, blast, query, 
             max_hits, evalue, out_dir, bitscore, pident,
-            coverage
+            coverage, ppos
             )
         results_dict = ObyOsearch(
             db, rundb, blast, None, report_dir, biotype,
             query, hsps, max_hits, evalue, cpus,
             bitscore, pident, coverage, diamond, search_arg,
-            reparse = reparse
+            reparse = reparse, ppos = ppos
             )
 
     print('\nCompiling fastas', flush = True)
@@ -989,13 +1023,15 @@ if __name__ == '__main__':
 
     p_arg = parser.add_argument_group('Search parameters')
     p_arg.add_argument('-e', '--evalue', help = 'E value threshold, e.g. ' \
-        + '10^(-x) where x is the input', type = int)
+        + '10^(-x) where x is the input', type = int, default = 0)
     p_arg.add_argument('-bit', '--bitscore', default = 0,
         type = int, help = 'Bit score minimum')
     p_arg.add_argument('-i', '--identity', default = 0,
         type = float, help = '[mmseqs|blast] Identity minimum, e.g. 0.6')
+    p_arg.add_argument('-p', '--positives', default = 0,
+        type = float, help = '[blast] Positives minimum, e.g. 0.6')
     p_arg.add_argument('-m', '--max_hits', type = int, help = 'Max hits for each ome')
-    p_arg.add_argument('-qt', '--query_thresh', type = float,
+    p_arg.add_argument('-qt', '--query_thresh', type = float, default = 0,
         help = 'Query percent hit threshold (+/-), e.g. 0.5')
     p_arg.add_argument('--coordinate', help = 'Extract alignment; DEFAULT: full protein ',
         action = 'store_true')
@@ -1097,9 +1133,10 @@ if __name__ == '__main__':
     else:
         cpu = mp.cpu_count()
 
-    evalue = None 
     if args.evalue:
         evalue = 10**( -args.evalue)
+    else:
+        evalue = 1
 
     args_dict = { 
         'Algorithm': args.algorithm, 'MycotoolsDB': args.mtdb, 
@@ -1107,6 +1144,7 @@ if __name__ == '__main__':
         'Output': output, 'Hits/ome': args.max_hits, 
         'Coverage threshold': args.query_thresh, 'Max E-value': evalue, 
         'Min bitscore': args.bitscore, 'Min identity': args.identity,
+        'Min positives': args.positives,
         'Coordinate extract': args.coordinate, 'Iterations': args.iterations,
         'HMM accession': args.acc, 'Diamond': args.diamond,
         'Output': output, 'CPUs': cpu
@@ -1128,7 +1166,7 @@ if __name__ == '__main__':
             bitscore = args.bitscore, pident = args.identity,
             max_hits = args.max_hits, cpus = cpu, force = True,
             search_arg = manual_cmd, coordinate = args.coordinate, 
-            coverage = args.query_thresh
+            coverage = args.query_thresh, ppos = args.positives
             )
     # run mmseqs
     else:

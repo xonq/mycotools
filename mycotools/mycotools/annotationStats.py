@@ -59,8 +59,7 @@ def compileExon( gff_path, output, ome = None ):
         return None
 
     if any( line for line in gff if line['type'] == 'intron' ):
-        eprint('ERROR: ' + os.path.basename(gff_path) + ' - introns detected. Convert to exons. Skipping', flush = True)
-        return None
+        eprint('ERROR: ' + os.path.basename(gff_path) + ' - introns detected. Exons only considered', flush = True)
 
     if not output:
         print( '{:<25}'.format('GENE LENGTH:') + str(total) , flush = True)

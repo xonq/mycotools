@@ -9,6 +9,7 @@ import json
 import shutil
 import tarfile
 import subprocess
+from tqdm import tqdm
 from datetime import datetime
 
 def checksum(path, cmd = 'sha256', ref = ''):
@@ -719,7 +720,7 @@ def run_subqueue(args, shell = False, verbose = False, injectable = False):
 
 
 def multisub(args_lists, processes = 1, shell = False, 
-             verbose = False, injectable = False):
+             verbose = False, injectable = False, status = True):
     import multiprocessing as mp
     '''
     Inputs: list of arguments, integer of processes, subprocess `shell` bool
@@ -738,53 +739,13 @@ def multisub(args_lists, processes = 1, shell = False,
         IF there are not arguments in args_lists, wait until all processes
         are complete before exiting the function.
     '''
-    with mp.Pool(processes = processes) as pool:
-        exit_pre = pool.starmap(run_subqueue, ((x, shell, verbose, injectable) \
-                                                for x in args_lists))
-    return [{'stdin': stdin, 'code': exit} for stdin, exit in exit_pre]
-"""
-    if verbose:
-        stdout, stderr = None, None
+    if not status:
+        with mp.Pool(processes = processes) as pool:
+            exit_pre = pool.starmap(run_subqueue, ((x, shell, verbose, injectable) \
+                                                    for x in args_lists))
     else:
-        stdout = subprocess.DEVNULL
-        stderr = subprocess.DEVNULL
-
-    running, outputs = [], []
-    if processes <= 0:
-        processes = 1
-
-    while args_lists: # while there are arguments populating arg_lists
-        while len(running) < processes and args_lists: # while not @ max
-        # processes
-            cmd = args_lists[0]
-#            run_temp = subprocess.Popen(cmd , stdout = stdout, \
- #               stderr = stderr, shell = shell) # run command
-#            running.append([run_temp, cmd]) # add command to running
-            running.append([subqueue(cmd, shell = shell, verbose = verbose), 
-                            cmd])
-            mp.Process(target = running[-1].open)
-            del args_lists[0] # delete from argument list to run
-
-        if len(args_lists) > 0: # if there are remaining arguments
-            for q, cmd in running: # check each status
-                
-                if returncode is not None:
-                    outputs.append({
-                        'stdin': handle[1], 'code': returncode
-                        }) # add command and exit code
-                    del running[index] # remove from running
-                    break
-
-        else: # if there aren't remaining arguments
-            while len(running) > 0: # hold until all commands complete
-                handle = running[0]
-                handle[0].poll()
-                returncode = handle[0].returncode
-                if returncode is not None:
-                    outputs.append({
-                        'stdin': handle[1], 'code': returncode
-                        })
-                    del running[0]
-
-    return outputs # [{stdin: '', code: int()}]
-"""
+        with mp.Pool(processes = processes) as pool:
+            exit_pre = pool.starmap(run_subqueue, tqdm([(x, shell, verbose, injectable) \
+                                                    for x in args_lists], 
+                                                    total = len(args_lists)))
+    return [{'stdin': stdin, 'code': exit} for stdin, exit in exit_pre]

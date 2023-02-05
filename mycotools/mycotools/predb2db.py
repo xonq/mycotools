@@ -9,6 +9,7 @@ import sys
 import copy
 import shutil
 import multiprocessing as mp
+from tqdm import tqdm
 from collections import Counter, defaultdict
 from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
@@ -509,7 +510,7 @@ def main(
 
     vprint('\nCurating data', v = verbose, flush = True)
     with mp.Pool(processes = cpus) as pool:
-        cur_data = pool.starmap(cur_mngr, cur_cmds)
+        cur_data = pool.starmap(cur_mngr, tqdm(cur_cmds, total = len(cur_cmds)))
 
     for data in cur_data:
         if not data[1]:
