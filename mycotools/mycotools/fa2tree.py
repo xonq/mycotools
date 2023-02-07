@@ -171,20 +171,21 @@ def treeRun(name, clipkit_file, out_dir, hpc, constraint,
             cmd.extend(['-g', constraint])
     if not hpc:
         print(spacer + 'Tree building', flush = True)
+        if fast:
+            cmd[2] += '.tmp'
         if verbose:
-            run_tree = subprocess.call(
-                cmd
-                )
+            run_tree = subprocess.call(cmd)
         else:
             run_tree = subprocess.call(
                 cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
                 )
+        if fast:
+            shutil.move(cmd[2], cmd[2][:-4])
         if run_tree != 0:
             eprint(spacer + '\tERROR: tree failed: ' + str(run_tree), flush = True)
             raise PhyloError
     else: 
         vprint('\nOutputting bash script `tree.sh`.\n', v = verbose, flush = True)
-
         with open(out_dir + name + '_tree.sh', 'w') as out:
             out.write(hpc + '\n\n' + ' '.join([str(x) for x in cmd]))
 

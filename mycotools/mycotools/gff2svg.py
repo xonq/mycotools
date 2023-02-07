@@ -50,6 +50,7 @@ def gff2svg(
                 # value it should be annotated as such
                     product = null
                 elif product not in product_dict:
+                    print(product)
                     try: # try to use the next color
                         product_dict[product] = colors[count]
                         count += 1
@@ -104,7 +105,8 @@ def main(
     labels = True, wheel = None, shuffle = False
     ):
 
-    if not wheel:
+    product_dict = {k.lower(): v for k, v in product_dict.items()}
+    if not wheel and not product_dict:
         if not set(product_dict.keys()).difference({null}): 
         # if no keys or null is the only product key
             products = compileProducts(gff_list, prod_comp, types = types)
@@ -115,8 +117,10 @@ def main(
         colors = getColors(1)
     elif wheel == 2:
         colors = getColors(17)
-    else:
+    elif wheel == 3:
         colors = getColors(28)
+    else:
+        colors = None
 
     if shuffle:
         random.shuffle(colors)

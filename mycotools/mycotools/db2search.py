@@ -601,7 +601,7 @@ def db2searchLog(report_dir, blast, query, max_hits,
                     os.remove(r)
                 reparse = True
             prev = True
-        elif log_list1[1:5] != log_list0[1:5]:
+        elif log_list1[1] != log_list0[1] and log_list1[3:] != log_list0[3:]:
             eprint('\tInconsistent thresholds, rerunning', flush = True)
             log_list0, report_dir = run_denovo(report_dir, log_list0, log_name)
         else:

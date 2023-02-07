@@ -746,16 +746,22 @@ def crap_mngr(
  #           db, random.choice(out_keys), True, True, True, True, False
   #          )
         root_key = random.choice(out_keys)
-        svgs2tree(
-            query, None, raw_tree, db, tree_file,
-            out_dir, root_key, midpoint = midpoint #svg_dir, out_dir
-            )
+        try:
+            svgs2tree(
+                query, None, raw_tree, db, tree_file,
+                out_dir, root_key, midpoint = midpoint #svg_dir, out_dir
+                )
+        except ete3.parser.newick.NewickError:
+            eprint('\t\t\tERROR: newick malformatted', flush = True)
     else:
-        svgs2tree(
-            query, None, raw_tree, db, tree_file,
-            out_dir, midpoint = midpoint #svg_dir, out_dir
-            )
-
+        try:
+            svgs2tree(
+                query, None, raw_tree, db, tree_file,
+                out_dir, midpoint = midpoint #svg_dir, out_dir
+                )
+        except ete3.parser.newick.NewickError:
+            eprint('\t\t\tERROR: newick malformatted', flush = True)
+    
 def og_main(
     db, input_genes, ogtag, fast = True, out_dir = None,
     clus_cons = 0.05, clus_var = 0.65, min_seq = 3, max_size = 250, cpus = 1,
