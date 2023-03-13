@@ -916,7 +916,8 @@ def search_main(
     max_size = 250, cpus = 1, reoutput = True, plusminus = 10000, 
     evalue = 0, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
-    midpoint = True, clus_meth = 'mmseqs easy-linclust', ppos = 0
+    midpoint = True, clus_meth = 'mmseqs easy-linclust', ppos = 0,
+    max_hits = 1000
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
@@ -979,10 +980,11 @@ def search_main(
             diamond = 'diamond'
         else:
             diamond = False
+        # max hits is arbitrarily set here, can be higher
         search_fas = {**search_fas, **db2search(
             db, binary, query_path, wrk_dir, evalue = evalue, bitscore = bitscore,
             pident = pident, force = True, coverage = clus_cons,
-            skip = skips, diamond = diamond, ppos = ppos
+            skip = skips, diamond = diamond, ppos = ppos, max_hits = max_hits
             )}
         for query in search_fas:
             search_fas[query][query] = query_fa[query]
@@ -1121,7 +1123,6 @@ if __name__ == "__main__":
         help = 'GFF for non-mycotools locus diagram. Requires -q fasta input'
         )
 
-
     hg_opt = parser.add_argument_group('Homolog inference')
     hg_opt.add_argument(
         '-s', '--search',
@@ -1138,6 +1139,10 @@ if __name__ == "__main__":
     hg_opt.add_argument(
         '-b', '--bitscore', type = float,
         default = 30, help = 'Bitscore minimum for search algorithm. DEFAULT: 30'
+        )
+    hg_opt.add_argument(
+        '-mts', '--max_target_seq', type = int, default = 1000,
+        help = 'Max alignment target sequences; DEFAULT: 1000'
         )
     hg_opt.add_argument(
         '-og', '--orthogroups', 
@@ -1284,6 +1289,7 @@ if __name__ == "__main__":
         'Database': args.mtdb,
         'Orthogroup Tag': args.orthogroups,
         'Search binary': args.search,
+        'Maximum alignment seq': args.max_target_seq,
         'Locus +/-': args.plusminus,
         'Cluster method': clus_meth,
         'Tree': tree,
@@ -1351,5 +1357,6 @@ if __name__ == "__main__":
             midpoint = not bool(args.no_midpoint),
             outgroups = not args.no_outgroup, conversion_dict = conversion_dict, 
             clus_meth = clus_meth, labels = not args.no_label,
+            max_hits = args.max_target_seq
             )
     outro(start_time)

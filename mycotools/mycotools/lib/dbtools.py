@@ -118,22 +118,25 @@ class mtdb(dict):
         if len(data[0]) == 16: # LEGACY conversion to be deprecated
             del df['ecology']
             del df['eco_conf']
-        if legacy:
-            for i, ome in enumerate(df['ome']):
-                df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
-                df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
-                df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
-        else:
-            for i, ome in enumerate(df['ome']): 
-                if not df['fna'][i]:
+        try:
+            if legacy:
+                for i, ome in enumerate(df['ome']):
                     df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
                     df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
                     df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
-                elif df['fna'][i] == ome + '.fna':
-                    df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
-                    df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
-                    df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
-
+            else:
+                for i, ome in enumerate(df['ome']): 
+                    if not df['fna'][i]:
+                        df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
+                        df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
+                        df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
+                    elif df['fna'][i] == ome + '.fna':
+                        df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
+                        df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
+                        df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
+        except KeyError:
+            eprint('ERROR: MycotoolsDB not in path, cannot delineate biofile paths', flush = True)
+    
         return df
 
     def df2db(self, db_path = None, headers = False):

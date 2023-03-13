@@ -5,6 +5,7 @@
 # NEED streamline mmseqs parsing
 # NEED mmseqs mtdb check
 # NEED mmseqs save db option
+# NEED profile mmseqs
 # NEED concatenate mmseqs query dbs
 # NEED option to fail upon any failures
 # NEED log (hmmer)
@@ -233,10 +234,10 @@ def hmmer_main(db, hmm_paths, output, accessions, max_hits, query_cov,
                                          cpu = par_cpus)
         hmmsearch_codes = multisub(hmmsearch_tuples, processes = par_runs,
                                    injectable = True, verbose = verbose)
-        for code in hmmsearch_codes:
-            if code['code']:
+        for i, code in enumerate(hmmsearch_codes):
+            if code:
                 eprint('\tERROR: ' \
-                        + str(code['stdin']),
+                        + str(hmmsearch_tuples[i]),
                         flush = True)
 
         # extract results

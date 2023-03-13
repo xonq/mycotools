@@ -709,13 +709,13 @@ class Subqueue():
         self.complete = True
         
 
-def run_subqueue(args, shell = False, verbose = False, injectable = False):
+def run_subqueue(i, args, shell = False, verbose = False, injectable = False):
  #   if args:
     s = Subqueue(args, shell = shell, 
                  verbose = verbose, 
                  injectable = injectable)
     s.open()
-    return args, s.exit
+    return i, s.exit
 #    return [], -420
 
 
@@ -741,11 +741,11 @@ def multisub(args_lists, processes = 1, shell = False,
     '''
     if not status:
         with mp.Pool(processes = processes) as pool:
-            exit_pre = pool.starmap(run_subqueue, ((x, shell, verbose, injectable) \
-                                                    for x in args_lists))
+            exit_pre = pool.starmap(run_subqueue, ((i, x, shell, verbose, injectable) \
+                                                    for i, x in enumerate(args_lists)))
     else:
         with mp.Pool(processes = processes) as pool:
-            exit_pre = pool.starmap(run_subqueue, tqdm([(x, shell, verbose, injectable) \
-                                                    for x in args_lists], 
+            exit_pre = pool.starmap(run_subqueue, tqdm([(i, x, shell, verbose, injectable) \
+                                                    for i, x in enumerate(args_lists)], 
                                                     total = len(args_lists)))
-    return [{'stdin': stdin, 'code': exit} for stdin, exit in exit_pre]
+    return [exit for i, exit in sorted(exit_pre, key = lambda x: x[0])]
