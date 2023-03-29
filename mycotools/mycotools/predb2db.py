@@ -71,7 +71,7 @@ def move_biofile(old_path, ome, typ, wrk_dir, suffix = '' ):
 
 def gen_predb():
     example = [
-        'Fibsp1', '', 'Fibularhizoctonia', 'psychrophila', 'CBS',
+        'Fibsp1', 'fibpsy1', 'Fibularhizoctonia', 'psychrophila', 'CBS',
         '1.0', 'n', '<PATH/TO/ASSEMBLY>', '<PATH/TO/GFF3>', 'jgi',
         'no', '2018'
         ]

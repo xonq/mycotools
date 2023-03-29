@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED to remove standalone scripts from PATH and just reference mtdb (legacy)
 # NEED to add option to export NCBI/JGI credentials
-# NEED to import updatedb (u), predb2db, extract (x), init (i) function
 # NEED to pay attention to old ome versions
 
 import os
@@ -27,22 +27,39 @@ def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
 
 if __name__ == '__main__':
 
-    description = 'MycotoolsDB (MTDB) utility' \
-        + '\n\nmtdb: <PATH> print master MTDB path' \
+    description = 'MycotoolsDB (MTDB) utility usage' \
+        + '\n\nmtdb <SUBSCRIPT>:' \
+        + '\n[e]xtract\t\textract sub .mtdb file' \
+        + '\n[u]pdate\t\tupdate/initialize primary MTDB' \
+        + '\n[p]redb2db\tadd local genomes to the primary MTDB' \
+        + '\n\nmtdb: print master MTDB path' \
         + '\nmtdb <OME>[.gff3|.fna|.faa]: [PATH] print ome/ome code path' \
+        + '\nmtdb <ARG>:' \
         + '\n[-i DBPATH]\t[--init]       \tInitialize MTDB connection' \
         + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
         + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
         + '\n[-d]\t\t[--dependency]\tInstall/update dependencies'
+
+    config = parse_config()
+    if any([not x.startswith('-') for x in sys.argv[1:]]):
+        script = [x for x in sys.argv[1:] if not x.startswith('-')]
+        script = script[0]
+        ab2mt = {'extract': 'extractDB.py', 'update': 'updateDB.py', 'predb2db': 'predb2db.py',
+                 'e': 'extractDB.py', 'u': 'updateDB.py', 'p': 'predb2db.py'}
+        if script in ab2mt:
+            exit_code = subprocess.call([ab2mt[script]] + [x for x in sys.argv[1:] \
+                                         if x != script])
+            sys.exit(exit_code)
+
+    if len([x for x in sys.argv if x.startswith('-')]) > 1:
+        print('\nERROR: one argument allowed.\n' + description, flush = True)
+        sys.exit(2)
+
     set_argv = set(sys.argv)
     if {'-h', '--help'}.intersection(set_argv):
         print('\n' + description + '\n', flush = True)
         sys.exit(0)
-
-    config = parse_config()
-    if len([x for x in sys.argv if x.startswith('-')]) > 1:
-        print('\nERROR: one argument allowed.\n' + description, flush = True)
-        sys.exit(2)
+       
     if {'-i', '--init'}.intersection(set_argv):
         if '-i' in set_argv:
             coord = '-i'
@@ -82,7 +99,6 @@ if __name__ == '__main__':
             mtdb_connect(config, 'fungi')
             if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
                 loginCheck()
-
     elif {'-p', '--prokaryote'}.intersection(set_argv):
         if '-p' in set_argv:
             coord = '-p'

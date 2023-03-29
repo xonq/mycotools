@@ -530,7 +530,8 @@ def svg2node(node):
             pass
 
 def svgs2tree(input_gene, og, tree_data, db, tree_path,
-              out_dir, root_key = None, midpoint = True):#svg_dir, out_dir):
+              out_dir, root_key = None, midpoint = True,
+              ext = '.svg'):#svg_dir, out_dir):
     tree = Tree(tree_data)
     if root_key:
         tree.set_outgroup(root_key)
@@ -558,10 +559,10 @@ def svgs2tree(input_gene, og, tree_data, db, tree_path,
         n.set_style(nstyle)
     try:
         if og is not None:
-            tree.render(out_dir + input_gene + '_OG' + str(og) + '.' + adj + '.svg', 
+            tree.render(out_dir + input_gene + '_OG' + str(og) + '.' + adj + ext, 
                         w=800, tree_style = ts)
         else:
-            tree.render(out_dir + input_gene + '.' + adj + '.svg', 
+            tree.render(out_dir + input_gene + '.' + adj + ext, 
                         w=800, tree_style = ts)
     except TypeError: # QStandardPaths doesn't have permissions
         # this does not work
@@ -569,10 +570,10 @@ def svgs2tree(input_gene, og, tree_data, db, tree_path,
              os.mkdir(out_dir + '.XDG/')
         os.environ['XDG_RUNTIME_DIR'] = out_dir + '.XDG/'
         if og is not None:
-            tree.render(out_dir + input_gene + '_OG' + str(og) + '.' + adj + '.svg', 
+            tree.render(out_dir + input_gene + '_OG' + str(og) + '.' + adj + ext, 
                         w=800, tree_style = ts)
         else:
-            tree.render(out_dir + input_gene + '.' + adj + '.svg', 
+            tree.render(out_dir + input_gene + '.' + adj + ext, 
                         w=800, tree_style = ts)
 
 def merge_color_palette(merges, query2color):
@@ -704,7 +705,7 @@ def crap_mngr(
     db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, 
     tree_suffix, genes2query, plusminus, query2color, 
     cpus = 1, verbose = False, og = False, ogs = None, reoutput = True,
-    out_keys = [], labels = True, midpoint = True
+    out_keys = [], labels = True, midpoint = True, ext = '.svg'
     ):
 
     db = db.set_index('ome')
@@ -749,7 +750,8 @@ def crap_mngr(
         try:
             svgs2tree(
                 query, None, raw_tree, db, tree_file,
-                out_dir, root_key, midpoint = midpoint #svg_dir, out_dir
+                out_dir, root_key, midpoint = midpoint,
+                ext = ext #svg_dir, out_dir
                 )
         except ete3.parser.newick.NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
@@ -757,7 +759,7 @@ def crap_mngr(
         try:
             svgs2tree(
                 query, None, raw_tree, db, tree_file,
-                out_dir, midpoint = midpoint #svg_dir, out_dir
+                out_dir, midpoint = midpoint, ext = ext #svg_dir, out_dir
                 )
         except ete3.parser.newick.NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
@@ -767,7 +769,7 @@ def og_main(
     clus_cons = 0.05, clus_var = 0.65, min_seq = 3, max_size = 250, cpus = 1,
     plusminus = 10000, verbose = False, reoutput = True, interval = 0.1,
     outgroups = True, labels = True, midpoint = True, 
-    clus_meth = 'mmseqs easy-cluster'
+    clus_meth = 'mmseqs easy-cluster', ext = '.svg'
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
@@ -866,7 +868,7 @@ def og_main(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, tree_suffix, 
             ome_gene2og, plusminus, og2color, cpus, verbose, OG, list(input_ogs.values()),
             reoutput = reoutput, out_keys = out_keys, labels = labels,
-            midpoint = midpoint
+            midpoint = midpoint, ext = ext
             )
 
     for query in fas4clus:
@@ -906,7 +908,7 @@ def og_main(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, tree_suffix,
             ome_gene2og, plusminus, og2color, cpus, verbose, OG, 
             list(input_ogs.values()), reoutput = reoutput, labels = labels,
-            out_keys = out_keys, midpoint = midpoint
+            out_keys = out_keys, midpoint = midpoint, ext = ext
             )
 
 
@@ -917,7 +919,7 @@ def search_main(
     evalue = 0, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
     midpoint = True, clus_meth = 'mmseqs easy-linclust', ppos = 0,
-    max_hits = 1000
+    max_hits = 1000, ext = '.svg'
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
@@ -1052,7 +1054,8 @@ def search_main(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, 
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
-            out_keys = out_keys, labels = labels, midpoint = midpoint
+            out_keys = out_keys, labels = labels, midpoint = midpoint,
+            ext = ext
             )
 
     if fas4clus:
@@ -1101,7 +1104,8 @@ def search_main(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, 
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
-            out_keys = out_keys, labels = labels, midpoint = midpoint
+            out_keys = out_keys, labels = labels, midpoint = midpoint,
+            ext = ext
             )
 
 
@@ -1223,6 +1227,8 @@ if __name__ == "__main__":
         )
     run_opt.add_argument('-c', '--cpu', default = 1, type = int)
     run_opt.add_argument('-v', '--verbose', default = False, action = 'store_true')
+    run_opt.add_argument('-of', '--out_format', default = 'svg',
+                         help = 'Output format: ["svg", "pdf", "png"]')
     args = parser.parse_args()
 
     execs = ['diamond', 'clipkit', 'mafft', 'iqtree']
@@ -1234,6 +1240,12 @@ if __name__ == "__main__":
             execs.append(args.search)
             args.orthogroups = None
     findExecs(execs, exit = set(execs))
+
+    if args.out_format.lower() not in {'svg', 'pdf', 'png'}:
+        eprint('\nERROR: invalid -of', flush = True)
+        sys.exit(10)
+    else:
+        out_ext = '.' + args.out_format.lower()
 
     input_fa, input_GFF = False, False
     if args.query == '-':
@@ -1304,6 +1316,7 @@ if __name__ == "__main__":
         'Labels': not args.no_label,
         'CPU': args.cpu,
         'Output directory': args.output,
+        'Output extension': out_ext,
         'Verbose': args.verbose
         }
 
@@ -1338,7 +1351,7 @@ if __name__ == "__main__":
             verbose = args.verbose, plusminus = args.plusminus, 
             interval = 0.1, labels = not args.no_label,
             outgroups = not args.no_outgroup, clus_meth = clus_meth,
-            midpoint = not bool(args.no_midpoint)
+            midpoint = not bool(args.no_midpoint), ext = out_ext
             )
     else:
         new_log = init_log(
@@ -1357,6 +1370,6 @@ if __name__ == "__main__":
             midpoint = not bool(args.no_midpoint),
             outgroups = not args.no_outgroup, conversion_dict = conversion_dict, 
             clus_meth = clus_meth, labels = not args.no_label,
-            max_hits = args.max_target_seq
+            max_hits = args.max_target_seq, ext = out_ext
             )
     outro(start_time)

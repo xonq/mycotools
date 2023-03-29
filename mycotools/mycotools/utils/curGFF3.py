@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# DOESNT WORK RERUNNING THOSE WITH ALIAS
+# NEED to identify overlapping genes and labelling as alternately spliced single entry
 # NEED to curate CDS parents to ensure they relate to the RNA
 # NEED to curate protein ids to be a uniform title
 # NEED to fix mobile_genetic_element conversion from NCBI
@@ -394,7 +396,7 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
             if entry['attributes'].rstrip().endswith(';'):
                 entry['attributes'] += alias_tag
             else:
-                entry['atrributes'] += ';' + alias_tag
+                entry['attributes'] += ';' + alias_tag
         else:
             if 'Alias=' not in entry['attributes']:
                 if 'RNA' in entry['type']:
