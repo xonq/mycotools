@@ -696,7 +696,7 @@ if __name__ == "__main__":
             goSRA(pd.DataFrame({'sra': [args.input.rstrip()]}), output, pe = args.paired)
     else:
         if os.path.isfile(format_path(args.input)):
-            ncbi_df = db2df(args.input) # db2df is deprecated, so this needs to change. move out of pandas in general
+            ncbi_df = pd.read_csv(args.input, sep = '\t', header = None)
             if not args.column:
                 if 'assembly_acc' in ncbi_df.keys():
                     column = 'assembly_acc'
@@ -706,21 +706,25 @@ if __name__ == "__main__":
                     ncbi_column = 'Assembly Accession'
                 else:
                     column = 0
-            try:
-                column = ncbi_df.columns[int(column)]
-                ncbi_column = column
-            except ValueError: # not an integer
-                pass
+            else:
+                try:
+                    column = ncbi_df.columns[int(0)]
+                    ncbi_column = column
+                except ValueError: # not an integer
+                    pass
             if not args.ncbi_column:
-                if column.lower() in {'assembly'}:
-                    ncbi_column = 'assembly'
-                elif column.lower() in \
-                    {'genome', 'assembly accession', 'assembly_acc'}:
-                    ncbi_column = 'genome'
-                elif column.lower() in {'biosample', 'biosample accession'}:
-                    ncbi_column = 'biosample'
+                if args.column is not None:
+                    if column.lower() in {'assembly'}:
+                        ncbi_column = 'assembly'
+                    elif column.lower() in \
+                        {'genome', 'assembly accession', 'assembly_acc'}:
+                        ncbi_column = 'genome'
+                    elif column.lower() in {'biosample', 'biosample accession'}:
+                        ncbi_column = 'biosample'
+                    else:
+                        ncbi_column = column.lower()
                 else:
-                    ncbi_column = column.lower()
+                    ncbi_column = 'genome'
             else:
                 ncbi_column = args.ncbi_column.lower()
         else:
