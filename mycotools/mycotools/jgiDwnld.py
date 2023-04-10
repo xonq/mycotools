@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED to remove gff v gff3 option
+
 import os
 import re
 import sys
@@ -542,7 +544,8 @@ if __name__ == '__main__':
                     df = pd.read_csv(args.input, sep='\t', header = None)
                 break
     else:
-        df = pd.DataFrame({'assembly_acc': [args.input]})
+        in_data = args.input.replace('"','').replace("'",'').replace(',',' ').split()
+        df = pd.DataFrame({'assembly_acc': in_data})
 
     output = format_path(args.output)
 

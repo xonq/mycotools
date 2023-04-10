@@ -14,6 +14,7 @@ from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gtfComps, gff3Comps, gff2Comps
 from mycotools.lib.kontools import collect_files, eprint, format_path
 from mycotools.gff2seq import aamain as gff2proteome
+from mycotools.utils.curGFF3 import rename_and_organize
 
 
 def grabOutput(output_pref):
@@ -62,7 +63,7 @@ def intron2exon(gff, gene_comp = re.compile(r'gene_id \"(.*?)\"')):
     to the `new_gff`. Then add genes with new exons.
     '''
 
-
+    comps = gtfComps()
     gff1, gene_info = [], {}
     for entry in gff:
         try:
@@ -70,6 +71,9 @@ def intron2exon(gff, gene_comp = re.compile(r'gene_id \"(.*?)\"')):
         except TypeError:
             if entry['type'] in {'transcript', 'gene'} and entry['source'] == 'AUGUSTUS':
                 continue
+            gene_comp = re.compile(r'name \"(.*?)\"')
+            gene = gene_comp.search(entry['attributes'])[1]
+            comps = gff2Comps()
         if int(entry['start']) > int(entry['end']):
             start, end = copy.deepcopy(entry['start']), copy.deepcopy(entry['end'])
             entry['start'], entry['end'] = end, start
@@ -133,21 +137,19 @@ def intron2exon(gff, gene_comp = re.compile(r'gene_id \"(.*?)\"')):
         gff2.extend(add_data)
 
 
-    return gff2
+    return gff2, comps
 
 
-def curCDS(gff):
+def curCDS(gff, gene_compile = re.compile(r'gene_id \"(.*?)\"')):
 
     new_gff, info_dict = [], {}
-    gene_compile = re.compile(r'gene_id \"(.*?)\"')
     for entry in gff:
         if not gene_compile.search(entry['attributes']):
             gene_compile = re.compile(r'ID=(.*?);')
         try:
             gene = gene_compile.search(entry['attributes'])[1]
         except TypeError:
-            print(entry, flush = True)
-            sys.exit(1)
+            gene = gene_compile.search(entry['attributes'])[1]
         if gene not in info_dict:
             info_dict[gene] = {'start_codon': [], 'stop_codon': [], 'raw': []}
         if entry['type'] == 'gene':
@@ -249,36 +251,34 @@ def conservativeRemoval(gene_dict_prep):
     for gene, temp in gene_dict_prep.items():
         rna_keys = []
         for typ in ['exon', 'cds', 'rna', 'start_codon', 'stop_codon']:
-            rna_keys.extend(list(temp[typ].keys()))
+            rna_keys.extend(set(temp[typ].keys()).difference({None}))
         rnas = list(set(rna_keys))
         try:
             for tran in rnas:
-                if not temp['start_codon'][tran] \
-                    or not temp['stop_codon'][tran]:
-                    temp['exon'][tran].sort()
-                    if not temp['start_codon'][tran]:
-                        if temp['strand'] == '+':
-                            temp['start_codon'][tran] = [
-                                temp['exon'][tran][0],
-                                temp['exon'][tran][0] + 2
-                                ]
-                        else:
-                            temp['start_codon'][tran] = [
-                                temp['exon'][tran][-1] - 2,
-                                temp['exon'][tran][-1]
-                                ]
-                    if not temp['stop_codon'][tran]:
-                        if temp['strand'] == '+':
-                            temp['stop_codon'][tran] = [
-                                temp['exon'][tran][-1] - 2,
-                                temp['exon'][tran][-1]
-                                ]
-                        else:
-                            temp['stop_codon'][tran] = [
-                                temp['exon'][tran][0],
-                                temp['exon'][tran][0] + 3
-                                ]
-                    flagged.append(gene)
+                temp['exon'][tran].sort()
+                if not temp['start_codon'][tran]:
+                    if temp['strand'] == '+':
+                        temp['start_codon'][tran] = [
+                            temp['exon'][tran][0],
+                            temp['exon'][tran][0] + 2
+                            ]
+                    else:
+                        temp['start_codon'][tran] = [
+                            temp['exon'][tran][-1] - 2,
+                            temp['exon'][tran][-1]
+                            ]
+                if not temp['stop_codon'][tran]:
+                    if temp['strand'] == '+':
+                        temp['stop_codon'][tran] = [
+                            temp['exon'][tran][-1] - 2,
+                            temp['exon'][tran][-1]
+                            ]
+                    else:
+                        temp['stop_codon'][tran] = [
+                            temp['exon'][tran][0],
+                            temp['exon'][tran][0] + 3
+                            ]
+                flagged.append(gene)
         except IndexError:
             eprint(gene + ' cannot create gene coordinates' , flush = True)
             continue
@@ -287,13 +287,27 @@ def conservativeRemoval(gene_dict_prep):
     
     return gene_dict, flagged, failed
         
+def fill_transcripts(gene_dict_prep):
+    # currently doesnt handle alternate splicing
+    for gene, typ_dict in gene_dict_prep.items():
+        if 'cds' in typ_dict and 'exon' in typ_dict:
+            if {None} == set(typ_dict['cds'].keys()):
+                if not None in typ_dict['exon']:
+                    if len(typ_dict['exon']) != 1:
+                        raise ValueError('cannot reconcile JGI gff2 alternate splicing')
+                    else:
+                        tran = list(typ_dict['exon'].keys())[0]
+                    typ_dict['cds'][tran] = typ_dict['cds'][None]
+                    del typ_dict['cds'][None]
+    return gene_dict_prep
 
+def add_genes(gtf, safe = True, 
+              comps = gtfComps(),
+              gene_prefix = 'gene_id'):
 
-def add_genes(gtf, safe = True):
-
-    comps, contigs = gtfComps(), defaultdict(dict)
-    gene_compile = re.compile(comps['id'])
+    contigs = defaultdict(dict)
     tran_compile = re.compile(comps['transcript'])
+    gene_compile = re.compile(comps['id'])
     gene_dict_prep, gene_dict = {}, {}
     for entry in gtf:
         gene = gene_compile.search(entry['attributes'])[1]
@@ -325,16 +339,20 @@ def add_genes(gtf, safe = True):
         elif 'RNA' in entry['type']:
             gene_dict_prep[gene]['rna'][tran] = entry
 
+    gene_dict_prep = fill_transcripts(gene_dict_prep)
     gene_dict, flagged, failed = conservativeRemoval(gene_dict_prep)
 
     check, insert_list = set(), []
     for index, entry in enumerate(gtf):
         gene = gene_compile.search(entry['attributes'])[1]
         if gene not in check and gene in gene_dict:
+            # make a new entry for this gene
             new_entry = dict(entry)
             new_entry['type'] = 'gene'
             new_entry['phase'], new_entry['score'] = '.', '.'
-            new_entry['attributes'] = 'gene_id "' + gene + '";'
+            new_entry['attributes'] = f'{gene_prefix} "' + gene + '";'
+
+            # grab all start and stop coordinates for entries
             start_stop_coords = []
             for rna, coords in gene_dict[gene]['start_codon'].items():
                 start_stop_coords.extend(coords)
@@ -342,27 +360,39 @@ def add_genes(gtf, safe = True):
                 start_stop_coords.extend(coords)
             for rna, coords in gene_dict[gene]['exon'].items():
                 start_stop_coords.extend(coords)
+ 
+            # use the minimum and maximum start stops to define the gene
             new_entry['start'] = min(start_stop_coords)
             new_entry['end'] = max(start_stop_coords)
-            for rna, rna_entry in gene_dict_prep[gene]['rna']:
-                 insert_list.extend([[index, rna_entry], [index, new_entry]])
+
+
+            # for each existing entry in the rnas of gene_dict, append a new
+            if gene_dict[gene]['rna']:
+                for rna, rna_entry in gene_dict[gene]['rna']:
+                    insert_list.extend([[index, rna_entry], [index, new_entry]])
+            # we must infer the coordinates from the exons
             else:
+                # for each transcript id in the exon information
                 for rna, coords in gene_dict[gene]['exon'].items():
+                    # if there aren't CDS then its an ambiguous RNA (tRNA/rRNA)
                     if not gene_dict[gene]['cds'][rna]:
-                        rna_type = 'tRNA' # assumes tRNA if not coding, but
-                        # disregards rRNA, maybe should generalize to RNA
+                        rna_type = 'RNA' # usually tRNA, but its not a safe assumption
+                        # from the data we are using
                     else:
                         rna_type = 'mRNA'
                     new2 = copy.deepcopy(new_entry)
                     coords.sort()
                     new2['type'] = rna_type
+                    # define the RNA from the minimum and maximum coordintes
                     new2['start'] = min(coords)
                     new2['end'] = max(coords)
+                    # give it a new entry
                     if new2['attributes'].endswith(';'):
                         new2['attributes'] += f' transcript_id "{rna}";'
                     else:
                         new2['attributes'] += f'; transcript_id "{rna}";'
-                    insert_list.extend([[index, new2]])
+                    insert_list.append([index, new2])
+                # add one gene entry
                 insert_list.append([index, new_entry])
             check.add(gene)
 
@@ -378,10 +408,9 @@ def remove_start_stop(gtf):
     return [x for x in gtf if x['type'] not in {'start_codon', 'stop_codon'}]
 
 
-def curate(gff, prefix = None, failed = set()):
+def curate(gff, prefix = None, failed = set(), comps = gtfComps()):
 
     failed = set(failed)
-    comps = gtfComps()
     gene_comp = re.compile(comps['id'])
     tran_comp = re.compile(comps['transcript'])
 
@@ -392,12 +421,15 @@ def curate(gff, prefix = None, failed = set()):
     for line in gff:
         if line['type'] in {'exon', 'start_codon', 'stop_codon', 'CDS'} \
             or 'RNA' in line['type']:
-            gene_id = gene_comp.search(line['attributes'])[1]
+            try:
+                gene_id = gene_comp.search(line['attributes'])[1]
+            except TypeError:
+                gene_id = re.search(gtfComps()['id'], line['attributes'])[1]
             try:
                 tran_id = tran_comp.search(line['attributes'])[1]
             except TypeError:
                 print(line)
-                sys.exit()
+                raise TypeError
             if tran_id not in tran2gene:
                 tran2gene[tran_id] = gene_id
             elif not tran2gene[tran_id] == gene_id: # transcript points to
@@ -587,16 +619,18 @@ def main(gff_path, prefix, fail = True):
     elif isinstance(gff_path, list):
         gff = gff_path
 
-    exonGtf = intron2exon(gff)
-    exonGtfCur = curCDS(exonGtf)
-    exonGtfCurGenes, failed, flagged = add_genes(exonGtfCur, safe = fail)
+    exonGtf, comps = intron2exon(gff)
+    exonGtfCur = curCDS(exonGtf, re.compile(comps['id']))
+    exonGtfCurGenes, failed, flagged = add_genes(exonGtfCur, safe = fail, 
+                                                 comps = comps)
 
     preGff = remove_start_stop(exonGtfCurGenes)
-    unsortedGff, trans_str = curate(preGff, prefix, failed) 
+    unsortedGff, trans_str = curate(preGff, prefix, failed, comps) 
 #    unsortedGff = addExons(gffUncur)
 
     if prefix:
-        gff = sortGFF(unsortedGff, re.compile(gff3Comps()['Alias']))
+        out_gff = sortGFF(unsortedGff, re.compile(gff3Comps()['Alias']))
+        gff = rename_and_organize(out_gff)
     else:
         gff = unsortedGff
 
@@ -650,9 +684,10 @@ if __name__ == '__main__':
  #       eprint('\nERROR: assembly (`-f`) required for curation\n', flush = True)
   #      sys.exit(2)
 
-    if '_' in args.prefix:
-        eprint('\nERROR: "_" not allowed in prefix\n', flush = True)
-        sys.exit(1)
+    if args.prefix:
+        if '_' in args.prefix:
+            eprint('\nERROR: "_" not allowed in prefix\n', flush = True)
+            sys.exit(1)
 
     gff, trans_str, failed, flagged = main(
         format_path(args.gff), args.prefix #, args.fail

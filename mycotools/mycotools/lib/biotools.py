@@ -228,14 +228,16 @@ def list2gff(gff_list, ver = 3):
 def gff3Comps( source = None ):
 
     comps = {}
-    comps['par'] = r'Parent=["\']?([^;\'"]+)'
-    comps['id'] = r'ID=["\']?([^;\'"]+)'
-    comps['Alias'] = r'Alias=["\']?([^;\'"]+)'
-    comps['product'] = r"""product=["\']?([^;"']+)"""
-    comps['OG'] = r'OG=["\']?([\w+:\d+\|]+)'
+    comps['par'] = '(?:^|(?<=;))' + r'Parent=["\']?([^;\'"]+)'
+    comps['id'] = '(?:^|(?<=;))' + r'ID=["\']?([^;\'"]+)'
+    comps['Alias'] = '(?:^|(?<=;))' + r'Alias=["\']?([^;\'"]+)'
+    comps['product'] = '(?:^|(?<=;))' + r"""product=["\']?([^;"']+)"""
+    comps['OG'] = '(?:^|(?<=;))' + r'OG=["\']?([\w+:\d+\|]+)'
     comps['ver'] = 'gff3'
-    comps['prot'] = r'protein_id=["\']?([^;\'"]+)|proteinId=["\']?([^"\';]+)'
-    comps['transcript'] = r'transcriptId=["\']?([^;"\'])'
+    comps['prot'] = '(?:^|(?<=;))' + r'protein_id=["\']?([^;\'"]+)|' \
+                  + '(?:^|(?<=;))' + r'proteinId=["\']?([^"\';]+)'
+    comps['transcript'] = '(?:^|(?<=;))' + r'transcriptId=["\']?([^;"\'])|' \
+                  + '(?:^|(?<=;))' + r'transcript_id=["\']?([^;\'"]+)'
    
     return comps
 

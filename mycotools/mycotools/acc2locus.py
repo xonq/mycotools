@@ -176,15 +176,27 @@ def prep_outputXbase(prot_dict, acc, plusminus):
 
     return out_index
 
+def grab_between(prot_dict, accs):
+    prot_list = list(prot_dict.keys())
+    a0i = prot_list.index(accs[0])
+    a1i = prot_list.index(accs[1])
+    mini = min(a0i, a1i)
+    maxi = max(a0i, a1i)
+    out_index = prot_list[mini:maxi+1]
+    return out_index
+
 def main(gff_list, accs, plusminus = 10, mycotools = False,
-         geneGff = False, nt = False):
+         geneGff = False, nt = False, between = False):
 
     out_indices = {}
     if mycotools:
         cds_dict, acc2seqid = compileCDS_mycotools(gff_list, accs)
     else:
         cds_dict, acc2seqid = compileCDS(gff_list, accs)
-    if nt:
+    if between:
+        seqid = list(acc2seqid.values())[0]
+        out_indices[accs[0]] = grab_between(cds_dict[seqid], accs)
+    elif nt:
         for acc, seqid in acc2seqid.items():
             out_indices[acc] = prep_outputXbase(cds_dict[seqid], acc,
                                                 plusminus)
@@ -223,7 +235,8 @@ def main(gff_list, accs, plusminus = 10, mycotools = False,
         return out_indices, geneGffs
     return out_indices
 
-def mycotools_main(db, accs, plusminus = 10, cpus = 1, nt = False):
+def mycotools_main(db, accs, plusminus = 10, cpus = 1, nt = False,
+                   between = False):
 
     acc_dict = {}
     for acc in accs:
@@ -234,10 +247,10 @@ def mycotools_main(db, accs, plusminus = 10, cpus = 1, nt = False):
 
     db = db.set_index('ome')
     cmds = [
-        [gff2list(db[ome]['gff3']), accs, args.plusminus, True, False, nt] \
+        [gff2list(db[ome]['gff3']), accs, plusminus, True, False, nt, between] \
         for ome, accs in acc_dict.items()
         ]
-    with mp.Pool(processes = cpu) as pool:
+    with mp.Pool(processes = cpus) as pool:
         acc_res = pool.starmap(main, cmds)
 
     out_indices = {}
@@ -251,7 +264,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Extracts loci from acc(s)')
     parser.add_argument('-a', '--acc', help = '"-" for stdin')
     parser.add_argument('-i', '--input', help = 'File of accs')
-    parser.add_argument('-b', '--bybase', action = 'store_true',
+    parser.add_argument('-b', '--between', help = 'Between two input accs',
+                        action = 'store_true')
+    parser.add_argument('-n', '--nucleotide', action = 'store_true',
         help = '+/- by base')
     parser.add_argument('-p', '--plusminus', default = 10, type = int,
         help = '+/- from acc; DEFAULT: 10 genes')
@@ -285,18 +300,27 @@ if __name__ == '__main__':
             else:
                 accs = [args.acc]
     else:
-        print('\nERROR: requires input or acc', flush = True)
+        eprint('\nERROR: requires input or acc', flush = True)
         sys.exit(1)
+
+    if args.between:
+        if len(accs) > 2:
+            eprint('\nERROR: -b needs 2 accessions', flush = True)
+            sys.exit(2)
+        if args.nucleotide:
+            eprint('\nERROR: -b and -n are incompatible', flush = True)
+            sys.exit(3)
 
     db = None
     out_indices = {}
     if args.gff: 
         gff = gff2list(format_path(args.gff))
-        out_indices = main(gff, acc, args.plusminus, nt = args.bybase)
+        out_indices = main(gff, accs, args.plusminus, between = args.between,
+                           nt = args.nucleotide)
     else:
         db = mtdb(format_path(args.mtdb)).set_index('ome')
-        out_indices = mycotools_main(db, accs, plusminus = 10, 
-                                     cpus = args.cpu, nt = args.bybase)
+        out_indices = mycotools_main(db, accs, plusminus = 10, between = args.between,
+                                     cpus = args.cpu, nt = args.nucleotide)
 
     if args.output:
         if not db:

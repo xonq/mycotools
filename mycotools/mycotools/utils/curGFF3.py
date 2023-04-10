@@ -1,20 +1,20 @@
 #! /usr/bin/env python3
 
-# DOESNT WORK RERUNNING THOSE WITH ALIAS
-# NEED to identify overlapping genes and labelling as alternately spliced single entry
+# NEED to remove introns
+# NEED to make compatible with rerunning
 # NEED to curate CDS parents to ensure they relate to the RNA
 # NEED to curate protein ids to be a uniform title
 # NEED to fix mobile_genetic_element conversion from NCBI
     # entries contain a gene, mRNA, exon
-# NEED to restrict passing types [mobile_genetic_element], 
-    # or make them conform
-        # change alias to accomodate these edge cases:
-            # Long_terminal_repeat, mobile_genetic_element
-                # MRNA should not include a CDS here
 # NEED to fix standalone gene alias
     # an alias is applied like "Alias" with nothing else
     # only sometimes
         # if followed by unreviewed type
+# NEED validation module to check common errors
+    # lacking alias
+    # overlapping genes
+    # RNAs with no parent
+    # CDS/exons with no parent
 
 import os
 import re
@@ -27,16 +27,28 @@ from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
 class RNAError(Exception):
     pass
 
+class GeneError(Exception):
+    pass
+
+
 def addMissing(gff_list, intron, comps, ome):
+    accepted_types = {'pseudogene', 'pseudogenic_trna', 'trna',
+                      'rrna', 'mrna', 'rna', 'transcript', 'gene',
+                      'cds', 'exon', 'cds', 'three_prime_utr', 'intron',
+                      'five_prime_utr', '5_prime_utr', '3_prime_utr'}
     out_genes, t_list, rnas, introns = {}, [], {}, {}
     mtdb_count, pseudocount, alt_alias = 1, 1, {}
     rna_changes = {} # a dictionary for changing ambigious rna id names for
     # explicit RNA type references
     for entry in gff_list:
+        if entry['type'].lower() not in accepted_types:
+            continue
         entry['attributes'] = \
             entry['attributes'].replace('proteinId', 'protein_id')
         entry['attributes'] = \
             entry['attributes'].replace('transcriptId', 'transcript_id')
+        # remove old alias if present
+        entry['attributes'] = re.sub(r';?Alias=[^;]+', '', entry['attributes'])
         addEntry = None
         id_ = re.search(comps['id'], entry['attributes'])[1]
         if 'gene' in entry['type']: # includes pseudogenes
@@ -120,7 +132,7 @@ def addMissing(gff_list, intron, comps, ome):
         elif 'RNA' in entry['type'] or entry['type'] == 'transcript':
             entry['type'] = entry['type'].replace('transcript','RNA')
             if id_.startswith('rna'): # make RNA ID explicit
-                new_id = entry['type'].lower() + id_[3:]
+                new_id = entry['type'].lower() + '-' + id_[3:]
                 entry['attributes'] = re.sub(comps['id'], 'ID=' + new_id,
                                              entry['attributes'])
                 rna_changes[id_] = new_id
@@ -132,8 +144,13 @@ def addMissing(gff_list, intron, comps, ome):
                 addEntry['type'] = 'gene'
                 geneID = id_.replace('rna-', 'gene-')
                 if geneID == id_:
-                    raise RNAError('RNA ID annotated as gene')
-                addEntry['attributes'] = addEntry['attributes'].replace('ID=rna-', 'ID=gene-')
+                    if id_.startswith('trna'):
+                        geneID = 'gene-' + id_
+                    else:
+                        print(entry)
+                        raise RNAError('RNA ID annotated as gene')
+                addEntry['attributes'] = re.sub(r'ID=' + id_, 'ID=' + geneID, addEntry['attributes'])
+                #addEntry['attributes'].replace('ID=rna-', 'ID=gene-')
                 addEntry['attributes'] = addEntry['attributes'].replace(entry['type'], 'gene')
                 addEntry['attributes'] = re.sub(r'gbkey=[^;]+', 'gbkey=gene',
                                                 addEntry['attributes'])
@@ -245,14 +262,16 @@ def addMissing(gff_list, intron, comps, ome):
                 del geneInfo['tmrna']
         elif geneInfo['tmrna'] and not geneInfo['cds']:
             del geneInfo['tmrna']
-        if geneInfo['texon'] and geneInfo['exon']:
-            if multiRNA:
-                exonCoords0 = set(tuple(sorted([int(x['start']), int(x['end'])])) for x in geneInfo['exon'])
-                exonCoords1 = set(tuple(sorted([int(x['start']), int(x['end'])])) for x in geneInfo['texon'])
-                if all(x in exonCoords0 for x in exonCoords1):
-                    del geneInfo['texon']
-            else:
-                del geneInfo['texon']
+        if geneInfo['exon']:
+            del geneInfo['texon']
+#        if geneInfo['texon'] and geneInfo['exon']:
+    #        if multiRNA:
+#                exonCoords0 = set(tuple(sorted([int(x['start']), int(x['end'])])) for x in geneInfo['exon'])
+ #               exonCoords1 = set(tuple(sorted([int(x['start']), int(x['end'])])) for x in geneInfo['texon'])
+  #              if all(x in exonCoords0 for x in exonCoords1):
+   #                 del geneInfo['texon']
+#            else:
+ #               del geneInfo['texon']
         for seqType, seqEntry in geneInfo.items():
             if seqType != 'pseudo':
                 out_list.extend(seqEntry)
@@ -272,7 +291,7 @@ def addMissing(gff_list, intron, comps, ome):
 
 def acquireFormat( gff_list ):
 
-    prot_comp = re.compile( r'ID=(.*?)[;|$]' )
+    prot_comp = re.compile(gff3Comps()['id'])
     gene = False
     for line in gff_list:
         if line['type'] == 'gene':
@@ -452,6 +471,97 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
     return cur_list
 
 
+def rename_and_organize(gff_list):
+    alias2geneid = {}
+    scaf2gene2entries = defaultdict(lambda: defaultdict(lambda: {'gene': None, 'rna': {}}))
+    todel = []
+    for i, entry in enumerate(gff_list):
+        if entry['type'] == 'gene':
+            seqid = entry['seqid']
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            alias_list = alias.split('|')
+            if len(alias_list) > 1:
+                gene_id = 'gene_' + alias_list[0] + '-' \
+                        + alias_list[-1][alias_list[-1].find('_') + 1:]
+            elif len(alias_list) == 1:
+                gene_id = 'gene_' + alias_list[0]
+            else:
+                raise GeneError('gene with no alias')
+            for a in alias_list:
+                alias2geneid[a] = gene_id
+            entry['attributes'] = re.sub(gff3Comps()['id'], 'ID=' + gene_id, 
+                                         entry['attributes'])
+            scaf2gene2entries[seqid][gene_id]['gene'] = [entry]
+            todel.append(i)
+
+    for i in reversed(todel):
+        del gff_list[i]
+
+    todel = []
+    alias2rnaid = {}
+    for i, entry in enumerate(gff_list):
+        if 'RNA' in entry['type']:
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            rna_id = entry['type'].lower() + '_' + alias
+            entry['attributes'] = re.sub(gff3Comps()['id'], 'ID=' + rna_id,
+                                         entry['attributes'])
+            gene_id = alias2geneid[alias]
+            entry['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + gene_id,
+                                     entry['attributes'])
+            seqid = entry['seqid']
+            scaf2gene2entries[seqid][gene_id]['rna'][alias] = [entry]
+            alias2rnaid[alias] = rna_id
+            todel.append(i)
+
+    for i in reversed(todel):
+        del gff_list[i]
+
+    id_dict = defaultdict(dict)
+    for entry in gff_list:
+        try:
+            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+        except TypeError:
+            raise TypeError(entry)
+        typ = entry['type'].lower()
+        if typ not in id_dict[alias]:
+            id_dict[alias][typ] = 0
+        else:
+            id_dict[alias][typ] += 1
+        oth_id = typ + str(id_dict[alias][typ]) + '_' + alias
+        entry['attributes'] = re.sub(gff3Comps()['id'], 'ID=' + oth_id,
+                                     entry['attributes'])
+        if alias in alias2rnaid:
+            par_id = alias2rnaid[alias]
+            gene_id = alias2geneid[alias]
+            entry['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + par_id,
+                                         entry['attributes'])
+            scaf2gene2entries[entry['seqid']][gene_id]['rna'][alias].append(entry)
+        elif alias in alias2geneid:
+            par_id = alias2geneid[alias]
+            entry['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + par_id,
+                                         entry['attributes'])
+            scaf2gene2entries[entry['seqid']][par_id]['gene'][alias].append(entry)
+        else:
+            raise KeyError('missing parent')
+
+    out_gff = []
+    for seqid in sorted(scaf2gene2entries.keys()):
+        gene_data = scaf2gene2entries[seqid]
+        sorted_genes = {k: v for k, v in sorted(gene_data.items(), 
+                                                key = lambda x: x[1]['gene'][0]['start'])}
+        for gene_id, entry_dict in sorted_genes.items():
+            out_gff.extend(entry_dict['gene'])
+            sorted_rnas = {k: v for k, v in sorted(entry_dict['rna'].items(),
+                                                   key = lambda x: x[1][0]['start'])}
+            for rna, entries in sorted_rnas.items():
+                out_gff.append(entries[0])
+                out_gff.extend(sorted(entries[1:], key = lambda x: x['start']))
+
+    return out_gff
+        
+  
+
+
 def curGff3(gff_list, ome, cur_seqids = False):
 
     cur_list, intron = [], False
@@ -479,8 +589,9 @@ def main(gff_path, ome, cur_seqids = False):
         return None
 
     new_gff = curGff3(gff, ome, cur_seqids)
+    clean_gff = rename_and_organize(new_gff)
 
-    return new_gff
+    return clean_gff
 
 
 if __name__ == '__main__':

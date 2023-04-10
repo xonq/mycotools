@@ -459,7 +459,7 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
     elif gffVer == 2.5:
         gff, trans_str, failed, flagged = gtf2gff3(gff, ome)
     else:
-        gff = gff2gff3(gff, ome, assembly_accession, verbose = False)
+        gff, errors = gff2gff3(gff, ome, assembly_accession, verbose = False)
 
     ver_search = re.search(r'(.{6}\d+)\.(\d+)', ome)
     if ver_search is not None:
