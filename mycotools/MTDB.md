@@ -47,7 +47,7 @@ Tab-delimited file, with one row per genome and ordered columns:
 `psicub1`/`cryneo24.1` `[a-zA-Z0-9\.]`
 - `genus`: Genus name; `[a-zA-Z]`
 - `species`: Species name; `[a-zA-Z]`
-- `strain`: Strain name; `[a-zA-z0-9]`
+- `strain`: Strain name; `[a-zA-Z0-9]`
 - `taxonomy`: NCBI taxonomy `JSON` object derived from genus
 - `version`: MycoCosm version/NCBI modification date
 - `source`: Genome source, e.g. 'ncbi'/'jgi'/'lab'; `[a-z0-9\.]`
@@ -75,8 +75,8 @@ All MTDB aliases will be formatted as `<ome>_<acc>` where `ome` is `ome` in the
 MTDB and acc is the retrieved accession for both assemblies and proteomes.
 Thus, MTDB aliases are directly connected to the MTDB by slicing to the
 underscore.
-For JGI, accessions will pull from the `protein_id` field in the gene coordinates file.
-For NCBI, accessions will pull from the `product_id` field in the gene coordinates file.
+For JGI, MTDB accessions will pull from the `protein_id` field in the gene coordinates file.
+For NCBI, MTDB accessions will pull from the `product_id` field in the gene coordinates file.
 For entries without a detected protein ID, an alias will be assigned with the
 prefix, 'mtdb'. Pseudogenes, tRNAs, and rRNAs aliases will format as
 `<ome>_<type><type_count>`
@@ -92,21 +92,19 @@ All attribute fields will contain `ID=[^;]+`, `Alias=[^;]+`;
 Non-gene entries will have a parent field `Parent=[^;]+` that relates the entry
 to its parent RNA and each RNA to their parent gene.
 
-On the occassion GFF entries are not given an attribute, *assume that these are
+On the occassion GFF entries are not given an Alias, *assume that these are
 ignored by Mycotools*; while curation is fairly robust for JGI and NCBI GFFs,
-non-permitted gff sequence fields that pull through curation may not receive an alias
-and are likely ignorable. CDSs without an alias will not be translated into the
-proteome `faa` fasta.
+other GFFs may have cryptic formatting discrepancies. CDSs without an alias will 
+not be translated into the proteome `faa` fasta.
 
 #### - permitted `gff3` sequence type fields: 
 - gene, pseudogene: contains the terminal ID of descendant entries and alias (Alias=.*;) that contains
-  all MTDB aliases derived from the gene, separated by `|`
+  all MTDB aliases derived from the gene, separated by `|`. `ID=gene_<ACC>`
 - mRNA, tRNA, rRNA, RNA: `RNA` is synonymous with `transcript` and represents
-  transcribed, but not translated, sequences without tRNA/rRNA functionality
-- exon: exon ID *should* contain a unique number `exon\d+`; parent will be an RNA
-  ID; introns will be curated to exons
-- CDS: CDS ID *should* contain a unique number `cds\d+`; parent will be an RNA ID; typically contains a
-  `protein_id/product_id` field
+  transcribed, but not translated, sequences without tRNA/rRNA functionality. `ID=<RNA>_<ACC>`
+- exon: parent will be an RNA ID; introns will be curated to exons. `ID=exon_<ACC>_<EXON#>`
+- CDS: CDS ID parent will be an RNA ID; typically contains a
+  `protein_id/product_id` field. `ID=CDS_<ACC>_<CDS#>`
 
 #### - `gff3` attributes field formatting
 MTDB recognizes several attribute fields, separated by a semi-colon and
@@ -179,7 +177,7 @@ primary database.
 ## Database management
 
 The primary MTDB should be generated from one user, and privileges should be
-distributed using `chmod`. Note, the primary user/group are the only ones with 
+distributed using `chmod`; e.g. `chmod -R 755`. Note, the primary user/group are the only ones with 
 privileges to update and merge manually curated `predb` files into the primary database.
 
 Users should refrain from making edits to database files as unexpected errors
