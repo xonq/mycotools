@@ -23,6 +23,7 @@ how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-
 	- [Initializing MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#initialization)
 	- [Updating MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#updating)
 	- [Connecting to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
+	- [Managing the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#managing)
 	- [Querying the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#querying)
 	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
@@ -78,7 +79,9 @@ an established MTDB, see
 [interfacing](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
 
 #### FUNGI
-To initialize a curated database of all NCBI and MycoCosm (JGI) fungal genomes:
+To initialize a curated database of all NCBI and MycoCosm (JGI) fungal genomes; note, 
+JGI downloading is limited to one file per minute, so initialization will take multiple days
+and can be resumed with `-r YYYYmmdd`:
 
 ```bash
 mtdb update -i <INIT DIRECTORY>
@@ -103,7 +106,7 @@ mtdb update -u
 
 ## Interfacing
 ### mtdb
-`mtdb` is a utility that initializes interfacing with an established master
+`mtdb` is the MycotoolsDB central utility. It initializes interfacing with an established master
 database or just prints the path of the master database. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
 mtdb
@@ -123,8 +126,20 @@ mtdb -p
 
 <br /><br />
 
+## Managing
+### mtdb manage
+To encrypt a local copy of your NCBI and JGI passwords for fast access, run:
+```bash
+mtdb manage -p
+```
+
+This is necessary to submit jobs for scripts that require passwords. Such scripts 
+(like `mtdb update`) will need to receive a password from stdin to run without a `tty` 
+
+<br /><br />
+
 ## Querying
-`mtdb` has querying functions. To obtain the whole row for an ome code, simply:
+`mtdb` can query ome codes. To obtain the whole row for an ome code, simply:
 ```bash
 mtdb <OME>
 ```
@@ -152,7 +167,7 @@ to extract based on taxonomy.
 
 ## Creating modular databases
 ### mtdb extract
-If you are only interested in a subset of lineages in the master mycotoolsDB, then extract the portion you want. By default, this script will ignore use-restricted data - run `-n` to include if you are aware of and will respect the limitations of use-restricted data. Run `mtdb extract -h` to see all options.
+`mtdb extract` subsets lineages of interest from the primary MTDB. By default, this script will ignore use-restricted data - add `-n` to include use-restricted data if you are aware of and will respect the limitations of use-restricted data. Run `mtdb extract -h` to see all options.
 
 e.g. grab a database of a taxonomic order: 
 ```bash
@@ -196,11 +211,10 @@ options:
 
 ## Acquiring database files
 ### db2files.py
-Inputs a MycotoolsDB `.mtdb` file (by default uses the master database), then creates symlinks of the selected file types, hard copies the files, or prints their PATHs. A symlink is simply creating a placeholder file that links to the database file... this way it does not take up additional storage space like a hard copy does. However, editing symlinks will edit the original file, so *only hard copy `--hard` if you need to edit the files*.
+Inputs a `.mtdb` file (by default uses the primary database), then symlinks the selected file types, hard copies the files, or prints their PATHs. A symlink is simply creating a placeholder file that links to the database file... this way it does not take up additional storage space like a hard copy does. However, editing symlinks will edit the original file, so *only hard copy `--hard` if you need to edit the files*.
 
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```bash
-mkdir pullFiles && cd pullFiles
 mtdb extract -l Atheliaceae > atheliaceae.mtdb
 ```
 
@@ -218,18 +232,18 @@ db2files.py -d atheliaceae.mtdb -p --print
 
 ## Adding local genomes
 ### mtdb predb2db
-To add in-house annotations `mtdb p` will input your genome and metadata, curate, and prepare a database file to add to the database. The manager of the database (Zach for Ohio Supercomputer) will then take your database and add it to the master.
+To add in-house annotations `mtdb predb2db` will input your genome and metadata, curate, and prepare a database file to add to the database. The manager of the database (Zach for Ohio Supercomputer) will then take your database and add it to the master.
 
 First, generate a predb spreadsheet:
 ```bash
-mtdb p > predb.tsv
+mtdb predb2db > predb.tsv
 ```
 
 The resulting `predb.tsv` can be filled in via spreadsheet software and exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and separate by tabs. De novo annotations produced by Funannotate/Orthofiller must be filled in as "new" for the genomeSource column; *annotations directly derived from NCBI/JGI data need to be specified in genomeSource.
 
 Finally, generate a mycotoolsDB file from your completed predb, and notify your database manager that it is ready for integration:
 ```bash
-mtdb p <PREDB.TSV>
+mtdb predb2db <PREDB.TSV>
 ```
 
 <br /><br />
@@ -259,7 +273,7 @@ assemblyStats.py <ASSEMBLY.fa>
 annotationStats.py <ANNOTATION.gff3>
 ```
 
-To obtain a table of organisms' annotation statistics, [create a mycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
+To obtain a table of annotation statistics, [create a mycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
 ```bash
 assemblyStats.py <MYCOTOOLSDB.mtdb>
 annotationStats.py <MYCOTOOLSDB.mtdb>
@@ -275,24 +289,23 @@ If you want to route the output to a file, simply redirect output by appending `
 ### jgiDwnld.py / ncbiDwnld.py
 These scripts input a MycotoolsDB or can be manually made as shown at the bottom of this section. 
 
-Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
+Say you want to grab transcript information from a genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```bash
-mkdir dwnldFiles && cd dwnldFiles
 mtdb extract -l aspergillus > aspergillus.mtdb_ncbi
 ```
 
-If there are organisms you don't want in the extracted `.mtdb`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
+If there are organisms you do not want in the extracted `.mtdb`s, delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
 ```bash
 jgiDwnld.py -i aspergillus.mtdb_jgi -t -e
 ncbiDwnld.py -i aspergillus.mtdb_ncbi -t
 ```
 
-These scripts populate with compressed files. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. 
-To submit as a job (not recommended), you must create an encrypted MycotoolsDB passkey using `mtdb manage` and pass the password to stdin to these scripts.
+To unzip all the files, run `gunzip <FILETYPE>/*.gz`. 
+To submit as a job (not recommended), you must create an encrypted MycotoolsDB passkey using [`mtdb manage`](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#managing) and pass the password to stdin to these scripts.
 
 <br />
 
-These scripts can input assembly accessions (NCBI) or genome codes (JGI). The column must have the appropriate header ('assembly_acc' or 'assembly_acc') (substitute `-i aspergillus.mtdb` with this file):
+These scripts can input assembly accessions (NCBI) or genome codes (JGI). The column must have the appropriate header ('assembly_acc' or 'assembly_acc'):
 
 `jgiGenomeCodes.txt`
 ```
@@ -312,13 +325,13 @@ SAMN02744098
 
 <br />
 
-You can download NCBI SRA's by acquiring NCBI's SRA tools, making sure `fastq-dump` is included in your PATH, and then running:
+You can download NCBI SRA's after downloading NCBI's SRA tools and making sure `fastq-dump` is in your PATH:
 
 ```bash
 ncbiDwnld.py --sra -i <REFERENCE>
 ```
 
-You can create a file with SRA ID's or BioProject, etc. Basically any query that is unique and sufficient to acquire the SRRs of interest. For paired-end reads, append `-pe` to the command.
+You can create a file with SRA ID's or BioProject, etc. Basically any query that is unique and sufficient to acquire the SRRs of interest. For paired-end reads, include `-pe`.
 
 <br /><br />
 
@@ -356,8 +369,7 @@ Grab loci the same as above within a set number of genes plus or minus:
 
 list proximal +/- 5Kb from accession to standard out:
 ```bash
-acc2locus.py -a fibpsy1_906341 -p 5000 -b
-
+acc2locus.py -a fibpsy1_906341 -p 5000 -n
 fibpsy1_809145
 fibpsy1_923701
 fibpsy1_771516
@@ -370,7 +382,6 @@ fibpsy1_138
 list proximal +/- 5 genes to standard out:
 ```bash
 acc2locus.py -a fibpsy1_906341 -p 5
-
 fibpsy1_880711
 fibpsy1_846234
 fibpsy1_809145
@@ -382,6 +393,17 @@ fibpsy1_846242
 fibpsy1_138
 fibpsy1_942299
 fibpsy1_906343
+```
+
+grab genes between two accessions:
+```bash
+acc2locus.py -a "psicub1_30114 psicub1_87205" -b
+psicub1_30114
+psicub1_72370
+psicub1_30121
+psicub1_30049
+psicub1_72373
+psicub1_87205
 ```
 
 Generate a genbank from the locus (useful for `clinker`):
@@ -417,8 +439,7 @@ coords2fa.py coords.tsv
 
 ## Gene coordinates to sequences
 ### gff2seq.py
-`gff2seq.py` will extract the nucleotide or amino acid sequences associated with a gene coordinates `gff` file. Users can optionally input a flanking nucleotide plus/minus to extract from 
-the flanks of the provided `gff`. `gff2seq.py` will extract flanks independently for each sequence ID (column 1) within the `gff`. Coding or noncoding regions can be specified. If `--intergenic` is called then only the first and last gene for each fasta
+`gff2seq.py` will extract the nucleotide or amino acid sequences associated with a gene coordinates `gff` file. Accepts optional flanking nucleotide plus/minus to extract from flanks of coordinates. `gff2seq.py` will extract flanks independently for each sequence ID (column 1) within the `gff`. Coding or noncoding regions can be specified. If `--intergenic` is called then only the first and last gene for each fasta
 sequence are considered.
 
 e.g. extract nucleotide sequences and 1 kilobase flanks and noncoding regions within the following genes:
@@ -427,43 +448,44 @@ e.g. extract nucleotide sequences and 1 kilobase flanks and noncoding regions wi
 gff2seq.py -g <.GFF3> -a <.FNA> -nc -pm 1000 -n
 ```
 
-```
-optional arguments:
-  -h, --help            show this help message and exit
-  -g GFF, --gff GFF
-  -n, --nucleotide
-  -p, --protein
-  -a ASSEMBLY, --assembly ASSEMBLY
-  -i --intergenic	-n only
-  -nc, --noncoding      -n only
-  -pm PLUSMINUS, --plusminus PLUSMINUS
-                        -n only
-  -af, --all_flanks     -n and -nc only
-```
 
 <br /><br />
 
 ## Curate annotation
+Please note that MTDB curates annotations and assemblies prior to adding to the database via
+`mtdb predb2db`. If your intention is to add your data to the database, please see `mtdb predb2db`.
+If your data can be curated, it will be submitted to one of the following scripts during 
+`mtdb predb2db`. These scripts are not in your PATH by default and are useful for testing 
+compatibility with MTDB. Only complete genome annotations are acceptable. 
+MTDB strives to incorporate the most common annotation software -
+please raise an issue if your complete genome annotation - from a common software - is not compatible.
+
 ### gtf2gff3.py
 This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and 
 optionally adds Alias
 
 ```bash
-gtf2gff3.py -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY>
+gtf2gff3.py -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY> -p <OME>
 ```
 
-### curGFF3.py / gff2gff3.py
-There are several scripts in the `utils` used to curate gene coordinate files
-and proteomes for the MycotoolsDB. `curGFF3.py` is tested with, Funannotate, 
-both JGI and NCBI `gff3` files, `gff2gff3.py` curates JGI `gff2` files to MycotoolsDB
-compatible `gff3`
+### gff2gff3.py
+Designed for JGI gff2 legacy formatted gffs
+```bash
+gff2gff3.py -o <OME> -j <JGI_ome> -i <GFF2>
+```
+
+### curGFF3.py 
+`curGFF3.py` is tested with, Funannotate, JGI, and GenBank `gff3` files
+```bash
+curGFF3.py <GFF3> <OME>
+```
 
 <br /><br />
 
 ## Adding corrected gene models
 ### add2gff.py
-This script will add new and corrected gene models formatted in an inputted gff to a full genome gff.
-Overlapping coordinates can be removed and an update file for `mtdb` is optionally generated.
+This script will add new and corrected gene models to a full genome gff.
+Overlapping coordinates can be removed and an update file for the primary MTDB  is optionally generated.
 
 To add corrected genes from an `exonerate`-derived gff to a MycotoolsDB `gff` and prepare a database update:
 
@@ -569,21 +591,18 @@ Runtime options:
 ## Tree Building
 ### fa2tree.py
 `fa2tree.py` will input a fasta file or directory of fasta files, trim, and
-generate trees either via job submission (`slurm` or `torque`) or immediate execution. 
-Note you will need `mafft`, `clipkit`, and `iqtree` installed.
-If these are not installed, install them into your mycotools conda environment via 
-`conda install mafft iqtree` and `pip install clipkit`.
+generate trees. 
 
 Information on a complete [phylogenetic pipeline](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-pipelines) is elaborated below.
 
 <br />
 
-e.g. Swiftly construct a tree from a fasta
+e.g. Swiftly construct a fastree from a fasta
 ```bash
 fa2tree.py -i <FASTA>.fa --fast
 ```
 
-Prepare a robust tree for slurm job submission
+Prepare a robust IQ-TREE for slurm job submission
 ```bash
 fa2tree.py -i <FASTA> -s -A PAS1046
 ```
@@ -593,11 +612,7 @@ Construct a multigene phylogeny with independent evolutionary models for each ge
 fa2tree.py -i <FASTA_DIR> -p
 ```
 
-Begin the tree pipeline by navigating into the folder and running `bash
-mafft.sh` (execute immediately) or `sbatch mafft.sh` (job submission). If you
-run out of memory, then add increased memory/cores to the job submission script(s).
-
-Most often, the final file you want is `*.contree`.
+The final IQ-TREE file you want is `*.contree`; fastree is a `.treefile`
 View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 
 <br /><br />
@@ -605,11 +620,11 @@ View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 
 ## Sequence clustering
 ### fa2clus.py
-Some gene families (e.g. P450s) yield many results when searching across a large set
-of genomes. `fa2clus.py` allows the user to truncate these sets to closely related homologs 
-without constructing a phylogeny. `fa2clus.py` optionally implements an automated iterative 
-approach to obtaining a cluster of minimum - maximum size with the gene of interest. `fa2clus.py`
-implements mmseqs cluster, mmseqs linclust, and hierarchical agglomerative clustering.
+Some gene families (e.g. P450s) have many highly identical and closely related homologs, which
+is problematic for conducting phylogenetic analysis and manipulating these large datasets. 
+`fa2clus.py` invokes sequence clustering algorithms to systematically truncate your dataset
+withou constructing a phylogeny. `fa2clus.py` optionally implements an automated iterative 
+approach to obtaining a cluster of minimum - maximum size with the gene of interest.
 
 For hierarchical agglomerative clustering: `fa2clus.py` will either take a `fasta` and generate a distance matrix using 
 `usearch calc_distmx` by default or the % identity of `diamond` alignments.
@@ -657,11 +672,8 @@ multifasta input of external accessions. Following homolog acquisition,
 clustering if the number of sequences exceeds the inputted maximum 
 (`-m`).
 
-By default, `crap.py` will construct trees using fasttree. Fasttree is often
-sufficient to get an idea of how the cluster is evolving because CRAP builds
-phylogenies for all query genes within a cluster, so congruent topology across
-different genes is corroborative. Alternatively, CRAP can
-also construct a robust IQ-TREE with 1000 boostrap iteration support values
+By default, `crap.py` will construct trees using fasttree.
+Alternatively, CRAP can construct a robust IQ-TREE with 1000 boostrap iteration support values
 by specifying `-i`/`--iqtree`.
 
 <br />
@@ -672,79 +684,38 @@ mtdb extract --lineage Basidiomycota > basi.mtdb
 crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
 ```
 
-```bash
-Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline
-
-optional arguments:
-  -h, --help            show this help message and exit
-
-Inputs:
-  -q QUERY, --query QUERY
-                        Fasta, white-space delimited file/string of cluster genes, "-" for stdin
-  -d MTDB, --mtdb MTDB
-  -g GFF, --gff GFF     GFF for non-mycotools locus diagram. Requires -q fasta input
-
-Homolog inference:
-  -s SEARCH, --search SEARCH
-                        Search binary {mmseqs, diamond, blastp} for search-based CRAP
-  -b BITSCORE, --bitscore BITSCORE
-                        Bitscore minimum for search algorithm. DEFAULT: 30
-  -og ORTHOGROUPS, --orthogroups ORTHOGROUPS
-                        MycotoolsDB Orthogroup tag for OG-based CRAP. DEFAULT: P for phylum
-
-Phylogeny size management:
-  --minseq MINSEQ       Min sequences for trees/cluster size; DEFAULT: 3
-  --maxseq MAXSEQ       Max sequences for trees/min for fa2clus.py; DEFAULT: 250
-  -l, --linclust        Cluster large gene sets via mmseqs linclust; DEFAULT: easy-cluster
-  -a, --agg_clus        Cluster large gene sets via hierarchical clustering NONFUNCTIONAL
-  -f, --fail            Do not fallback to alternative clustering method upon failure NONFUNCTIONAL
-
-Phylogeny annotation:
-  -p PLUSMINUS, --plusminus PLUSMINUS
-                        Bases up-/downstream query hits for homolog search; DEFAULT: 20,000
-  --conversion CONVERSION
-                        Tab delimited alternative annotation file: "query,name"
-  -i, --iqtree          IQTree2 1000 bootstrap iterations. DEFAULT: fasttree
-  --no_outgroup         Do not detect outgroups, do not root trees
-  --no_midpoint         Do not infer midpoint roots for outgroup failures
-  --no_label            Do not label synteny diagrams
-
-Runtime options:
-  -o OUTPUT, --output OUTPUT
-                        Output base dir - will rerun if previous directory exists
-  -c CPU, --cpu CPU
-  -v, --verbose
-```
-
 <br /><br /><br />
 
 # Mycotools Pipelines
 ## Shell Pipelining with Mycotools
 Mycotools is designed to enable pipelining in Linux shells as well as python.
-MycotoolsDB (*.mtdb*) files provide the reference genomes for each analysis and
-are often inputted as `-d`. Databases of reference omes can be generated by
+MycotoolsDB (*.mtdb*) files provide the reference genomes for each analysis. 
+Databases of reference omes can be generated by
 parsing the master database file (obtained via command `mtdb`) or extracted via
 a set of parameters denoted in `mtdb extract`.
 
 For scripts such as `acc2fa/acc2gbk/acc2gff/acc2locus`, the input is an accession or set of
 accessions, and can be piped in via standard input. *All scripts that accept
-standard input (stdin) will require "-" as the input argument.* Even more advanced scripts, such
-as `crap.py` accept query accessions as standard input;
-therefore, you can chain commands together to swiftly generate the necessary
+standard input (stdin) will require "-" as the input argument.* 
+Stdin access allows you can to chain commands and swiftly generate the necessary
 input for downstream analysis.
 
-Say you want to see if an accession of interest is part of a gene cluster:
+Say you want to see if an accession of interest is part of a gene cluster. Run a CRAP
+around accessions within 20 kb +/- your gene of interest:
 ```
-acc2locus.py -a athter2_3 | crap.py -q - <ARGS>
+acc2locus.py -a athter2_3 -n -p 20000 | crap.py -q - <ARGS>
 ```
 
-Say you find a gene cluster! Now, you want to run `clinker` on it, so first
-create a file of query genes from the various organisms at the center of their
-cluster locus. Now, we can generate a locus for each of those files and create a
-genbank of the loci for clinker.
+Say you it appears like there is a gene cluster! Now, you want to run `clinker`,
+which takes genbanks `.gbk` as input. 
+Create a file of query genes from the CRAP output, extract locus accessions for each gene,
+and output a genbank for each locus:
 
 ```bash
-for acc in $(cat <INPUT_FILE>); do acc2locus.py -a $acc | acc2gbk.py -a - > $acc.locus.gbk; done
+for acc in $(cat <INPUT_FILE>)
+do 
+  acc2locus.py -a $acc -p 20000 -n | acc2gbk.py -a - > $acc.locus.gbk 
+done
 ```
 
 Understanding these principals of Mycotools is how you will get the most
@@ -754,35 +725,29 @@ efficiency gain out of the software suite... it was designed for pipelining.
 
 ## Phylogenetic analysis
 
-A key component of robust phylogenetic reconstruction is
-adequately sampling. MycotoolsDB enables adequate sampling by 
-providing a near-comprehensive database of available fungal genomic data. 
-Despite the benefits of increased sampling, there are two prominent problems: 1) large alignments
-lose resolution because they must consider many sequences and 2) computational 
-complexity increases with sample size. 
+MycotoolsDB enables assimilation of all available fungal genomic data. 
+Despite the benefits of increased sampling, there are two prominent problems
+large samples create in phylogenetic analysis: 1) large alignments
+lose resolution because they must consider many sequences and 2) analysis
+time increases with sample size. 
 For a small set of genes, such as ITS, one can usually assume that the gene family is 
-strictly vertically inherited, so the dataset can be cut down to closely 
+conserved , so the dataset can be cut down to closely 
 related organisms. For most other genes, it is not valid to assume the gene family
-is vertically conserved because horizontal transfer is a prominent modality of
+is conserved, particularly because horizontal transfer is a prominent modality of
 gene transmission in prokaryotes and fungi.
 
-It is thus both important to adequately sample and systematically truncate 
-the dataset into a manageable set of gene homologs. This is accomplished by
-iteratively constructing phylogenies, identifying gene family homologs,
-truncating the data to these homologs, and repeating until a manageable tree is
-obtained. On its own, this analysis requires elaborate integration of multiple 
-independent softwares, but Mycotools takes care of the bulk of this work.
-
-You will need several programs for this analysis, so activate your Mycotools conda environment
-and run `conda install iqtree mafft blast -c bioconda` and `pip install clipkit`
+It is thus necessary to observe sufficient alignment resolution and systematically truncate 
+the dataset into a computationally tractable set of gene homologs. This is accomplished by
+iteratively constructing phylogenies, identifying and extracting clades of homologs,
+and repeating until a manageable tree is obtained. On its own, this analysis requires 
+elaborate integration of multiple independent softwares, but Mycotools takes care of most of this.
 
 <br />
 
 ### Example 1:
 
-A phylogenetic analysis often starts with a single gene of interest. The first step
-is to obtain the gene family of closely related genes by BLASTing a gene protein sequence 
-across the mycotoolsDB. 
+Acquire a set of homologs for a gene family of interest by BLASTing a representative
+query protein sequence. 
 
 1. extract a database of published sequences, or use other arguments to extract
 other organisms of interest
@@ -796,19 +761,25 @@ mtdb extract > pub.mtdb
 2. obtain gene homologs using `db2search.py` with an e-value threshold of 10<sup>-2</sup>:
 
 ```bash
-fa2clus.py -f <FASTA>.fa -m 0.3 -x 0.7 -l
+db2search.py -d pub.mtdb -e 2 -q <QUERY>
 ```
 
-<br />
+3. If there are more than 1000 homologs, truncate the resulting homologs around a gene of 
+interest between 50 and 500 genes:
 
-5b. Open the `.clus` file to obtain the cluster with your sequence of interest,
-copy those sequences into a blank file, then use `acc2fa.py` as described in
-step 6a. If the clusters are too small/big, open the `.newick` output in figtree to 
-select the clade of interest as described in step 6a.
+```bash
+fa2clus.py -f <FASTA>.fa --min_seq 50 --max_seq 500 -i <FOCAL_GENE>
+```
 
-<br />
+4. If there are less than 1000 homologs, construct a fastree, `-f`, if there are many samples,
+or remove that parameter for a robust IQ-TREE.
 
-6b. Repeat the analysis at step 4a until a final phylogeny is obtained.
+```bash
+fa2tree.py -i <FASTA>.fa 
+```
+
+5. If the phylogeny can be improved, extract a highly supported node from 4 and reconstruct,
+or systematically truncate the dataset with 3 and reconstruct.
 
 <img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
 
@@ -823,7 +794,7 @@ select the clade of interest as described in step 6a.
 - [x] update crap information
 - [ ] eggnog to synteny diagram
 - [ ] overview of mycotools scripts functions, e.g. resume on -o, output standards
-- [ ] update phylogenetic pipeline with fa2clus renovations
-- [ ] add partition analysis tutorial
+- [x] update phylogenetic pipeline with fa2clus renovations
+- [x] add partition analysis tutorial
 - [ ] discuss output in crap
 - [ ] add caveats to outputs of fa2clus, crap, etc
