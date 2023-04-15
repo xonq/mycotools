@@ -7,8 +7,8 @@ high throughput pipelining and routine genomic analysis. Mycotools is *HEAVILY*
 dependent on the MycotoolsDB, so there is no guarantee that these scripts will
 work with external files. 
 
-Why the dependency on MycotoolsDB? Because bioinformatics file formats lack systematic, 
-uniform curation so establishing the MycotoolsDB allows for safe assumptions on
+Why the dependency on MycotoolsDB? Because bioinformatics file formats need systematic, 
+uniform curation. The MycotoolsDB allows for safe assumptions on
 how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md)
 
 <br /><br />
@@ -72,8 +72,8 @@ files. To learn more about MycotoolsDB and the `.mtdb` format standard, refer to
 <br /><br />
 
 ## Initialization
-### updateDB.py
-updateDB.py is for initializing and building the master MTDB; to interface with
+### mtdb update
+`mtdb update` is for initializing and building the master MTDB; to interface with
 an established MTDB, see
 [interfacing](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
 
@@ -81,13 +81,13 @@ an established MTDB, see
 To initialize a curated database of all NCBI and MycoCosm (JGI) fungal genomes:
 
 ```bash
-updateDB.py -i <INIT DIRECTORY>
+mtdb update -i <INIT DIRECTORY>
 ```
 
 #### PROKARYOTES
 To initialize a curated database of all NCBI genomes prokaryotic genomes:
 ```bash
-updateDB.py -i <INIT_DIRECTORY> -p
+mtdb update -i <INIT_DIRECTORY> -p
 ```
 
 <br /><br />
@@ -96,7 +96,7 @@ updateDB.py -i <INIT_DIRECTORY> -p
 To update MycotoolsDB:
 
 ```bash
-updateDB.py -u
+mtdb update -u
 ```
 
 <br /><br />
@@ -145,32 +145,32 @@ grep 'Psilocybe' $(mtdb)
 NOTE: `grep` may yield non-specific taxonomy results, e.g. `grep Athelia
 $(mtdb)` will not only yield the genus *Athelia*, but also all members of the
 family Atheliaceae. See
-[extractDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
+[mtdb extract](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
 to extract based on taxonomy.
 
 <br /><br />
 
 ## Creating modular databases
-### extractDB.py
-If you are only interested in a subset of lineages in the master mycotoolsDB, then extract the portion you want. By default, this script will ignore use-restricted data - run `-n` to include if you are aware of and will respect the limitations of use-restricted data. Run `extractDB.py -h` to see all options.
+### mtdb extract
+If you are only interested in a subset of lineages in the master mycotoolsDB, then extract the portion you want. By default, this script will ignore use-restricted data - run `-n` to include if you are aware of and will respect the limitations of use-restricted data. Run `mtdb extract -h` to see all options.
 
 e.g. grab a database of a taxonomic order: 
 ```bash
-extractDB.py -l Atheliales > atheliales.mtdb
+mtdb extract -l Atheliales > atheliales.mtdb
 ```
 
 grab all NCBI Aspergilli accessions: 
 ```bash
-extractDB.py -s ncbi -l aspergillus > aspergillus.mtdb_ncbi
+mtdb extract -s ncbi -l aspergillus > aspergillus.mtdb_ncbi
 ``` 
 
 grab a list of orders from a file:
 ```bash
-extractDB.py -ll <TAX_FILE> > taxa.mtdb
+mtdb extract -ll <TAX_FILE> > taxa.mtdb
 ```
 
 ```bash
-Extracts a MycotoolsDB from arguments. E.g. `extractDB.py -l Atheliaceae`
+Extracts a MycotoolsDB from arguments. E.g. `mtdb extract -l Atheliaceae`
 
 options:
   -h, --help            show this help message and exit
@@ -201,7 +201,7 @@ Inputs a MycotoolsDB `.mtdb` file (by default uses the master database), then cr
 Let's say you want protein data from organisms in one family. First, you should extract a database of organisms you want:
 ```bash
 mkdir pullFiles && cd pullFiles
-extractDB.py -l Atheliaceae > atheliaceae.mtdb
+mtdb extract -l Atheliaceae > atheliaceae.mtdb
 ```
 
 Then, run `db2files.py` to copy the protein fastas into the current directory (call `-h` to see all options):
@@ -217,19 +217,19 @@ db2files.py -d atheliaceae.mtdb -p --print
 <br /><br />
 
 ## Adding local genomes
-### predb2db.py
-To add in-house annotations predb2db.py will input your genome and metadata, curate, and prepare a database file to add to the database. The manager of the database (Zach for Ohio Supercomputer) will then take your database and add it to the master.
+### mtdb predb2db
+To add in-house annotations `mtdb p` will input your genome and metadata, curate, and prepare a database file to add to the database. The manager of the database (Zach for Ohio Supercomputer) will then take your database and add it to the master.
 
 First, generate a predb spreadsheet:
 ```bash
-predb2db.py > predb.tsv
+mtdb p > predb.tsv
 ```
 
 The resulting `predb.tsv` can be filled in via spreadsheet software and exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and separate by tabs. De novo annotations produced by Funannotate/Orthofiller must be filled in as "new" for the genomeSource column; *annotations directly derived from NCBI/JGI data need to be specified in genomeSource.
 
 Finally, generate a mycotoolsDB file from your completed predb, and notify your database manager that it is ready for integration:
 ```bash
-predb2db.py <PREDB.TSV>
+mtdb p <PREDB.TSV>
 ```
 
 <br /><br />
@@ -278,7 +278,7 @@ These scripts input a MycotoolsDB or can be manually made as shown at the bottom
 Say you want to grab a few organisms' transcript information from your genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```bash
 mkdir dwnldFiles && cd dwnldFiles
-extractDB.py -l aspergillus > aspergillus.mtdb_ncbi
+mtdb extract -l aspergillus > aspergillus.mtdb_ncbi
 ```
 
 If there are organisms you don't want in the extracted `.mtdb`s, just delete their line(s) in the file. Next call `jgiDwnld.py -h` or `ncbiDwnld.py -h` to find the flags necessary to download the files you want. To download transcript data (and EST data for JGI) in your current directory:
@@ -288,7 +288,7 @@ ncbiDwnld.py -i aspergillus.mtdb_ncbi -t
 ```
 
 These scripts populate with compressed files. To unzip all the files, run `gunzip <FILETYPE>/*.gz`. You will also see log files for the download process. 
-To submit as a job (not recommended), you must create an encrypted MycotoolsDB passkey using `updateDB.py` and pass the password to stdin to these scripts.
+To submit as a job (not recommended), you must create an encrypted MycotoolsDB passkey using `mtdb manage` and pass the password to stdin to these scripts.
 
 <br />
 
@@ -668,7 +668,7 @@ by specifying `-i`/`--iqtree`.
 
 To search an extracted sub-MycotoolsDB using `blastp` and create phylogenies with `fasttree`:
 ```bash
-extractDB.py --lineage Basidiomycota > basi.mtdb
+mtdb extract --lineage Basidiomycota > basi.mtdb
 crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
 ```
 
@@ -724,7 +724,7 @@ Mycotools is designed to enable pipelining in Linux shells as well as python.
 MycotoolsDB (*.mtdb*) files provide the reference genomes for each analysis and
 are often inputted as `-d`. Databases of reference omes can be generated by
 parsing the master database file (obtained via command `mtdb`) or extracted via
-a set of parameters denoted in `extractDB.py`.
+a set of parameters denoted in `mtdb extract`.
 
 For scripts such as `acc2fa/acc2gbk/acc2gff/acc2locus`, the input is an accession or set of
 accessions, and can be piped in via standard input. *All scripts that accept
@@ -788,7 +788,7 @@ across the mycotoolsDB.
 other organisms of interest
 
 ```bash
-extractDB.py > pub.mtdb
+mtdb extract > pub.mtdb
 ```
 
 <br />

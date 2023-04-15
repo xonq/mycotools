@@ -330,7 +330,7 @@ def expandEnvVar( path ):
     return path.replace('//','/')
 
 
-def format_path(path):
+def format_path(path, force_dir = False):
     '''Goal is to convert all path types to absolute path with explicit dirs'''
 
 #    path = path.replace('//','/') 
@@ -345,14 +345,18 @@ def format_path(path):
       #      return None again, let this be handled on the other end to increase
       #      throughput
     
-        if path.endswith('/'):
-            if not os.path.isdir( path ):
-                path = path[:-1]
-        else:
-            if os.path.isdir( path ):
+        if force_dir:
+            if not path.endswith('/'):
                 path += '/'
-        if not path.startswith('/'):
-            path = os.getcwd() + '/' + path
+        else:
+            if path.endswith('/'):
+                if not os.path.isdir( path ):
+                    path = path[:-1]
+            else:
+                if os.path.isdir( path ):
+                    path += '/'
+            if not path.startswith('/'):
+                path = os.getcwd() + '/' + path
     
     return path
 

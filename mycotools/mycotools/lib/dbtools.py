@@ -312,8 +312,8 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
     else:
         ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi, jgi)
         if ncbi and jgi:
-            hash_check = input( 'Would you like to encrypt your login ' + \
-                'information to ' + info_path + ' [Y/n]: ' )
+            hash_check = input('Would you like to encrypt your login ' + \
+                'information to ' + info_path + ' [Y/n]: ')
         else:
             hash_check = 'n'
         if hash_check not in {'n', 'N'}:
@@ -344,21 +344,6 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
 #
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
-def gen_config( 
-    branch = 'fungi', forbidden = '$MYCODB/log/forbidden.tsv',
-    repo = "https://gitlab.com/xonq/mycotoolsdb", 
-    rogue = False, nonpublished = False
-    ):
-
-    config = { 
-        'forbidden': forbidden,
-        'repository': repo, 
-        'branch': branch,
-        'nonpublished': nonpublished,
-        'rogue': rogue,
-    }
-
-    return config
 
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit` 
 def log_editor( log, ome, edit ):

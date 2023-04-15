@@ -3,9 +3,15 @@
         src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.white.png"
     >
 </p>
-Now supports prokaryotes too!
+Now alpha support for prokaryotes too!
 
 <br /><br />
+
+# NOTE
+While extensive alpha testing has been conducted, this software is in a beta state, and errors are expected. Kindly report these issues and remain patient for fixes - if you can find the bug, even better! This software will have longterm maintenance, although my focus is on my own research.
+
+Cheers,
+Zachary Konkel
 
 # PURPOSE
 Bring broadscale comparative genomics to the masses. 

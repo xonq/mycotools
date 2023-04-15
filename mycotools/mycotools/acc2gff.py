@@ -54,6 +54,7 @@ def gffMain(gffData, accs):
         accGffs[acc] = grabGffAcc(gff, acc)
     return accGffs
 
+
 def dbMain(db, accs, cpus = 1):
 
     omes = set([x[:x.find('_')] for x in accs])

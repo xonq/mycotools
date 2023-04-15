@@ -80,7 +80,7 @@ Prokaryote: `/fs/ess/PAS1568/mycotools/`
 You're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
 #### Non-OSC
-MycotoolsDB will be available September, 2022.
+MycotoolsDB will be available May, 2023.
 
 <br /><br /><br />
 

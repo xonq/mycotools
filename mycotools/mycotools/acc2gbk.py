@@ -38,7 +38,7 @@ def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
     return cds_dict
 
 def contig2gbk(ome, row, contig, contig_dict, 
-               contig_seq, faa, product_search = r'product=([^;]+)'):
+               contig_seq, faa, product_searches = {'product': r'product=([^;]+)'}):
     """Generate a genbank string for a contig_dict, which contains a dictionary
     of protein keys and list of each gff entry associated with the protein. 
     ome: ome_code
@@ -47,7 +47,7 @@ def contig2gbk(ome, row, contig, contig_dict,
     contig_dict: {prot: [gff_entries]}
     contig_seq: contig sequence string
     faa: proteome
-    product_search: product regular expression"""
+    product_searches: {prod_id: product regular expression}"""
 
     seq_coords = [] # a list of all the coordinates from the contig
     for prot, prot_list in contig_dict.items():
@@ -99,7 +99,7 @@ def contig2gbk(ome, row, contig, contig_dict,
 
         for entry in entries['gene']:
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
-            eprint(alias)
+#            eprint(alias)
             if '|' in alias: # alternately spliced gene
                 if alias in used_aliases:
                     continue
@@ -107,10 +107,13 @@ def contig2gbk(ome, row, contig, contig_dict,
                     used_aliases.add(alias)
             id_ = re.search(gff3Comps()['id'], entry['attributes'])[1]
 
-            try:
-                product = re.search(product_search, entry['attributes'])[1]
-            except TypeError: # no product
-                product = ''
+            products = {}
+            for prod_id, product_search in product_searches.items():
+                try:
+                    product = re.search(product_search, entry['attributes'])[1]
+                    products[prod_id] = product
+                except TypeError: # no product
+                    pass
             start, end = sorted([int(entry['start']), int(entry['end'])])
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
@@ -123,8 +126,9 @@ def contig2gbk(ome, row, contig, contig_dict,
             gbk += gene_coords
             gbk += '/locus_tag="' + alias + '"\n                     ' 
 
-            if product:
-                gbk += '/product="' + product + '"\n                     '
+            for prod_id, product in products.items():
+                if product:
+                    gbk += f'/{prod_id}="' + product + '"\n                     '
             if entry['phase'] != '.':
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
@@ -132,10 +136,13 @@ def contig2gbk(ome, row, contig, contig_dict,
         for entry in entries['RNA']:
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
-            try:
-                product = re.search(product_search, entry['attributes'])[1]
-            except TypeError: # no product
-                product = ''
+            products = {}
+            for prod_id, product_search in product_searches.items():
+                try:
+                    product = re.search(product_search, entry['attributes'])[1]
+                    products[prod_id] = product
+                except TypeError: # no product
+                    pass
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             id_ = re.search(gff3Comps()['par'], entry['attributes'])[1]
 
@@ -153,8 +160,9 @@ def contig2gbk(ome, row, contig, contig_dict,
                 gbk += gene_coords
             gbk += '/locus_tag="' + alias + '"\n                     ' 
 
-            if product:
-                gbk += '/product="' + product + '"\n                     '
+            for prod_id, product in products.items():
+                if product:
+                    gbk += f'/{prod_id}="' + product + '"\n                     '
             if entry['phase'] != '.':
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
@@ -199,18 +207,24 @@ def contig2gbk(ome, row, contig, contig_dict,
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             id_ = re.search(gff3Comps()['id'], entry['attributes'])[1]
 
-            try:
-                product = re.search(product_search, entry['attributes'])[1]
-            except TypeError: # no product
-                product = ''
+
+            products = {}
+            for prod_id, product_search in product_searches.items():
+                try:
+                    product = re.search(product_search, entry['attributes'])[1]
+                    products[prod_id] = product
+                except TypeError: # no product
+                    pass
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
             final_coords += '\n                     '
             gbk += final_coords
             gbk += '/locus_tag="' + alias + '"\n                     ' 
 
-            if product:
-                gbk += '/product="' + product + '"\n                     '
+
+            for prod_id, product in products.items():
+                if product:
+                    gbk += f'/{prod_id}="' + product + '"\n                     '
             if entry['phase'] != '.':
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
@@ -254,26 +268,38 @@ def contig2gbk(ome, row, contig, contig_dict,
     gbk += '//'
     return gbk
 
-def gen_gbk(ome_dict, row, ome, product_search):
+def gen_gbk(ome_dict, row, fna, faa, ome, product_searches):
 
-    assembly = fa2dict(row['fna'])
-    faa = fa2dict(row['faa'])
     gbk = {}
     for contig, contig_dict in ome_dict.items():
         gbk[contig] = contig2gbk(ome, row, contig, contig_dict, 
-                   assembly[contig]['sequence'], faa, 
-                   product_search = product_search)
+                   fna[contig]['sequence'], faa, 
+                   product_searches = product_searches)
 
     return gbk
-        
 
-def main(gff_list, db, product_search = r'product=([^;]+)'):
+def ome_main(ome, gff_lists, row, product_searches = {'product': r'product=([^;]+)'}):
+    gbks = defaultdict(list)
+    faa, fna = fa2dict(row['faa']), fa2dict(row['fna'])
+    for key, gffs in gff_lists.items():
+        for gff_list in gffs:
+            cds_dict = col_CDS(gff_list, types = {'gene', 'CDS', 'exon',
+                                                  'mRNA', 'tRNA', 'rRNA',
+                                                  'RNA', 'pseudogene'})
+            gbks[key].append(gen_gbk(cds_dict[ome], row, fna, faa, 
+                                     ome, product_searches))
+    return gbks
+
+
+def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'}):
     cds_dict = col_CDS(gff_list, 
             types = {'gene', 'CDS', 'exon', 'mRNA', 
                      'tRNA', 'rRNA', 'RNA', 'pseudogene'})
     ome_gbks = {}
     for ome, ome_dict in cds_dict.items():
-        ome_gbks[ome] = gen_gbk(ome_dict, db[ome], ome, product_search)
+        fna = fa2dict(db[ome]['fna'])
+        faa = fa2dict(db[ome]['faa'])
+        ome_gbks[ome] = gen_gbk(ome_dict, db[ome], fna, faa, ome, product_searches)
 
     return ome_gbks
 
@@ -335,11 +361,11 @@ if __name__ == '__main__':
 
     gbk_dict = {}
     if args.gff:
-        gbk_dict = main(gff2list(format_path(args.gff)), db, regex)
+        gbk_dict = main(gff2list(format_path(args.gff)), db, {'product': regex})
     else:
         gffs = acc2gff(db, accs, args.cpu)
         for ome, gff in gffs.items():
-            gbk_dict[ome] = main(gff, db, regex)[ome]
+            gbk_dict[ome] = main(gff, db, {'product': regex})[ome]
     
     if args.ome:
         for ome, gbks in gbk_dict.items():

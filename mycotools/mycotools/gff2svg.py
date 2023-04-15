@@ -30,7 +30,7 @@ def gff2svg(
     gff, svg_path, product_dict, colors,
     prod_comp = gff3Comps()['product'], width = 10,
     null = 'hypothetical protein', types = {'tRNA', 'mRNA', 'rRNA'},
-    max_size = 100, labels = True
+    max_size = 100, labels = True, gen_new_colors = True
     ):
     # needs to end with .svg
     if not svg_path.endswith('.svg'):
@@ -46,8 +46,12 @@ def gff2svg(
             if prod is not None:
                 product = prod[1].lower() # lower case for uniformity
                 product = product.replace('"', '')
-                if product == null or not product: # if the product is a null
+                if product in product_dict:
+                    pass
+                elif product == null or not product: # if the product is a null
                 # value it should be annotated as such
+                    product = null
+                elif not gen_new_colors:
                     product = null
                 elif product not in product_dict:
                     print(product)
@@ -102,10 +106,10 @@ def main(
     gff_list, svg_path, product_dict = {}, 
     width = 10, prod_comp = gff3Comps()['product'], 
     null = 'hypothetical protein', types = {'tRNA', 'mRNA', 'rRNA'},
-    labels = True, wheel = None, shuffle = False
+    labels = True, wheel = None, shuffle = False, gen_new_colors = True
     ):
 
-    product_dict = {k.lower(): v for k, v in product_dict.items()}
+    product_dict = {str(k.lower()): v for k, v in product_dict.items()}
     if not wheel and not product_dict:
         if not set(product_dict.keys()).difference({null}): 
         # if no keys or null is the only product key
@@ -131,7 +135,7 @@ def main(
     product_dict = gff2svg(
         gff_list, svg_path, product_dict, colors,
         prod_comp = prod_comp, width = width, null = null,
-        labels = labels, types = types
+        labels = labels, types = types, gen_new_colors = gen_new_colors
         )
 
     return product_dict

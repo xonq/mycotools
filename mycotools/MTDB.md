@@ -1,4 +1,4 @@
-![MycotoolsDB](https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png)
+![MycotoolsDB](https://gitlab.com/xonq/mycotools/-/raw/primary/misc/mtdb.png)
 
 # Mycotools Database (MTDB)
 
@@ -16,7 +16,7 @@ Enable broadscale comparative genomics via a systematically curated, automatical
 assembled/updated, scaleable genomics database. MTDB primarily seeks to resolve
 several outstanding problems in comparative genomics: 
 
-1. Uniformly curate genomic data within and across multiple databases, i.e. the notorious
+1. Uniformly curate genomic data within and across multiple databases, i.e. the 
 inconsistency of the gene coordinates, `gff` file
 2. Promote ease-of-use for scalable and large scale analyses, e.g. transitioning between datasets
 in a phylogenetic analysis
@@ -30,10 +30,10 @@ make routine comparative genomic analyses accessible
 ### `.mtdb` file format standard
 Because MTDBs are essentially tab-delimitted spreadsheets, the database can be
 scaled by extracting rows of interest using
-`bash`/[extractDB.py](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
-and feeding the scaled MTDB into [Mycotools scripts](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md). Master MTDB files are
+`bash`/[extractDB.py](https://gitlab.com/xonq/mycotools/-/blob/primary/mycotools/USAGE.md#creating-modular-databases)
+and feeding the scaled MTDB into [Mycotools scripts](https://gitlab.com/xonq/mycotools/-/blob/primary/mycotools/USAGE.md). Master MTDB files are
 labelled `YYYYmmdd.mtdb` based on the date the update began; the most recent
-`mtdb` in the master MTDB folder will be used as the master database.
+`mtdb` in the primary MTDB folder will be used as the primary database.
 
 Example row:
 ```
@@ -51,12 +51,12 @@ Tab-delimited file, with one row per genome and ordered columns:
 - `taxonomy`: NCBI taxonomy `JSON` object derived from genus
 - `version`: MycoCosm version/NCBI modification date
 - `source`: Genome source, e.g. 'ncbi'/'jgi'/'lab'; `[a-z0-9\.]`
-- `biosample`: NCBI BioSample accession
+- `biosample`: optional NCBI BioSample accession
 - `assembly_acc`: NCBI GenBank/RefSeq assembly accession or MycoCosm portal
 - `published`: Publication metadata or binary publication response; 0/None/''
-  are use-restricted - all others are presumed to be open use ([see
-  below](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md#data-assimilation))
-- `acquisition_date`: Date of input into master database; `YYYYmmdd`
+  are use-restricted - all others are presumed to be open access by Mycotools scripts ([see
+  below](https://gitlab.com/xonq/mycotools/-/blob/primary/mycotools/MTDB.md#data-assimilation))
+- `acquisition_date`: Date of input into primary database; `YYYYmmdd`
 - `fna`: assembly `.fna`, required when not `$MYCOFNA/fna/<ome>.fna`; PATH
 - `faa`: proteome `.faa`, required when not `$MYCOFAA/faa/<ome>.faa`; PATH
 - `gff3`: gene coordinate `.gff3`, required when not
@@ -135,22 +135,23 @@ CDS coordinates that can be tied to an mRNA with a gene parent.
 
 ### data assimilation
 #### - JGI
-`updateDB.py` will prioritize MycoCosm (JGI) genomes over NCBI by referencing
+`mtdb update` will prioritize MycoCosm (JGI) genomes over NCBI by referencing
 the submitter field in NCBI assembly metadata. Each unique Portal is retrieved from the
-MycoCosm master table. 
+MycoCosm primary table. 
 
 ##### JGI use restriction
-Use restriction metadata is applied from the associated field in
-the MycoCosm master table.
+Use restriction metadata is applied from the associated field in the MycoCosm primary table.
+IT IS USER RESPONSIBILITY TO VERIFY THE VALIDITY OF AUTOMATICALLY APPLIED USE-RESTRICTION LABELS.
+Please review [JGI policy on use-restricted data](https://jgi.doe.gov/user-programs/pmo-overview/policies/).
 
 #### - NCBI
-NCBI genomes will be retrieved from the master eukaryotes.txt/prokaryotes.txt 
+NCBI genomes will be retrieved from the primary eukaryotes.txt/prokaryotes.txt 
 and each unique assembly accession that was not submitted by JGI is retrieved. 
 Version checking operates on the `Modify Date` field.
 
 ##### taxonomy
 All taxonomy metadata is acquired by querying the NCBI taxonomy with the genus
-name. Therefore, taxonomy is subject to discrepancies in NCBI taxonomy.
+name. Therefore, taxonomy is subject to errors in NCBI taxonomy.
 
 ##### NCBI use restriction
 All NCBI entries are
@@ -168,28 +169,27 @@ published data is use available.
 
 #### - local
 Locally annotated genomes can be added to the database by filling out and
-submitting a `.predb` file using `predb2db.py`. `predb2db.py` will curate the
+submitting a `.predb` file using `mtdb predb2db`. `mtdb predb2db` will curate the
 inputted data and output into the current directory. Once complete,
-`updateDB.py -a <PREDB_RESULT>` will add the `.mtdb` from `predb2db.py` to the
-master database.
+`mtdb update --add <PREDB_RESULT>` will add the `.mtdb` generated to the
+primary database.
 
 <br /><br /><br />
 
 ## Database management
 
-The master MTDB should be generated from one user, and privileges should be
-distributed using `chmod`. Note, the master user/group are the only ones with 
-privileges to update and merge manually curated `predb` files into the master database.
+The primary MTDB should be generated from one user, and privileges should be
+distributed using `chmod`. Note, the primary user/group are the only ones with 
+privileges to update and merge manually curated `predb` files into the primary database.
 
 Users should refrain from making edits to database files as unexpected errors
 may result with downstream scripts.
 
-<img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
+<img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/primary/misc/ablogo.png">
 
 <br /><br /><br /><br /><br /><br /><br /><br /><br />
 
 ## TODO:
 
-- [ ] ensure exon/CDS numbering
 - [ ] unify protein id
 - [ ] add plant and animal functions.
