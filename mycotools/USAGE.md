@@ -1,5 +1,7 @@
 ![Mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.png)
 
+![Analysis_examples](https://gitlab.com/xonq/mycotools/-/raw/master/misc/examples.png)
+
 # OVERVIEW
 Mycotools is a comparative genomics software suite centered around a curated
 database (MycotoolsDB/MTDB) of genomic data. This guide references Mycotools scripts that enable
@@ -8,8 +10,7 @@ dependent on the MycotoolsDB, so there is no guarantee that these scripts will
 work with external files. 
 
 Why the dependency on MycotoolsDB? Because bioinformatics file formats need systematic, 
-uniform curation. The MycotoolsDB allows for safe assumptions on
-how files are formatted. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md)
+uniform curation. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md)
 
 <br /><br />
 
