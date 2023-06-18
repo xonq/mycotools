@@ -64,21 +64,22 @@ mtdb -d
 
 <br />
 
-## 4. Integrate with installed MycotoolsDB 
-If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, you can use the preinstalled fungal and prokaryote databases. If you are outside OSC change the `<PATHS>` to your database administrators path. Initializing databases is covered in the [usage guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md).
+Determine if you are going to link to an already installed database, or become
+the administrator of a new one:
 
-To link with an existing database, fill in `<PATH>` with the database path. OSC databases denoted below.
+## 4a. USER: Integrate with already initialized MycotoolsDB
+To link with an existing database, fill in `<PATH>` with the database path
+
 ```bash
-mtdb --init <PATH>
+mtdb --init <DB_PATH>
 ```
-Fungi: `/fs/project/PAS1046/databases/mycotoolsdb/`
-Prokaryote: `/fs/ess/PAS1568/mycotools/`
-
 
 You're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
-#### Non-OSC
-MycotoolsDB will be available May, 2023.
+## 4b. ADMINISTRATOR: Initialize a local MycotoolsDB
+```bash
+mtdb update --init <DB_PATH>
+```
 
 <br /><br /><br />
 
@@ -91,7 +92,10 @@ python scripting standpoint.
 
 Code edits should focus on stabilizing existing features and simplifying/decerasing the code base.
 I try to implement code aligned with principles of the [functional
-programming paradigm](https://docs.python.org/3/howto/functional.html). 
+programming paradigm](https://docs.python.org/3/howto/functional.html) and
+modifications should act in accord with this paradigm, i.e. sparing
+implementation of new classes, limited necessary abstraction, no hidden state
+changes, and function-based flow.
 
 
 <img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">
