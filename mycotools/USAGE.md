@@ -89,7 +89,8 @@ mtdb update -i <INIT DIRECTORY>
 ```
 
 #### PROKARYOTES
-To initialize a curated database of all NCBI prokaryotic genomes (please note there are 100,000s prokaryote genomes to download and this will take several days-weeks):
+To initialize a curated database of all NCBI prokaryotic genomes (please note
+this is in alpha-testing; additionally, there are 100,000s prokaryote genomes to download and this will take several days-weeks):
 ```bash
 mtdb update -i <INIT_DIRECTORY> -p
 ```
@@ -191,28 +192,6 @@ grab a list of orders from a file:
 mtdb extract -ll <TAX_FILE> > taxa.mtdb
 ```
 
-```bash
-Extracts a MycotoolsDB from arguments. E.g. `mtdb extract -l Atheliaceae`
-
-options:
-  -h, --help            show this help message and exit
-  -l LINEAGE, --lineage LINEAGE
-  -r RANK, --rank RANK  Taxonomy rank
-  -s SOURCE, --source SOURCE
-  -n, --nonpublished    Include restricted
-  -u, --unique_strain
-  -a ALLOWED_SP, --allowed_sp ALLOWED_SP
-                        Replicate species allowed
-  -i, --inverse         Inverse [source|lineage(s)|nonpublished]
-  -ol OME, --ome OME    File w/list of omes
-  -ll LINEAGES, --lineages LINEAGES
-                        File w/list of lineages (same rank)
-  --headers
-  -, --stdin
-  -d MTDB, --mtdb MTDB
-  -o OUTPUT, --output OUTPUT
-```
-
 <br /><br />
 
 
@@ -239,18 +218,34 @@ db2files.py -d atheliaceae.mtdb -p --print
 
 ## Adding local genomes
 ### mtdb predb2db
-To add in-house annotations `mtdb predb2db` will input your genome and metadata, curate, and prepare a database file to add to the database. The manager of the database (Zach for Ohio Supercomputer) will then take your database and add it to the master.
+To add in-house annotations `mtdb predb2db` will input your genome and
+metadata, curate, and prepare a database file to add to the database. The
+administrator will then take your database and add it to the primary MTDB.
 
 First, generate a predb spreadsheet:
 ```bash
 mtdb predb2db > predb.tsv
 ```
 
-The resulting `predb.tsv` can be filled in via spreadsheet software and exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and separate by tabs. De novo annotations produced by Funannotate/Orthofiller must be filled in as "new" for the genomeSource column; *annotations directly derived from NCBI/JGI data need to be specified in genomeSource.
+The resulting `predb.tsv` can be filled in via spreadsheet software and
+exported as a tab delimited `.tsv`. Alternatively, use a plain text editor and
+separate by tabs. De novo annotations produced by Funannotate/Orthofiller must
+be filled in as "new" for the genomeSource column; *annotations directly
+derived from NCBI/JGI data need to be specified in genomeSource. Updates to
+existing database entries may not be automatically detected using the metadata,
+so please explicitly enter the current MTDB ome code you are updating in the
+`previous_ome` column.
 
-Finally, generate a mycotoolsDB file from your completed predb, and notify your database manager that it is ready for integration:
+Next, generate a MycotoolsDB file from your completed predb, and notify your
+database administrator that it is ready for integration:
 ```bash
 mtdb predb2db <PREDB.TSV>
+```
+
+Finally, inform your database administrator that the database is ready for
+submission to the primary MTDB. Administrators will execute:
+```bash
+mtdb update -a <PREDB2DB.mtdb>
 ```
 
 <br /><br />
@@ -498,20 +493,11 @@ To add corrected genes from an `exonerate`-derived gff to a MycotoolsDB `gff` an
 
 `add2gff.py -i <EXONERATE_GFF> -a $(mtdb <OME>.gff3) -u`
 
-NOTE: database managers will need to finalize the updates to propagate the data to the master database
+NOTE: database administrators will need to finalize the updates to propagate
+the data to the primary database via:
 
-```
-add2gff.py [-h] -i INPUT [-a ADDTO] [-o OME] [-r] [-u]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i INPUT, --input INPUT
-                        To add gff
-  -a ADDTO, --addto ADDTO
-                        Add to gff
-  -o OME, --ome OME     Input ome if no [-a]
-  -r, --replace         Replace overlapping accession(s)
-  -u, --update          [-a] Prepare output for mtdb update
+```bash
+mtdb update -a <ADD2GFF.mtdb>
 ```
 
 <br /><br />
@@ -539,57 +525,6 @@ gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
 ## Homolog search MycotoolsDB
 ### db2search.py
 `db2search.py` will execute `hmmer`, `blast`, `diamond`, or `mmseqs`, query an input fasta, and output a results fasta for each accession in the query.
-```
--bash-4.2$ db2search.py -h
-usage: db2search.py [-h] [-d MTDB] [-q QUERY] [-qd QUERY_DIR] [-qf QUERY_FILE] [-a ALGORITHM]
-                    [-s SEQTYPE] [--diamond] [-e EVALUE] [-bit BITSCORE] [-i IDENTITY] [-m MAX_HITS]
-                    [-qt QUERY_THRESH] [--coordinate] [--convert] [--iterations ITERATIONS]
-                    [--manual MANUAL] [--acc] [-v] [-o OUTPUT] [-c CPU] [--ram RAM]
-
-Searches a query sequence or profile database against an mtdb. Compiles output fastas for each query.
-
-optional arguments:
-  -h, --help            show this help message and exit
-
-Inputs:
-  -d MTDB, --mtdb MTDB
-  -q QUERY, --query QUERY
-                        Profile database or sequence
-  -qd QUERY_DIR, --query_dir QUERY_DIR
-                        Dir of queries
-  -qf QUERY_FILE, --query_file QUERY_FILE
-                        File of query paths
-
-Search algorithm:
-  -a ALGORITHM, --algorithm ALGORITHM
-                        Search binary ['blastn', 'blastp', 'blastx', 'hmmsearch', 'mmseqs', 'tblastn']
-  -s SEQTYPE, --seqtype SEQTYPE
-                        [mmseqs] Subject sequence type {aa, nt}
-  --diamond             [blast] Use diamond. Not recommended for ome-by-ome
-
-Search parameters:
-  -e EVALUE, --evalue EVALUE
-                        E value threshold, e.g. 10^(-x) where x is the input
-  -bit BITSCORE, --bitscore BITSCORE
-                        Bit score minimum
-  -i IDENTITY, --identity IDENTITY
-                        [mmseqs|blast] Identity minimum, e.g. 0.6
-  -m MAX_HITS, --max_hits MAX_HITS
-                        Max hits for each ome
-  -qt QUERY_THRESH, --query_thresh QUERY_THRESH
-                        Query percent hit threshold (+/-), e.g. 0.5
-  --coordinate          Extract alignment; DEFAULT: full protein
-  --convert             [mmseqs] Convert query IDs to respective database name (profile search)
-  --iterations ITERATIONS
-                        [mmseqs] --num-iterations in search; DEFAULT: 3
-  --manual MANUAL       [mmseqs] Additional search arguments in quotes
-  --acc                 [hmmer] Extract accessions instead of queries (Pfam)
-
-Runtime options:
-  -v, --verbose
-  -o OUTPUT, --output OUTPUT
-  -c CPU, --cpu CPU
-  --ram RAM             Useful for mmseqs: e.g. 10M or 5G
 ```
 
 <br /><br />
@@ -627,10 +562,10 @@ View your trees using [FigTree](https://github.com/rambaut/figtree/releases).
 
 ## Sequence clustering
 ### fa2clus.py
-Some gene families (e.g. P450s) have many highly identical and closely related homologs, which
+Some gene families (e.g. P450s) have many highly identical homologs, which
 is problematic for conducting phylogenetic analysis and manipulating these large datasets. 
 `fa2clus.py` invokes sequence clustering algorithms to systematically truncate your dataset
-withou constructing a phylogeny. `fa2clus.py` optionally implements an automated iterative 
+without constructing a phylogeny. `fa2clus.py` optionally implements an automated iterative 
 approach to obtaining a cluster of minimum - maximum size with the gene of interest.
 
 For hierarchical agglomerative clustering: `fa2clus.py` will either take a `fasta` and generate a distance matrix using 
@@ -697,10 +632,6 @@ crap.py -q <QUERYGENES> -d basi.mtdb -s blastp --bitscore 40 --cpu 12
 # Mycotools Pipelines
 ## Shell Pipelining with Mycotools
 Mycotools is designed to enable pipelining in Linux shells as well as python.
-MycotoolsDB (*.mtdb*) files provide the reference genomes for each analysis. 
-Databases of reference omes can be generated by
-parsing the master database file (obtained via command `mtdb`) or extracted via
-a set of parameters denoted in `mtdb extract`.
 
 For scripts such as `acc2fa/acc2gbk/acc2gff/acc2locus`, the input is an accession or set of
 accessions, and can be piped in via standard input. *All scripts that accept
@@ -714,8 +645,6 @@ around accessions within 20 kb +/- your gene of interest:
 acc2locus.py -a athter2_3 -n -p 20000 | crap.py -q - <ARGS>
 ```
 
-Say you it appears like there is a gene cluster! Now, you want to run `clinker`,
-which takes genbanks `.gbk` as input. 
 Create a file of query genes from the CRAP output, extract locus accessions for each gene,
 and output a genbank for each locus:
 
@@ -726,27 +655,23 @@ do
 done
 ```
 
-Understanding these principals of Mycotools is how you will get the most
-efficiency gain out of the software suite... it was designed for pipelining.
-
 <br />
 
 ## Phylogenetic analysis
 
-MycotoolsDB enables assimilation of all available fungal genomic data. 
 Despite the benefits of increased sampling, there are two prominent problems
 large samples create in phylogenetic analysis: 1) large alignments
 lose resolution because they must consider many sequences and 2) analysis
 time increases with sample size. 
 For a small set of genes, such as ITS, one can usually assume that the gene family is 
-conserved , so the dataset can be cut down to closely 
+conserved, so the dataset can be cut down to closely 
 related organisms. For most other genes, it is not valid to assume the gene family
-is conserved, particularly because horizontal transfer is a prominent modality of
-gene transmission in prokaryotes and fungi.
+is conserved because horizontal transfer can lead to unexpected distributions.
 
-It is thus necessary to observe sufficient alignment resolution and systematically truncate 
-the dataset into a computationally tractable set of gene homologs. This is accomplished by
-iteratively constructing phylogenies, identifying and extracting clades of homologs,
+It is thus sometimes necessary to balance alignment resolution and computational
+tractability by systematically truncating the dataset into subset of gene homologs. 
+This is accomplished in Mycotools by iteratively constructing phylogenies, 
+identifying and extracting clades of homologs,
 and repeating until a manageable tree is obtained. On its own, this analysis requires 
 elaborate integration of multiple independent softwares, but Mycotools takes care of most of this.
 
