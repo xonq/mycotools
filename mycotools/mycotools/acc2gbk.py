@@ -8,7 +8,7 @@ import multiprocessing as mp
 from collections import defaultdict
 from Bio.Seq import Seq
 from mycotools.lib.kontools import eprint, format_path, stdin2str
-from mycotools.lib.dbtools import mtdb, masterDB
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps
 from mycotools.acc2gff import dbMain as acc2gff
 
@@ -317,7 +317,7 @@ if __name__ == '__main__':
         help = 'Output files by sequence ID (contig/scaffold/chromosome)'
         )
     parser.add_argument('-d', '--mtdb',
-        help = "DEFAULT: master", default = masterDB())
+        help = "DEFAULT: master", default = primaryDB())
     parser.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 

@@ -12,7 +12,8 @@ If Mycotools contribute to your analysis, please cite this git repository (gitla
 
 # UPDATE
 Mycotools is currently in an advanced beta state with frequent updates. It is
-recommended to run the following in your conda environment before analyses:
+recommended to run the following in your conda environment if you are having
+trouble with analyses:
 
 ```bash
 conda update mycotools -c xonq
@@ -22,7 +23,7 @@ conda update mycotools -c xonq
 
 # INSTALL
 ## 1. Installing miniconda
-Miniconda3 is a software environment manager. Pay attention to the installation if you want to install to a specific path (e.g. `~/software/miniconda3`).
+Miniconda3 is a software environment manager:
 
 ```bash
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/miniconda3.sh
@@ -52,24 +53,21 @@ conda config --set channel_priority strict
 <br />
 
 ## 3. Installing mycotools
-Create a new conda environment; `(base)` should appear
-in your shell before running - if not, try `conda activate base` or `source activate base`.
+Make sure `conda` is active, usually by seeing `(base)` in in your shell.
+If not, try `conda activate base` or `source activate base`.
 
 ```bash
-conda create -n mycotools mycotools -c xonq
+conda create -n mycotools mycotools -c xonq -y
 conda activate mycotools
 mtdb -d
 ```
 
-NOTE: if you are having trouble on install, run the `conda config` commands
-above
-
 <br />
 
 ## 4. Integrate with installed MycotoolsDB 
-#### OSC
-If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, you can use the preinstalled fungal and prokaryote databases respectively without reinitializing. Otherwise, change the `<PATHS>` to your database administrators path. Initializing databases is covered in the [usage guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md).
-Run this command with the respective path to integrate your installation with the fungal or prokaryote database:
+If you are using the Ohio Supercomputer and have access to PAS1046/PAS1568, you can use the preinstalled fungal and prokaryote databases. If you are outside OSC change the `<PATHS>` to your database administrators path. Initializing databases is covered in the [usage guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md).
+
+To link with an existing database, fill in `<PATH>` with the database path. OSC databases denoted below.
 ```bash
 mtdb --init <PATH>
 ```
@@ -91,9 +89,9 @@ which are importable modules executing the purpose of the script. This enables M
 to be a pipelining-friendly software suite, both from a command line and
 python scripting standpoint.
 
-I *primarily* abide by the [functional
-programming paradigm](https://docs.python.org/3/howto/functional.html).
-Furthermore, I only create new class objects if a task *needs specific manipulations* that are cumbersome in default classes alone. Any code edits should follow this guideline and adhere to the functional paradigm i.e. no hidden state changes.
+Code edits should focus on stabilizing existing features and simplifying/decerasing the code base.
+I try to implement code aligned with principles of the [functional
+programming paradigm](https://docs.python.org/3/howto/functional.html). 
 
 
 <img align="right" src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/ablogo.png">

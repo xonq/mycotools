@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gff3Comps, gff2Comps, gtfComps
-from mycotools.lib.dbtools import mtdb, masterDB, loginCheck
+from mycotools.lib.dbtools import mtdb, primaryDB, loginCheck
 from mycotools.utils.gtf2gff3 import main as gtf2gff3
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
@@ -148,6 +148,12 @@ def read_predb(predb_path, spacer = '\t'):
             predb['species'][i] = 'sp.'
     return predb
 
+def sub_disallowed(data, disallowed = r"""[^\w\d]"""):
+    if data:
+        return re.sub(disallowed, '', data)
+    else:
+        return data
+
 def predb2mtdb(predb):
     infdb = mtdb()
     if not 'assemblyPath' in predb and 'fna' in predb:
@@ -158,36 +164,24 @@ def predb2mtdb(predb):
         predb['previous_ome'] = predb['ome']
     elif not 'previous_ome' in predb:
         predb['previous_ome'] = \
-            [None for x in predb['ome']]
+            [None for x in predb[list(predb.keys())[0]]]
     for i, code in enumerate(predb['genus']):
+        toAdd = {
+            'assembly_acc': predb['assembly_acc'][i],
+            'ome': sub_disallowed(predb['previous_ome'][i]),
+            'genus': sub_disallowed(predb['genus'][i]),
+            'species': sub_disallowed(predb['species'][i]),
+            'strain': re.sub(r'[^a-zA-Z0-9]', '', predb['strain'][i]),
+            'version': sub_disallowed(predb['version'][i]),
+            'biosample': sub_disallowed(predb['biosample'][i]),
+            'fna': predb['assemblyPath'][i],
+            'gff3': predb['gffPath'][i],
+            'source': predb['source'][i]
+            }
         if predb['published'][i]:
-            toAdd = {
-                'assembly_acc': predb['assembly_acc'][i],
-                'ome': predb['previous_ome'][i],
-                'genus': predb['genus'][i],
-                'species': predb['species'][i],
-                'strain': re.sub(r'[^a-zA-Z0-9]', '', predb['strain'][i]),
-                'version': predb['version'][i],
-                'biosample': predb['biosample'][i],
-                'fna': predb['assemblyPath'][i],
-                'gff3': predb['gffPath'][i],
-                'source': predb['source'][i],
-                'published': predb['published'][i]
-                }
+            toAdd['published'] = predb['published'][i]
         else:
-            toAdd = {
-                'assembly_acc': predb['assembly_acc'][i],
-                'ome': predb['previous_ome'][i],
-                'genus': predb['genus'][i],
-                'species': predb['species'][i],
-                'strain': re.sub(r'[^a-zA-Z0-9]', '', predb['strain'][i]),
-                'version': predb['version'][i],
-                'biosample': predb['biosample'][i],
-                'fna': predb['assemblyPath'][i],
-                'gff3': predb['gffPath'][i],
-                'source': predb['source'][i],
-                'published': not predb['restriction'][i]
-                }
+            toAdd['published'] = not predb['restriction'][i]
 #        if predb['published'][i]:
  #           toAdd['published'] = predb['published'][i]
         infdb = infdb.append(toAdd)
@@ -369,8 +363,11 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
             if exit:
                 raise ie from None
             return ome, False, 'gff3'
-    
-        gff = gff2list(uncur_gff_path)
+        try:   
+            gff = gff2list(uncur_gff_path)
+        # malformatted
+        except IndexError:
+            return ome, False, 'gff3'
         try:
             gff_mngr(ome, gff, cur_gff_path, source, assembly_accession)
         except Exception as e: # catch all errors to continue script
@@ -543,9 +540,9 @@ if __name__ == '__main__':
         elif len(sys.argv) > 3:
             refDB = mtdb(format_path(sys.argv[3]))
         else:
-            refDB = mtdb(masterDB())
+            refDB = mtdb(primaryDB())
     else:
-        refDB = mtdb(masterDB())
+        refDB = mtdb(primaryDB())
 
     if set(sys.argv).intersection({'-s', '--skip'}):
         exit = False

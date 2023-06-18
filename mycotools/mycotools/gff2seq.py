@@ -4,7 +4,7 @@ import re
 import sys
 import argparse
 from Bio.Seq import Seq
-from mycotools.lib.dbtools import mtdb, masterDB
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps, dict2fa
 from mycotools.lib.kontools import format_path, sys_start, eprint, stdin2str
 
@@ -589,7 +589,7 @@ if __name__ == '__main__':
         assembly_dicts = {'input': fa2dict( format_path(args.assembly) )}
         gff_dicts = {'input': input_gff}
     else:
-        db = mtdb(masterDB()).set_index('ome')
+        db = mtdb(primaryDB()).set_index('ome')
         gff_dicts, assembly_dicts = {}, {}
         try:
             for line in input_gff:

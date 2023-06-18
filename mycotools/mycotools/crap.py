@@ -27,11 +27,12 @@ import shutil
 from collections import Counter
 try:
     from ete3 import Tree, faces, TreeStyle, NodeStyle, AttrFace
+    from ete3.parser.newick import NewickError
 except ImportError:
     raise ImportError('Install ete3 into your conda environment via `conda install ete3`')
-from mycotools.lib.dbtools import mtdb, masterDB
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.kontools import eprint, format_path, findExecs, intro, outro, \
-    read_json, write_json, stdin2str, getColors
+    read_json, write_json, stdin2str, getColors, collect_files
 from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Comps
 from mycotools.acc2fa import dbmain as acc2fa
 from mycotools.fa2clus import write_data, ClusteringError, \
@@ -152,7 +153,7 @@ def write_seq_clus(gene_module, focal_gene, db, output_path, out_fa):
         fa_dict = acc2fa(db, gene_module)
     except KeyError:
         eprint('\t\t\tWARNING: some hits not in database', flush = True)
-        db_omes = set(db['ome'])
+        db_omes = set(db.keys())
         gene_module = [x for x in gene_module if x[:x.find('_')] in db_omes]
         fa_dict = acc2fa(db, gene_module)
 
@@ -610,8 +611,11 @@ def make_color_palette(inputs, conversion_dict = {}):
                 conversion_dict[i] = str(i)
     else:
         for i, v in inputs.items(): # HGs
-            if v not in conversion_dict:
+            if str(v) in conversion_dict:
+                conversion_dict[int(v)] = conversion_dict[str(v)]
+            elif v not in conversion_dict:
                 conversion_dict[v] = str(v)
+            
         inputs = list(inputs.values())
 
 
@@ -684,6 +688,7 @@ def init_log(
 
 def parseLog(logPath, new_log, out_dir):
     wrk_dir = out_dir + 'working/'
+    clus_dir = wrk_dir + 'clus/'
     try:
         oldLog = read_json(logPath)
     except FileNotFoundError:
@@ -728,7 +733,7 @@ def parseLog(logPath, new_log, out_dir):
 def crap_mngr(
     db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, 
     tree_suffix, genes2query, plusminus, query2color, 
-    cpus = 1, verbose = False, hg = False, hgs = None, reoutput = True,
+    cpus = 1, verbose = False, hg = None, hgs = None, reoutput = True,
     out_keys = [], labels = True, midpoint = True, ext = '.svg'
     ):
 
@@ -784,19 +789,19 @@ def crap_mngr(
         root_key = random.choice(out_keys)
         try:
             svgs2tree(
-                query, None, raw_tree, db, tree_file,
+                query, hg, raw_tree, db, tree_file,
                 out_dir, root_key, midpoint = midpoint,
                 ext = ext #svg_dir, out_dir
                 )
-        except ete3.parser.newick.NewickError:
+        except NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
     else:
         try:
             svgs2tree(
-                query, None, raw_tree, db, tree_file,
+                query, hg, raw_tree, db, tree_file,
                 out_dir, midpoint = midpoint, ext = ext #svg_dir, out_dir
                 )
-        except ete3.parser.newick.NewickError:
+        except NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
 
     return query2color
@@ -806,7 +811,7 @@ def hg_main(
     clus_cons = 0.05, clus_var = 0.65, min_seq = 3, max_size = 250, cpus = 1,
     plusminus = 10000, verbose = False, reoutput = True, interval = 0.1,
     outgroups = True, labels = True, midpoint = True, faa_dir = None,
-    clus_meth = 'mmseqs easy-cluster', ext = '.svg'
+    clus_meth = 'mmseqs easy-cluster', ext = '.svg', conversion_dict = {}
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
@@ -834,7 +839,7 @@ def hg_main(
         del input_hgs[i]
         del input_genes[i]
 
-    hg2color, conversion_dict = make_color_palette(input_hgs)
+    hg2color, conversion_dict = make_color_palette(input_hgs, conversion_dict)
 
     # in the future, genes without HGs will be placed into HGs via RBH
     if not input_hgs:
@@ -965,7 +970,7 @@ def search_main(
     db, input_genes, query_fa, query_gff, binary = 'mmseqs', fast = True, 
     out_dir = None, clus_cons = 0.4, clus_var = 0.65, min_seq = 3, 
     max_size = 250, cpus = 1, reoutput = True, plusminus = 10000, 
-    evalue = 0, bitscore = 40, pident = 0, mem = None, verbose = False,
+    evalue = 1, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
     midpoint = True, clus_meth = 'mmseqs easy-linclust', ppos = 0,
     max_hits = 1000, ext = '.svg'
@@ -1170,7 +1175,7 @@ if __name__ == "__main__":
                 "-" for stdin',
         required = True
         )
-    i_opt.add_argument('-d', '--mtdb', default = masterDB())
+    i_opt.add_argument('-d', '--mtdb', default = primaryDB())
     i_opt.add_argument(
         '-g', '--gff',
         help = 'GFF for non-mycotools locus diagram. Requires -q fasta input'
@@ -1191,7 +1196,7 @@ if __name__ == "__main__":
         )
     hg_opt.add_argument(
         '-b', '--bitscore', type = float,
-        default = 30, help = 'Bitscore minimum for search algorithm. DEFAULT: 30'
+        default = 25, help = 'Bitscore minimum for search algorithm. DEFAULT: 25'
         )
     hg_opt.add_argument(
         '-mts', '--max_target_seq', type = int, default = 1000,
@@ -1221,8 +1226,8 @@ if __name__ == "__main__":
         )
     clus_opt.add_argument(
         '--min_cov', 
-        help = 'Minimum query coverage; DEFAULT: 0.4', 
-        default = 0.4, type = float
+        help = 'Minimum query coverage; DEFAULT: 0.3', 
+        default = 0.3, type = float
         )
     clus_opt.add_argument(
         '-l', '--linclust',
@@ -1286,7 +1291,7 @@ if __name__ == "__main__":
     execs = ['diamond', 'clipkit', 'mafft', 'iqtree']
     if args.search:
         if args.search not in {'mmseqs', 'blastp', 'diamond'}:
-            eprint('\nERROR: invalid -b', flush = True)
+            eprint('\nERROR: invalid -s', flush = True)
             sys.exit(3)
         else:
             execs.append(args.search)
@@ -1325,10 +1330,11 @@ if __name__ == "__main__":
         if args.gff:
             eprint('\nERROR: GFF input requires fasta input', flush = True)
             sys.exit(3)
-        input_genes = args.query.replace('"','').replace("'",'').split()
+        input_genes = args.query.replace('"','').replace("'",'').replace(',', ' ').split()
     else:
-        eprint('\nERROR: invalid input', flush = True)
-        sys.exit(2)
+        input_genes = args.query.replace('"','').replace("'",'').replace(',', ' ').split()
+#        eprint('\nERROR: invalid input', flush = True)
+ #       sys.exit(2)
 
 # would be nice to make this work from a base standpoint now
 #    if round(len(input_genes)/2) > args.plusminus:
@@ -1407,7 +1413,8 @@ if __name__ == "__main__":
             verbose = args.verbose, plusminus = args.plusminus, 
             interval = 0.1, labels = not args.no_label,
             outgroups = not args.no_outgroup, clus_meth = clus_meth,
-            midpoint = not bool(args.no_midpoint), ext = out_ext
+            midpoint = not bool(args.no_midpoint), ext = out_ext,
+            conversion_dict = conversion_dict
             )
     else:
         new_log = init_log(

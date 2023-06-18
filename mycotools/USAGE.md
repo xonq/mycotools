@@ -88,7 +88,7 @@ mtdb update -i <INIT DIRECTORY>
 ```
 
 #### PROKARYOTES
-To initialize a curated database of all NCBI genomes prokaryotic genomes:
+To initialize a curated database of all NCBI prokaryotic genomes (please note there are 100,000s prokaryote genomes to download and this will take several days-weeks):
 ```bash
 mtdb update -i <INIT_DIRECTORY> -p
 ```
@@ -134,7 +134,13 @@ mtdb manage -p
 ```
 
 This is necessary to submit jobs for scripts that require passwords. Such scripts 
-(like `mtdb update`) will need to receive a password from stdin to run without a `tty` 
+(like `mtdb update`) will need to receive a password from stdin e.g.:
+
+```bash
+read -s PASSWORD
+<type password>
+printf '{"username":"myname","password":"%s"}' $PASSWORD | mtdb update -u
+```
 
 <br /><br />
 
@@ -660,7 +666,8 @@ evolution on a gene-by-gene basis. CRAP will:
 or orthogroup-based approach to find homologs in the MycotoolsDB
 
 2) implement sequence similarity clustering to truncate the sequence set 
-and detect outgroups
+and detect outgroups. NOTE: sequence similarity clustering can sometimes remove close homologs
+if there are too many sequences analyzed relative to the set maximum sequences. 
 
 3) construct phylogenies of each query sequence
 

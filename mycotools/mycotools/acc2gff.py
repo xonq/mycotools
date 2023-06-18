@@ -6,7 +6,7 @@ import sys
 import argparse
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff
-from mycotools.lib.dbtools import mtdb, masterDB
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.kontools import format_path, stdin2str
 
 def grabGffAcc( gff_list, acc, term = 'Alias=' ):
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--column', default = 1, 
         help = 'Accssions column for -i (1 indexed). DEFAULT: 1')
     parser.add_argument('-o', '--ome', action = 'store_true', help = 'Output files by ome code')
-    parser.add_argument('-d', '--mtdb', default = masterDB(), help = 'mycodb DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = primaryDB(), help = 'mycodb DEFAULT: master')
     parser.add_argument('--cpu', type = int, default = mp.cpu_count())
     args = parser.parse_args()
 

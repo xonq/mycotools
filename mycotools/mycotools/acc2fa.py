@@ -6,7 +6,7 @@ import sys
 import argparse
 from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
-from mycotools.lib.dbtools import mtdb, masterDB
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.kontools import format_path, eprint, stdin2str
 
 def extract_mtdb_accs_exp(fa_dict, accs):
@@ -166,7 +166,7 @@ if __name__ == '__main__':
         help = 'Accessions column for -i (1 indexed). DEFAULT: 1', type = int)
     parser.add_argument('-s', '--start', help = 'Start index column (1 indexed)', type = int)
     parser.add_argument('-e', '--end', help = 'End index column (1 indexed)', type = int)
-    parser.add_argument('-d', '--mtdb', default = masterDB())
+    parser.add_argument('-d', '--mtdb', default = primaryDB())
     args = parser.parse_args()
 
     if args.input: # input file

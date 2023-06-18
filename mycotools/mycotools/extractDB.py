@@ -10,7 +10,7 @@ import random
 import argparse
 from collections import defaultdict
 from mycotools.lib.kontools import file2list, intro, outro, format_path, eprint
-from mycotools.lib.dbtools import mtdb, masterDB
+from mycotools.lib.dbtools import mtdb, primaryDB
 
 def infer_rank(db, lineage):
     linlow, rank = lineage.lower(), None
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('-ll', '--lineages', help = 'File w/list of lineages' )
     parser.add_argument('--headers', action = 'store_true')
     parser.add_argument('-', '--stdin', action = 'store_true')
-    parser.add_argument('-d', '--mtdb', default = masterDB())
+    parser.add_argument('-d', '--mtdb', default = primaryDB())
     parser.add_argument('-o', '--output' )
     args = parser.parse_args()
     db_path = format_path( args.mtdb )

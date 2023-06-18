@@ -142,7 +142,7 @@ def prepare_nexus(concat_fa, models, spacer = '\t'):
 
 def run_partition_tree(fa_file, nex_file, constraint,
                        verbose, cpus, spacer = '\t'):
-    cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-nt', 'auto',
+    cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-nt', str(cpus),
            '-B', '1000', '--sampling', 'GENESITE'] # this is not using the
            # specified CPUs, but instead the most efficient
     if constraint:
@@ -167,7 +167,8 @@ def treeRun(name, clipkit_file, out_dir, hpc, constraint,
             cmd.extend(['-constraints', constraint])
     else:
         # the following will identify the optimum number of threads
-        cmd = ['iqtree', '-s', tree_file, '-B', '1000', '-nt', 'auto']
+        cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-nt', str(cpus),
+               '--prefix', tree_file]
         if constraint:
             cmd.extend(['-g', constraint])
     if not hpc:

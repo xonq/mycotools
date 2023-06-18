@@ -4,7 +4,7 @@ import os
 import re
 import sys
 from mycotools.lib.kontools import format_path, sys_start, eprint
-from mycotools.lib.dbtools import masterDB, mtdb
+from mycotools.lib.dbtools import primaryDB, mtdb
 
 forbidden = [
     '/', '\\', '[', ']', '|', '+', '=', '(', ')',
@@ -49,7 +49,7 @@ def parseArgs(args):
                 forbidden.append( let )
 
     if goOn:
-        db = mtdb( masterDB() )
+        db = mtdb( primaryDB() )
 
     with open( args[1], 'r' ) as raw_input:
         data_input = raw_input.read()

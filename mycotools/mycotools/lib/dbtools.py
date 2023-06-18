@@ -86,18 +86,7 @@ class mtdb(dict):
             return {x: [] for x in mtdb.columns}
         with open(format_path(db_path), 'r') as raw:
             data = [x.rstrip().split('\t') for x in raw if not x.startswith('#')]
-        if len(data[0]) == 16: # legacy conversion TO BE DEPRECATED
-            eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
-            columns = [
-                'ome', 'genus', 'species', 'strain', 'version',
-                'biosample', 'fna', 'faa', 'gff3', 'taxonomy', 'ecology',
-                'eco_conf',
-                'source', 'published', 'assembly_acc', 'acquisition_date'
-                ]
-            legacy = True
-        else:
-            legacy = False
-            columns = self.columns
+        columns = self.columns
         for entry in data:
             [df[c].append('') for c in columns] # add a blank entry to each
             # column
@@ -115,25 +104,22 @@ class mtdb(dict):
                 df['genus'][-1] + ' ' + df['species'][-1]
             df['taxonomy'][-1]['strain'] = \
                 df['strain'][-1]
-        if len(data[0]) == 16: # LEGACY conversion to be deprecated
-            del df['ecology']
-            del df['eco_conf']
         try:
-            if legacy:
-                for i, ome in enumerate(df['ome']):
+            for i, ome in enumerate(df['ome']): 
+                if not df['fna'][i]:
+                    if {'MYCOFNA', 'MYCOFAA', 'MYCOGFF3'}.difference(set(os.environ.keys())):
+                        raise FileNotFoundError('You are not connected to a primary MTDB. ' \
+                                              + 'Standalone databases need absolute paths')
                     df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
                     df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
                     df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
-            else:
-                for i, ome in enumerate(df['ome']): 
-                    if not df['fna'][i]:
-                        df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
-                        df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
-                        df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
-                    elif df['fna'][i] == ome + '.fna':
-                        df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
-                        df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
-                        df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
+                elif df['fna'][i] == ome + '.fna':
+                    if {'MYCOFNA', 'MYCOFAA', 'MYCOGFF3'}.difference(set(os.environ.keys())):
+                        raise FileNotFoundError('You are not connected to a primary MTDB. ' \
+                                              + 'Standalone databases need absolute paths')
+                    df['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
+                    df['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
+                    df['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
         except KeyError:
             eprint('ERROR: MycotoolsDB not in path, cannot delineate biofile paths', flush = True)
     
@@ -165,6 +151,8 @@ class mtdb(dict):
                         output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                     else:
                         output[ome]['taxonomy'] = '{}'
+                    if not output[ome]['published']:
+                        output[ome]['published'] = ''
                     out.write(
                         ome + '\t' + \
                         '\t'.join([str(output[ome][x]) for x in output[ome]]) + '\n'
@@ -382,7 +370,7 @@ def readLog( log, columns = '', sep = '\t' ):
 
     return log_dict
 
-def masterDB(path = '$MYCODB'):
+def primaryDB(path = '$MYCODB'):
     """Acquire the path of the master database by searching $MYCODB for a file
     with a basename that starts with a date string %Y%m%d."""
 
@@ -725,6 +713,10 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome', forbid={'no rank', 'superki
 
     return db
 
+def mtdb_disconnect(config, mtdb_config_file = format_path('~/.mycotools/config.json')):
+    config['active'] = False
+    write_json(config, mtdb_config_file)
+
 def mtdb_connect(config, dbtype, 
                  mtdb_config_file= format_path('~/.mycotools/config.json')):
     config['active'] = dbtype
@@ -754,9 +746,10 @@ def mtdb_initialize(mycodb_loc,
 interface = format_path('~/.mycotools/config.json')
 if os.path.isfile(interface):
     envs_info = read_json(interface)
-    for var, env in envs_info[envs_info['active']].items():
-        os.environ[var] = env
+    if envs_info['active']:
+        for var, env in envs_info[envs_info['active']].items():
+            os.environ[var] = env
 
-if not masterDB():
-    eprint('WARNING: MycotoolsDB not initialized; setup using `mtdb -h`', flush = True)
+#if not primaryDB():
+#    eprint('WARNING: Primary MycotoolsDB not connected; setup using `mtdb u/-i/-p/-f`', flush = True)
 

@@ -153,7 +153,7 @@ name. Therefore, taxonomy is subject to errors in NCBI taxonomy.
 
 ##### NCBI use restriction
 All NCBI entries are
-assumed to be "published" for non-restricted use. 
+assumed to be "published" for non-restricted use. "However, some submitters may claim patent, copyright, or other intellectual property rights in all or a portion of the data they have submitted." - [NCBI](ncbi.nlm.nih.gov/genbank/). It is the user responsbility to determine which, if any, genome data have use-restriction policies.
 
 *There may be edge-case examples
 of use-restricted NCBI data, however NCBI cannot provide oversight for their

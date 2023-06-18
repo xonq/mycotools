@@ -197,6 +197,12 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
              'gff': 'genes', 'gff3': 'genes', 'transcripts': 'transcripts',
              'est': 'ests'}
 
+    ft2fn = {'fna$masked': ['masked'], 
+             'fna$unmasked': ['AssembledScaffolds', 'scaffolds'],
+             'gff3': ['GeneCatalog', 'FilteredModels'],
+             'transcripts': ['transcripts'],
+             'est': ['EST']}
+
     url, md5, filename = None, False, None
 
     tree = ET.parse(xml_file)
@@ -214,19 +220,23 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
                                                break
                                    for chil2 in chil1:
                                             if ft2fh[ft] == chil2.attrib['name'].lower():
-                                                t_url = chil2[0].attrib['url']
-                                                if 'get_tape_file' not in t_url \
-                                                    and t_url not in forbidden:
-                                                    url = chil2[0].attrib['url']
-                                                    filename = chil2[0].attrib['filename']
-                                                    # all requirements satisfied
-                                                    try:
-                                                        md5 = chil2[0].attrib['md5']
-                                                        break
-                                                    # continue on to find an md5, or omit
-                                                    # if exhaustively searched
-                                                    except KeyError:
-                                                        pass
+                                                for chil3 in chil2:
+                                                    t_url = chil3.attrib['url']
+                                                    if 'get_tape_file' not in t_url \
+                                                        and t_url not in forbidden:
+                                                        if all(x not in chil3.attrib['filename'] \
+                                                               for x in ft2fn[ft]):
+                                                            continue
+                                                        url = chil3.attrib['url']
+                                                        filename = chil3.attrib['filename']
+                                                        # all requirements satisfied
+                                                        try:
+                                                            md5 = chil3.attrib['md5']
+                                                            break
+                                                        # continue on to find an md5, or omit
+                                                        # if exhaustively searched
+                                                        except KeyError:
+                                                            pass
         if not url and ft == 'fna$masked':
             ft = 'fna$unmasked'
             flip = False
@@ -431,7 +441,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                         except UnicodeDecodeError:
                             pass
                             break
-                        time.sleep( 60 )
+                        time.sleep(60)
                 elif md5 != dwnld_md5 and attempt == 2:
                     print(f'{spacer}\tERROR: md5 does not match JGI. Attempt {attempt}', 
                           flush = True)
@@ -478,8 +488,8 @@ def main(
     
 #    pd.options.mode.chained_assignment = None  # default='warn'
     if not 'assembly_acc' in df.columns:
-        if len( df.columns ) != 1:
-            eprint( '\nInvalid input. No assembly_acc column and more than one column.' , flush = True)
+        if len(df.columns) != 1:
+            eprint('\nInvalid input. No assembly_acc column and more than one column.', flush = True)
         else:
             ome_col = list(df.columns)[0]
     else:
@@ -505,13 +515,9 @@ def main(
         if error_check > 0:
             ome_set.add( row[ome_col] )
         if error_check != -1:
-            time.sleep( 0.1 )
+            time.sleep(0.1)
 
-    eprint(spacer + 'Downloading JGI files\n\tMaximum rate: 1 genome/min' , flush = True)
-    if len( df ) > 60:
-        eprint(spacer + 'Minimum time: ' + str(len(df)) / 60 + ' hours' , flush = True)
-    else:
-        eprint(spacer + 'Minimum time: ' + str(len(df)) + ' minutes' , flush = True)
+    eprint(spacer + 'Downloading JGI files\n\tMaximum rate: 1 file/min' , flush = True)
     
     dwnlds = []
     if assembly:
@@ -534,7 +540,7 @@ def main(
     for i, row in df.iterrows():
         ome = row[ome_col]
         if not preexisting:
-            time.sleep( 60 )
+            time.sleep(60)
         if ome not in ome_set:
             jgi_login( user, pwd )
             if 'ome' in row.keys():

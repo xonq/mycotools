@@ -14,7 +14,7 @@ from mycotools.extractHmmAcc import main as extr_hmm
 from mycotools.db2search import compAcc2fa
 from mycotools.acc2fa import famain as acc2fa
 from mycotools.lib.kontools import intro, outro, findExecs, eprint, format_path
-from mycotools.lib.dbtools import mtdb, masterDB
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import dict2fa
 
 def runextractHmmAcc(hmm, accession, output):
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--fasta', required = True, help = 'Input .fasta')
     parser.add_argument('--hmm', required = True, help = 'Input .hmm')
     parser.add_argument('-b', '--binary', required = True, help = "{'hmmsearch', 'nhmmer'}")
-    parser.add_argument('-d', '--mtdb', default = masterDB(), help = 'MycoDB. DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = primaryDB(), help = 'MycoDB. DEFAULT: master')
     parser.add_argument('-q', '--query', help = 'Query [acc if -a] from .hmm, or new line delimited file')
     parser.add_argument('-c', '--coverage', type = float, help = 'Decimal minimum percent hmm coverage')
     parser.add_argument('-w', '--whole', action = 'store_true', help = 'Extract entire hit sequence' )

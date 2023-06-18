@@ -9,7 +9,8 @@ import re
 import sys
 import subprocess
 from mycotools.lib.kontools import format_path, read_json, write_json, eprint
-from mycotools.lib.dbtools import masterDB, mtdb_connect, mtdb_initialize, mtdb, loginCheck
+from mycotools.lib.dbtools import primaryDB, mtdb_connect, mtdb_disconnect, \
+    mtdb_initialize, mtdb, loginCheck
 
 
 def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
@@ -39,6 +40,7 @@ if __name__ == '__main__':
         + '\n[-i DBPATH]\t[--init]       \tInitialize MTDB connection' \
         + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
         + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
+        + '\n[-u]\t\t[--unlink]\tUnlink from MTDB' \
         + '\n[-d]\t\t[--dependency]\tInstall/update dependencies'
 
     config = parse_config()
@@ -112,10 +114,16 @@ if __name__ == '__main__':
             mtdb_connect(config, 'prokaryote')
             if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
                 loginCheck()
+    elif {'-u', '--unlink'}.intersection(set_argv):
+        if '-u' in set_argv:
+            coord = '-u'
+        else:
+            coord = '--unlink'
+        mtdb_disconnect(config)
     elif len(sys.argv) > 1:
         omes = sys.argv[1].replace('"','').replace("'",'').split()
         for ome_prep in omes:
-            db = mtdb(masterDB()).set_index()
+            db = mtdb(primaryDB()).set_index()
             if ome_prep in db:
                 print(ome_prep + '\t' \
                     + '\t'.join([str(db[ome_prep][x]) \
@@ -148,7 +156,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
 
-    path = masterDB()
+    path = primaryDB()
     if path:
         print(path)
         sys.exit(0)

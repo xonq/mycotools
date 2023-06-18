@@ -24,8 +24,8 @@ from io import StringIO
 from collections import defaultdict
 from mycotools.db2files import soft_main as db2files
 from mycotools.lib.kontools import intro, outro, collect_files, multisub, \
-    findExecs, untardir, eprint, format_path, mkOutput, tardir, inject_args
-from mycotools.lib.dbtools import masterDB, mtdb
+    findExecs, untardir, eprint, format_path, mkOutput, tardir, inject_args, stdin2str
+from mycotools.lib.dbtools import primaryDB, mtdb
 from mycotools.lib.biotools import dict2fa, fa2dict
 #from mycotools.extractHmmsearch import main as exHmm
 from mycotools.acc2fa import dbmain as acc2fa_db, famain as acc2fa_fa
@@ -617,6 +617,7 @@ def prepare_search_run(
     coverage, ppos
     ):
 
+
     prev, finished, rundb = False, set(), db
     if isinstance(query, list):
         query = ','.join(query)
@@ -773,7 +774,7 @@ def mmseqs_mngr(
 
 def checkSearchDB(binary = 'blast'):
 
-    db_date = os.path.basename(masterDB())
+    db_date = os.path.basename(primaryDB())
     if 'blast' in binary:
         search_db = format_path('$MYCOFAA/blastdb/' + db_date + '.00.psd')
         if os.path.isfile(search_db):
@@ -890,10 +891,16 @@ def mmseqs_main(
     search_arg = [], convert = False, iterations = 3,
     ):
 
+    report_dir = prepOutput(out_dir)
     if isinstance(query, str):
         query = [query]
+    elif isinstance(query, dict):
+        with open(out_dir + 'query.fa', 'w') as out:
+            out.write(dict2fa(query))
+        query = [out_dir + 'query.fa'] 
 
-    report_dir = prepOutput(out_dir)
+
+
     rundb, reparse = prepare_search_run(
         db, report_dir, mmseqs, query, 
         max_hits, evalue, out_dir, bitscore, pident,
@@ -929,8 +936,7 @@ def blast_main(
     search_arg = [], ppos = 0
     ):
 
-    if isinstance(query, str):
-        query = [query]
+       
     if blast in {'tblastn', 'blastp'}:
         seq_type = 'prot'
         biotype = 'faa'
@@ -943,6 +949,14 @@ def blast_main(
         eprint('\nERROR: invalid search binary: ' + blast, flush = True)
 
     report_dir = prepOutput(out_dir)
+    if isinstance(query, str):
+        query = [query]
+    elif isinstance(query, dict):
+        with open(out_dir + 'query.fa', 'w') as out:
+            out.write(dict2fa(query))
+        query = [out_dir + 'query.fa'] 
+
+
     query_dict = {}
     for q in query:
         query_dict = {**query_dict, **fa2dict(q)}
@@ -1009,8 +1023,8 @@ if __name__ == '__main__':
                )
 
     i_arg = parser.add_argument_group('Inputs')
-    i_arg.add_argument('-d', '--mtdb', default = masterDB())
-    i_arg.add_argument('-q', '--query', help = 'Profile database or sequence')
+    i_arg.add_argument('-d', '--mtdb', default = primaryDB())
+    i_arg.add_argument('-q', '--query', help = 'Profile database, sequence, or "-" for stdin fasta')
     i_arg.add_argument('-qd', '--query_dir', help = 'Dir of queries')
     i_arg.add_argument('-qf', '--query_file', help = 'File of query paths')
 
@@ -1068,7 +1082,10 @@ if __name__ == '__main__':
         sys.exit(20)
     else:
         if args.query:
-            queries = [format_path(args.query)]
+            if args.query == '-':
+                queries = fa2dict(stdin2str(), file_ = False)
+            else:
+                queries = [format_path(args.query)]
         elif args.query_dir:
             queries = [format_path(args.query_dir) + x \
                        for x in os.listdir(format_path(args.query_dir))]
@@ -1095,14 +1112,14 @@ if __name__ == '__main__':
             biotype = 'faa'
         else:
             biotype = 'fna'
-        query_set = set(queries)
-        for query in queries:
-            if query + '.index' in query_set:
-                for ext in ['_h', '_h.index', '.lookup', '.source',
-                            '.dbtype', '_h.dbtype', '.index']:
-                    if query + ext in query_set:
-                        query_set.remove(query + ext)
-        queries = sorted(query_set)
+#        query_set = set(queries)
+ #       for query in queries:
+  #          if query + '.index' in query_set:
+   #             for ext in ['_h', '_h.index', '.lookup', '.source',
+    #                        '.dbtype', '_h.dbtype', '.index']:
+     #               if query + ext in query_set:
+      #                  query_set.remove(query + ext)
+       # queries = sorted(query_set)
     else:
         biotype = None
     findExecs(deps, exit = set(deps))
@@ -1141,7 +1158,7 @@ if __name__ == '__main__':
 
     args_dict = { 
         'Algorithm': args.algorithm, 'MycotoolsDB': args.mtdb, 
-        'Queries': ','.join([os.path.basename(x) for x in queries]), 
+        'Queries': ','.join(list(queries)), 
         'Output': output, 'Hits/ome': args.max_hits, 
         'Coverage threshold': args.query_thresh, 'Max E-value': evalue, 
         'Min bitscore': args.bitscore, 'Min identity': args.identity,

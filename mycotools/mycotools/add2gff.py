@@ -227,8 +227,8 @@ def main(toadd_gff, addto_gff = [], ome = None, replace = False):
 
 def prep_mtdb_update(new_gff, ome):
     from mycotools.predb2db import main as predb2db
-    from mycotools.lib.dbtools import mtdb, masterDB
-    db = mtdb(masterDB()).set_index()
+    from mycotools.lib.dbtools import mtdb, primaryDB
+    db = mtdb(primaryDB()).set_index()
     out_dir = mkOutput(format_path(os.getcwd()), 'add2gff')
     wrk_dir = out_dir + 'working/'
     if not os.path.isdir(wrk_dir):

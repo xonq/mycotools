@@ -7,7 +7,7 @@ import argparse
 import multiprocessing as mp
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, format_path, file2list, stdin2str
-from mycotools.lib.dbtools import masterDB, mtdb
+from mycotools.lib.dbtools import primaryDB, mtdb
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
 from mycotools.acc2gff import grabGffAcc
 
@@ -275,7 +275,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gff', help = 'Input GFF file')
     parser.add_argument('-f', '--faa', help = 'Input protein fasta file')
     parser.add_argument('-s', '--sep', help = 'Separator for input file.', default = '\n')
-    parser.add_argument('-d', '--mtdb', default = masterDB(), help = 'MTDB; DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = primaryDB(), help = 'MTDB; DEFAULT: master')
     parser.add_argument('--cpu', type = int, default = 1)
     args = parser.parse_args()
 
@@ -319,7 +319,7 @@ if __name__ == '__main__':
                            nt = args.nucleotide)
     else:
         db = mtdb(format_path(args.mtdb)).set_index('ome')
-        out_indices = mycotools_main(db, accs, plusminus = 10, between = args.between,
+        out_indices = mycotools_main(db, accs, plusminus = args.plusminus, between = args.between,
                                      cpus = args.cpu, nt = args.nucleotide)
 
     if args.output:
