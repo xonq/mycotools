@@ -1,7 +1,5 @@
 ![Mycotools](https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.png)
 
-![Analysis_examples](https://gitlab.com/xonq/mycotools/-/raw/master/misc/examples.png)
-
 # OVERVIEW
 Mycotools is a comparative genomics software suite centered around a curated
 database (MycotoolsDB/MTDB) of genomic data. This guide references Mycotools scripts that enable
@@ -61,7 +59,13 @@ uniform curation. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/m
 	- [Phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
 
 
+<br />
+
+![Analysis_examples](https://gitlab.com/xonq/mycotools/-/raw/master/misc/examples.png)
+
 ---
+
+
 
 <br /><br /><br />
 
@@ -525,7 +529,6 @@ gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
 ## Homolog search MycotoolsDB
 ### db2search.py
 `db2search.py` will execute `hmmer`, `blast`, `diamond`, or `mmseqs`, query an input fasta, and output a results fasta for each accession in the query.
-```
 
 <br /><br />
 
@@ -573,6 +576,12 @@ For hierarchical agglomerative clustering: `fa2clus.py` will either take a `fast
 Then, cluster sequences via hierarchical agglomerative clustering and output a
 `.clus` file of cluster assignments and `.newick` dendrogram. 
 
+Please note that sequence similarity clustering is using a heuristic, sequence
+similarity, as a proxy of relatedness. Therefore, sequence similarity
+clustering may remove closely related sequences in cases where the inputted number of
+genes is much greater than the maximum cluster constraint and/or if there are
+not highly similar sequences around the gene of interest
+
 To run `mmseqs cluster` on a faster with minimum 20% query coverage and minimum 30% AA identity
 
 ```bash
@@ -594,7 +603,7 @@ fa2clus.py -f <FASTA> -m 0.2 -x 0.3 --iterative <FOCAL_GENE> --minseq 50 --maxse
 src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
 alt="Extracted clade of CRAP pipeline" height="450" width="578">
 
-CRAP, adopted and expanded from [Slot & Rokas implementation](https://doi.org/10.1016/j.cub.2010.12.020)),
+CRAP, adopted and expanded from [Slot & Rokas implementation](https://doi.org/10.1016/j.cub.2010.12.020),
 reconstructs and visualizes gene cluster phylogenies to study gene cluster
 evolution on a gene-by-gene basis. CRAP will: 
 
