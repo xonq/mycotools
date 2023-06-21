@@ -679,7 +679,8 @@ def ref_update(
             print('\tCurating MycoCosm data', flush = True)
             jgi_premtdb = jgi_predb.fillna('').to_dict(orient='list')
             jgi_mtdb, jgi_failed1 = predb2db(jgi_premtdb, mtdb(), update_path,
-                                            forbidden = forbid_omes, cpus = cpus, 
+#                                            forbidden = forbid_omes, 
+                                            cpus = cpus, 
                                             remove = remove, spacer = '\t\t')
             jgi_failed.extend(jgi_failed1)
             jgi_mtdb.df2db(jgi_predb_path)
