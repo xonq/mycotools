@@ -19,7 +19,8 @@ uniform curation. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/m
 
 
 - **MYCOTOOLSDB TOOLS**
-	- [Initializing MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#initialization)
+	- [Initializing *de novo* MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#de-novo-initialization)
+        - [Initializing reference MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#reference-initialization)
 	- [Updating MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#updating)
 	- [Connecting to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
 	- [Managing the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#managing)
@@ -83,6 +84,7 @@ files. To learn more about MycotoolsDB and the `.mtdb` format standard, refer to
 an established MTDB, see
 [interfacing](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
 
+### De novo initialization
 #### FUNGI
 To initialize a curated database of all NCBI and MycoCosm (JGI) fungal genomes; note, 
 JGI downloading is limited to one file per minute, so initialization will take multiple days
@@ -98,6 +100,23 @@ this is in alpha-testing; additionally, there are 100,000s prokaryote genomes to
 ```bash
 mtdb update -i <INIT_DIRECTORY> -p
 ```
+
+<br />
+
+### Reference initialization
+A MycotoolsDB can be initialized referencing an external `.mtdb` file, e.g. to reproduce an analysis using another dataset. Please note this will only assimilate NCBI and JGI genomes from the reference `.mtdb`.
+
+If you are currently linked to an existing MycotoolsDB, unlink via:
+```bash
+mtdb -u
+```
+
+To initialize a MycotoolsDB from a reference, appending necessary arguments:
+```bash
+mtdb update -i <INIT_DIR> -r <REF.mtdb>
+```
+
+If successful, a new MycotoolsDB will be initialized in `<INIT_DIR>`; to link back to any previously established MycotoolsDBs see how to [interface](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing). 
 
 <br /><br />
 
@@ -129,6 +148,8 @@ To switch between established interfaces:
 mtdb -f
 mtdb -p
 ```
+
+NOTE: only one MycotoolsDB of each type will be stored. Multiple databases of the same type require reiniterfacing via `mtdb -i <PATH>`.
 
 <br /><br />
 
