@@ -32,7 +32,7 @@ class mtdb(dict):
        ]
 
     # NEED a detect index feature for adding dicts in with alternative indices
-    def __init__(self, db = None, index = None):
+    def __init__(self, db = None, index = None, add_paths = True):
         self.columns = [
             'ome', 'genus', 'species', 'strain', 'taxonomy',
             'version', 'source', 'biosample', 'assembly_acc',
@@ -58,13 +58,14 @@ class mtdb(dict):
                         == set(self.columns):
                         super().__init__(db)
         else:
-            super().__init__(mtdb.db2df(self, db))
+            super().__init__(mtdb.db2df(self, db, add_paths = add_paths))
         self.index = index
 
-   # def mtdb2pd(self):
-  #      copy_mtdb = copy.deepcopy(self)
- #       copy_mtdb = copy_mtdb.reset_index()
-#        return pd.DataFrame(copy_mtdb) # assume pd is imported
+    def mtdb2pd(self):
+        import pandas as pd
+        copy_mtdb = copy.deepcopy(self)
+        copy_mtdb = copy_mtdb.reset_index()
+        return pd.DataFrame(copy_mtdb) # assume pd is imported
 
     def pd2mtdb(df): # legacy integration
         df = df.fillna('')
@@ -80,7 +81,7 @@ class mtdb(dict):
             })
         return db
         
-    def db2df(self, db_path):
+    def db2df(self, db_path, add_paths = True):
         df = defaultdict(list)
         if os.stat(db_path).st_size == 0:
             return {x: [] for x in mtdb.columns}
@@ -104,6 +105,9 @@ class mtdb(dict):
                 df['genus'][-1] + ' ' + df['species'][-1]
             df['taxonomy'][-1]['strain'] = \
                 df['strain'][-1]
+        
+        if not add_paths:
+            return df
         try:
             for i, ome in enumerate(df['ome']): 
                 if not df['fna'][i]:
@@ -725,13 +729,14 @@ def mtdb_connect(config, dbtype,
         os.environ[var] = env
 
 def mtdb_initialize(mycodb_loc, 
-                    mtdb_config_file= format_path('~/.mycotools/config.json')):
+                    mtdb_config_file= format_path('~/.mycotools/config.json'),
+                    init = False):
     mtdb_config = read_json(mycodb_loc + 'config/mtdb.json')
     dbtype = mtdb_config['branch']
     eprint('Establishing ' + dbtype + ' connection', flush = True)
     config = {}
 
-    if not os.path.isdir(mycodb_loc + 'mycodb'):
+    if not os.path.isdir(mycodb_loc + 'mycodb') and not init:
         raise FileNotFoundError('invalid MycotoolsDB path')
     dPath = mycodb_loc + 'data/'
     config[dbtype] = {

@@ -75,7 +75,7 @@ def mycocosmTermsAndConditions(config):
 
 def gen_config(
     branch = 'fungi', forbidden = '',
-    repo = "https://gitlab.com/xonq/mycotoolsdb",
+    repo = None,
     rogue = False, nonpublished = False, jgi = False
     ):
 
@@ -92,8 +92,7 @@ def gen_config(
 
 
 def addVars(init_dir, dbtype):
-    from mycotools.mtdb import interface
-    interface(init_dir, dbtype)
+    mtdb_initialize(init_dir, dbtype, init = True)
         # don't know how this will perform on non-bash or non-profile/non-bash_profile setups
         # need to change BLAST env var, maybe just insinuate that it is in proteome
         # need to update scripts to reference mycotoolsdb envvar
@@ -126,7 +125,8 @@ def addVars(init_dir, dbtype):
 
 
 def initDB(init_dir, branch, envs, dbtype, date = None, 
-           rogue = False, nonpublished = False, jgi = True):
+           rogue = False, nonpublished = False, jgi = True,
+           repo = None):
     '''Initialize database in `init_dir`'''
 
     new_dirs = [
@@ -146,7 +146,8 @@ def initDB(init_dir, branch, envs, dbtype, date = None,
 
     config = gen_config(branch = branch, rogue = rogue, 
                         forbidden = '$MYCODB/log/forbidden.tsv',
-                        nonpublished = nonpublished, jgi = jgi)
+                        nonpublished = nonpublished, jgi = jgi,
+                        repo = repo)
     write_json(config, init_dir + 'config/mtdb.json', indent = 1)
 
     if not rogue:
@@ -171,10 +172,6 @@ def initDB(init_dir, branch, envs, dbtype, date = None,
             with open(output + 'mtdb/' + date + '.mtdb', 'w') as out:
                 out.write(''.join(['\t' for x in mtdb.columns]))
 
-    if any(x not in os.environ for x in envs):
-        addVars(init_dir, dbtype)
-    else:
-        envs = {envs[x]: os.environ[x] for x in envs}
 
     return output, config
 
@@ -191,16 +188,14 @@ def parseForbidden( forbidden_path ):
 
 
 def addForbidden(
-    tag, source, file_path = format_path('$MYCODB/log/forbidden.tsv'),
+    tag, source, file_path = None,
     flag = 'failed download'
     ):
     edit = tag + '\t' + source + '\t' + flag
     log_editor(file_path, tag, edit)
 
 
-def parseDups(
-    file_path = format_path('$MYCODB/../log/duplicates.tsv')
-    ):
+def parseDups(file_path):
 
     duplicates = {}
     if os.path.isfile(file_path):
@@ -215,20 +210,20 @@ def parseDups(
 
 
 def addDups(
-    dup_code, dup_entry, file_path = format_path('$MYCODB/../log/duplicates.tsv')
+    dup_code, dup_entry, file_path
     ):
 
     edit = dup_code + '\t' + '\t'.join(dup_entry)
     log_editor(file_path, dup_code, edit)
 
-def acq_forbid_omes(file_path = format_path('$MYCODB/../log/relics.txt')):
+def acq_forbid_omes(file_path):
     if not os.path.isfile(file_path):
         return set()
     with open(file_path, 'r') as raw:
         relics = set([x.rstrip() for x in raw])
     return relics
 
-def write_forbid_omes(omes, file_path = format_path('$MYCODB/../log/relics.txt')):
+def write_forbid_omes(omes, file_path):
     if os.path.isfile(file_path):
         with open(file_path, 'r') as raw:
             old_relics = set([x.rstrip() for x in raw])
@@ -241,7 +236,7 @@ def write_forbid_omes(omes, file_path = format_path('$MYCODB/../log/relics.txt')
         out.write('\n'.join([str(x) for x in sorted(new_relics)]))
     shutil.move(file_path + '.tmp', file_path)
 
-def parseFailed(file_path = format_path('$MYCODB/../log/failed.tsv'), rerun = False):
+def parseFailed(file_path = None, rerun = False):
     
     prev_failed = {}
     if not os.path.isfile(file_path) or rerun:
@@ -261,7 +256,7 @@ def parseFailed(file_path = format_path('$MYCODB/../log/failed.tsv'), rerun = Fa
 
     return prev_failed
 
-def parse_ncbi2jgi(file_path = format_path('$MYCODB/../log/ncbi2jgi.tsv')):
+def parse_ncbi2jgi(file_path):
     """Parse previously collected NCBI to JGI data to limit querying"""
     ncbi2jgi = {}
     if not os.path.isfile(file_path):
@@ -277,7 +272,7 @@ def parse_ncbi2jgi(file_path = format_path('$MYCODB/../log/ncbi2jgi.tsv')):
 
     return ncbi2jgi
 
-def parse_true_ncbi(file_path = format_path('$MYCODB/../log/true_ncbi.tsv')):
+def parse_true_ncbi(file_path):
     """Parse true NCBI data"""
     true_ncbi = set()
     if not os.path.isfile(file_path):
@@ -289,11 +284,11 @@ def parse_true_ncbi(file_path = format_path('$MYCODB/../log/true_ncbi.tsv')):
 
     return true_ncbi
 
-def add_true_ncbi(true_ncbi, file_path = format_path('$MYCODB/../log/true_ncbi.tsv')):
+def add_true_ncbi(true_ncbi, file_path = None):
     with open(file_path, 'w') as out:
         out.write('#ncbi_acc\n' + '\n'.join([str(x) for x in list(true_ncbi)]))
 
-def add_ncbi2jgi(jgi2ncbi, file_path = format_path('$MYCODB/../log/ncbi2jgi.tsv')):
+def add_ncbi2jgi(jgi2ncbi, file_path = None):
     with open(file_path, 'w') as out:
         out.write('#ncbi_acc\tmycocosm_portal\n')
         for jgi, ncbi in jgi2ncbi.items():
@@ -301,7 +296,7 @@ def add_ncbi2jgi(jgi2ncbi, file_path = format_path('$MYCODB/../log/ncbi2jgi.tsv'
 
 def addFailed(
     code, source, version, date,
-    file_path = format_path('$MYCODB/../log/failed.tsv')
+    file_path    
     ):
    
     version = version.replace('-','').replace(' 00:00:00','') 
@@ -419,72 +414,6 @@ def checkBiofile( row, biotype ):
                 eprint('\tERROR: ' + ome + ' invalid ' + biotype + ' headers', flush = True)
 
     return code
-
-def stdUpdate(
-    missing_db, ncbi_email, ncbi_api, update_path, 
-    db, jgi_email, jgi_pwd, date
-    ):
-# NEED to grab trash from non-failed ncbiDwnld failures
-# NEED to separate forbidden from failed
-# NEED TO CHECK IF ROGUE HERE VIA CONFIG
-    forbid_omes = acq_forbid_omes()
-    ncbi_db, jgi_db = pd.DataFrame(), pd.DataFrame()
-    if len(missing_db) > 0:
-        missing_db_ncbi = missing_db[missing_db['source'] == 'ncbi']
-        missing_db_jgi = missing_db[missing_db['source'] == 'jgi']
-        if len(missing_db_ncbi) > 0:
-            ncbi_predb, failed = ncbiDwnld( 
-                ncbi_df = missing_db_ncbi,
-                output_path = update_path
-                )
-            trash = ncbi_predb[ncbi_predb['ome'].isin(set(failed))]
-            if len(trash) > 0:
-                vaddForbidden(trash['tag'], 'ncbi')
-            sys.exit(5)
-            ncbi_db = predb2db(ncbi_predb, db, forbidden = forbid_omes,
-                               remove = True, spacer = '\t\t')
-#            ncbi_db = ncbi_db.assign(**{
- #               'tag': vmakeTag(
-  #                  ncbi_db['genus'], ncbi_db['species'],
-   #                 ncbi_db['strain'], ncbi_db['assembly_acc'],
-    #                ncbi_db['source']),
-     #           'checkFile': vcheckFiles(
-      #              ncbi_db['fna'], ncbi_db['faa'],
-       #             ncbi_db['gff3']
-        #        )})
-      #  trash = ncbi_db[ncbi_db['checkFile'] != True]
-       # if len(trash) > 0:
-        #    vaddForbidden(trash['tag'], 'ncbi')
-        ncbi_db = ncbi_db[ncbi_db['checkFile'] == True]
-        df2db( ncbi_db, update_path + date + '.ncbi.mtddb' )
-        if len(missing_db_jgi) > 0:
-            jgi_predb, failed = jgiDwnld(
-                missing_db_jgi, update_path, jgi_email, jgi_pwd
-                )
-            trash = jgi_predb[jgi_predb['assembly_acc'].isin(set(failed))]
-            if len(trash) > 0:
-                vaddForbidden(trash['tag'], 'jgi')
-            jgi_db = predb2db(jgi_predb, db, forbidden = forbid_omes,
-                              remove = True, spacer = '\t\t')
-#            jgi_db = jgi_db.assign(**{
- #               'tag': vmakeTag(
-  #                  jgi_db['genus'], jgi_db['species'],
-   #                 jgi_db['strain'],
-    #                jgi_db['assembly_acc'], jgi_db['source']),
-     #           'checkFile': vcheckFiles(
-      #              jgi_db['fna'], jgi_db['faa'],
-       #             jgi_db['gff3'])
-        #         })
-         #   trash = jgi_db[jgi_db['checkFile'] != True]
-          #  if len(trash) > 0:
-           #     vaddForbidden(trash['tag'], 'jgi')
-            #jgi_db = jgi_db[jgi_db['checkFile'] == True]
-            df2db( jgi_db, update_path + date + '.jgi.mtdb' )
-    for i in ['fna', 'faa', 'gff3', 'gff']:
-        if os.path.isdir( update_path + i ):
-            shutil.rmtree( update_path + i )
-   
-    return pd.concat([ncbi_db, jgi_db])
 
 def dwnld_mycocosm(
     out_file,
@@ -637,6 +566,26 @@ def mk_wrk_dirs(update_path):
         if not os.path.isdir(update_path + wrk_dir):
             os.mkdir(update_path + wrk_dir)
 
+
+def prepare_ref_db(ref_db, date):
+    ref_db['acquisition_date'] = [date for x in ref_db['acquisition_date']]
+    ref_db = ref_db.set_index()
+    
+    jgi = mtdb({k: v for k,v in ref_db.items() \
+                if v['source'].lower() == 'jgi'}, 
+               index = 'ome')
+    ncbi = mtdb({k: v for k,v in ref_db.items() \
+                if v['source'].lower() == 'ncbi'},
+               index = 'ome')
+    if set(ref_db.keys()).difference(set(jgi.keys()).union(set(ncbi.keys()))):
+        eprint('\tWARNING: reference entries that are not labeled "jgi/ncbi" are excluded')
+
+    return jgi.mtdb2pd(), ncbi.mtdb2pd()
+
+    
+
+
+
 def internal_redundancy_check(db):
     db = mtdb.pd2mtdb(db).set_index()
     ncbi_db = {k: v for k,v in db.items() if v['source'] == 'ncbi'}
@@ -693,6 +642,143 @@ def internal_redundancy_check(db):
     
     return db2df(db.reset_index())
 
+
+def ref_update(
+    ref_db, update_path, date, rerun, jgi_email, jgi_pwd,
+    config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
+    jgi = True, group = 'eukaryotes', kingdom = 'Fungi',
+    remove = True
+    ):
+# NEED to mark none for new databases' refdb
+    # initialize update
+    print('\nInitializing run', flush = True)
+    mk_wrk_dirs(update_path)
+#    prev_failed = parseFailed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
+#    duplicates = parseDups(format_path('$MYCODB/../log/duplicates.tsv'))
+
+#    forbid_omes = acq_forbid_omes(
+ #       file_path = format_path('$MYCODB/../log/relics.txt')
+  #      )
+
+    jgi_df, ncbi_df = prepare_ref_db(ref_db, date)
+
+
+    # run JGI
+    if jgi and len(jgi_df) > 0:
+        print('\nAssimilating MycoCosm', flush = True)
+        jgi_db_path = update_path + date + '.jgi.mtdb'
+
+        print('\tDownloading MycoCosm data', flush = True)
+        jgi_predb_path = update_path + date + '.jgi.predb2.mtdb'
+        post_jgi_df, jgi_failed = jgiDwnld(jgi_df, update_path, jgi_email, jgi_pwd)
+        jgi_predb = post_jgi_df.rename(columns = {'published(s)': 'published',
+                                                  'fna': 'assemblyPath', 'gff3': 'gffPath'})
+
+
+        if not os.path.isfile(jgi_predb_path):
+            print('\tCurating MycoCosm data', flush = True)
+            jgi_premtdb = jgi_predb.fillna('').to_dict(orient='list')
+            jgi_mtdb, jgi_failed1 = predb2db(jgi_premtdb, mtdb(), update_path,
+                                            forbidden = forbid_omes, cpus = cpus, 
+                                            remove = remove, spacer = '\t\t')
+            jgi_failed.extend(jgi_failed1)
+            jgi_mtdb.df2db(jgi_predb_path)
+            for failure in jgi_failed:
+                addFailed(failure[0], 'jgi', str(failure[1]), date,
+                          format_path('$MYCODB/../log/failed.tsv'))
+
+        else:
+            jgi_mtdb = mtdb(jgi_predb_path)
+
+        try:
+            jgi_db = db2df(jgi_predb_path)
+        except pd.errors.EmptyDataError: # empty JGI predb
+            jgi_db = pd.DataFrame({x: [] for x in refdbjgi.keys()})
+    
+        new_db_path = update_path + date + '.checkpoint.jgi.mtdb'
+        if not os.path.isfile(new_db_path): 
+            if len(jgi_db) > 0:
+                df2db( jgi_db, jgi_db_path )
+                if not db is None:
+                    new_db = pd.concat([jgi_db, db])
+                else:
+                    new_db = jgi_db
+            else:
+                new_db = db
+            df2db(new_db, new_db_path)
+        else:
+            new_db = db2df(new_db_path)
+    else:
+        jgi_mtdb = None
+        new_db = db
+        new_dups = duplicates
+
+    print('\nAssimilating NCBI', flush = True)
+    if not os.path.isfile(update_path + date + '.ncbi.predb'):
+        print('\tDownloading NCBI data', flush = True)
+        ncbi_predb, ncbi_failed1 = ncbi_dwnld(
+            assembly = True, proteome = True, gff3 = True,
+            ncbi_df = ncbi_df, remove = True, output_path = update_path,
+            column = 'assembly_acc', ncbi_column = 'genome', check_MD5 = check_MD5
+            )
+    
+        for failure in ncbi_failed1:
+            addFailed(failure[0], 'ncbi', str(failure[1]), date,
+                      format_path('$MYCODB/../log/failed.tsv'))
+
+        for dup in new_dups:
+            addDups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
+        ncbi_predb.to_csv(update_path + date + '.ncbi.predb',
+                          sep = '\t', index = None)
+    else:
+        refdbncbi = mtdb(update_path + date + '.ncbi.ref.mtdb')
+        ncbi_predb = pd.read_csv(update_path + date + '.ncbi.predb',
+                                 sep = '\t')
+
+    print('\tCurating NCBI data', flush = True)
+    ncbi_predb['species'] = ncbi_predb['species'].fillna('')
+    ncbi_premtdb = ncbi_predb.to_dict(orient='list')
+    ncbi_mtdb, ncbi_failed2 = predb2db(ncbi_premtdb, refdbncbi, update_path,
+                                       forbidden = forbid_omes, cpus = cpus,
+                                       remove = remove, spacer = '\t\t')
+    for failure in ncbi_failed2:
+        addFailed(failure[0], 'ncbi', str(failure[1]), date,
+                  format_path('$MYCODB/../log/failed.tsv'))
+    ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
+    try:
+        ncbi_db = db2df(update_path + date + '.ncbi.predb2.mtdb')
+    except pd.errors.EmptyDataError:
+        ncbi_db = pd.DataFrame({x: [] for x in refdbncbi.keys()})
+    if len(ncbi_db) > 0:
+        df2db(ncbi_db, ncbi_db_path)
+        new_db = pd.concat([new_db, ncbi_db])
+
+    print('\nAssimilating NCBI taxonomy data', flush = True)
+    if kingdom.lower() == 'fungi':
+        rank = 'kingdom'
+    else:
+        rank = 'superkingdom'
+    tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
+                                king=kingdom, rank = rank)
+    new_db = assimilate_tax(new_db, tax_dicts) 
+    dupFiles = { 'fna': {}, 'faa': {}, 'gff3': {} }
+
+    if jgi_mtdb and ncbi_mtdb:
+        update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
+                            index = 'ome')
+    elif ncbi_mtdb:
+        update_mtdb = ncbi_mtdb
+    elif jgi_mtdb:
+        update_mtdb = jgi_mtdb
+    else:
+        eprint('\nNo updates', flush = True)
+        sys.exit(0)
+
+    return new_db, update_mtdb 
+
+
+
+
 def rogue_update(
     db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
@@ -703,8 +789,8 @@ def rogue_update(
     # initialize update
     print('\nInitializing run', flush = True)
     mk_wrk_dirs(update_path)
-    prev_failed = parseFailed(rerun = rerun)
-    duplicates = parseDups()
+    prev_failed = parseFailed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
+    duplicates = parseDups(format_path('$MYCODB/../log/duplicates.tsv'))
     forbid_omes = acq_forbid_omes(
         file_path = format_path('$MYCODB/../log/relics.txt')
         )
@@ -738,14 +824,14 @@ def rogue_update(
         # acquire the mycocosm master table
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
-        ncbi2jgi = parse_ncbi2jgi()
-        true_ncbi = parse_true_ncbi()
+        ncbi2jgi = parse_ncbi2jgi(format_path('$MYCODB/../log/ncbi2jgi.tsv'))
+        true_ncbi = parse_true_ncbi(format_path('$MYCODB/../log/true_ncbi.tsv'))
         ncbi_df, jgi2ncbi, jgi2biosample, true_ncbi, ncbi_jgi_overlap = \
             rm_ncbi_overlap(ncbi_df, jgi_df, ncbi2jgi, true_ncbi, api = api)
         print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
              flush = True)
-        add_true_ncbi(true_ncbi)
-        add_ncbi2jgi(jgi2ncbi)
+        add_true_ncbi(true_ncbi, format_path('$MYCODB/../log/true_ncbi.tsv'))
+        add_ncbi2jgi(jgi2ncbi, format_path('$MYCODB/../log/ncbi2jgi.tsv'))
         for i, row in jgi_df.iterrows():
             if row['portal'].lower() in jgi2ncbi:
                 jgi_df.at[i, 'biosample'] = jgi2biosample[
@@ -779,7 +865,8 @@ def rogue_update(
             jgi_failed.extend(jgi_failed1)
             jgi_mtdb.df2db(jgi_predb_path)
             for failure in jgi_failed:
-                addFailed(failure[0], 'jgi', str(failure[1]), date)
+                addFailed(failure[0], 'jgi', str(failure[1]), date,
+                          format_path('$MYCODB/../log/failed.tsv'))
         else:
             jgi_mtdb =  mtdb(jgi_predb_path)
 
@@ -817,9 +904,10 @@ def rogue_update(
             )
     
         for failure in ncbi_failed1:
-            addFailed(failure[0], 'ncbi', str(failure[1]), date)
+            addFailed(failure[0], 'ncbi', str(failure[1]), date,
+                      format_path('$MYCODB/../log/failed.tsv'))
         for dup in new_dups:
-            addDups(dup, new_dups[dup])
+            addDups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
         refdbncbi = mtdb.pd2mtdb(new_db)
         refdbncbi.df2db(update_path + date + '.ncbi.ref.mtdb')
         ncbi_predb.to_csv(update_path + date + '.ncbi.predb',
@@ -836,7 +924,8 @@ def rogue_update(
                                        forbidden = forbid_omes, cpus = cpus,
                                        remove = remove, spacer = '\t\t')
     for failure in ncbi_failed2:
-        addFailed(failure[0], 'ncbi', str(failure[1]), date)
+        addFailed(failure[0], 'ncbi', str(failure[1]), date,
+                  format_path('$MYCODB/../log/failed.tsv'))
     ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
     try:
         ncbi_db = db2df(update_path + date + '.ncbi.predb2.mtdb')
@@ -977,8 +1066,10 @@ def main():
     init_args.add_argument('-u', '--update', action = 'store_true')
     init_args.add_argument('-i', '--init', help = 'Initialize MTDB in dir')
     init_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
+    init_args.add_argument('-r', '--reference', 
+        help = '[-i] Initialize primary MTDB using a reference .mtdb')
     init_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
-    init_args.add_argument('--reinit', action = 'store_true', help = 'Redownload all web data')
+#    init_args.add_argument('--reinit', action = 'store_true', help = 'Redownload all web data')
 #    parser.add_argument('--rogue', action = 'store_true', 
  #       help = 'De novo MTDB') # currently required
 
@@ -1003,25 +1094,44 @@ def main():
 
     if not args.init \
         and not args.update \
+        and not args.reference \
         and not args.add:
-        eprint('\nERROR: --update/--init/--add must be specified', flush = True)
+        eprint('\nERROR: --update/--init/--reference/--add must be specified', flush = True)
         sys.exit(15)
+    elif args.reference and not args.init:
+        eprint('\nERROR: --reference requires a --init directory', flush = True)
+        sys.exit(14)
+    elif args.reference:
+        if args.add:
+            eprint('\nERROR: --add and --reference are incompatible')
+            sys.exit(13)
+        else:
+            ref_db = mtdb(format_path(args.reference), add_paths = False)
 
 #    if args.rogue:
     rogue_bool = True
-    
-    config = defaultdict(None)
-    if 'MYCODB' in os.environ and not args.init: # is MYCODB initialized?
-        config_path = format_path('$MYCODB/../config/mtdb.json')
-        if os.path.isfile(config_path):
-            config = read_json(format_path(config_path))
-#            rogue_bool = config['rogue']
-            args.nonpublished = config['nonpublished']
-            if not config['jgi'] and args.ncbi_only and not args.overwrite:
-                eprint('\nERROR: --ncbi_only discrepant with MTDB config; requires --overwrite',
-                       flush = True)
-                sys.exit(173)
+    if args.ncbi_only:
+        jgi = False
+    else:
+        jgi = True
 
+    
+    config = {'branch': None, 'nonpublished': None}
+    if 'MYCODB' in os.environ:
+        if not args.init: # is MYCODB initialized?
+            config_path = format_path('$MYCODB/../config/mtdb.json')
+            if os.path.isfile(config_path):
+                config = read_json(format_path(config_path))
+    #            rogue_bool = config['rogue']
+                args.nonpublished = config['nonpublished']
+                if not config['jgi'] and args.ncbi_only and not args.overwrite:
+                    eprint('\nERROR: --ncbi_only discrepant with MTDB config; requires --overwrite',
+                           flush = True)
+                    sys.exit(173)
+        elif args.init:
+            eprint('\nERROR: MTDB initialized and linked. Unlink via `mtdb -u`')
+            sys.exit(175)
+    
     if args.prokaryote or config['branch'] == 'prokaryote':
         nonpublished = True
     elif args.nonpublished and rogue_bool: 
@@ -1099,7 +1209,7 @@ def main():
         output, config = initDB( 
             init_dir, dbtype, envs, dbtype, date = date, 
             rogue = rogue_bool, nonpublished = nonpublished,
-            jgi = jgi
+            jgi = jgi, repo = format_path(args.reference)
             )
         for env in envs:
             os.environ[ env ] = envs[ env ]
@@ -1107,7 +1217,7 @@ def main():
         update_path = output + 'log/' + date + '/'
         if not os.path.isdir( update_path ):
             os.mkdir( update_path )
-        mtdb_initialize(init_dir, init_dir + 'config/mtdb.json')
+        mtdb_initialize(init_dir, init_dir + 'config/mtdb.json', init = True)
     else:
         output = format_path('$MYCODB/..')
         update_path = output + 'log/' + date + '/'
@@ -1126,16 +1236,6 @@ def main():
             orig_db = db2df(primaryDB())
 
     orig_db = orig_db.dropna(subset = ['ome'])
-#    forbid = parseForbidden('$MYCODB/log/forbidden.tsv')
- #   vmakeTag, vcheckFiles, vaddForbidden = \
-  #      np.vectorize(makeTag), np.vectorize(checkFiles), np.vectorize(addForbidden)
-   # if len(orig_db) > 0:
-    #    orig_db = orig_db.assign(**{'tag': vmakeTag(
-     #       orig_db['genus'], orig_db['species'], 
-      #      orig_db['strain'], orig_db['assembly_acc'],
-       #     orig_db['source']
-        #    )})
-#        orig_db = orig_db[~orig_db['tag'].isin(forbid)]
 
     if config['branch'] == 'prokaryote':
         jgi = False
@@ -1154,18 +1254,27 @@ def main():
     #        orig_db, jgi_email, jgi_pwd, date
      #       ) # NEED massive overhaul and git generation
 #    else:
-    new_db, update_mtdb = rogue_update(
-        orig_db, update_path, date, args.failed, jgi_email, jgi_pwd,
-        config, ncbi_email, ncbi_api, cpus = args.cpu, 
-        check_MD5 = not bool(args.no_md5), jgi = jgi, group = group,
-        kingdom = king, remove = not args.save
-        )
+
+    if not args.reference:
+        new_db, update_mtdb = rogue_update(
+            orig_db, update_path, date, args.failed, jgi_email, jgi_pwd,
+            config, ncbi_email, ncbi_api, cpus = args.cpu, 
+            check_MD5 = not bool(args.no_md5), jgi = jgi, group = group,
+            kingdom = king, remove = not args.save
+            )
+    else:
+        new_db, update_mtdb = ref_update(
+            ref_db, update_path, date, args.failed, jgi_email, jgi_pwd,
+            config, ncbi_email, ncbi_api, cpus = args.cpu, check_MD5 = not bool(args.no_md5),
+            jgi = jgi, group = group, kingdom = king,
+            remove = not args.save
+            )
     if not update_mtdb:
         eprint('\nNo new data acquired', flush = True)
 
     if not args.save: # add the predb2db and remove files
 #        df2db(db, format_path('$MYCODB/' + date + '.mtdb'))
-        write_forbid_omes(set(new_db['ome']))
+        write_forbid_omes(set(new_db['ome']), format_path('$MYCODB/../log/relics.txt'))
         # output new database and new list of omes
 
         eprint('\nMoving data into database', flush = True)
@@ -1194,7 +1303,7 @@ def main():
     else:
         # NEED to: insert note aboutrunning updatedb on predb
         df2db(db, format_path(update_path + date + '.mtdb'))
-        write_forbid_omes(set(db['ome']))
+        write_forbid_omes(set(db['ome']), format_path('$MYCODB/../log/relics.txt'))
         # output new database and new list of omes
 
 
