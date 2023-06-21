@@ -37,7 +37,7 @@ if __name__ == '__main__':
         + '\n[m]anage\t\tMTDB management utility' \
         + '\n\nmtdb <OME>[.gff3|.fna|.faa]: [PATH] print ome/ome code path' \
         + '\n\nmtdb <ARG>:' \
-        + '\n[-i DBPATH]\t[--init]       \tInitialize MTDB connection' \
+        + '\n[-i DBPATH]\t[--interface]       \tInitialize MTDB connection' \
         + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
         + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
         + '\n[-u]\t\t[--unlink]\tUnlink from MTDB' \
@@ -64,11 +64,11 @@ if __name__ == '__main__':
         print('\n' + description + '\n', flush = True)
         sys.exit(0)
        
-    if {'-i', '--init'}.intersection(set_argv):
+    if {'-i', '--interface'}.intersection(set_argv):
         if '-i' in set_argv:
             coord = '-i'
         else:
-            coord = '--init'
+            coord = '--interface'
         try:
             mycodb_loc_prep = sys.argv[sys.argv.index(coord) + 1]
             if isinstance(mycodb_loc_prep, str):
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                     elif not os.path.isdir(mycodb_loc + 'mycodb'):
                         raise FileNotFoundError('invalid MTDB path')
         except IndexError:
-            raise ValueError('--init requires a path')
+            raise ValueError('--interface requires a path')
         mtdb_initialize(mycodb_loc)
     elif {'-d', '--dependencies'}.intersection(set_argv):
         pip_deps = ['dna_features_viewer']
