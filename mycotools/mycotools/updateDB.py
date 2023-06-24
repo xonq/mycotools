@@ -1218,7 +1218,7 @@ def main():
         update_path = output + 'log/' + date + '/'
         if not os.path.isdir( update_path ):
             os.mkdir( update_path )
-        mtdb_initialize(init_dir, init_dir + 'config/mtdb.json', init = True)
+        mtdb_initialize(init_dir, init = True) #init_dir + 'config/mtdb.json', init = True)
     else:
         output = format_path('$MYCODB/..')
         update_path = output + 'log/' + date + '/'
@@ -1264,6 +1264,9 @@ def main():
             kingdom = king, remove = not args.save
             )
     else:
+        if any(not x for x in ref_db['published']) and not args.nonpublished:
+            eprint('\nWARNING: nonpublished data detected in reference and will be ignored', 
+                   flush = True)
         new_db, update_mtdb = ref_update(
             ref_db, update_path, date, args.failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = args.cpu, check_MD5 = not bool(args.no_md5),
@@ -1298,9 +1301,9 @@ def main():
     
         eprint('\nGathering annotation statistics', flush = True)
         annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'), 1)
-        genSearchDB(
-            update_path, set(full_mtdb['ome'])
-            )
+#        genSearchDB(
+ #           update_path, set(full_mtdb['ome'])
+  #          )
     else:
         # NEED to: insert note aboutrunning updatedb on predb
         df2db(db, format_path(update_path + date + '.mtdb'))
