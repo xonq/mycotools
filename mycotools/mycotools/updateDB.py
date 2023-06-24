@@ -751,7 +751,7 @@ def ref_update(
     except pd.errors.EmptyDataError:
         ncbi_db = pd.DataFrame({x: [] for x in refdbncbi.keys()})
     if len(ncbi_db) > 0:
-        df2db(ncbi_db, ncbi_db_path)
+#        df2db(ncbi_db, ncbi_db_path)
         new_db = pd.concat([new_db, ncbi_db])
 
     print('\nAssimilating NCBI taxonomy data', flush = True)
