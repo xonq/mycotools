@@ -79,7 +79,7 @@ if __name__ == '__main__':
                     mycodb_loc = format_path(mycodb_loc_prep)
                     if not os.path.isdir(mycodb_loc):
                         raise FileNotFoundError('invalid MTDB path')
-                    elif not os.path.isdir(mycodb_loc + 'mycodb'):
+                    elif not os.path.isdir(mycodb_loc + 'mtdb'):
                         raise FileNotFoundError('invalid MTDB path')
         except IndexError:
             raise ValueError('--interface requires a path')

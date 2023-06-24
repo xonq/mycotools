@@ -452,10 +452,6 @@ def db2df(data, stdin = False):
            db_df.at[i, 'faa'] = format_path(row['faa'])
            db_df.at[i, 'gff3'] = format_path(row['gff3'])
 
-    if len(db_df) == 16: # LEGACY conversion to be deprecated
-        del db_df['ecology']
-        del db_df['eco_conf']
-
     return db_df
 
 def df2std( df ):
@@ -743,7 +739,7 @@ def mtdb_initialize(mycodb_loc,
         raise FileNotFoundError('invalid MycotoolsDB path')
     dPath = mycodb_loc + 'data/'
     config[dbtype] = {
-        'MYCODB': mycodb_loc + 'mycodb/',
+        'MYCODB': mycodb_loc + 'mtdb/',
         'MYCOFNA': dPath + 'fna/',
         'MYCOFAA': dPath + 'faa/',
         'MYCOGFF3': dPath + 'gff3/'
