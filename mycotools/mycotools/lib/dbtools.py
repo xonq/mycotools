@@ -581,6 +581,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
     else:
         df['taxonomy'] = df['taxonomy'].fillna({})
         tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
+            
 
     count = 0
 
@@ -685,7 +686,10 @@ def read_tax(taxonomy_string):
     if taxonomy_string: 
         if isinstance(taxonomy_string, str):
             dict_string = taxonomy_string.replace("'",'"')
-            tax_dict = json.loads(dict_string)
+            try:
+                tax_dict = json.loads(dict_string)
+            except TypeError:
+                tax_dict = {}
         else:
             tax_dict = taxonomy_string
         tax_dict = {**tax_dict, **{x: '' for x in tax_strs if x not in tax_dict}}
