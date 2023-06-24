@@ -667,21 +667,23 @@ def ref_update(
     if jgi and len(jgi_df) > 0:
         print('\nAssimilating MycoCosm', flush = True)
         jgi_db_path = update_path + date + '.jgi.mtdb'
-
-        print('\tDownloading MycoCosm data', flush = True)
         jgi_predb_path = update_path + date + '.jgi.predb2.mtdb'
-        post_jgi_df, jgi_failed = jgiDwnld(jgi_df, update_path, jgi_email, jgi_pwd)
-        jgi_predb = post_jgi_df.rename(columns = {'published(s)': 'published',
-                                                  'fna': 'assemblyPath', 'gff3': 'gffPath'})
-
 
         if not os.path.isfile(jgi_predb_path):
+            print('\tDownloading MycoCosm data', flush = True)
+            post_jgi_df, jgi_failed = jgiDwnld(jgi_df, update_path, jgi_email, jgi_pwd)
+            jgi_predb = post_jgi_df.rename(columns = {'published(s)': 'published',
+                                                      'fna_path': 'assemblyPath', 
+                                                      'gff3_path': 'gffPath'})
+
+
             print('\tCurating MycoCosm data', flush = True)
             jgi_premtdb = jgi_predb.fillna('').to_dict(orient='list')
             jgi_mtdb, jgi_failed1 = predb2db(jgi_premtdb, mtdb(), update_path,
 #                                            forbidden = forbid_omes, 
                                             cpus = cpus, 
                                             remove = remove, spacer = '\t\t')
+            jgi_failed = list(jgi_failed)
             jgi_failed.extend(jgi_failed1)
             jgi_mtdb.df2db(jgi_predb_path)
             for failure in jgi_failed:
@@ -691,56 +693,54 @@ def ref_update(
         else:
             jgi_mtdb = mtdb(jgi_predb_path)
 
-        try:
-            jgi_db = db2df(jgi_predb_path)
-        except pd.errors.EmptyDataError: # empty JGI predb
-            jgi_db = pd.DataFrame({x: [] for x in refdbjgi.keys()})
     
-        new_db_path = update_path + date + '.checkpoint.jgi.mtdb'
-        if not os.path.isfile(new_db_path): 
-            if len(jgi_db) > 0:
-                df2db( jgi_db, jgi_db_path )
-                if not db is None:
-                    new_db = pd.concat([jgi_db, db])
-                else:
-                    new_db = jgi_db
-            else:
-                new_db = db
-            df2db(new_db, new_db_path)
-        else:
-            new_db = db2df(new_db_path)
+#        new_db_path = update_path + date + '.checkpoint.jgi.mtdb'
+ #       if not os.path.isfile(new_db_path): 
+  #          if len(jgi_db) > 0:
+   #             df2db( jgi_db, jgi_db_path )
+#                if not db is None:
+ #                   new_db = pd.concat([jgi_db, db])
+  #              else:
+   #                 new_db = jgi_db
+#            else:
+ #               new_db = db
+  #          df2db(new_db, new_db_path)
+   #     else:
+    #        new_db = db2df(new_db_path)
     else:
-        jgi_mtdb = None
-        new_db = db
-        new_dups = duplicates
+        jgi_mtdb = mtdb()
+#        new_dups = duplicates
+    new_db = jgi_mtdb.mtdb2pd()
 
     print('\nAssimilating NCBI', flush = True)
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
-        ncbi_predb, ncbi_failed1 = ncbi_dwnld(
-            assembly = True, proteome = True, gff3 = True,
+        ncbi_predb, ncbi_failed1 = ncbiDwnld(
+            assembly = True, proteome = False, gff3 = True,
             ncbi_df = ncbi_df, remove = True, output_path = update_path,
             column = 'assembly_acc', ncbi_column = 'genome', check_MD5 = check_MD5
             )
-    
+
         for failure in ncbi_failed1:
             addFailed(failure[0], 'ncbi', str(failure[1]), date,
                       format_path('$MYCODB/../log/failed.tsv'))
 
-        for dup in new_dups:
-            addDups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
+#        for dup in new_dups:
+ #           addDups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
         ncbi_predb.to_csv(update_path + date + '.ncbi.predb',
                           sep = '\t', index = None)
     else:
-        refdbncbi = mtdb(update_path + date + '.ncbi.ref.mtdb')
+#        refdbncbi = mtdb(update_path + date + '.ncbi.ref.mtdb')
         ncbi_predb = pd.read_csv(update_path + date + '.ncbi.predb',
                                  sep = '\t')
 
     print('\tCurating NCBI data', flush = True)
-    ncbi_predb['species'] = ncbi_predb['species'].fillna('')
+    for key in ncbi_predb.columns:
+        ncbi_predb[key] = ncbi_predb[key].fillna('')
     ncbi_premtdb = ncbi_predb.to_dict(orient='list')
-    ncbi_mtdb, ncbi_failed2 = predb2db(ncbi_premtdb, refdbncbi, update_path,
-                                       forbidden = forbid_omes, cpus = cpus,
+    ncbi_mtdb, ncbi_failed2 = predb2db(ncbi_premtdb, mtdb(), update_path,
+#                                       forbidden = forbid_omes, 
+                                       cpus = cpus,
                                        remove = remove, spacer = '\t\t')
     for failure in ncbi_failed2:
         addFailed(failure[0], 'ncbi', str(failure[1]), date,
@@ -1204,9 +1204,9 @@ def main():
             'MYCOFNA': init_dir + 'data/fna', 
             'MYCOFAA': init_dir + 'data/faa', 
             'MYCOGFF3': init_dir + 'data/gff3', 
-            'MYCODB': init_dir + 'mtdb'
+            'MYCODB': init_dir + 'mtdb/'
             }
-        os.environ['MYCODB'] = init_dir + 'mtdb'
+        os.environ['MYCODB'] = init_dir + 'mtdb/'
         output, config = initDB( 
             init_dir, dbtype, envs, dbtype, date = date, 
             rogue = rogue_bool, nonpublished = nonpublished,
