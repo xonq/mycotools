@@ -311,10 +311,16 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
     if file_type == 'gff':
         file_type += '3'
 
+    ran_dwnld = False
+
     filename, url, dwnld_md5 = parse_xml(file_type, xml_file, masked = masked)
+    if not dwnld_md5:
+        dwnld_md5 = None
+
+
     if url:
         f_urls = {url}
-        md5 = None
+        md5 = False 
         attempt = 0
         curl_cmd = 420
 
@@ -347,7 +353,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                                                                        masked, url, f_urls, spacer)
                         break
                     except FileNotFoundError:
-                        md5 = None
+                        md5 = False
                         break
                     except UnicodeDecodeError:
                         if not dwnld_md5:
@@ -366,6 +372,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                     dwnld], 
                     stdout = subprocess.PIPE, stderr = subprocess.PIPE 
                     )
+            ran_dwnld = True
 
             if curl_cmd == 0:
                 check = dwnld
@@ -476,7 +483,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
 #    else:
  #       print('\t\tfailed', flush = True)
 
-    return check, preexisting, file_type 
+    return check, preexisting, file_type, ran_dwnld
 
 
 
@@ -536,10 +543,10 @@ def main(
         if not os.path.isdir(output + '/' + typ):
             os.mkdir(output + '/' + typ)
 
-    preexisting = True
+    preexisting, ran_dwnld = True, False
     for i, row in df.iterrows():
         ome = row[ome_col]
-        if not preexisting:
+        if ran_dwnld:
             time.sleep(60)
         if ome not in ome_set:
             jgi_login( user, pwd )
@@ -548,12 +555,12 @@ def main(
             else:
                 eprint(spacer + ome , flush = True)     
             for typ in dwnlds:
-                check, preexisting, new_typ = jgi_dwnld(
+                check, preexisting, new_typ, ran_dwnld = jgi_dwnld(
                     ome, typ, output, masked = masked, spacer = spacer
                 )
                 if type(check) != int:
                     df.at[i, new_typ + '_path'] = output + '/' + new_typ + \
-                        '/' + check
+                        '/' + os.path.basename(check)
                     check = os.path.basename( os.path.abspath( check ) )
                 elif type(check) == int:
                     ome_set.add(row[ome_col])
