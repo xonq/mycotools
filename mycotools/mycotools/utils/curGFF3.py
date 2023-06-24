@@ -255,11 +255,20 @@ def addMissing(gff_list, intron, comps, ome):
     out_list = []
     for geneID, geneInfo in out_genes.items():
         multiRNA = False
-        if not geneInfo['rna'] and not geneInfo['tmrna'] and geneInfo['cds']:
+        if not any(x['type'] in {'RNA', 'mRNA'} for x in geneInfo['rna']) \
+            and not geneInfo['tmrna'] and geneInfo['cds']:
             # assume there is an mrna involved - I don't like having to do this
             # but I don't like having to do most all of this because  the files
             # are so inconsistently formatted
-            geneInfo['mrna']
+            geneInfo['tmrna'] = copy.deepcopy(geneInfo['gene'])
+            id_ = re.search(gff3Comps()['id'], geneInfo['tmrna'][0]['attributes'])[1]
+            new_id = 'mrna' + id_[4:]
+            geneInfo['tmrna'][0]['attributes'] = f'ID={new_id};Parent={geneID};gbkey=mRNA'
+            geneInfo['tmrna'][0]['type'] = 'mRNA'
+            for cds in geneInfo['cds']:
+                cds['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + new_id, cds['attributes'])
+
+            
         if geneInfo['rna']:
 #            if geneInfo['rna'][0]['type'] != 'mRNA' and not geneInfo['cds']:
  #               del geneInfo['tmrna']
