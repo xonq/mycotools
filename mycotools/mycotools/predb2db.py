@@ -168,7 +168,7 @@ def predb2mtdb(predb):
     for i, code in enumerate(predb['genus']):
         toAdd = {
             'assembly_acc': predb['assembly_acc'][i],
-            'ome': sub_disallowed(predb['previous_ome'][i]),
+            'ome': predb['previous_ome'][i].lower(),
             'genus': sub_disallowed(predb['genus'][i]),
             'species': sub_disallowed(predb['species'][i]),
             'strain': re.sub(r'[^a-zA-Z0-9]', '', predb['strain'][i]),
