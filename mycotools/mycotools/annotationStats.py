@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# NEED to add info on pseudogenes, tRNAs, account for those in output, base proteins off CDS
+
 import os
 import re
 import sys
