@@ -759,6 +759,7 @@ def ref_update(
         rank = 'kingdom'
     else:
         rank = 'superkingdom'
+
     tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
     new_db = assimilate_tax(new_db, tax_dicts) 
