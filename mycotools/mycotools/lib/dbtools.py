@@ -340,8 +340,11 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit` 
 def log_editor( log, ome, edit ):
 
-    with open( log, 'r' ) as raw:
-        data = raw.read()
+    try:
+        with open( log, 'r' ) as raw:
+            data = raw.read()
+    except FileNotFoundError:
+        data = ''
 
     if re.search( ome + r'\s', data ):
         new_data = re.sub( ome + r'\s.*', edit, data )
@@ -736,7 +739,7 @@ def mtdb_initialize(mycodb_loc,
     eprint('Establishing ' + dbtype + ' connection', flush = True)
     config = {}
 
-    if not os.path.isdir(mycodb_loc + 'mycodb') and not init:
+    if not os.path.isdir(mycodb_loc + 'mtdb') and not init:
         raise FileNotFoundError('invalid MycotoolsDB path')
     dPath = mycodb_loc + 'data/'
     config[dbtype] = {
