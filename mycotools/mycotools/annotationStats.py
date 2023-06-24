@@ -97,6 +97,25 @@ def compile_alia(gff_path, output, ome = None):
                 flush = True)
             med_pseudogenes = pseudogene_lens[round(pseu_len/2) - 1]
             print('{:<25}'.format('MEDIAN PSEUDOGENE LENGTH:') + str(med_pseudogenes), flush = True)
+    else:
+        mean_genes = sum(gene_lens)/gene_len
+        if prot_lens:
+            mean_prots = sum(prot_lens)/prot_len
+            med_prots = prot_lens[round(prot_len/2) - 1]
+        if mrna_lens:
+            mean_mrnas = sum(mrna_lens)/mrna_len
+            med_mrnas = mrna_lens[round(mrna_len/2) - 1]
+        if trna_lens:
+            mean_trnas = sum(trna_lens)/trna_len
+            med_trnas = trna_lens[round(trna_len/2) - 1]
+        if orna_lens:
+            mean_ornas = sum(orna_lens)/len(orna_len)
+            med_ornas = orna_lens[round(orna_len/2) - 1]
+        if pseudogene_lens:
+            mean_pseudogenes = sum(pseudogene_lens)/pseu_len
+            med_pseudogenes = pseudogene_lens[round(pseu_len/2) - 1]
+
+
 
 
 
