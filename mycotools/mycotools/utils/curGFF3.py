@@ -322,6 +322,7 @@ def addMissing(gff_list, intron, comps, ome):
 
                     parent = re.search(comps['id'], geneInfo['gene'][0]['attributes'])[1]
                     new_id = 'mrna-' + parent[4:] + '-T' + str(prot2i[prot])
+                    new_id = new_id.replace('--','-')
                     geneInfo['tmrna'][-1]['attributes'] = re.sub(comps['id'], 'ID=' + new_id + ';' \
                                                             + 'Parent=' + parent,
                                                  geneInfo['tmrna'][-1]['attributes'])
@@ -336,6 +337,7 @@ def addMissing(gff_list, intron, comps, ome):
                     new_id = 'exon' + id_[3:]
                     exon['attributes'] = f'ID={new_id};Parent={par};Alias={ali}'
                     exon['type'] = 'exon'
+
                        
         if geneInfo['exon']:
             del geneInfo['texon']
