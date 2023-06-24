@@ -42,7 +42,10 @@ def addMissing(gff_list, intron, comps, ome):
     # explicit RNA type references
     for entry in gff_list:
         if entry['type'].lower() not in accepted_types:
-            continue
+            if 'RNA' in entry['type']: # converts snRNAs
+                entry['type'] = 'RNA'
+            else:
+                continue
         entry['attributes'] = \
             entry['attributes'].replace('proteinId', 'protein_id')
         entry['attributes'] = \
@@ -132,7 +135,7 @@ def addMissing(gff_list, intron, comps, ome):
         elif 'RNA' in entry['type'] or entry['type'] == 'transcript':
             entry['type'] = entry['type'].replace('transcript','RNA')
             if id_.startswith('rna'): # make RNA ID explicit
-                new_id = entry['type'].lower() + '-' + id_[3:]
+                new_id = entry['type'].lower() + id_[3:]
                 entry['attributes'] = re.sub(comps['id'], 'ID=' + new_id,
                                              entry['attributes'])
                 rna_changes[id_] = new_id
@@ -147,8 +150,7 @@ def addMissing(gff_list, intron, comps, ome):
                     if id_.startswith('trna'):
                         geneID = 'gene-' + id_
                     else:
-                        print(entry)
-                        raise RNAError('RNA ID annotated as gene')
+                        raise RNAError(f'RNA ID annotated as gene: {entry}')
                 addEntry['attributes'] = re.sub(r'ID=' + id_, 'ID=' + geneID, addEntry['attributes'])
                 #addEntry['attributes'].replace('ID=rna-', 'ID=gene-')
                 addEntry['attributes'] = addEntry['attributes'].replace(entry['type'], 'gene')
@@ -161,7 +163,7 @@ def addMissing(gff_list, intron, comps, ome):
                                              entry['attributes'])
                 out_genes[geneID] = {
                     'gene': [addEntry], 'tmrna': [], 'rna': [], 'cds': [], 
-                    'exon': [], 'texon': [], 'etc': [] 
+                    'exon': [], 'texon': [], 'etc': [], 'pseudo': False 
                     }
 #                out_genes[geneID]['gene'].append(addEntry)
                 entry['attributes'] += ';Parent=' + geneID
@@ -262,6 +264,65 @@ def addMissing(gff_list, intron, comps, ome):
                 del geneInfo['tmrna']
         elif geneInfo['tmrna'] and not geneInfo['cds']:
             del geneInfo['tmrna']
+        elif geneInfo['tmrna']:
+            # check for difficult-to-detect alternate splicing
+            prots = []
+            for cds in geneInfo['cds']:
+                search = re.search(comps['prot'], cds['attributes'])
+                if search:
+                    prot = search.groups()[0] # try the first search
+                    if not prot:
+                        prot = search.groups()[1] # try the second
+                    prots.append(prot)
+            prots = set(prots)
+            if len(prots) > 1: # alternate splicing detected
+                prot_coords, prot_dir, prot2ali, prot2i = {}, {}, {}, {}
+                count = 0
+                for cds in geneInfo['cds']:
+                    search = re.search(comps['prot'], cds['attributes'])
+                    if search:
+                        prot = search.groups()[0] # try the first search
+                        if not prot:
+                            prot = search.groups()[1] # try the second
+                        alias = re.search(comps['Alias'], cds['attributes'])[1]
+                        prot_dir[prot] = cds['strand']
+                        prot2ali[prot] = alias
+                        if prot not in prot_coords:
+                            prot_coords[prot] = []
+                            prot2i[prot] = count
+                            count += 1
+                        parent = re.search(comps['par'], cds['attributes'])[1].replace('gene-', 'mrna=') + \
+                                 '-T' + str(prot2i[prot])
+                        cds['attributes'] = re.sub(comps['par'], 'Parent=' + parent, cds['attributes'])
+                        prot_coords[prot].extend([cds['start'], cds['end']])
+
+                # reinitialize the trmnas
+                geneInfo['tmrna'] = []
+                for prot, coords in prot_coords.items():
+                    start, stop = min(coords), max(coords)
+                    geneInfo['tmrna'].append(copy.deepcopy(geneInfo['gene'][0]))
+                    geneInfo['tmrna'][-1]['start'] = start
+                    geneInfo['tmrna'][-1]['end'] = stop
+                    geneInfo['tmrna'][-1]['strand'] = prot_dir[prot]
+                    geneInfo['tmrna'][-1]['type'] = 'mRNA'
+
+                    parent = re.search(comps['id'], geneInfo['gene'][0]['attributes'])[1]
+                    new_id = 'mrna-' + parent[4:] + '-T' + str(prot2i[prot])
+                    geneInfo['tmrna'][-1]['attributes'] = re.sub(comps['id'], 'ID=' + new_id + ';' \
+                                                            + 'Parent=' + parent,
+                                                 geneInfo['tmrna'][-1]['attributes'])
+                    geneInfo['tmrna'][-1]['attributes'] += ';Alias=' + prot2ali[prot]
+                    count += 1
+
+                geneInfo['exon'] = copy.deepcopy(geneInfo['cds'])
+                for exon in geneInfo['exon']:
+                    id_ = re.search(comps['id'], exon['attributes'])[1]
+                    par = re.search(comps['par'], exon['attributes'])[1]
+                    ali = re.search(comps['Alias'], exon['attributes'])[1]
+                    new_id = 'exon' + id_[3:]
+                    exon['attributes'] = f'ID={new_id};Parent={par};Alias={ali}'
+                    exon['type'] = 'exon'
+                       
         if geneInfo['exon']:
             del geneInfo['texon']
 #        if geneInfo['texon'] and geneInfo['exon']:
@@ -272,6 +333,10 @@ def addMissing(gff_list, intron, comps, ome):
    #                 del geneInfo['texon']
 #            else:
  #               del geneInfo['texon']
+        if geneInfo['pseudo']:
+            for cds in geneInfo['cds']:
+                cds['attributes'] = re.sub(gff3Comps()['Alias'], '', cds['attributes'])
+
         for seqType, seqEntry in geneInfo.items():
             if seqType != 'pseudo':
                 out_list.extend(seqEntry)
@@ -335,7 +400,15 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
             elif v['type'] == 'RNA':
                 transcripts[par].append(id_)
 
-    id_dict, pseudogenes = {}, set(pseudogenes)
+    todel = []
+    for par, trna in trnas.items():
+        if par in pseudogenes:
+            ptrnas[par].extend(trna)
+            todel.append(par)
+    for i in todel:
+        del trnas[i]
+
+    id_dict, pseudogenes, estranged_cds = {}, set(pseudogenes), []
     for i, entry in enumerate(cur_list):
         if 'gene' in entry['type']:
             id_ = re.search(comps['id'], entry['attributes'])[1]
@@ -351,6 +424,8 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
             # RNA
                 id_dict[par][par] = re.search(comps['Alias'],
                                               entry['attributes'])[1]
+            except TypeError: # missing alias, might be stripped from before
+                estranged_cds.append((id_, par))
 
     trna_count, rrna_count, ptrna_count, rna_count, etc_count = 1, 1, 1, 1, 1
     estranged = []
@@ -472,11 +547,11 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
 
 
 def rename_and_organize(gff_list):
-    alias2geneid = {}
+    alias2geneid, geneid2alias = {}, {}
     scaf2gene2entries = defaultdict(lambda: defaultdict(lambda: {'gene': None, 'rna': {}}))
     todel = []
     for i, entry in enumerate(gff_list):
-        if entry['type'] == 'gene':
+        if entry['type'] in {'pseudogene', 'gene'}:
             seqid = entry['seqid']
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             alias_list = alias.split('|')
@@ -489,6 +564,7 @@ def rename_and_organize(gff_list):
                 raise GeneError('gene with no alias')
             for a in alias_list:
                 alias2geneid[a] = gene_id
+                geneid2alias[gene_id] = a
             entry['attributes'] = re.sub(gff3Comps()['id'], 'ID=' + gene_id, 
                                          entry['attributes'])
             scaf2gene2entries[seqid][gene_id]['gene'] = [entry]
@@ -498,19 +574,23 @@ def rename_and_organize(gff_list):
         del gff_list[i]
 
     todel = []
-    alias2rnaid = {}
+    alias2rnaid, rnaid2alias = {}, {}
     for i, entry in enumerate(gff_list):
         if 'RNA' in entry['type']:
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             rna_id = entry['type'].lower() + '_' + alias
             entry['attributes'] = re.sub(gff3Comps()['id'], 'ID=' + rna_id,
                                          entry['attributes'])
-            gene_id = alias2geneid[alias]
+            try:
+                gene_id = alias2geneid[alias]
+            except KeyError:
+                raise KeyError('RNA alias that does not link with gene')
             entry['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + gene_id,
                                      entry['attributes'])
             seqid = entry['seqid']
             scaf2gene2entries[seqid][gene_id]['rna'][alias] = [entry]
             alias2rnaid[alias] = rna_id
+            rnaid2alias[rna_id] = alias
             todel.append(i)
 
     for i in reversed(todel):
@@ -542,7 +622,20 @@ def rename_and_organize(gff_list):
                                          entry['attributes'])
             scaf2gene2entries[entry['seqid']][par_id]['gene'][alias].append(entry)
         else:
-            raise KeyError('missing parent')
+            par_id = re.search(gff3Comps()['par'], entry['attributes'])[1]
+            if par_id in rnaid2alias:
+                new_alias = rnaid2alias[par_id]
+                gene_id = alias2geneid[new_alias]
+            elif par_id in geneid2alias:
+                new_alias = geneid2alias[par_id]
+                gene_id = par_id
+            else:
+                raise KeyError(f'missing parent: {entry}')
+            entry['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + par_id,
+                                         entry['attributes'])
+            entry['attributes'] = re.sub(gff3Comps()['Alias'], 'Alias=' + new_alias,
+                                         entry['attributes'])
+            scaf2gene2entries[entry['seqid']][gene_id]['gene'][new_alias].append(entry)
 
     out_gff = []
     for seqid in sorted(scaf2gene2entries.keys()):
