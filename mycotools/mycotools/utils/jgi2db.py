@@ -158,7 +158,8 @@ def runjgi_dwnld(
 
     ome = jgi_df[ome_col][i]
     jgi_login(user, pwd)
-       
+
+    ran_dwnld = False       
     if ome not in ome_set:
         print(spacer + '\t' + ome + ': ' + jgi_df['name'][i], flush = True)
         for typ in dwnlds:
@@ -166,7 +167,7 @@ def runjgi_dwnld(
                 if not rerun:
                     print(spacer + '\t\t' + typ + ': ERROR', flush = True)
                     continue
-            check, preexisting, new_typ = jgi_dwnld( 
+            check, preexisting, new_typ, ran_dwnld = jgi_dwnld( 
                 ome, typ, output, masked = masked
             )
             if type(check) != int:
@@ -186,9 +187,10 @@ def runjgi_dwnld(
                         )
                     failed.append([ome, jgi_df['version'][i]])
                     jgi_df = jgi_df.drop(i)
-                    time.sleep(60)
+                    if ran_dwnld:
+                        time.sleep(60)
                     break
-            if not preexisting:
+            if ran_dwnld:
                 time.sleep(60)
         log_editor(
             log_path, ome, ome + '\t' + log[ome]['fna'] + '\t'
