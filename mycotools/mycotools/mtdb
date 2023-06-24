@@ -38,7 +38,7 @@ if __name__ == '__main__':
         + '\n[m]anage\t\tMTDB management utility' \
         + '\n\nmtdb <OME>[.gff3|.fna|.faa]: [PATH] print ome/ome code path' \
         + '\n\nmtdb <ARG>:' \
-        + '\n[-i DBPATH]\t[--interface]       \tInitialize MTDB connection' \
+        + '\n[-i DBPATH]\t[--interface]\tInitialize MTDB connection' \
         + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
         + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
         + '\n[-u]\t\t[--unlink]\tUnlink from MTDB' \
@@ -121,6 +121,7 @@ if __name__ == '__main__':
         else:
             coord = '--unlink'
         mtdb_disconnect(config)
+        sys.exit(0)
     elif len(sys.argv) > 1:
         omes = sys.argv[1].replace('"','').replace("'",'').split()
         for ome_prep in omes:
@@ -162,4 +163,5 @@ if __name__ == '__main__':
         print(path)
         sys.exit(0)
     else:
+        eprint('Link a MycotoolsDB via `mtdb -i <MTDB_DIR>`')
         sys.exit(1)
