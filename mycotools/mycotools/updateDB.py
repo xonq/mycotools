@@ -8,9 +8,6 @@
     # NEED a prohibit option to import prohibited JGI/NCBI IDs and option to update
 #NEED to finish --save implementation
 #NEED an only one of a strain feature in config
-#NEED to rewrite standard update
-    # NEED an option to reference an inputted MTDB
-        # ideally GenBank should update the submitter field to JGI for these
 #NEED to pull failed JGI from NCBI
     # will require logging whatever NCBI omes directly overlap MycoCosm
 #NEED to remove overlap when rerunning failed genomes

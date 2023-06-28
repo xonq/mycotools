@@ -486,7 +486,7 @@ def inject_args(args, injection_calls):
     return args, manual_cmds
 
  
-def intro( script_name, args_dict, credit='', log = False, stdout = True):
+def intro(script_name, args_dict, credit='', log = False, stdout = True):
     '''
     Inputs: script_name string, args_dict dictionary of arguments, 
     credit string bool / path for output log
@@ -497,26 +497,26 @@ def intro( script_name, args_dict, credit='', log = False, stdout = True):
     '''
 
     start_time = datetime.now()
-    date = start_time.strftime( '%Y%m%d' )
+    date = start_time.strftime('%Y%m%d')
 
     out_str = '\n' + script_name + '\n' + credit + \
         '\nExecution began: ' + str(start_time)
 
     for arg in args_dict:
         out_str += '\n' + '{:<30}'.format(arg.upper() + ':') + \
-            str(args_dict[ arg ])
+            str(args_dict[arg])
 
     if log:
         zprint(out_str, log)
     elif stdout:
         print(out_str, flush = True)
     else:
-        eprint( out_str, flush = True )
+        eprint(out_str, flush = True)
 
     return start_time
 
 
-def outro( start_time, log = False, stdout = True ):
+def outro(start_time, log = False, stdout = True):
     '''
     Inputs: start time string formatted YYYYmmdd, log path
     Outputs: prints execution time and exits with 0 status
@@ -546,12 +546,12 @@ def prep_output(output, mkdir = True, require_newdir = False, cd = False):
     formatted path
     '''
 
-    output = format_path( output )
-    if os.path.isdir( output ):
+    output = format_path(output, force_dir = True)
+    if os.path.isdir(output):
         if require_newdir:
             eprint('\nERROR: directory exists.', flush = True)
             return None
-    elif os.path.exists( output ):
+    elif os.path.exists(output):
         output = os.path.dirname(output)
     else:
         if not mkdir:

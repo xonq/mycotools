@@ -1133,18 +1133,14 @@ if __name__ == '__main__':
     if not args.output:
         base = os.getcwd() + '/'
     else:
-        base = format_path(args.output)
-    if base.endswith('/'):
-        if 'db2search' in os.path.dirname(base):
-            output = base
-        else:
-            output = mkOutput(base, 'db2search')
+        base = format_path(args.output, force_dir = True)
+    if base:
+        output = base
+        if not os.path.isdir(output):
+            os.mkdir(output)
+#            output = mkOutput(base, 'db2search')
     else:
-        if 'db2search' in os.path.basename(base):
-            output = base + '/'
-            os.mkdir(output) # make it because we know it isnt there
-        else:
-            output = mkOutput(base, 'db2search')
+        output = mkOutput(base, 'db2search')
 
     if args.cpu and args.cpu < mp.cpu_count():
         cpu = args.cpu

@@ -692,7 +692,10 @@ def read_tax(taxonomy_string):
                 tax_dict = {}
         else:
             tax_dict = taxonomy_string
-        tax_dict = {**tax_dict, **{x: '' for x in tax_strs if x not in tax_dict}}
+        try:
+            tax_dict = {**tax_dict, **{x: '' for x in tax_strs if x not in tax_dict}}
+        except TypeError: # inappropriate tax_dict in the column
+            tax_dict = {x: '' for x in tax_strs}
         return tax_dict
     else:
         return {}

@@ -9,7 +9,7 @@ import numpy as np
 import multiprocessing as mp
 from tqdm import tqdm
 from itertools import combinations
-from collections import defaultdict
+from collections import defaultdict, Counter
 from mycotools.db2files import soft_main as symlink_files
 from mycotools.lib.kontools import format_path, mkOutput, \
                                    findExecs, intro, outro, \
@@ -290,9 +290,9 @@ def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 2, max_mean = 2):
             count_omes = list(Counter(hg_omes).values()) # prepare for median calculation
             count_omes.sort()
             median = count_omes[median_i]
-            print(median, max_median, len(genes), max_len)
+#            print(median, max_median, len(genes), max_len)
             if median <= max_median and len(genes) <= max_len:
-                print('\t', median, len(genes))
+ #               print('\t', median, len(genes))
                 near_schgs.append(hg)
             elif len(genes) >= max_len: # everything else will be higher
                 break
@@ -545,7 +545,7 @@ if __name__ == '__main__':
                  'Window size': args.window,
                  'Constraint': args.topology_constraint,
                  'CPUS': args.cpus, 'output': out_dir}
-    intro(args_dict, 'db2microsyntree', 'Zachary Konkel, Jason Slot')
+    intro('db2microsyntree', args_dict, 'Zachary Konkel')
 
     wrk_dir = out_dir + 'working/'
     if not os.path.isdir(wrk_dir):
@@ -555,10 +555,12 @@ if __name__ == '__main__':
         with open(format_path(args.focal_genes), 'r') as raw:
             focal_genes = [x.rstrip() for x in raw.read().split() \
                            if x.rstrip()]
+    else:
+        focal_genes = []
 
     tree_path = out_dir + 'microsynteny.newick'
 
-    db = mtdb(format_path(args.database)).set_index()
+    db = mtdb(format_path(args.db)).set_index()
 
     main(db, homogroups, out_dir, wrk_dir, method,
          tree_path, plusminus = args.window, min_cov = 0, min_id = 0.3,

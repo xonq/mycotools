@@ -109,7 +109,7 @@ def compile_alia(gff_path, output, ome = None):
             mean_trnas = sum(trna_lens)/trna_len
             med_trnas = trna_lens[round(trna_len/2) - 1]
         if orna_lens:
-            mean_ornas = sum(orna_lens)/len(orna_len)
+            mean_ornas = sum(orna_lens)/orna_len
             med_ornas = orna_lens[round(orna_len/2) - 1]
         if pseudogene_lens:
             mean_pseudogenes = sum(pseudogene_lens)/pseu_len
@@ -267,7 +267,7 @@ def main(in_path, log_path = None, cpus = 1):
 
         if not log_path:
 #            output_file = os.path.basename(format_path(sys.argv[1])) + '.annStats.tsv'
-            print('#ome\ttotal_length\tgenes\tmean_length\tmedian_length', flush = True)
+            print('#ome\t' + "\t".join(keys) + '\n', flush = True)
             for ome in out:
                 print(ome + '\t' + out[ome], flush = True)
         else:

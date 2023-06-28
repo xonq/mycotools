@@ -1,6 +1,10 @@
 #! /usr/bin/env python3
 
-# NEED to add list of DBs, ability to change names, quickly change between
+# NEED to add a log option
+    #list of DBs, ability to change names, quickly change between
+    # list update dates
+    #report storage information
+    #report taxonomy data
 # NEED to remove standalone scripts from PATH and just reference mtdb (legacy)
 # NEED to add option to export NCBI/JGI credentials
 # NEED to pay attention to old ome versions
@@ -57,7 +61,7 @@ if __name__ == '__main__':
             sys.exit(exit_code)
 
     if len([x for x in sys.argv if x.startswith('-')]) > 1:
-        print('\nERROR: one argument allowed.\n' + description, flush = True)
+        eprint('\nERROR: one argument allowed.\n' + description, flush = True)
         sys.exit(2)
 
     set_argv = set(sys.argv)
@@ -94,6 +98,9 @@ if __name__ == '__main__':
                 print('\nUPDATE failed. Exit ' + str(dep_cmd))
                 sys.exit(cmd)
     elif {'-f', '--fungi'}.intersection(set_argv):
+        if len(set_argv) > 2:
+            eprint('\nERROR: -f does not accept additional arguments. Did you mean -i?')
+            sys.exit(14)
         if '-f' in set_argv:
             coord = '-f'
         else:
@@ -105,6 +112,10 @@ if __name__ == '__main__':
             if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
                 loginCheck()
     elif {'-p', '--prokaryote'}.intersection(set_argv):
+        if len(set_argv) > 2:
+            eprint('\nERROR: -p does not accept additional arguments. Did you mean -i?')
+            sys.exit(15)
+
         if '-p' in set_argv:
             coord = '-p'
         else:

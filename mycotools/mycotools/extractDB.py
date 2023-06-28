@@ -130,14 +130,10 @@ def main(
 
 
 if __name__ == '__main__':
-    if {'-r', '--rank'}.intersection(set(sys.argv)):
-        eprint('\nERROR: -r/--rank are no longer necessary')
-        sys.exit(5)
     parser = argparse.ArgumentParser( description = \
-       'Extracts a MycotoolsDB from arguments. E.g.\t`extractDB.py ' + \
+       'Extracts a MycotoolsDB from arguments. E.g.\t`mtdb extract ' + \
        '-l Atheliaceae`' )
     parser.add_argument('-l', '--lineage')
-#    parser.add_argument('-r', '--rank', help = "Taxonomy rank")
     parser.add_argument('-s', '--source')
     parser.add_argument('-n', '--nonpublished', action = 'store_true', 
         help = 'Include restricted')
@@ -149,8 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('-ol', '--ome', help = "File w/list of omes" )
     parser.add_argument('-ll', '--lineages', help = 'File w/list of lineages' )
     parser.add_argument('--headers', action = 'store_true')
-    parser.add_argument('-', '--stdin', action = 'store_true')
-    parser.add_argument('-d', '--mtdb', default = primaryDB())
+    parser.add_argument('-d', '--mtdb', help = '- for stdin', default = primaryDB())
     parser.add_argument('-o', '--output' )
     args = parser.parse_args()
     db_path = format_path( args.mtdb )
@@ -162,6 +157,8 @@ if __name__ == '__main__':
     if args.lineage or args.lineages:
         eprint("\nWARNING: extracting taxonomy is subject to " \
              + "errors in NCBI's hierarchy\n")
+
+    args.lineage = args.lineage.replace('"','').replace("'",'')
 
     output = 'stdout'
     if args.output:
@@ -179,14 +176,14 @@ if __name__ == '__main__':
                 tag += '_pub'
             output += '/' + os.path.basename( db_path ) + tag
         
-    if args.stdin:
+    if args.mtdb == '-':
         data = ''
         for line in sys.stdin:
             data += line.rstrip() + '\n'
         data = data.rstrip()
         db = mtdb(data, stdin=True)
     else:
-       db = mtdb( db_path )
+       db = mtdb(db_path)
 
     if args.ome:
         omes = set(file2list(format_path(args.ome)))
