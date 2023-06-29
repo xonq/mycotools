@@ -62,7 +62,7 @@ uniform curation. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/m
 
 <br />
 
-![Analysis_examples](https://gitlab.com/xonq/mycotools/-/raw/master/misc/examples.png)
+![Analysis_examples](https://gitlab.com/xonq/mycotools/-/raw/primary/misc/examples.png)
 
 ---
 
@@ -80,7 +80,7 @@ files. To learn more about MycotoolsDB and the `.mtdb` format standard, refer to
 
 ## Initialization
 ### mtdb update
-`mtdb update` is for initializing and building the master MTDB; to interface with
+`mtdb update` is for initializing and building the primary MTDB; to interface with
 an established MTDB, see
 [interfacing](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
 
@@ -96,7 +96,7 @@ mtdb update -i <INIT DIRECTORY>
 
 #### PROKARYOTES
 To initialize a curated database of all NCBI prokaryotic genomes (please note
-this is in alpha-testing; additionally, there are 100,000s prokaryote genomes to download and this will take several days-weeks):
+this is in alpha-testing and needs to improve vectorization to scale more efficiently; additionally, there are 100,000s prokaryote genomes to download and this will take several days-weeks):
 ```bash
 mtdb update -i <INIT_DIRECTORY> -p
 ```
@@ -131,14 +131,14 @@ mtdb update -u
 
 ## Interfacing
 ### mtdb
-`mtdb` is the MycotoolsDB central utility. It initializes interfacing with an established master
-database or just prints the path of the master database. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
+`mtdb` is the MycotoolsDB central utility. It initializes interfacing with an established primary
+database or just prints the path of the primary database. MycotoolsDBs are labelled `YYYYmmdd.mtdb`.
 ```bash
 mtdb
 /home/xonq/mtdb/mtdb/20210125.mtdb
 ```
 
-To add interfacing with a fungal/prokaryote master MTDB:
+To add interfacing with a fungal/prokaryote primary MTDB:
 ```bash
 mtdb -i <DATABASE_BASE_DIRECTORY>
 ```
@@ -284,7 +284,7 @@ e.g. to substitute ome for genus species and strain: `ome2name.py <INPUT> oa`
 ```bash
 ome2name.py -h
 USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE> [MYCOTOOLSDB] asvg*&
-DEFAULTS: master db, see script for default forbidden characters
+DEFAULTS: primary db, see script for default forbidden characters
 Input file to regex sub omes with their name.
 optional MycotoolsDB, string of forbidden characters
 "o" no ome | "g" no genus | "s" no species | "v" no strain | "a" no alternative ome
@@ -621,7 +621,7 @@ fa2clus.py -f <FASTA> -m 0.2 -x 0.3 --iterative <FOCAL_GENE> --minseq 50 --maxse
 ### crap.py
 
 <img align="left"
-src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/crap_example.png"
+src="https://gitlab.com/xonq/mycotools/-/raw/primary/misc/crap_example.png"
 alt="Extracted clade of CRAP pipeline" height="450" width="578">
 
 CRAP, adopted and expanded from [Slot & Rokas implementation](https://doi.org/10.1016/j.cub.2010.12.020),
