@@ -22,6 +22,9 @@ conda update mycotools -c xonq
 <br />
 
 # INSTALL
+
+Please note I am currently having issues with delivering the complete pypi/conda package which will be resolved shortly.
+
 ## 1. Installing miniconda
 Miniconda3 is a software environment manager:
 
