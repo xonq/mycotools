@@ -17,7 +17,6 @@ uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/mas
 
 <br />
 
-https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md
 
 - **MYCOTOOLSDB TOOLS**
 	- [Initializing *de novo* MycotoolsDB](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#de-novo-initialization)
