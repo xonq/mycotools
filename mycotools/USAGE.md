@@ -62,7 +62,7 @@ uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/mas
 
 <br />
 
-![Analysis_examples](https://gitlab.com/xonq/mycotools/-/raw/primary/misc/examples.png)
+![Analysis_examples](https://github.com/xonq/mycotools/blob/master/misc/examples.png?raw=true)
 
 ---
 
@@ -621,7 +621,7 @@ fa2clus.py -f <FASTA> -m 0.2 -x 0.3 --iterative <FOCAL_GENE> --minseq 50 --maxse
 ### crap.py
 
 <img align="left"
-src="https://gitlab.com/xonq/mycotools/-/raw/primary/misc/crap_example.png"
+src="https://github.com/xonq/mycotools/blob/master/misc/crap_example.png?raw=true"
 alt="Extracted clade of CRAP pipeline" height="450" width="578">
 
 CRAP, adopted and expanded from [Slot & Rokas implementation](https://doi.org/10.1016/j.cub.2010.12.020),
