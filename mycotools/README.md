@@ -55,13 +55,18 @@ conda config --set channel_priority strict
 
 ## 3. Installing mycotools
 Make sure `conda` is active, usually by seeing `(base)` in in your shell.
-If not, try `conda activate base` or `source activate base`.
+If not, try `conda activate base` or `source activate base`. 
 
 ```bash
 conda create -n mycotools mycotools -c xonq -y
 conda activate mycotools
+python3 -m pip install mycotools --upgrade
 mtdb -d
 ```
+
+NOTE: There is an unfortunate build dependency conflict with the conda package,
+so be sure to explicitly run `pip install` as noted above to update the
+mycotools package inside the conda environment.
 
 <br />
 
