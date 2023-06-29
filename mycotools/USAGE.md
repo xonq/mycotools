@@ -8,7 +8,7 @@ dependent on the MycotoolsDB, so there is no guarantee that these scripts will
 work with external files. 
 
 Why the dependency on MycotoolsDB? Because bioinformatics file formats need systematic, 
-uniform curation. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md)
+uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/master/mycotools/MTDB.md)
 
 <br /><br />
 
@@ -17,47 +17,48 @@ uniform curation. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/m
 
 <br />
 
+https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md
 
 - **MYCOTOOLSDB TOOLS**
-	- [Initializing *de novo* MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#de-novo-initialization)
-        - [Initializing reference MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#reference-initialization)
-	- [Updating MycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#updating)
-	- [Connecting to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
-	- [Managing the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#managing)
-	- [Querying the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#querying)
-	- [Creating modular databases](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
-	- [Acquiring database files / file paths](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#acquiring-database-files)
-	- [Adding local genomes to the database](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#adding-local-genomes)
-	- [Substitute organism name for MycotoolsDB organism code](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#ome2namepy)
+	- [Initializing *de novo* MycotoolsDB](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#de-novo-initialization)
+        - [Initializing reference MycotoolsDB](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#reference-initialization)
+	- [Updating MycotoolsDB](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#updating)
+	- [Connecting to the database](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#interfacing)
+	- [Managing the database](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#managing)
+	- [Querying the database](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#querying)
+	- [Creating modular databases](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#creating-modular-databases)
+	- [Acquiring database files / file paths](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#acquiring-database-files)
+	- [Adding local genomes to the database](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#adding-local-genomes)
+	- [Substitute organism name for MycotoolsDB organism code](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#ome2namepy)
 
 <br />
 
 
 - **SEQUENCE DATA**
-	- [Downloading from NCBI / JGI](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#downloading-files)
-	- [Sequence data statistics](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-data-statistics)
-	- [Grabbing accessions](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-accessions)
-	- [Extract fasta coordinates](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#fasta-coordinates)
-	- [Grabbing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#grab-loci)
-	- [GFF to sequence](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#gene-coordinates-to-sequences)
-	- [Curating annotation](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#curate-annotation)
-	- [Adding corrected gene models](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#adding-corrected-gene-models)
-	- [Visualizing loci](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#visualizing-loci)
+	- [Downloading from NCBI / JGI](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#downloading-files)
+	- [Sequence data statistics](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#sequence-data-statistics)
+	- [Grabbing accessions](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#grab-accessions)
+	- [Extract fasta coordinates](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#fasta-coordinates)
+	- [Grabbing loci](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#grab-loci)
+	- [GFF to sequence](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#gene-coordinates-to-sequences)
+	- [Curating annotation](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#curate-annotation)
+	- [Adding corrected gene models](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#adding-corrected-gene-models)
+	- [Visualizing loci](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#visualizing-loci)
 <br />
 
 
 - **EVOLUTIONARY ANALYSES**
-	- [MycotoolsDB BLAST/HMM](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#homolog-search-mycotoolsdb)
-	- [Fasta to tree](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#tree-building)
-	- [Sequence clustering](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#sequence-clustering)
-	- [Gene cluster phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#crappy)
+	- [MycotoolsDB BLAST/HMM](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#homolog-search-mycotoolsdb)
+	- [Fasta to tree](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#tree-building)
+	- [Sequence clustering](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#sequence-clustering)
+	- [Gene cluster phylogenetic analysis](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#crappy)
 
 
 <br />
 
 - **MYCOTOOLS PIPELINES**
-    - [Mycotools pipelining principles](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#shell-pipelining-with-mycotools)
-	- [Phylogenetic analysis](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
+    - [Mycotools pipelining principles](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#shell-pipelining-with-mycotools)
+	- [Phylogenetic analysis](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#phylogenetic-analysis)
 
 
 <br />
@@ -74,7 +75,7 @@ uniform curation. [See here for more](https://gitlab.com/xonq/mycotools/-/blob/m
 # MYCOTOOLSDB
 The following scripts interface with and manipulate MycotoolsDB (MTDB) `.mtdb`
 files. To learn more about MycotoolsDB and the `.mtdb` format standard, refer to
-[this guide](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/MTDB.md).
+[this guide](https://github.com/xonq/mycotools/blob/master/mycotools/MTDB.md).
 
 <br /><br />
 
@@ -82,7 +83,7 @@ files. To learn more about MycotoolsDB and the `.mtdb` format standard, refer to
 ### mtdb update
 `mtdb update` is for initializing and building the primary MTDB; to interface with
 an established MTDB, see
-[interfacing](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing)
+[interfacing](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#interfacing)
 
 ### De novo initialization
 #### FUNGI
@@ -116,7 +117,7 @@ To initialize a MycotoolsDB from a reference, appending necessary arguments:
 mtdb update -i <INIT_DIR> -r <REF.mtdb>
 ```
 
-If successful, a new MycotoolsDB will be initialized in `<INIT_DIR>`; to link back to any previously established MycotoolsDBs see how to [interface](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#interfacing). 
+If successful, a new MycotoolsDB will be initialized in `<INIT_DIR>`; to link back to any previously established MycotoolsDBs see how to [interface](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#interfacing). 
 
 <br /><br />
 
@@ -193,7 +194,7 @@ grep 'Psilocybe' $(mtdb)
 NOTE: `grep` may yield non-specific taxonomy results, e.g. `grep Athelia
 $(mtdb)` will not only yield the genus *Athelia*, but also all members of the
 family Atheliaceae. See
-[mtdb extract](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases)
+[mtdb extract](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#creating-modular-databases)
 to extract based on taxonomy.
 
 <br /><br />
@@ -300,7 +301,7 @@ assemblyStats.py <ASSEMBLY.fa>
 annotationStats.py <ANNOTATION.gff3>
 ```
 
-To obtain a table of annotation statistics, [create a mycotoolsDB](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
+To obtain a table of annotation statistics, [create a mycotoolsDB](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#creating-modular-databases) file with the organisms of interest and run:
 ```bash
 assemblyStats.py <MYCOTOOLSDB.mtdb>
 annotationStats.py <MYCOTOOLSDB.mtdb>
@@ -328,7 +329,7 @@ ncbiDwnld.py -i aspergillus.mtdb_ncbi -t
 ```
 
 To unzip all the files, run `gunzip <FILETYPE>/*.gz`. 
-To submit as a job (not recommended), you must create an encrypted MycotoolsDB passkey using [`mtdb manage`](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#managing) and pass the password to stdin to these scripts.
+To submit as a job (not recommended), you must create an encrypted MycotoolsDB passkey using [`mtdb manage`](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#managing) and pass the password to stdin to these scripts.
 
 <br />
 
@@ -559,7 +560,7 @@ gff2svg.py -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
 `fa2tree.py` will input a fasta file or directory of fasta files, trim, and
 generate trees. 
 
-Information on a complete [phylogenetic pipeline](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md#mycotools-pipelines) is elaborated below.
+Information on a complete [phylogenetic pipeline](https://github.com/xonq/mycotools/blob/master/mycotools/USAGE.md#mycotools-pipelines) is elaborated below.
 
 <br />
 
