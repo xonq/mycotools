@@ -166,7 +166,7 @@ def dbMainGff(og_file, ogtag, cpus = 1):
         pool.starmap(og2gff, og2gff_cmds)
 
 
-if __name__ == '__main__':
+def cli():
 
     usage = 'Adds orthogroup tag ("OG=") to mycotoolsDB GFFs from an OrthoFinder Orthogroups.txt file\n' \
         + 'og2mycodb.py <Orthogroups.txt> <TAG>\n\n' \
@@ -179,3 +179,7 @@ if __name__ == '__main__':
         cpus = 1
     dbMain(format_path(args[0]), args[1])
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()
