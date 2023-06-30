@@ -226,7 +226,7 @@ def main(toadd_gff, addto_gff = [], ome = None, replace = False):
 
 
 def prep_mtdb_update(new_gff, ome):
-    from mycotools.predb2db import main as predb2db
+    from mycotools.predb2mtdb import main as predb2mtdb
     from mycotools.lib.dbtools import mtdb, primaryDB
     db = mtdb(primaryDB()).set_index()
     out_dir = mkOutput(format_path(os.getcwd()), 'add2gff')
@@ -256,7 +256,7 @@ def prep_mtdb_update(new_gff, ome):
              'source': [db[ome]['source']],
              'useRestriction (yes/no)': [db[ome]['published']],
              'published': [db[ome]['published']]}
-    new_db, failed = predb2db(predb, db.reset_index(), out_dir + 'working/', 
+    new_db, failed = predb2mtdb(predb, db.reset_index(), out_dir + 'working/', 
                               exit = True, remove = False)
 
     update_db_path = out_dir + 'add2gff.mtdb'
