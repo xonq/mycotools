@@ -35,7 +35,7 @@ from mycotools.ncbiDwnld import esearch_ncbi, esummary_ncbi, main as ncbiDwnld
 from mycotools.jgiDwnld import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
-from mycotools.predb2db import main as predb2db
+from mycotools.predb2mtdb import main as predb2mtdb
 from mycotools.assemblyStats import main as assStats
 from mycotools.annotationStats import main as annStats
 
@@ -676,7 +676,7 @@ def ref_update(
 
             print('\tCurating MycoCosm data', flush = True)
             jgi_premtdb = jgi_predb.fillna('').to_dict(orient='list')
-            jgi_mtdb, jgi_failed1 = predb2db(jgi_premtdb, mtdb(), update_path,
+            jgi_mtdb, jgi_failed1 = predb2mtdb(jgi_premtdb, mtdb(), update_path,
 #                                            forbidden = forbid_omes, 
                                             cpus = cpus, 
                                             remove = remove, spacer = '\t\t')
@@ -735,7 +735,7 @@ def ref_update(
     for key in ncbi_predb.columns:
         ncbi_predb[key] = ncbi_predb[key].fillna('')
     ncbi_premtdb = ncbi_predb.to_dict(orient='list')
-    ncbi_mtdb, ncbi_failed2 = predb2db(ncbi_premtdb, mtdb(), update_path,
+    ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, mtdb(), update_path,
 #                                       forbidden = forbid_omes, 
                                        cpus = cpus,
                                        remove = remove, spacer = '\t\t')
@@ -858,7 +858,7 @@ def rogue_update(
         if not os.path.isfile(jgi_predb_path):
             print('\tCurating MycoCosm data', flush = True)
             jgi_premtdb = jgi_predb.fillna('').to_dict(orient='list')
-            jgi_mtdb, jgi_failed1 = predb2db(jgi_premtdb, refdbjgi, update_path,
+            jgi_mtdb, jgi_failed1 = predb2mtdb(jgi_premtdb, refdbjgi, update_path,
                                             forbidden = forbid_omes, cpus = cpus, 
                                             remove = remove, spacer = '\t\t')
             jgi_failed.extend(jgi_failed1)
@@ -919,7 +919,7 @@ def rogue_update(
     print('\tCurating NCBI data', flush = True)
     ncbi_predb['species'] = ncbi_predb['species'].fillna('')
     ncbi_premtdb = ncbi_predb.to_dict(orient='list')
-    ncbi_mtdb, ncbi_failed2 = predb2db(ncbi_premtdb, refdbncbi, update_path,
+    ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, refdbncbi, update_path,
                                        forbidden = forbid_omes, cpus = cpus,
                                        remove = remove, spacer = '\t\t')
     for failure in ncbi_failed2:
@@ -1034,7 +1034,7 @@ def db2primary(addDB, refDB, save = False, combined = False):
     refDB = refDB.set_index()
     if refOmes.intersection(addOmes) and not combined:
         eprint(refOmes.intersection(addOmes), flush = True)
-        raise KeyError('ERROR: ome codes exist in database. Rerun predb2db')
+        raise KeyError('ERROR: ome codes exist in database. Rerun predb2mtdb')
     for i, ome in enumerate(addDB['ome']):
         base_ome = re.search(r'^[^\d]+\d+', ome)[0]
         if base_ome in base_ome2update_ome:
@@ -1158,7 +1158,7 @@ def main():
     else:
         date = str(args.resume)
 
-    if args.add: # add predb2db 2 master database
+    if args.add: # add predb2mtdb 2 master database
         addDB = mtdb(format_path(args.add))
         addDB['aquisition_date'] = [date for x in addDB['ome']] 
         # make date the acquisition time
@@ -1274,7 +1274,7 @@ def main():
     if not update_mtdb:
         eprint('\nNo new data acquired', flush = True)
 
-    if not args.save: # add the predb2db and remove files
+    if not args.save: # add the predb2mtdb and remove files
 #        df2db(db, format_path('$MYCODB/' + date + '.mtdb'))
         write_forbid_omes(set(new_db['ome']), format_path('$MYCODB/../log/relics.txt'))
         # output new database and new list of omes
