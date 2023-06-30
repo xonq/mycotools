@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mycotools"
+version = "0.30.8"
+authors = [{name="Zachary Konkel", email="konkelzach@protonmail.com"}]
+description = "Bleeding-edge comparative genomics automation and standardization software"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = '>=3.0,<4'
+dependencies = ['biopython', 'pandas', 'requests', 'scipy', 'openpyxl', 'tqdm']
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/xonq/mycotools"
+"Bug Tracker" = "https://github.com/xonq/mycotools/issues"
+
+[project.scripts]
+mtdb = "mycotools.mtdb:main"
