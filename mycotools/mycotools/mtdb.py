@@ -30,9 +30,7 @@ def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
         config = {}
     return config
 
-
-if __name__ == '__main__':
-
+def main(argv = sys.argv):
     description = 'MycotoolsDB (MTDB) utility usage' \
         + '\n\nmtdb: print master MTDB path' \
         + '\n\nmtdb <SUBSCRIPT>:' \
@@ -49,22 +47,22 @@ if __name__ == '__main__':
         + '\n[-d]\t\t[--dependency]\tInstall/update dependencies'
 
     config = parse_config()
-    if any([not x.startswith('-') for x in sys.argv[1:]]):
-        script = [x for x in sys.argv[1:] if not x.startswith('-')]
+    if any([not x.startswith('-') for x in argv[1:]]):
+        script = [x for x in argv[1:] if not x.startswith('-')]
         script = script[0]
         ab2mt = {'extract': 'extractDB.py', 'update': 'updateDB.py', 'predb2db': 'predb2db.py',
                  'e': 'extractDB.py', 'u': 'updateDB.py', 'p': 'predb2db.py', 'm': 'manageDB.py',
                  'manage': 'mangeDB.py'}
         if script in ab2mt:
-            exit_code = subprocess.call([ab2mt[script]] + [x for x in sys.argv[1:] \
+            exit_code = subprocess.call([ab2mt[script]] + [x for x in argv[1:] \
                                          if x != script])
             sys.exit(exit_code)
 
-    if len([x for x in sys.argv if x.startswith('-')]) > 1:
+    if len([x for x in argv if x.startswith('-')]) > 1:
         eprint('\nERROR: one argument allowed.\n' + description, flush = True)
         sys.exit(2)
 
-    set_argv = set(sys.argv)
+    set_argv = set(argv)
     if {'-h', '--help'}.intersection(set_argv):
         print('\n' + description + '\n', flush = True)
         sys.exit(0)
@@ -75,7 +73,7 @@ if __name__ == '__main__':
         else:
             coord = '--interface'
         try:
-            mycodb_loc_prep = sys.argv[sys.argv.index(coord) + 1]
+            mycodb_loc_prep = argv[argv.index(coord) + 1]
             if isinstance(mycodb_loc_prep, str):
                 if mycodb_loc_prep.startswith('-'):
                     raise IndexError
@@ -89,9 +87,9 @@ if __name__ == '__main__':
             raise ValueError('--interface requires a path')
         mtdb_initialize(mycodb_loc)
     elif {'-d', '--dependencies'}.intersection(set_argv):
-        pip_deps = ['dna_features_viewer']
+        pip_deps = ['dna_features_viewer', 'mycotools']
         dep_cmds = [['conda', 'install', '-y', '-c', 'jlsteenwyk', 'clipkit'],
-                    ['python3', '-m', 'pip', 'install', ' '.join(pip_deps)]]
+                    ['python3', '-m', 'pip', 'install', ' '.join(pip_deps), '--upgrade']]
         for dep_cmd in dep_cmds:
             cmd = subprocess.call(dep_cmd)
             if cmd:
@@ -133,8 +131,8 @@ if __name__ == '__main__':
             coord = '--unlink'
         mtdb_disconnect(config)
         sys.exit(0)
-    elif len(sys.argv) > 1:
-        omes = sys.argv[1].replace('"','').replace("'",'').split()
+    elif len(argv) > 1:
+        omes = argv[1].replace('"','').replace("'",'').split()
         for ome_prep in omes:
             db = mtdb(primaryDB()).set_index()
             if ome_prep in db:
@@ -176,3 +174,7 @@ if __name__ == '__main__':
     else:
         eprint('Link a MycotoolsDB via `mtdb -i <MTDB_DIR>`')
         sys.exit(1)
+
+
+if __name__ == '__main__':
+    main(sys.argv)
