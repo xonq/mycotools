@@ -1,0 +1,52 @@
+{% set name = "mycotools" %}
+{% set version = "0.30.7" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: "https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz"
+  sha256: 8629756ec2b2b47050e506eeb0cff3f7e75bbbbf2e87bf04745db708030180d3
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
+
+requirements:
+  host:
+    - biopython
+    - openpyxl
+    - pandas
+    - pip
+    - python
+    - requests
+    - scipy
+    - tqdm
+  run:
+    - biopython
+    - openpyxl
+    - pandas
+    - python
+    - requests
+    - scipy
+    - tqdm
+
+test:
+  imports:
+    - mycotools
+    - mycotools.lib
+    - mycotools.utils
+
+about:
+  home: "https://gitlab.com/xonq/mycotools/mycotools"
+  license: "BSD 3-Clause License"
+  license_family: LGPL
+  license_file: 
+  summary: "Bleeding-edge comparative genomics automation and standardization software"
+  doc_url: 
+  dev_url: 
+
+extra:
+  recipe-maintainers:
+    - your-github-id-here
