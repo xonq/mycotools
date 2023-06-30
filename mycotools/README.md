@@ -16,8 +16,12 @@ recommended to run the following in your conda environment if you are having
 trouble with analyses:
 
 ```bash
-conda update mycotools -c xonq
+python3 -m pip install mycotools --upgrade
 ```
+
+NOTE: Make sure the conda environment is active when updating.
+I recommend updating with `pip` because the `conda` distribution 
+is currently prone to dependency issues and will not update reliably.
 
 <br />
 
@@ -80,7 +84,8 @@ To link with an existing database, fill in `<PATH>` with the database path
 mtdb --init <DB_PATH>
 ```
 
-You're good to proceed to the [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
+You're good to proceed to the
+[usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/mycotools/USAGE.md)
 
 ## 4b. ADMINISTRATOR: Initialize a local MycotoolsDB
 ```bash
