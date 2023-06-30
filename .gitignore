@@ -6,3 +6,4 @@ prepUpdate.py
 *.swp
 *.pyc
 include.txt
+build.sh
