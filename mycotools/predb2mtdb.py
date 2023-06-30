@@ -28,7 +28,7 @@ predb_headers = [
     ]
 
 def prep_output(base_dir):
-    out_dir = mkOutput(base_dir, 'predb2db')
+    out_dir = mkOutput(base_dir, 'predb2mtdb')
     wrk_dir = out_dir + 'working/'
     dirs = [
         out_dir, wrk_dir, wrk_dir + 'gff3/', wrk_dir + 'fna/', wrk_dir + 'faa/'
@@ -79,7 +79,7 @@ def gen_predb():
         separate each column by a tab. The predb can be filled in \
         via spreadsheet software and exported as a tab delimited `.tsv`. \
         ASSEMBLY ACCESSIONS and PREVIOUS_OME fields must be unique to the \
-        genome; otherwise predb2db will update the corresponding database entry. \
+        genome; otherwise predb2mtdb will update the corresponding database entry. \
         Novel data must be filled in as "new" for the genomeSource column.', flush = True)
     outputStr = '#' + '\t'.join(predb_headers)
     outputStr += '\n#' + '\t'.join(example) + '\n'
@@ -523,10 +523,10 @@ def main(
 
 
 def cli():
-    usage = 'Generate a predb file:\npredb2db.py\n\nCreate a mycotoolsdb ' + \
-    'from a predb file:\npredb2db.py <PREDBFILE>\n\nCreate a mycotoolsdb ' + \
-    'referencing an alternative master database:\npredb2db.py <PREDBFILE> ' + \
-    '<REFERENCEDB>\nSkip failing genomes:\npredb2db.py <PREDBFILE> -s'
+    usage = 'Generate a predb file:\npredb2mtdb.py\n\nCreate a mycotoolsdb ' + \
+    'from a predb file:\npredb2mtdb.py <PREDBFILE>\n\nCreate a mycotoolsdb ' + \
+    'referencing an alternative master database:\npredb2mtdb.py <PREDBFILE> ' + \
+    '<REFERENCEDB>\nSkip failing genomes:\npredb2mtdb.py <PREDBFILE> -s'
 
     if any(x in {'-h', '--help', '-help'} for x in sys.argv):
         eprint('\n' + usage + '\n', flush = True)
@@ -564,7 +564,7 @@ def cli():
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
     tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
     outdb = assimilate_tax(omedb, tax_dicts)
-    outdb.df2db(out_dir + 'predb2db.mtdb')
+    outdb.df2db(out_dir + 'predb2mtdb.mtdb')
     sys.exit(0)
 
 
