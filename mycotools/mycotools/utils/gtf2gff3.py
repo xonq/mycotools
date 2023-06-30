@@ -647,7 +647,7 @@ def sortMain(gff, prefix):
     return gff
 
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser(description = 'Curates Funannotate or ' + \
         'post OrthoFiller output by naming accessions as <PREFIX>_####, where ' + \
@@ -712,3 +712,7 @@ if __name__ == '__main__':
             out.write('\n'.join(flagged))
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

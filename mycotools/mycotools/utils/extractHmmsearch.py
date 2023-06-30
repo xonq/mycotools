@@ -230,7 +230,7 @@ def main(
     return out
             
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser( description = 'Extracts inputted accession hits and alignments from `hmmsearch` ' + \
         'output. Optionally provide a size-based query threshold to only extract alignments of a certain size.' )
@@ -316,3 +316,7 @@ if __name__ == '__main__':
             out.write( out_dict[name][1] )
 
     outro( start_time )
+
+
+if __name__ == '__main__':
+    cli()

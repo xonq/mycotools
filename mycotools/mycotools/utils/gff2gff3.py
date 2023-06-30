@@ -236,7 +236,7 @@ def main(gff_list, ome, jgi_ome, safe = True, verbose = True):
 
     return gff3, errors
 
-if __name__ == '__main__':
+def cli():
     
     parser = argparse.ArgumentParser( description = 'Converts jgi gff2 to gff3' )
     parser.add_argument( '-i', '--input', required = True, help = 'JGI gff2' )
@@ -252,3 +252,7 @@ if __name__ == '__main__':
     print( list2gff( gff3 ) , flush = True)
 
     sys.exit( 0 )
+
+
+if __name__ == '__main__':
+    cli()

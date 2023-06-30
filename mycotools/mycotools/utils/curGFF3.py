@@ -702,9 +702,13 @@ def main(gff_path, ome, cur_seqids = False):
     return clean_gff
 
 
-if __name__ == '__main__':
+def cli():
     usage = 'Imports gene coordinates file gff3, ome and curates headers'
     sys_start( sys.argv, usage, 3, files = [sys.argv[1]] )
     cur_gff = main( format_path(sys.argv[1]), sys.argv[2] )
     print( list2gff( cur_gff ) , flush = True)
     sys.exit( 0 )
+
+
+if __name__ == '__main__':
+    cli()

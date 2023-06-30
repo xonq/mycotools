@@ -63,7 +63,7 @@ def main(hmm_db, accessions = False):
     return hmm_str
 
 
-if __name__ == '__main__':
+def cli():
 
     usage = '\nInputs <`.hmm`> database, optional <accession | new line delimitted accessions file>, returns `hmm` accession. If no accession is specified, a folder of all accessions will be created.\n'
     if len( sys.argv ) < 2:
@@ -95,3 +95,7 @@ if __name__ == '__main__':
                 out.write( hmm_strs[ accession ] )
 
     sys.exit( 0 )
+
+
+if __name__ == '__main__':
+    cli()

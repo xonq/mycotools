@@ -380,7 +380,7 @@ def main(
     return jgi_premtdb_df, new_ref_db.reset_index(), failed, duplicates
 
 
-if __name__ == '__main__':
+def cli():
 
     mycoCosmURL = 'https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/' + \
             'download-group?flt=&seq=all&pub=all&grp=fungi&srt=released&ord=desc'
@@ -453,3 +453,7 @@ if __name__ == '__main__':
             Run updateDB to confirm and finish update.')
 
     outro( start_time )
+
+
+if __name__ == '__main__':
+    cli()
