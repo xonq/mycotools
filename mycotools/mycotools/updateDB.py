@@ -551,7 +551,7 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
 
     ncbi_jgi_overlap = pd.DataFrame()
     for i in reversed(todel):
-        ncbi_jgi_overlap = ncbi_jgi_overlap.append(ncbi_df.loc[i])
+        ncbi_jgi_overlap = pd.concat([ncbi_jgi_overlap, ncbi_df.loc[i]])
         ncbi_df = ncbi_df.drop(i)
 
     
