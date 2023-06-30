@@ -36,7 +36,7 @@ def main(argv = sys.argv):
         + '\n\nmtdb <SUBSCRIPT>:' \
         + '\n[e]xtract\t\textract sub .mtdb file' \
         + '\n[u]pdate\t\tupdate/initialize primary MTDB' \
-        + '\n[p]redb2db\t\tadd local genomes to the primary MTDB' \
+        + '\n[p]redb2mtdb\t\tadd local genomes to the primary MTDB' \
         + '\n[m]anage\t\tMTDB management utility' \
         + '\n\nmtdb <OME>[.gff3|.fna|.faa]: [PATH] print ome/ome code path' \
         + '\n\nmtdb <ARG>:' \
@@ -50,9 +50,9 @@ def main(argv = sys.argv):
     if any([not x.startswith('-') for x in argv[1:]]):
         script = [x for x in argv[1:] if not x.startswith('-')]
         script = script[0]
-        ab2mt = {'extract': 'extractDB.py', 'update': 'updateDB.py', 'predb2db': 'predb2db.py',
-                 'e': 'extractDB.py', 'u': 'updateDB.py', 'p': 'predb2db.py', 'm': 'manageDB.py',
-                 'manage': 'mangeDB.py'}
+        ab2mt = {'extract': 'extract_mtdb', 'update': 'update_mtdb', 'predb2mtdb': 'predb2mtdb',
+                 'e': 'extract_mtdb', 'u': 'update_mtdb', 'p': 'predb2mtdb', 'm': 'manage_mtdb',
+                 'manage': 'mange_mtdb'}
         if script in ab2mt:
             exit_code = subprocess.call([ab2mt[script]] + [x for x in argv[1:] \
                                          if x != script])
