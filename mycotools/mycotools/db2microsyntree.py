@@ -492,7 +492,7 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
 
     return ome2i, gene2hg, i2ome, hg2gene, ome2pairs, cooccur_dict
 
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser(description = 'Generate a microsynteny ' \
       + 'tree that recapitulates the divergence of gene order within small ' \
       + 'loci.')
@@ -575,3 +575,7 @@ if __name__ == '__main__':
          n50thresh = None, near_single_copy_genes = focal_genes,
          constraint = format_path(args.topology_constraint), verbose = False, 
          cpus = args.cpus)
+
+
+if __name__ == '__main__':
+    cli()

@@ -29,7 +29,7 @@ def extractCoords(fa_dict, seqid, coord_start = 0, coord_end = -1, sense = '+', 
 
     return new_fa, error
 
-if __name__ == '__main__':
+def cli():
 
     usage = 'Input nucleotide fasta/tsv input, extract coordinates\n' \
         + 'coords2fa.py <FA> <SEQID> <START_COORD> <END_COORD> <STRAND_SENSE>' \
@@ -120,3 +120,7 @@ if __name__ == '__main__':
     print(dict2fa(out_fa))
     eprint(error)
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

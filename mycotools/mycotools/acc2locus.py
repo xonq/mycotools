@@ -259,7 +259,7 @@ def mycotools_main(db, accs, plusminus = 10, cpus = 1, nt = False,
 
     return out_indices
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser(description = 'Extracts loci from acc(s)')
     parser.add_argument('-a', '--acc', help = '"-" for stdin')
@@ -353,3 +353,6 @@ if __name__ == '__main__':
                 print(hit, flush = True)
             print(flush = True)
     sys.exit(0)
+
+if __name__ == '__main__':
+    cli()

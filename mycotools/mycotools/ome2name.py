@@ -83,7 +83,7 @@ def main( db, data_input, genus, species, strain, ome_code, alternative ):
     return data_input.rstrip()
 
 
-if __name__ == '__main__':
+def cli():
 
     usage = 'USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE>' \
         + ' [MYCODB] asvg*&\nDEFAULTS: master db, see script for default' \
@@ -97,3 +97,7 @@ if __name__ == '__main__':
     data_output = main(db, data_input, g, sp, st, ome_code, alt)
     print( data_output , flush = True)
     sys.exit( 0 )
+
+
+if __name__ == '__main__':
+    cli()

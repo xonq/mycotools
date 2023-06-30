@@ -141,7 +141,7 @@ def main(
     return product_dict
 
 
-if __name__ == "__main__":
+def cli():
 
     parser = argparse.ArgumentParser(description = 'Converts .gff3(s) to .svg')
     parser.add_argument('-g', '--gff')
@@ -226,3 +226,7 @@ if __name__ == "__main__":
             )
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

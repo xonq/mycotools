@@ -459,7 +459,7 @@ def main(
                 v = verbose)
 
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser( 
         description = 'Takes in a multifasta, or directory/list of fastas [partition]  ' + \
@@ -567,3 +567,6 @@ if __name__ == '__main__':
         )
 
     outro(start_time)
+
+if __name__ == '__main__':
+    cli()

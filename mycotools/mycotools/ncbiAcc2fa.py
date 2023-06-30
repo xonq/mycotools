@@ -8,7 +8,7 @@ from Bio import Entrez
 from mycotools.lib.kontools import file2list, eprint
 
 
-if __name__ == '__main__':
+def cli():
 
     usage = "\nInput NCBI accession or new line delimitted file of accessions and optionally the column name.\n"
     usage += 'ncbiAccs2fa.py <ACC> <COLNAME>\n'
@@ -62,3 +62,7 @@ if __name__ == '__main__':
         out.write( out_str )
 
     sys.exit( 0 )
+
+
+if __name__ == '__main__':
+    cli()

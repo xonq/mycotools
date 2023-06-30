@@ -657,7 +657,7 @@ def write_data(newick, clusters, output):
             out.write(newick)
 
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser( 
         description = "Sequence clustering with iterative search option." 
@@ -799,3 +799,7 @@ if __name__ == '__main__':
             out.write(dict2fa(output_fa)) 
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

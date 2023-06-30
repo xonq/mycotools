@@ -563,7 +563,7 @@ def aamain( gff_dicts, assem_dict, spacer = '\t' ):
     return genes_fa_dict
 
             
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser(
        description = 'Inputs MycoDB compatible gff3, assembly (optional), ' + \
@@ -613,3 +613,7 @@ if __name__ == '__main__':
                 ), flush = True)
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

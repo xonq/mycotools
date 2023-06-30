@@ -7,7 +7,7 @@ from Bio import SeqIO
 def main(in_file, in_fmt, out_fmt):
     SeqIO.convert(in_file, in_fmt, sys.stdout, out_fmt)
 
-if __name__ == '__main__':
+def cli():
     usage = 'bioreform.py <INPUT_FILE> <OUT_FORMAT> [IN_FORMAT]' \
           + '\nIN_FORMAT is required for ambiguous extensions'
     args = sys_start(sys.argv[1:], usage, 2, files = [sys.argv[1]])
@@ -28,3 +28,7 @@ if __name__ == '__main__':
     
     main(in_file, in_fmt, out_fmt)
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

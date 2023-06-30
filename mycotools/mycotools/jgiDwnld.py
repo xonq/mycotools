@@ -583,7 +583,7 @@ def main(
     return df, ome_set
 
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser( description = \
         "Imports table/database with JGI `assembly_acc` column and downloads assembly, proteome, gff, " + \
@@ -654,3 +654,6 @@ if __name__ == '__main__':
 
     outro(start_time)
 
+
+if __name__ == '__main__':
+    cli()

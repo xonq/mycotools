@@ -155,7 +155,7 @@ def famain(accs, fa, ome = None):
     return fa_dict
 
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser(description = 'Inputs accession, extracts fasta')
     parser.add_argument('-a', '--accession', help = '"-" for stdin. For coordinates ' + \
@@ -210,3 +210,6 @@ if __name__ == '__main__':
 
     print(fasta_str.rstrip() , flush = True)
     sys.exit(0)
+
+if __name__ == '__main__':
+    cli()

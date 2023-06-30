@@ -71,7 +71,7 @@ def restrictions(db, restr_list, mtdb_config = format_path('~/.mycotools/config.
         out.write('\n'.join(['\t'.join(x) for x in restricted]))
     
 
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser(description = 'Primary MycotoolsDB management utility')
     parser.add_argument('-c', '--clear_cache', action = 'store_true',
                         help = 'Clear MycotoolsDB legacy data')
@@ -99,3 +99,7 @@ if __name__ == '__main__':
         rm_outdated(mtdb(primaryDB())['ome'], args.yes)
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

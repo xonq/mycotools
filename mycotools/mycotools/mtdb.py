@@ -176,5 +176,9 @@ def main(argv = sys.argv):
         sys.exit(1)
 
 
-if __name__ == '__main__':
+def cli():
     main(sys.argv)
+
+
+if __name__ == '__main__':
+    cli()

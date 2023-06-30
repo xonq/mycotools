@@ -282,7 +282,7 @@ def main(in_path, log_path = None, cpus = 1):
         
 
 
-if __name__ == '__main__':
+def cli():
 
     output = False
     usage = '\nUSAGE: `gff`/`gtf`/`gff3` OR mycotoolsDB, optional output file\n'
@@ -304,3 +304,7 @@ if __name__ == '__main__':
     main(in_path, log_path, os.cpu_count())
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

@@ -303,7 +303,7 @@ def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'}):
 
     return ome_gbks
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser(description = "Inputs MTDB gff or accessions, outputs GenBank file" )
     parser.add_argument('-a', '--accession', help = '"-" for stdin')
@@ -382,3 +382,6 @@ if __name__ == '__main__':
                 print(gbk, flush = True)
 
     sys.exit(0)
+
+if __name__ == '__main__':
+    cli()

@@ -129,7 +129,7 @@ def main(
         return new_db.reset_index()
 
 
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser( description = \
        'Extracts a MycotoolsDB from arguments. E.g.\t`mtdb extract ' + \
        '-l Atheliaceae`' )
@@ -208,3 +208,7 @@ if __name__ == '__main__':
         new_db.df2db( headers = bool(args.headers) )
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

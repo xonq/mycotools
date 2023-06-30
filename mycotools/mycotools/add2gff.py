@@ -280,7 +280,7 @@ def import_toadd_gff(toadd_file):
         toadd_gff = gff2list(toadd_gff_str, path = False)
     return toadd_gff
 
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', help = 'To add gff', required = True)
     parser.add_argument('-a', '--addto', help = 'Add to gff')
@@ -328,3 +328,7 @@ if __name__ == '__main__':
     else:
         print(list2gff(gff_list))
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

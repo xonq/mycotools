@@ -191,7 +191,7 @@ def main(in_path, log_path = None, cpus = 1):
                 print( '{:<25}'.format( info.upper() + ':' ) + str( stats[stat][info] ) , flush = True)
             
 
-if __name__ == '__main__':
+def cli():
     usage = '\nUSAGE: assembly statistics\nAssembly `fasta` or mycotoolsDB, optional output file if using database\n'
     if {'-h', '--help'}.intersection(set(sys.argv)):
         print(usage, flush = True)
@@ -210,3 +210,7 @@ if __name__ == '__main__':
 
     sys.exit(0)
 
+
+
+if __name__ == '__main__':
+    cli()

@@ -1008,7 +1008,7 @@ def blast_main(
     return output_fas
 
 
-if __name__ == '__main__':
+def cli():
 # NEED abstract covered portion
 # NEED max hits after blast compiled
 # NEED hsp option
@@ -1201,3 +1201,7 @@ if __name__ == '__main__':
             out.write( dict2fa(output_fas[query]) )
 
     outro(start_time)
+
+
+if __name__ == '__main__':
+    cli()

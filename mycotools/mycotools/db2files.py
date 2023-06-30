@@ -51,7 +51,7 @@ def hard_main(filetypes, db, output_path):
             except FileNotFoundError:
                 eprint('\tERROR: ' + ome + ' ' + ftype, flush = True)
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser( description = 'Symlinks/copies selected files from database' )
     parser.add_argument( '-d', '--mtdb', default = primaryDB(), help = 'DEFAULT: primaryDB' )
@@ -91,3 +91,7 @@ if __name__ == '__main__':
         hard_main(filetypes, db, output_path)
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

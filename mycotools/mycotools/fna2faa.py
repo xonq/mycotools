@@ -5,7 +5,7 @@ from Bio.Seq import Seq
 from mycotools.lib.kontools import format_path, stdin2str, sys_start
 from mycotools.lib.biotools import fa2dict, dict2fa
 
-if __name__ == '__main__':
+def cli():
     usage = 'Input nucleotide fasta ("-" for stdin), translate to protein fasta'
     args = sys_start(sys.argv[1:], usage, 1)
     if args[0] == '-':
@@ -23,3 +23,7 @@ if __name__ == '__main__':
            for k, v in fna.items()}
     print(dict2fa(faa))
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

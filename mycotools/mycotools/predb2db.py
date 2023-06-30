@@ -522,7 +522,7 @@ def main(
     return omedb.reset_index(), failed
 
 
-if __name__ == '__main__':
+def cli():
     usage = 'Generate a predb file:\npredb2db.py\n\nCreate a mycotoolsdb ' + \
     'from a predb file:\npredb2db.py <PREDBFILE>\n\nCreate a mycotoolsdb ' + \
     'referencing an alternative master database:\npredb2db.py <PREDBFILE> ' + \
@@ -566,3 +566,7 @@ if __name__ == '__main__':
     outdb = assimilate_tax(omedb, tax_dicts)
     outdb.df2db(out_dir + 'predb2db.mtdb')
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

@@ -76,7 +76,7 @@ def dbMain(db, accs, cpus = 1):
     return gffs
 
 
-if __name__ == '__main__':
+def cli():
 
 #    mp.set_start_method('spawn')
     parser = argparse.ArgumentParser( 
@@ -145,3 +145,6 @@ if __name__ == '__main__':
         print(out_str)
 
     sys.exit( 0 )
+
+if __name__ == '__main__':
+    cli()

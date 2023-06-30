@@ -87,7 +87,7 @@ def main(n):
     out = final_group(comb_data, n, out)
     return [sorted(x) for x in out if x]
 
-if __name__ == '__main__':
+def cli():
     usage = 's2subs.py <SAMPLE_NUMBER> [OUTPUT_FILE]'
     if not {'-h', '--help', '-help'}.isdisjoint(set(sys.argv)) \
         or len(sys.argv) < 2:
@@ -109,3 +109,7 @@ if __name__ == '__main__':
                 for x in out
                 ]))
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    cli()

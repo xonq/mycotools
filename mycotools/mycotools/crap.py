@@ -1163,7 +1163,7 @@ def search_main(
             )
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description = 'Mycotools integrated Cluster Reconstruction and Phylogeny (CRAP) pipeline'
         )
@@ -1436,3 +1436,7 @@ if __name__ == "__main__":
             max_hits = args.max_target_seq, ext = out_ext
             )
     outro(start_time)
+
+
+if __name__ == '__main__':
+    cli()

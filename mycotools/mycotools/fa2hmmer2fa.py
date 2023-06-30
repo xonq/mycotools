@@ -146,7 +146,7 @@ def main(
     return output_fas
 
 
-if __name__ == '__main__':
+def cli():
 
     parser = argparse.ArgumentParser( 
         description = 'Runs hmmsearch or nhmmer on a fasta and returns a fasta of hits'
@@ -208,3 +208,7 @@ if __name__ == '__main__':
     outputFas(output_fas, out_dir, fastaname)
 
     outro(start_time)
+
+
+if __name__ == '__main__':
+    cli()

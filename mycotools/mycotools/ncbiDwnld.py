@@ -642,7 +642,7 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
             count = 0
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', required = True, \
     help = 'Space delimited accession; tab delimited file with -c')
@@ -741,3 +741,7 @@ if __name__ == "__main__":
         new_df.to_csv( args.input + '_dwnld', sep = '\t' )
 
     outro(start_time)
+
+
+if __name__ == '__main__':
+    cli()
