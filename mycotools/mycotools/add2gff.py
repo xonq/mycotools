@@ -259,13 +259,26 @@ def prep_mtdb_update(new_gff, ome):
     new_db, failed = predb2db(predb, db.reset_index(), out_dir + 'working/', 
                               exit = True, remove = False)
 
-    update_db_path = out_dir + 'add2gff.db'
+    update_db_path = out_dir + 'add2gff.mtdb'
     count = 1
     while os.path.isfile(update_db_path):
         update_db_path = re.sub(r'_\d+$', '', update_db_path)
         update_db_path += f'_{count}'
         count += 1
     new_db.df2db(update_db_path)
+
+
+def import_toadd_gff(toadd_file):
+    try:
+        toadd_gff = gff2list(toadd_file)
+    except IndexError: # not completely a gff
+        toadd_gff_str = ''
+        with open(toadd_file, 'r') as raw:
+            for line in raw:
+                if len(line.split('\t')) == 9:
+                    toadd_gff_str += line 
+        toadd_gff = gff2list(toadd_gff_str, path = False)
+    return toadd_gff
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -306,9 +319,10 @@ if __name__ == '__main__':
         eprint('\nERROR: -i does not exist', flush = True)
         sys.exit(7)
 
-    replace = bool(args.replace)
+    toadd_gff = import_toadd_gff(toadd_file)
 
-    gff_list, ome = main(gff2list(toadd_file), addto_gff, ome, replace)
+    replace = bool(args.replace)
+    gff_list, ome = main(toadd_gff, addto_gff, ome, replace)
     if args.update:
         prep_mtdb_update(gff_list, ome)
     else:
