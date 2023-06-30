@@ -19,7 +19,7 @@ from datetime import datetime
 from mycotools.lib.kontools import intro, outro, eprint
 from mycotools.lib.dbtools import db2df, df2db, primaryDB
 from mycotools.ncbiDwnld import main as ncbi_dwnld
-from mycotools.predb2db import main as predb2db
+from mycotools.predb2mtdb import main as predb2mtdb
 
 def redundancy_check(db, ncbi_df, duplicates, ass_acc):
     '''should expect that ncbi_df (pd.DataFrame()) is only comprised of biosamples that are

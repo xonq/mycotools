@@ -12,7 +12,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from io import StringIO
-from mycotools.predb2db import main as predb2db
+from mycotools.predb2mtdb import main as predb2mtdb
 from mycotools.lib.kontools import intro, outro
 from mycotools.lib.dbtools import db2df, df2db, readLog, log_editor
 from mycotools.jgiDwnld import jgi_login as jgi_login
