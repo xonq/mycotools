@@ -760,4 +760,6 @@ or systematically truncate the dataset with 3 and reconstruct.
 - [x] update phylogenetic pipeline with fa2clus renovations
 - [x] add partition analysis tutorial
 - [ ] discuss output in crap
+- [ ] add bioreform
+- [ ] convert to wiki
 - [ ] add caveats to outputs of fa2clus, crap, etc
