@@ -1,4 +1,4 @@
-![MycotoolsDB](https://gitlab.com/xonq/mycotools/-/raw/primary/misc/mtdb.png)
+![MycotoolsDB](https://github.com/xonq/mycotools/blob/master/misc/mtdb.png)
 
 # Mycotools Database (MTDB)
 
@@ -189,5 +189,5 @@ may result with downstream scripts.
 
 ## TODO:
 
-- [ ] unify protein id
-- [ ] add plant and animal functions.
+- [x] unify protein id
+- [ ] add plant and animal functions
