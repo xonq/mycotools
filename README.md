@@ -14,38 +14,22 @@ release, though maintaining the software for my use is currently the priority.
 # PURPOSE
 Bring broadscale comparative genomics to the masses. 
 
-Mycotools is a compilation of computational biology tools and database [MycotoolsDB](https://github.com/xonq/mycotools/blob/master/MTDB.md) software that facilitate large-scale fungal comparative genomics. MycotoolsDB locally assimilates all NCBI and MycoCosm (Joint Genome Institute) genomes into a database schema with uniform file curation, scalability, and automation as guiding principles. 
+Mycotools is a compilation of computational biology tools and database
+([MycotoolsDB](https://github.com/xonq/mycotools/blob/master/MTDB.md)) software that facilitate large-scale comparative genomics. MycotoolsDB locally assimilates all NCBI and MycoCosm (Joint Genome Institute) genomes into a database schema with uniform file curation, scalability, and automation as guiding principles. 
 
 - Database initialization is as simple as `mtdb u --init <DIR>`
 - `mtdb u --update` brings the database to the current date
 - The MycotoolsDB (MTDB) uniformly curates the numerous iterations of
-  the `gff`, allowing for reliable analyses and format expectations from
-  multiple eras
+  the `gff` into a consistent standard
 - The `.mtdb` database format enables swift transitions from analyses with datasets of 100,000s genomes to as few as a lineage of interest
-- The MycotoolsDB can be adminstered by one administrator and accessed by
-  multiple users that integrate via `mtdb -i <DB_DIR>`
+- Mycotools software suite includes modules to automate routine-complex
+  comparative genomics
 
 <p align="center">
     <img
         src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png"
     >
 </p>
-
-<br />
-
-Mycotools facilitates routine-complex
-tasks like retrieving locus, `gff`, or `fasta` accessions; running and compiling
-`fasta`s of MycotoolsDB BLAST/hmmsearches; automated phylogenetic analysis
-pipelines from BLAST to Pfam extraction to tree prediction, etc etc. Mycotools
-includes sets of utilities that also enable easy acquisition of batches of
-sequence data using `ncbiDwnld.py` and `jgiDwnld.py`. Please see the [USAGE
-guide](https://github.com/xonq/mycotools/blob/master/USAGE.md) for
-more information.
-
-<br />
-
-# USAGE
-Check out [README.md](https://github.com/xonq/mycotools/blob/master/README.md) for install and the [USAGE.md](https://github.com/xonq/mycotools/blob/master/USAGE.md) for a guide. 
 
 <br />
 
@@ -59,7 +43,7 @@ If Mycotools contribute to your analysis, please cite this git repository (githu
 
 # INSTALL
 
-## 1. Installing miniconda
+## 1. Using an environment manager
 Miniconda3 is a software environment manager:
 
 ```bash
@@ -76,7 +60,7 @@ conda init
 
 <br />
 
-## 2. Setting up miniconda
+## 2. Configuring the environment manager
 Setup and prioritize channels for your miniconda installation. This step must be
 completed for new and old installs.
 
@@ -100,8 +84,8 @@ python3 -m pip install mycotools --upgrade
 mtdb -d
 ```
 
-NOTE: There is an unfortunate build dependency conflict with the conda package,
-so be sure to explicitly run `pip install` as noted above to update the
+NOTE: New builds may conflict with the conda package - please 
+explicitly run `pip install` as noted above to update the
 mycotools package inside the conda environment.
 
 <br />
@@ -118,6 +102,8 @@ mtdb --init <DB_PATH>
 
 You're good to proceed to the
 [usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/USAGE.md)
+
+<br />
 
 ## 4b. ADMINISTRATOR: Initialize a local MycotoolsDB
 ```bash
