@@ -129,9 +129,9 @@ is currently prone to dependency issues and will not update reliably.
 <br /><br /><br />
 
 ### A NOTE ON THE CODE
-Each standalone script is written with `__name__ == '__main__'`, designed to
+Each standalone script is written with a `cli` function, designed to
 handle running the script from the command line, as well as `main` function(s),
-which are importable modules executing the purpose of the script. This enables Mycotools
+which are importable python modules. This enables Mycotools
 to be a pipelining-friendly software suite, both from a command line and
 python scripting standpoint.
 
