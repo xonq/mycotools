@@ -42,11 +42,14 @@ from mycotools.annotationStats import main as annStats
 def mycocosmTermsAndConditions(config):
 
     if config:
-        if config['nonpublished'].lower() in {'yes', 'y'}:
-            nonpublished = 'yes'
-        else:
-            nonpublished = False # weird situation for prokaryotes, how to
-            # handle?
+        try:
+            if config['nonpublished'].lower() in {'yes', 'y'}:
+                nonpublished = 'yes'
+            else:
+                nonpublished = False # weird situation for prokaryotes, how to
+                # handle?
+        except AttributeError:
+            nonpublished = False
     else:
         print('\nPlease review JGIs use-restricted data policy here: ' \
             + 'https://jgi.doe.gov/user-programs/pmo-overview/policies/' \
