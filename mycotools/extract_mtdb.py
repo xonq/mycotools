@@ -12,6 +12,9 @@ from collections import defaultdict
 from mycotools.lib.kontools import file2list, intro, outro, format_path, eprint
 from mycotools.lib.dbtools import mtdb, primaryDB
 
+# NEED to fix when same lineage multiple ranks, e.g. Tremellales sp. will be listed
+# as an order and as a genus
+
 def infer_rank(db, lineage):
     linlow, rank = lineage.lower(), None
     for ome, row in db.items():
@@ -20,6 +23,7 @@ def infer_rank(db, lineage):
                         for k,v in zip(row['taxonomy'].values(), 
                                        row['taxonomy'].keys())}
             rank = rev_dict[lineage]
+            
 
     if not rank:
         raise KeyError(f'no entry for {lineage}')
