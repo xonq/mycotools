@@ -37,6 +37,7 @@ uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/mas
 	- [Downloading from NCBI / JGI](https://github.com/xonq/mycotools/blob/master/USAGE.md#downloading-files)
 	- [Sequence data statistics](https://github.com/xonq/mycotools/blob/master/USAGE.md#sequence-data-statistics)
 	- [Grabbing accessions](https://github.com/xonq/mycotools/blob/master/USAGE.md#grab-accessions)
+	- [Grabbing full GenBank](https://github.com/xonq/mycotools/blob/master/USAGE.md#full-genome-genbanks)
 	- [Extract fasta coordinates](https://github.com/xonq/mycotools/blob/master/USAGE.md#fasta-coordinates)
 	- [Grabbing loci](https://github.com/xonq/mycotools/blob/master/USAGE.md#grab-loci)
 	- [GFF to sequence](https://github.com/xonq/mycotools/blob/master/USAGE.md#gene-coordinates-to-sequences)
@@ -390,6 +391,19 @@ Alternatively, input accessions from stdin:
 echo "pancya1_PPQ80975.1" | acc2gbk -a -
 ```
 
+<br />
+
+### Full genome GenBanks
+Full genome GenBanks (GBKs) are not available by default to save space.
+To retrieve a full genome GBK, simply append `--full` to the `acc2gbk`
+command and change `-a` from an accession to an ome code.
+
+```bash
+acc2gbk -f -a athter2.2 > athter2.2.full.gbk
+```
+
+<br />
+
 ### Grab loci
 ### acc2locus
 Grab loci the same as above within a set number of genes plus or minus:
@@ -444,6 +458,7 @@ acc2locus -a <OME>_<ACC> -p 5 --ome
 ```
 
 <br /><br />
+
 ## Fasta coordinates
 ### coords2fa
 
