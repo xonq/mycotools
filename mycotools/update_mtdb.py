@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+#NEED to add taxonomy for --add options
 #NEED reinit implementation
 #NEED to update introduction
 #NEED a verbose option

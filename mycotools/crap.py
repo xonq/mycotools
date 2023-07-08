@@ -46,6 +46,8 @@ from mycotools.ome2name import main as ome2name
 from mycotools.db2microsyntree import compile_homolog_groups
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
+
+
 def parse_conversion_file(conversion_file):
     with open(conversion_file, 'r') as raw:
         data = [x.rstrip().split('\t') for x in raw]
@@ -216,6 +218,7 @@ def run_fa2clus(
                    output_path, output + '../' + str(out_name) + '.fa')
 
     return True, overshot, fa2clus_log
+
 
 def outgroup_mngr(
     db, focal_gene, min_seq, max_seq, clus_dir, wrk_dir,
@@ -553,6 +556,8 @@ def svgs2tree(input_gene, og, tree_data, db, tree_path,
     tree_info = re.search(r'(.*\.)([^\.]+)$', tree_path)
     with open(tree_info[1] + adj + '.' + tree_info[2], 'w') as out:
         out.write(new_tree)
+    with open(tree_info[1] + adj + '.omes.' + tree_info[2], 'w') as out:
+        out.write(tree.write())
 
     tree = Tree(new_tree)
     ts = TreeStyle()
@@ -1309,23 +1314,13 @@ def cli():
         sys.exit(12)
 
     input_fa, input_GFF = False, False
+
+
     if args.query == '-':
         if args.gff:
             eprint('\nERROR: GFF input requires fasta input', flush = True)
             sys.exit(3)
         input_genes = stdin2str().replace('"','').replace("'",'').split()
-    elif os.path.isfile(args.query):
-        if args.query.lower().endswith((
-            '.fasta', '.fa', '.faa', '.fna', '.fsa'
-            )):
-            input_fa = fa2dict(args.query)
-            input_genes = list(input_fa.keys())
-            if args.gff:
-                input_GFF = gff2list(format_path(args.gff))
-        else:
-            with open(args.query, 'r') as raw:
-                data = raw.read()
-            input_genes = data.rstrip().split()
     elif "'" in args.query or '"' in args.query:
         if args.gff:
             eprint('\nERROR: GFF input requires fasta input', flush = True)
@@ -1333,6 +1328,29 @@ def cli():
         input_genes = args.query.replace('"','').replace("'",'').replace(',', ' ').split()
     else:
         input_genes = args.query.replace('"','').replace("'",'').replace(',', ' ').split()
+
+    db = mtdb(args.mtdb)
+    gene0 = input_genes[0]
+    ome = input_genes[0][:input_genes[0].find('_')]
+    if not ome in set(db['ome']):
+        if os.path.isfile(args.query):
+            if args.query.lower().endswith((
+                '.fasta', '.fa', '.faa', '.fna', '.fsa'
+                )):
+                input_fa = fa2dict(args.query)
+                input_genes = list(input_fa.keys())
+                if args.gff:
+                    input_GFF = gff2list(format_path(args.gff))
+            else:
+                with open(args.query, 'r') as raw:
+                    data = raw.read()
+                input_genes = data.rstrip().split()
+        else:
+            print('\nDetected non-mycotools input', flush = True)
+            if not input_fa or not args.search:
+                eprint('\tnon-mycotools input requires -s, -i as a fasta, optionally -g', flush = True)
+                sys.exit(4)
+
 #        eprint('\nERROR: invalid input', flush = True)
  #       sys.exit(2)
 
@@ -1383,15 +1401,6 @@ def cli():
         }
 
     start_time = intro('Mycotools OHCrap', args_dict, 'Jason Slot, Zachary Konkel')
-
-    db = mtdb(args.mtdb)
-    gene0 = input_genes[0]
-    ome = input_genes[0][:input_genes[0].find('_')]
-    if not ome in set(db['ome']):
-        print('\nDetected non-mycotools input', flush = True)
-        if not input_fa or not args.search:
-            eprint('\tnon-mycotools input requires -s, -i as a fasta, optionally -g', flush = True)
-            sys.exit(4)
 
     if args.conversion:
         conversion_dict = parse_conversion_file(format_path(args.conversion))

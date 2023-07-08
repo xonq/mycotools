@@ -7,3 +7,8 @@ prepUpdate.py
 *.pyc
 include.txt
 build.sh
+update_mtdb
+extract_mtdb
+pred2mtdb
+mtdb
+manage_mtdb

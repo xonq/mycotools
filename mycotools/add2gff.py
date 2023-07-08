@@ -15,6 +15,7 @@ from collections import defaultdict
 from mycotools.lib.kontools import sys_start, format_path, eprint, mkOutput
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps, \
     gff2Comps, gtfComps
+from mycotools.utils.curGFF3 import rename_and_organize
 
 
 def determine_version(toadd_gff, ome = None):
@@ -222,7 +223,8 @@ def main(toadd_gff, addto_gff = [], ome = None, replace = False):
     toadd_gff, comps = determine_version(toadd_gff, ome = ome)
     curadd_gff = parse_toadd(toadd_gff, comps, ome, max_mtdb_acc)
     out_gff = add_to_mtdb_gff(curadd_gff, addto_gff, ome, replace)
-    return out_gff, ome
+    final_gff = rename_and_organize(out_gff)
+    return final_gff, ome
 
 
 def prep_mtdb_update(new_gff, ome):

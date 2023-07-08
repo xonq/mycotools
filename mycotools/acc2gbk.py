@@ -38,7 +38,9 @@ def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
     return cds_dict
 
 def contig2gbk(ome, row, contig, contig_dict, 
-               contig_seq, faa, product_searches = {'product': r'product=([^;]+)'}):
+               contig_seq, faa, 
+               product_searches = {'product': r'product=([^;]+)'},
+               full = False):
     """Generate a genbank string for a contig_dict, which contains a dictionary
     of protein keys and list of each gff entry associated with the protein. 
     ome: ome_code
@@ -58,6 +60,10 @@ def contig2gbk(ome, row, contig, contig_dict,
     # sort the coordinates
     seq_coords.sort(key = lambda x: x[0])
     # the starting index
+    if full:
+        seq_coords.insert(0, [1, 1])
+        seq_coords.append([len(contig_seq), len(contig_seq)])
+
     init_start_test = int(seq_coords[0][0]) - 1
     init_end_test = int(seq_coords[-1][1])
     end_test = init_end_test - init_start_test # relative end
@@ -268,12 +274,12 @@ def contig2gbk(ome, row, contig, contig_dict,
     gbk += '//'
     return gbk
 
-def gen_gbk(ome_dict, row, fna, faa, ome, product_searches):
+def gen_gbk(ome_dict, row, fna, faa, ome, product_searches, full = False):
 
     gbk = {}
     for contig, contig_dict in ome_dict.items():
         gbk[contig] = contig2gbk(ome, row, contig, contig_dict, 
-                   fna[contig]['sequence'], faa, 
+                   fna[contig]['sequence'], faa, full = full,
                    product_searches = product_searches)
 
     return gbk
@@ -291,7 +297,9 @@ def ome_main(ome, gff_lists, row, product_searches = {'product': r'product=([^;]
     return gbks
 
 
-def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'}):
+
+def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'}, 
+         full = False):
     cds_dict = col_CDS(gff_list, 
             types = {'gene', 'CDS', 'exon', 'mRNA', 
                      'tRNA', 'rRNA', 'RNA', 'pseudogene'})
@@ -299,7 +307,8 @@ def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'}):
     for ome, ome_dict in cds_dict.items():
         fna = fa2dict(db[ome]['fna'])
         faa = fa2dict(db[ome]['faa'])
-        ome_gbks[ome] = gen_gbk(ome_dict, db[ome], fna, faa, ome, product_searches)
+        ome_gbks[ome] = gen_gbk(ome_dict, db[ome], fna, faa, ome, product_searches,
+                                full = full)
 
     return ome_gbks
 
@@ -308,6 +317,8 @@ def cli():
     parser = argparse.ArgumentParser(description = "Inputs MTDB gff or accessions, outputs GenBank file" )
     parser.add_argument('-a', '--accession', help = '"-" for stdin')
     parser.add_argument('-i', '--input', help = 'File with accessions')
+    parser.add_argument('-f', '--full', action = 'store_true',
+        help = 'Whole genome; -a must be an ome code')
     parser.add_argument('-g', '--gff', help = 'GFF3 input')
     parser.add_argument('-p', '--product', 
         help = 'Product regular expression: DEFAULT: "Product=([^;]+)"')
@@ -321,6 +332,8 @@ def cli():
     parser.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 
+
+    # gather accessions from various input styles and split into a list
     if args.input:
         input_file = format_path(args.input)
         with open(input_file, 'r') as raw:
@@ -344,6 +357,12 @@ def cli():
     elif not args.gff:
         raise FileNotFoundError('need input file or accession')
 
+    if args.full:
+        if any('_' in x for x in accs):
+            eprint('\nERROR: -f requires omes, not accessions', flush = True)
+            sys.exit(3)
+
+    # create a default regular expression for the product name
     if not args.product:
         regex = r'Product=([^;])+'
     else:
@@ -359,13 +378,19 @@ def cli():
     db = mtdb(format_path(args.mtdb))
     db = db.set_index() 
 
+    # various output formats
     gbk_dict = {}
     if args.gff:
-        gbk_dict = main(gff2list(format_path(args.gff)), db, {'product': regex})
-    else:
+        gbk_dict = main(gff2list(format_path(args.gff)), db, {'product': regex},
+                        full = args.full)
+    elif not args.full:
         gffs = acc2gff(db, accs, args.cpu)
         for ome, gff in gffs.items():
             gbk_dict[ome] = main(gff, db, {'product': regex})[ome]
+    else:
+        gffs = {ome: db[ome]['gff3'] for ome in accs}
+        for ome, gff_p in gffs.items():
+            gbk_dict[ome] = main(gff2list(gff_p), db, {'product': regex}, args.full)[ome]
     
     if args.ome:
         for ome, gbks in gbk_dict.items():
@@ -381,7 +406,8 @@ def cli():
             for contig, gbk in gbks.items():
                 print(gbk, flush = True)
 
-    sys.exit(0)
 
 if __name__ == '__main__':
     cli()
+    sys.exit(0)
+
