@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mycotools"
-version = "0.30.21"
+version = "0.30.24"
 authors = [{name="Zachary Konkel", email="konkelzach@protonmail.com"}]
 description = "Bleeding-edge comparative genomics automation and standardization software"
 readme = "README.md"
