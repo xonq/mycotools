@@ -567,7 +567,10 @@ def prep_output(output, mkdir = True, require_newdir = False, cd = False):
 def mkOutput(base_dir, program, reuse = True, suffix = datetime.now().strftime('%Y%m%d')):
     if not os.path.isdir(format_path(base_dir)):
         raise FileNotFoundError(base_dir + ' does not exist')
-    out_dir = format_path(base_dir) + program + '_' + suffix
+    if suffix:
+        out_dir = format_path(base_dir) + program + '_' + suffix
+    else:
+        out_dir = format_path(base_dir) + program
 
     if not reuse:
         count, count_dir = 1, out_dir
