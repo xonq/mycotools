@@ -180,6 +180,18 @@ def compile_trim_cmd(output, mod = '', trimmed = None, ex = 'phylip'):
     return cmd_tuples
 
 
+def compile_hmm_queries(hmm_paths, hmm_out):
+    queries, complete_hmm = [], ''
+    for hmm_path in hmm_paths:
+        with open(hmm_path, 'r') as hmm_raw:
+            hmm_data = hmm_raw.read()
+            queries.extend(grabAccs(hmm_data))
+            complete_hmm += hmm_data + '\n'
+    with open(hmm_out, 'w') as hmm_oh:
+        hmm_oh.write(complete_hmm.rstrip())
+    return queries
+
+
 def hmmer_main(db, hmm_paths, output, accessions, max_hits, query_cov,
                coords = False, evalue = 0.01, bitscore = 0,
                binary = 'hmmsearch', verbose = False, cpu = 1):
@@ -188,14 +200,9 @@ def hmmer_main(db, hmm_paths, output, accessions, max_hits, query_cov,
     faa_dir = output + 'fastas/'
 
     db = db.set_index('ome')
-    queries, complete_hmm, hmm_out = [], '', output + 'query.hmm'
-    for hmm_path in hmm_paths:
-        with open(hmm_path, 'r') as hmm_raw:
-            hmm_data = hmm_raw.read()
-            queries.extend(grabAccs(hmm_data))
-            complete_hmm += hmm_data + '\n'
-    with open(hmm_out, 'w') as hmm_oh:
-        hmm_oh.write(complete_hmm.rstrip())
+    hmm_out = output + 'query.hmm'
+
+    queries = compile_hmm_queries(hmm_paths, hmm_out)
 
     ome_set, skip1 = set(), False
     if os.path.isdir(faa_dir): # is there a previous run?
