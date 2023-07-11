@@ -9,6 +9,6 @@ include.txt
 build.sh
 update_mtdb
 extract_mtdb
-pred2mtdb
+predb2mtdb
 mtdb
 manage_mtdb
