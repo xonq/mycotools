@@ -234,11 +234,15 @@ def contig2gbk(ome, row, contig, contig_dict,
             if entry['phase'] != '.':
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
+            try:
+                inputSeq = faa[alias]['sequence']
+            except KeyError:
+                continue
             gbk += '                     '
             gbk += '/protein_id="' + alias + '"\n'
             gbk += '                     ' + \
                 '/transl_table=1\n                     /translation="'
-            inputSeq = faa[alias]['sequence']
+
             lines = [inputSeq[:45]]
             if len(inputSeq) > 45:
                 restSeq = inputSeq[45:]
