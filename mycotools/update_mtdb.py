@@ -1038,7 +1038,7 @@ def db2primary(addDB, refDB, save = False, combined = False):
     refDB = refDB.set_index()
     if refOmes.intersection(addOmes) and not combined:
         eprint(refOmes.intersection(addOmes), flush = True)
-        raise KeyError('ERROR: ome codes exist in database. Rerun predb2mtdb')
+        raise KeyError('ERROR: ome codes exist in database. Rerun predb2mtdb or remove manually')
     for i, ome in enumerate(addDB['ome']):
         base_ome = re.search(r'^[^\d]+\d+', ome)[0]
         if base_ome in base_ome2update_ome:
@@ -1162,6 +1162,11 @@ def main():
     else:
         date = str(args.resume)
 
+    ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck()
+    Entrez.email = ncbi_email
+    if ncbi_api:
+        Entrez.api_key = ncbi_api
+
     if args.add: # add predb2mtdb 2 master database
         addDB = mtdb(format_path(args.add))
         addDB['aquisition_date'] = [date for x in addDB['ome']] 
@@ -1172,9 +1177,29 @@ def main():
             os.mkdir( update_path )
         shutil.copy(primaryDB(), update_path)
 
+        if config['branch'] == 'prokaryote':
+            jgi = False
+            group = 'prokaryotes'
+            king = 'bacteria' # NEED to make DB tools pull from this
+            rank = 'superkingdom'
+        else:
+            jgi = not args.ncbi_only
+            group = 'eukaryotes'
+            king = 'fungi'
+            rank = 'kingdom'
+     
+        tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
+                                    king=king, rank = rank)
+        addDB = assimilate_tax(addDB, tax_dicts) 
+
+
         new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save = args.save)
         new_db_path = format_path('$MYCODB/' + date + '.mtdb')
+
+
         new_mtdb.df2db(new_db_path)
+
+
 #        if update_omes and args.clear_cache:
  #           for update_ome in update_omes:
   #              ome_gff3 = os.environ['MYCOGFF3'] + update_ome + '.gff3'
@@ -1186,11 +1211,6 @@ def main():
         if new_db_path != db_path:
             os.remove(db_path)
         outro(start_time)
-
-    ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck()
-    Entrez.email = ncbi_email
-    if ncbi_api:
-        Entrez.api_key = ncbi_api
 
     if args.init:
         if args.prokaryote:
