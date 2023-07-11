@@ -87,7 +87,7 @@ def grabCDS(gff_dicts, spacer = '\t'):
             except TypeError:
                 raise TypeError(str(entry))
             mrnas.extend(alias.split('|')) # account for posttranslational mods
-        elif entry['type'] == 'gene':
+        elif 'gene' in entry['type']:
             try:
                 alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
                 genes.extend(alias.split('|'))
