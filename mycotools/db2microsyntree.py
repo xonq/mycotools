@@ -391,8 +391,8 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
                                                             useableOmes)
 
 # remove and reactivate other once otefa is finished
-    if return_post_compile:
-        return ome2i, gene2hg, i2ome, hg2gene, None, None
+ #   if return_post_compile:
+  #      return ome2i, gene2hg, i2ome, hg2gene, None, None
 
 
     
@@ -423,8 +423,8 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
     print('\t\tHGs:', len(hg2gene), flush = True)
     print('\t\tGenes:', len(gene2hg), flush = True)
 
-#    if return_post_compile:
- #       return ome2i, gene2hg, i2ome, hg2gene, None, None
+    if return_post_compile:
+        return ome2i, gene2hg, i2ome, hg2gene, None, None
 
 
      # compile cooccuring pairs of homogroups in each genome
