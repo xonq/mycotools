@@ -112,11 +112,11 @@ def mngr(assembly_path, ome):
     return ome, tuple([(x, calcs[x]) for x in calcs])
 
 
-def main(in_path, log_path = None, cpus = 1):
+def main(in_path, log_path = None, cpus = 1, db = None):
 
     stats = {}
 
-    if in_path.endswith('db'):
+    if in_path.endswith('db') or db:
         head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
             '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
 
@@ -133,7 +133,8 @@ def main(in_path, log_path = None, cpus = 1):
                             ome = line[:omeI]
                             prevOmes[ome] = line[omeI+1:].rstrip()
 
-        db = mtdb(in_path).set_index()
+        if not db:
+            db = mtdb(in_path).set_index()
 
         cmds = []
         for ome in db:

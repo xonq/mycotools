@@ -230,12 +230,13 @@ def compileExon( gff_path, output, ome = None ):
     return ome, geneStats
 
 
-def main(in_path, log_path = None, cpus = 1):
+def main(in_path, log_path = None, cpus = 1, db = None):
 
-    if in_path[-4:] not in {'.gtf', '.gff', 'gff3'}:
+    if in_path[-4:] not in {'.gtf', '.gff', 'gff3'} or db:
         from mycotools.lib.dbtools import mtdb
         import multiprocessing as mp
-        db = mtdb(in_path).set_index()
+        if not db:
+            db = mtdb(in_path).set_index()
 
         prevOmes = {}
         if log_path and os.path.isfile(log_path):
