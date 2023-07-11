@@ -18,6 +18,7 @@ from mycotools.lib.dbtools import mtdb, primaryDB, loginCheck
 from mycotools.utils.gtf2gff3 import main as gtf2gff3
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
+from mycotools.utils.curGFF3 import rename_and_organize as rename_and_organize
 from mycotools.gff2seq import aamain as gff2seq
 
 predb_headers = [
@@ -419,12 +420,12 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
             gffVer = 3
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])
             if alias is not None:
-                if entry['seqid'].startswith(ome + '_'):
-                    alias = True
-                else:
-                    alias = False # remove the old aliases
-                    entry['attributes'] = re.sub(r';?Alias=[^;]+', '',
-                                                entry['attributes'])
+#                if entry['seqid'].startswith(ome + '_'):
+                alias = True
+                #else:
+                 #   alias = False # remove the old aliases
+                  #  entry['attributes'] = re.sub(r';?Alias=[^;]+', '',
+                  #                              entry['attributes'])
             else:
                 break
         elif re.search(gtfComps()['id'], entry['attributes']):
@@ -435,22 +436,27 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
             break
 
     if gffVer == 3:
-        if source == 'new':
-            if alias: #already curated
-                aliasOme = alias[1]
-                for entry in gff:
-                    alias0 = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
-                    alias_num = alias0[alias0.find('_') + 1:]
-                    new_alias = ome + '_' + alias_num
-                    entry['attributes'] = re.sub(
-                        gff3Comps()['Alias'], 'Alias='+ new_alias,
-                        entry['attributes']
-                        )
-            else:
-#                try:
-                gff = curGFF3(gff, ome)
-  #              except:
-#                gff, trans_str, failed, flagged = curRogue(gff, ome)
+#        if source == 'new':
+        if alias: #already curated
+            try:
+                new_gff = copy.deepcopy(gff)
+                old_ome_p = re.search(gff3Comps()['Alias'], new_gff[0]['attributes'])[1]
+                old_ome = old_ome_p[:old_ome_p.find('_')]
+                for entry in new_gff:
+#                    alias0 = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+ #                   alias_num = alias0[alias0.find('_') + 1:]
+#                    new_alias = ome + '_' + alias_num
+ #                   entry['attributes'] = re.sub(
+  #                      gff3Comps()['Alias'], 'Alias='+ new_alias,
+   #                     entry['attributes']
+    #                    )
+                    entry['attributes'] = entry['attributes'].replace(old_ome, ome)
+                new_gff = rename_and_organize(new_gff)
+                gff = new_gff
+            except:
+                gff = curGFF3(gff, ome, cur_seqids = True)
+#        else:
+ #           gff = curGFF3(gff, ome)
         else:
             gff = curGFF3(gff, ome, cur_seqids = True)
     elif gffVer == 2.5:
