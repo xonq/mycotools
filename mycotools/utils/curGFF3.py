@@ -385,6 +385,7 @@ def acquireFormat( gff_list ):
                 return 'jgi_gff3'
             else:
                 return 'misc_gff3'
+
     return None
 
 def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
@@ -693,7 +694,7 @@ def main(gff_path, ome, cur_seqids = False):
     typ = acquireFormat( gff )
 
     if not typ:
-        eprint('\tERROR: type unknown ' + gff_path, flush = True)
+        eprint('\tERROR: type unknown ', flush = True)
         return None
 
     new_gff = curGff3(gff, ome, cur_seqids)
