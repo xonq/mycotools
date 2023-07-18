@@ -301,19 +301,25 @@ def outgroup_mngr(
                 ) # aggclus  (clus_cons is held at 0.2)
         else:
             min_var = max_success['cluster_variable']
-            if not run_min_seq_var:
+            try:
+                if not run_min_seq_var:
+                    max_var = 1
+                else:
+                    max_var = run_min_seq_var
+            except UnboundLocalError: # run_min_seq_var not here
                 max_var = 1
-            else:
-                max_var = run_min_seq_var
             clus_var = max_var - 0.01
-            cluster, null, overshot, fa2clus_log = fa2clus(
-                fa_path, clus_cons, clus_var, run_min_seq, run_max_seq,
-                search_program = algorithm, focal_gene = focal_gene,
-                interval = interval, output = output_path,
-                verbose = verbose, log_path = log_path,
-                spacer = spacer, cpus = cpus, min_var = min_var,
-                max_var = max_var
-                ) # mmseqs
+            try:
+                cluster, null, overshot, fa2clus_log = fa2clus(
+                    fa_path, clus_cons, clus_var, run_min_seq, run_max_seq,
+                    search_program = algorithm, focal_gene = focal_gene,
+                    interval = interval, output = output_path,
+                    verbose = verbose, log_path = log_path,
+                    spacer = spacer, cpus = cpus, min_var = min_var,
+                    max_var = max_var
+                    ) # mmseqs
+            except ClusterParameterError as e:
+                pass
 
     [fa2clus_log['successes'].append(x) for x in fa2clus_log['iterations'] \
      if x['size'] > min_seq and x['size'] < max_seq]
