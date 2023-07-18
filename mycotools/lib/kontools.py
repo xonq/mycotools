@@ -39,6 +39,21 @@ def stdin2str():
     data = data.rstrip()
     return data
 
+def split_input(inp, ignore_white = False):
+    if inp.startswith('"') and inp.endswith('"'):
+        inp = inp[1:-1]
+    elif inp.startswith("'") and inp.endswith("'"):
+        inp = inp[1:-1]
+    if ', ' in inp:
+        out_list = inp.split(', ')
+    elif '; ' in inp:
+        out_list = inp.split('; ')
+    elif ',' in inp:
+        out_list = inp.split(',')
+    elif not ignore_white:
+        out_list = inp.split()
+    return out_list
+
 def hex2rgb(hexCode):
     return tuple(int(hexCode.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
 
