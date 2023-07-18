@@ -15,6 +15,7 @@ from collections import defaultdict
 from mycotools.lib.kontools import sys_start, format_path, eprint, mkOutput
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps, \
     gff2Comps, gtfComps
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.utils.curGFF3 import rename_and_organize
 
 
@@ -95,7 +96,7 @@ def parse_toadd(toadd_gff, comps, ome, mtdb_acc = 0):
                               int(gene_dict['gene']['end'])])
         scaf, source, strand = gene['seqid'], gene['source'], gene['strand']
         score, phase = gene['score'], gene['phase']
-        gene_acc = 'manual' + str(mtdb_acc)
+        gene_acc = ome + '_manual' + str(mtdb_acc)
         if len(gene_dict['rna']) > 1:
             eprint('\nAlternately spliced loci currently not supported')
             sys.exit(2)
@@ -193,16 +194,15 @@ def add_to_mtdb_gff(curadd_gff, addto_gff, ome, replace = False):
                 if seqid in ref_coords:
                     for ref_coord, ref_acc in ref_coords[seqid].items():
                         ref_start, ref_stop = ref_coord
-                        if (start > ref_start and start < ref_stop) or \
-                           (stop > ref_start and stop < ref_stop): # if overlap
+                        if (start >= ref_start and start <= ref_stop) or \
+                           (stop >= ref_start and stop <= ref_stop): # if overlap
                             update[entry['seqid']][ref_acc] = new_acc # what about multiple gene
                             # updates? e.g. fusions? this would delete
                             eprint(ref_acc + '\t->\t' + new_acc, flush = True)
 
-        scafs = set(list(update.keys()))
         out_gff = []
         for entry in addto_gff:
-            if entry['seqid'] in scafs:
+            if entry['seqid'] in update:
                 mtdb_acc = re.search(gff3Comps()['Alias'],
                                      entry['attributes'])[1]
                 if mtdb_acc in update[entry['seqid']]:
@@ -227,10 +227,9 @@ def main(toadd_gff, addto_gff = [], ome = None, replace = False):
     return final_gff, ome
 
 
-def prep_mtdb_update(new_gff, ome):
+def prep_mtdb_update(new_gff, ome, db):
     from mycotools.predb2mtdb import main as predb2mtdb
     from mycotools.lib.dbtools import mtdb, primaryDB
-    db = mtdb(primaryDB()).set_index()
     out_dir = mkOutput(format_path(os.getcwd()), 'add2gff')
     wrk_dir = out_dir + 'working/'
     if not os.path.isdir(wrk_dir):
@@ -291,6 +290,7 @@ def cli():
         help = 'Replace overlapping accession(s)')
     parser.add_argument('-u', '--update', action = 'store_true',
         help = '[-a] Prepare output for mtdb update')
+    parser.add_argument('-d', '--mtdb', default = primaryDB())
     args = parser.parse_args()
 
 #    usage = 'Add gff to an existing mtdb gff.\n' \
@@ -326,7 +326,8 @@ def cli():
     replace = bool(args.replace)
     gff_list, ome = main(toadd_gff, addto_gff, ome, replace)
     if args.update:
-        prep_mtdb_update(gff_list, ome)
+        db = mtdb(format_path(args.mtdb)).set_index()
+        prep_mtdb_update(gff_list, ome, db)
     else:
         print(list2gff(gff_list))
     sys.exit(0)
