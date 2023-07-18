@@ -84,7 +84,7 @@ def compile_alia(gff_path, output, ome = None):
             med_trnas = trna_lens[round(trna_len/2) - 1]
             print('{:<25}'.format('MEDIAN tRNA LENGTH:') + str(med_trnas), flush = True)
         if orna_lens:
-            mean_ornas = sum(orna_lens)/len(orna_len)
+            mean_ornas = sum(orna_lens)/orna_len
             print('{:<25}'.format('OTHER RNA LENGTH:') + str(sum(orna_lens)) , flush = True)
             print('{:<25}'.format('MEAN OTHER RNA LENGTH:') + str(mean_ornas), 
                 flush = True)
@@ -92,7 +92,7 @@ def compile_alia(gff_path, output, ome = None):
             print('{:<25}'.format('MEDIAN OTHER RNA LENGTH:') + str(med_ornas), flush = True)
         if pseudogene_lens:
             mean_pseudogenes = sum(pseudogene_lens)/pseu_len
-            print('{:<25}'.format('PSEUDOGENE LENGTH:') + str(sum(pseu_lens)) , flush = True)
+            print('{:<25}'.format('PSEUDOGENE LENGTH:') + str(sum(pseudogene_lens)) , flush = True)
             print('{:<25}'.format('MEAN PSEUDOGENE LENGTH:') + str(mean_pseudogenes), 
                 flush = True)
             med_pseudogenes = pseudogene_lens[round(pseu_len/2) - 1]
