@@ -406,9 +406,9 @@ acc2gbk -f -a athter2.2 > athter2.2.full.gbk
 
 ### Grab loci
 ### acc2locus
-Grab loci the same as above within a set number of genes plus or minus:
+Grab loci the same as above within a set number of genes or nucleotides (`-n`) plus or minus:
 
-list proximal +/- 5Kb from accession to standard out:
+list proximal +/- 5Kb from accession to standard out; NOTE `-n` for nucleotide:
 ```bash
 acc2locus -a fibpsy1_906341 -p 5000 -n
 fibpsy1_809145
@@ -420,7 +420,7 @@ fibpsy1_846242
 fibpsy1_138
 ```
 
-list proximal +/- 5 genes to standard out:
+list proximal +/- 5 genes to standard out; NOTE no `-n`:
 ```bash
 acc2locus -a fibpsy1_906341 -p 5
 fibpsy1_880711
@@ -436,7 +436,7 @@ fibpsy1_942299
 fibpsy1_906343
 ```
 
-grab genes between two accessions:
+grab genes between two accessions; NOTE `-b` for between:
 ```bash
 acc2locus -a "psicub1_30114 psicub1_87205" -b
 psicub1_30114
