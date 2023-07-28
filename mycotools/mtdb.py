@@ -89,7 +89,7 @@ def main(argv = sys.argv):
     elif {'-d', '--dependencies'}.intersection(set_argv):
         pip_deps = ['dna_features_viewer', 'mycotools']
         dep_cmds = [['conda', 'install', '-y', '-c', 'jlsteenwyk', 'clipkit'],
-                    ['python3', '-m', 'pip', 'install', ' '.join(pip_deps), '--upgrade']]
+                    ['python3', '-m', 'pip', 'install'] + pip_deps + ['--upgrade']]
         for dep_cmd in dep_cmds:
             cmd = subprocess.call(dep_cmd)
             if cmd:
