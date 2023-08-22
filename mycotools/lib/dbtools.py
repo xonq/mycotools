@@ -327,7 +327,7 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
                 hash_pwd = getpass.getpass( prompt = 'New MycoDB login password: ' )
                 hash_check = getpass.getpass( prompt = 'Confirm password: ' )
 
-            key = base64.urlsafe_b64encode(kdf.derive(bytes(hash_pwd)))
+            key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
             fernet = Fernet( key )
             out_data = ncbi_email + '\t' + ncbi_api + '\t' + jgi_email + '\t' + jgi_pwd
             encrypt_data = fernet.encrypt(out_data)
