@@ -391,8 +391,8 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
                                                             useableOmes)
 
 # remove and reactivate other once otefa is finished
- #   if return_post_compile:
-  #      return ome2i, gene2hg, i2ome, hg2gene, None, None
+#    if return_post_compile:
+ #       return ome2i, gene2hg, i2ome, hg2gene, None, None
 
 
     
@@ -423,8 +423,6 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
     print('\t\tHGs:', len(hg2gene), flush = True)
     print('\t\tGenes:', len(gene2hg), flush = True)
 
-    if return_post_compile:
-        return ome2i, gene2hg, i2ome, hg2gene, None, None
 
 
      # compile cooccuring pairs of homogroups in each genome
@@ -436,39 +434,44 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
         )
 
     cooccur_dict = None
-    if not os.path.isfile(out_dir + 'hgps.tsv.gz'):     
-        # assimilate cooccurrences across omes
-        print('\tIdentifying cooccurences', flush = True)
-        
-        seed_len = sum([len(ome2pairs[x]) for x in ome2pairs])
-        print('\t\t' + str(seed_len) + ' initial HG-pairs', flush = True)
-        cooccur_array, cooccur_dict, hgpair2i, i2hgpair = \
-            form_cooccur_structures(ome2pairs, 2, ome2i, cc_arr_path)
-        max_omes = max([len(cooccur_dict[x]) for x in cooccur_dict])
-        print('\t\t' + str(max_omes) + ' maximum organisms with HG-pair', flush = True)
-        cooccur_array[cooccur_array > 0] = 1
-        cooccur_array.astype(np.uint8)
-        print('\t\t' + str(sys.getsizeof(cooccur_array)/1000000) + ' MB', flush = True)
-        cooccur_array, del_omes = remove_nulls(cooccur_array)
-        for i in del_omes:
-            del i2ome[i]
-        
-        ome2i = {v: i for i, v in enumerate(i2ome)}
-        with open(wrk_dir + 'ome2i.tsv', 'w') as out:
-            out.write(
-                '\n'.join([k + '\t' + str(v) for k, v in ome2i.items()])
-                )
-        cooccur_dict = {k: tuple(sorted([ome2i[x] for x in v])) \
-                        for k, v in cooccur_dict.items()}
-        np.save(cc_arr_path, cooccur_array)
+#    if not os.path.isfile(out_dir + 'hgps.tsv.gz'):     
+    # assimilate cooccurrences across omes
+    print('\tIdentifying cooccurences', flush = True)
+    
+    seed_len = sum([len(ome2pairs[x]) for x in ome2pairs])
+    print('\t\t' + str(seed_len) + ' initial HG-pairs', flush = True)
+    cooccur_array, cooccur_dict, hgpair2i, i2hgpair = \
+        form_cooccur_structures(ome2pairs, 2, ome2i, cc_arr_path)
+    max_omes = max([len(cooccur_dict[x]) for x in cooccur_dict])
+    print('\t\t' + str(max_omes) + ' maximum organisms with HG-pair', flush = True)
+    cooccur_array[cooccur_array > 0] = 1
+    cooccur_array.astype(np.uint8)
+    print('\t\t' + str(sys.getsizeof(cooccur_array)/1000000) + ' MB', flush = True)
+    cooccur_array, del_omes = remove_nulls(cooccur_array)
+    for i in del_omes:
+        print(f'\t\t\t{i2ome[i]} removed for lacking overlap')
+        del i2ome[i]
+    
+    ome2i = {v: i for i, v in enumerate(i2ome)}
+    with open(wrk_dir + 'ome2i.tsv', 'w') as out:
+        out.write(
+            '\n'.join([k + '\t' + str(v) for k, v in ome2i.items()])
+            )
+    cooccur_dict = {k: tuple(sorted([ome2i[x] for x in v])) \
+                    for k, v in cooccur_dict.items()}
+    if return_post_compile:
+        return ome2i, gene2hg, i2ome, hg2gene, None, None
+
+
+#        np.save(cc_arr_path, cooccur_array)
 #    elif not os.path.isfile(tree_path):
-    elif not os.path.isfile(tree_path):
-        cooccur_array = np.load(cc_arr_path + '.npy')
+#    elif not os.path.isfile(tree_path):
+ #       cooccur_array = np.load(cc_arr_path + '.npy')
 
     ome2pairs = {ome2i[ome]: v for ome, v in ome2pairs.items() \
                  if ome in ome2i}
     microsynt_dict = {}
-    print('\nII. Building microsynteny tree', flush = True)
+    print('\nII. Microsynteny tree', flush = True)
     if not os.path.isfile(tree_path):
         nschgs = []
         if near_single_copy_genes:
