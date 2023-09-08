@@ -297,7 +297,7 @@ def findExecs( deps, exit = set(), verbose = True ):
     '''
 
     vprint('\nDependency check:', v = verbose, e = True, flush = True)
-    checks = []
+    checks, failed = [], []
     if type(deps) is str:
         deps = [deps]
     for dep in sorted(deps):
@@ -305,11 +305,17 @@ def findExecs( deps, exit = set(), verbose = True ):
         vprint('{:<15}'.format(dep + ':', flush = True) + \
             str(check), v = verbose, e = True)
         if not check and dep in exit:
-            eprint('\nERROR: ' + dep + ' not in PATH', flush = True)
-            sys.exit(300)
+            failed.append(dep)
         else:
             checks.append(check)
 
+    if failed:
+        eprint('\nERROR: missing dependencies:', flush = True)
+        for f in failed:
+            vprint(f, v = verbose, e = True)
+        eprint()
+        sys.exit(300) 
+          
     return checks
 
 
