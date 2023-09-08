@@ -303,6 +303,8 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
         jgi_pwd = data[3].rstrip()
     else:
         ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi, jgi)
+        # CURRENTLY THE REST DOESNT WORK, SO SKIP FOR NOW
+        return ncbi_email, ncbi_api, jgi_email, jgi_pwd
         if ncbi and jgi:
             hash_check = input('Would you like to encrypt your login ' + \
                 'information to ' + info_path + ' [Y/n]: ')
