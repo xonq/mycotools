@@ -192,13 +192,17 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
     ft2xt = {'fna$masked': 'assembly', 'fna$unmasked': 'assembly',
              'gff': 'annotation', 'gff3': 'annotation',
              'transcripts': 'annotation', 'est': 'ests and est clusters'}
-    ft2fh = {'fna$masked': 'assembled scaffolds (masked)',
-             'fna$unmasked': 'assembled scaffolds (unmasked)',
-             'gff': 'genes', 'gff3': 'genes', 'transcripts': 'transcripts',
-             'est': 'ests'}
+    ft2fh = {'fna$masked': ['genome assembly (masked)', 
+                            'assembled scaffolds (masked)'],
+             'fna$unmasked': ['assembled scaffolds (unmasked)',
+                            'genome assembly (unmasked)'],
+             'gff': ['genes'], 'gff3': ['genes'], 
+             'transcripts': ['transcripts'],
+             'est': ['ests']}
 
-    ft2fn = {'fna$masked': ['masked'], 
-             'fna$unmasked': ['AssembledScaffolds', 'scaffolds'],
+    ft2fn = {'fna$masked': ['masked', 'Genome Assembly (masked)'], 
+             'fna$unmasked': ['AssembledScaffolds', 'scaffolds',
+                              'Genome Assembly (unmasked)'],
              'gff3': ['GeneCatalog', 'FilteredModels'],
              'transcripts': ['transcripts'],
              'est': ['EST']}
@@ -219,7 +223,8 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
                                                chil1 = chil2
                                                break
                                    for chil2 in chil1:
-                                            if ft2fh[ft] == chil2.attrib['name'].lower():
+                                            if any(x == chil2.attrib['name'].lower() \
+                                                   for x in ft2fh[ft]):
                                                 for chil3 in chil2:
                                                     t_url = chil3.attrib['url']
                                                     if 'get_tape_file' not in t_url \
@@ -316,7 +321,6 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
     filename, url, dwnld_md5 = parse_xml(file_type, xml_file, masked = masked)
     if not dwnld_md5:
         dwnld_md5 = None
-
 
     if url:
         f_urls = {url}
