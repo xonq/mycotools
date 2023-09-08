@@ -428,7 +428,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
 
 
 def dwnld_mngr(
-    data, acc, file_types, output_path, count, remove, api, spacer
+    ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
     ):
     fail = []
     exits, count = download_files( 
@@ -454,7 +454,7 @@ def dwnld_mngr(
     return fail, count
 
 def dwnld_mngr_no_MD5(
-    data, acc, file_types, output_path, count, remove, api, spacer
+    ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
     ):
     run, fail = False, []
     for file_type in file_types:
@@ -547,7 +547,7 @@ def main(
             eprint(spacer + '\t' + str(acc), flush = True)
             if data:
                 fail, count = dwnld_mngr(
-                    data, acc, file_types, output_path,
+                    ncbi_df, data, acc, file_types, output_path,
                     count, remove, api, spacer
                     )
                 if fail:
@@ -571,7 +571,7 @@ def main(
         for acc, data in ass_prots.items():
             eprint(spacer + '\t' + str(acc), flush = True)
             fail, count = dwnld_mngr_no_MD5(
-                data, acc, file_types, output_path, count, remove, api, spacer
+                ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
                 )
             if fail:
                 failed.append(fail)
