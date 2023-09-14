@@ -5,3 +5,5 @@
   naming in dereplication
 - [ ] Address script TODOs "NEEDs"
 - [ ] Build all-in-one stable conda package
+- [ ] Vectorize MTDB class 
+- [ ] Transition code-base to Rust
