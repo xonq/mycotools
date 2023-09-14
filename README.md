@@ -101,15 +101,15 @@ mtdb --init <DB_PATH>
 mtdb update --init <DB_PATH>
 ```
 
-<br />
+<br /><br />
 
 # USAGE
 
 Once installed, you're good to proceed to the
-[usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/USAGE.md)
+[usage guide!](https://github.com/xonq/mycotools/blob/master/USAGE.md)
 
 
-<br />
+<br /><br />
 
 # UPDATE
 Mycotools is currently in an advanced beta state with frequent updates. It is
