@@ -41,8 +41,10 @@ db2search -a hmmsearch -d $(mtdb) \
 <br />
 
 ### Compile the accession names of the single-copy orthologs in preparation for microsynteny tree reconstruction:
-```for i in test_hmmsearch/fastas/*fa; do grep ‘>’ $i >> scos.txt; done
-sed -Ei ‘s/>//’ scos.txt```
+```
+for i in test_hmmsearch/fastas/*fa; do grep ‘>’ $i >> scos.txt; done
+sed -Ei ‘s/>//’ scos.txt
+```
 
 <br />
 
