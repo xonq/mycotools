@@ -2,9 +2,9 @@
 
 # Mycotools Database (MTDB)
 
-MTDBs are locally assimilated, uniformly curated databases of JGI MycoCosm (preferred) and NCBI
-fungal or prokaryotic genomic data. MTDBs are represented in tab delimitted database `.mtdb` reference files,
-which serve as the scaleable input to Mycotools scripts. 
+MTDBs are locally assimilated, uniformly curated databases of local genomes,
+JGI MycoCosm, and NCBI fungal or prokaryotic genomic data. MTDBs are represented in tab delimitted database `.mtdb` reference files,
+which serve as the scalable input to Mycotools scripts. 
 
 Herein are the objectives, standards, and expectations of MTDB and associated files.
 
@@ -13,14 +13,14 @@ Herein are the objectives, standards, and expectations of MTDB and associated fi
 ## OBJECTIVE
 
 Enable broadscale comparative genomics via a systematically curated, automatically
-assembled/updated, scaleable genomics database. MTDB primarily seeks to resolve
+assembled/updated, scalable genomes database. MTDB primarily seeks to resolve
 several outstanding problems in comparative genomics: 
 
-1. Uniformly curate genomic data within and across multiple databases, i.e. the 
+1. Uniformly curate genome data within and across multiple databases, i.e. the 
 inconsistency of the gene coordinates, `gff` file
 2. Promote ease-of-use for scalable and large scale analyses, e.g. transitioning between datasets
 in a phylogenetic analysis
-3. Keep-up with the accelerating deposition of public genomic data via automatic updates
+3. Keep-up with the accelerating deposition of public genome data via automatic updates
 4. Implement a modular comparative genomic analyses toolkit to enable automated pipelining and 
 make routine comparative genomic analyses accessible
 
