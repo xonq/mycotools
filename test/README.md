@@ -28,8 +28,10 @@ guide](https://github.com/xonq/mycotools/blob/master/USAGE.md).
 <br />
 
 ### Identify 14 single-copy orthologs in each genome:
-```db2search -a hmmsearch -d $(mtdb) \
--q scos.hmm -e 2 -c <CPUS> -m 1 -o test_hmmsearch```
+```
+db2search -a hmmsearch -d $(mtdb) \
+-q scos.hmm -e 2 -c <CPUS> -m 1 -o test_hmmsearch
+```
 
 <br />
 
