@@ -8,7 +8,7 @@
 
 # NOTE
 This software is a beta release (prokaryote is alpha state) - errors are
-expected. Kindly raise an issue if they are not in the TODO.md or other issues.
+expected. Kindly raise an issue if the error has not been mentioned.
 If you can find the bug, even better! The goal is to reach a longterm stable
 release, though maintaining the software for my use is currently the priority.
 
@@ -86,7 +86,7 @@ mycotools package inside the conda environment.
 Determine if you are going to link to an already installed database, or become
 the administrator of a new one:
 
-## 4a. USER: Integrate with already initialized MycotoolsDB
+## 3a. USER: Integrate with already initialized MycotoolsDB
 To link with an existing database, fill in `<PATH>` with the database path
 
 ```bash
@@ -95,7 +95,7 @@ mtdb --init <DB_PATH>
 
 <br />
 
-## 4b. ADMINISTRATOR: Initialize a local MycotoolsDB
+## 3b. ADMINISTRATOR: Initialize a local MycotoolsDB
 ```bash
 mtdb update --init <DB_PATH>
 ```
