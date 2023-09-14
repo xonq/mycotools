@@ -10,7 +10,8 @@
 This software is a beta release (prokaryote is alpha state) - errors are
 expected. Kindly raise an issue if the error has not been mentioned.
 If you can find the bug, even better! The goal is to reach a longterm stable
-release, though maintaining the software for my use is currently the priority.
+release with well-annotated PEP8 code, though maintaining the software for my 
+use is currently the priority.
 
 # PURPOSE
 Bring broadscale comparative genomics to the masses. 
