@@ -7,7 +7,8 @@
 <br /><br />
 
 # NOTE
-This software is a beta release (prokaryote is alpha state) - errors are expected. Kindly report them.
+This software is a beta release (prokaryote is alpha state) - errors are
+expected. Kindly raise an issue if they are not in the TODO.md or other issues.
 If you can find the bug, even better! The goal is to reach a longterm stable
 release, though maintaining the software for my use is currently the priority.
 
@@ -35,7 +36,11 @@ Mycotools is a compilation of computational biology tools and database
 
 # CITING
 
-If Mycotools contribute to your analysis, please cite this git repository (github.com/xonq/mycotools) and mention the Mycotools version in line.
+If Mycotools contribute to your analysis, please cite the preprint and mention
+the version in-line. 
+
+Konkel, Z., Slot, J. C. Mycotools: An Automated and Scalable Platform for
+Comparative Genomics. bioRxiv 2023.09.08.556886; doi: https://doi.org/10.1101/2023.09.08.556886
 
 ---
 
@@ -43,24 +48,12 @@ If Mycotools contribute to your analysis, please cite this git repository (githu
 
 # INSTALL
 
-## 1. Using an environment manager
-Miniconda3 is a software environment manager:
-
-```bash
-curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > ~/miniconda3.sh
-bash ~/miniconda3.sh
-```
-
-Activate miniconda and initialize it so it starts up automatically
-```bash
-source activate base # if this fails run conda activate base
-conda init
-```
-
+The installation guide will use miniconda3 as the environment manager. Please
+reference their [install and initialization instructions](https://docs.conda.io/projects/miniconda/en/latest/).
 
 <br />
 
-## 2. Configuring the environment manager
+## 1. Configuring miniconda3
 Setup and prioritize channels for your miniconda installation. This step must be
 completed for new and old installs.
 
@@ -73,7 +66,7 @@ conda config --set channel_priority strict
 
 <br />
 
-## 3. Installing mycotools
+## 2. Installing mycotools
 Make sure `conda` is active, usually by seeing `(base)` in in your shell.
 If not, try `conda activate base` or `source activate base`. 
 
@@ -84,7 +77,7 @@ python3 -m pip install mycotools --upgrade
 mtdb -d
 ```
 
-NOTE: New builds may conflict with the conda package - please 
+NOTE: The conda package is broken on its own, so please 
 explicitly run `pip install` as noted above to update the
 mycotools package inside the conda environment.
 
@@ -100,15 +93,20 @@ To link with an existing database, fill in `<PATH>` with the database path
 mtdb --init <DB_PATH>
 ```
 
-You're good to proceed to the
-[usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/USAGE.md)
-
 <br />
 
 ## 4b. ADMINISTRATOR: Initialize a local MycotoolsDB
 ```bash
 mtdb update --init <DB_PATH>
 ```
+
+<br />
+
+# USAGE
+
+Once installed, you're good to proceed to the
+[usage guide!](https://gitlab.com/xonq/mycotools/-/blob/master/USAGE.md)
+
 
 <br />
 
