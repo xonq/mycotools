@@ -40,8 +40,13 @@ from mycotools.predb2mtdb import main as predb2mtdb
 from mycotools.assemblyStats import main as assStats
 from mycotools.annotationStats import main as annStats
 
-def mycocosmTermsAndConditions(config):
 
+def validate_t_and_c(config):
+    """Validate that user understands and accepts the conditions of
+    use-restricted data, and that responsibility over confirming the
+    desigination of use-restriction is the user's responsibility"""
+
+    # if there is a configuration json, just query that
     if config:
         try:
             if config['nonpublished'].lower() in {'yes', 'y'}:
@@ -51,6 +56,8 @@ def mycocosmTermsAndConditions(config):
                 # handle?
         except AttributeError:
             nonpublished = False
+
+    # if there isnt a configuration, alert the user to use-restriction policies
     else:
         print('\nPlease review JGIs use-restricted data policy here: ' \
             + 'https://jgi.doe.gov/user-programs/pmo-overview/policies/' \
@@ -61,10 +68,11 @@ def mycocosmTermsAndConditions(config):
         check = ''
         if check.lower() not in {'y', 'yes'}:
             check = input('\nDo you agree to honor the terms and conditions ' \
-                  + 'of use-restricted JGI and GenBank data; acknowledge that it is ' \
-                  + 'Mycotools may not comprehensively determine use-restricted' \
-                  + 'designations; and acknowledge that you will validate' \
-                  + 'use-restricted assignments in your local MTDB?' \
+                  + 'of use-restricted JGI and GenBank data; acknowledge that ' \
+                  + 'Mycotools may not comprehensively determine use-restricted ' \
+                  + 'designations; and acknowledge that you will validate ' \
+                  + 'any use-restricted assignments in your local MTDB ' \
+                  + 'prior to publication?' \
                   + '\n\nPlease type [y]es/[N]o if you acknowledge these terms')
         if check.lower() not in {'y', 'yes'}:
             print('\nRerun without --nonpublished', flush = True)
@@ -92,37 +100,9 @@ def gen_config(
     return config
 
 
-def addVars(init_dir, dbtype):
+def add_vars(init_dir, dbtype):
+    """Initialize the environmental variables for MTDB"""
     mtdb_initialize(init_dir, dbtype, init = True)
-        # don't know how this will perform on non-bash or non-profile/non-bash_profile setups
-        # need to change BLAST env var, maybe just insinuate that it is in proteome
-        # need to update scripts to reference mycotoolsdb envvar
-    #    env_vars = 'export MYCOFNA=' + envs['MYCOFNA'] + '\n' + \
-     #       'export MYCOFAA=' + envs['MYCOFAA'] + '\n' + \
-      #      'export MYCOGFF3=' + envs['MYCOGFF3'] + '\n' + \
-       #     'export MYCODB=' + envs['MYCODB'] + '\n' + \
-        #    '# end mycotools database\n'
-
-#        if os.path.isfile( format_path( '~/.bash_profile' ) ):
- #           eprint('\nExporting environment variables to ~/.bash_profile', flush = True)
-  #          with open( format_path( '~/.bash_profile' ), 'r' ) as raw:
-   #             data = raw.read()
-    #        if env_vars not in data:
-     #           data += '\n\n# mycotools database\n' + env_vars
-      #          with open( format_path( '~/.bash_profile' ), 'w' ) as out:
-       #             out.write( data )
-        #elif os.path.isfile( format_path( '~/.profile' ) ):
-         #   eprint('\nExporting environment variables to ~/.profile', flush = True)
-          #  with open( format_path( '~/.profile' ), 'r' ) as raw:
-           #     data = raw.read()
-            #if env_vars not in data:
-             #   data += '\n\n# mycotools database\n' + env_vars
-              #  with open( format_path( '~/.profile' ), 'w' ) as out:
-               #     out.write( data )
-#        else:
- #           eprint('\nERROR: environment variables not in PATH and no existing ' + \
-  #              '~/.bash_profile or ~/.profile to append')
-   #         sys.exit( 4 )
 
 
 def initDB(init_dir, branch, envs, dbtype, date = None, 
@@ -152,6 +132,8 @@ def initDB(init_dir, branch, envs, dbtype, date = None,
     write_json(config, init_dir + 'config/mtdb.json', indent = 1)
 
     if not rogue:
+        # this is a relic, and needs to be adjusted to a central reference if
+        # that is ever created
         if not os.path.isdir( init_dir + 'mtdb' ):
 # NEED TO CHANGE FROM SSH TO LINK ONCE OPEN (config['repository'])
             git_exit = subprocess.call( [
@@ -177,8 +159,10 @@ def initDB(init_dir, branch, envs, dbtype, date = None,
     return output, config
 
 
-def parseForbidden( forbidden_path ):
-
+def parse_forbidden(forbidden_path):
+    """Read the log file containing information on forbidden genomes"""
+    # NEED to be rewritten to reference a central repository forbidden file
+    
     log_path = format_path(forbidden_path)
     if os.path.isfile(log_path):
         log_dict = readLog(log_path)
@@ -188,7 +172,7 @@ def parseForbidden( forbidden_path ):
     return log_dict
 
 
-def addForbidden(
+def add_forbidden(
     tag, source, file_path = None,
     flag = 'failed download'
     ):
@@ -196,8 +180,14 @@ def addForbidden(
     log_editor(file_path, tag, edit)
 
 
-def parseDups(file_path):
-
+def parse_dups(file_path):
+    """Retrieve a file containing replicated genomes and ignore these.
+    This is important for dereplication of discrepant genus naming between NCBI
+    and MycoCosm due to not adhering to conserved genus naming standards and
+    updating relic genus names. It appears that MycoCosm will name genera by
+    their anamorph occassionally, and not the consensus name - though I assume
+    this is also to some extent present in NCBI. Ultimately, a manually curated
+    file is necessary for this and should be held in a central repository."""
     duplicates = {}
     if os.path.isfile(file_path):
         with open(file_path, 'r') as raw:
@@ -655,7 +645,7 @@ def ref_update(
     print('\nInitializing run', flush = True)
     mk_wrk_dirs(update_path)
 #    prev_failed = parseFailed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
-#    duplicates = parseDups(format_path('$MYCODB/../log/duplicates.tsv'))
+#    duplicates = parse_dups(format_path('$MYCODB/../log/duplicates.tsv'))
 
 #    forbid_omes = acq_forbid_omes(
  #       file_path = format_path('$MYCODB/../log/relics.txt')
@@ -793,7 +783,7 @@ def rogue_update(
     print('\nInitializing run', flush = True)
     mk_wrk_dirs(update_path)
     prev_failed = parseFailed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
-    duplicates = parseDups(format_path('$MYCODB/../log/duplicates.tsv'))
+    duplicates = parse_dups(format_path('$MYCODB/../log/duplicates.tsv'))
     forbid_omes = acq_forbid_omes(
         file_path = format_path('$MYCODB/../log/relics.txt')
         )
@@ -820,7 +810,7 @@ def rogue_update(
 
     # run JGI
     if jgi:
-        print('\nAssimilating MycoCosm', flush = True)
+        print('\nAssimilating MycoCosm (1 download/minute)', flush = True)
         jgi_db_path = update_path + date + '.jgi.mtdb'
         mycocosm_path = update_path + date + '.mycocosm.csv'
         jgi_df = dwnld_mycocosm(mycocosm_path)
@@ -896,7 +886,7 @@ def rogue_update(
         new_db = db
         new_dups = duplicates
 
-    print('\nAssimilating NCBI', flush = True)
+    print('\nAssimilating NCBI (10 download/minute w/API key, 3 w/o)', flush = True)
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
         ncbi_predb, new_db, ncbi_failed1, new_dups = ncbi2db( 
@@ -1138,7 +1128,7 @@ def main():
     if args.prokaryote or config['branch'] == 'prokaryote':
         nonpublished = True
     elif args.nonpublished and rogue_bool: 
-        nonpublished = mycocosmTermsAndConditions(config)
+        nonpublished = validate_t_and_c(config)
     elif args.nonpublished and not rogue_bool:
         eprint('\nERROR: Specify --rogue to assimilate use-restricted data.' , flush = True)
         sys.exit(5)
