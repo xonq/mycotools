@@ -18,10 +18,13 @@ def compile_alia(gff_path, output, ome = None):
         defaultdict(list), defaultdict(list), defaultdict(list), \
         defaultdict(list)
     for entry in gff:
-        try:
-            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
-        except TypeError:
-            raise TypeError(f'entry without MTDB alias: {entry}')
+        # Perform the search
+        alias_match = re.search(gff3Comps()['Alias'], entry['attributes'])
+        # Check if a match was found
+        if alias_match:
+            alias = alias_match.group(1)  # Access the captured group
+        else:
+            alias = None  # Set a default value if no match was found
         if entry['type'].lower() == 'gene':
             gene_dict[alias].append(sorted((entry['start'], entry['end'])))
         elif entry['type'].lower() == 'cds':
