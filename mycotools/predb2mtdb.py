@@ -165,7 +165,7 @@ def predb2mtdb(predb):
         predb['previous_ome'] = predb['ome']
     elif not 'previous_ome' in predb:
         predb['previous_ome'] = \
-            [None for x in predb[list(predb.keys())[0]]]
+            ['' for x in predb[list(predb.keys())[0]]]
     for i, code in enumerate(predb['genus']):
         toAdd = {
             'assembly_acc': predb['assembly_acc'][i],
