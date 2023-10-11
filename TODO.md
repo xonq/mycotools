@@ -86,6 +86,7 @@
 - [ ] error check FAA
 
 ### update_mtdb
+- [ ] optimize dereplication, currently too slow
 - [ ] update introduction output
 - [ ] need a verbose option
 - [ ] reversion option
