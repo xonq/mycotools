@@ -49,5 +49,7 @@ sed -Ei ‘s/>//’ scos.txt
 <br />
 
 ### Reconstruct a microsynteny tree referencing gene neighborhoods of single-copy orthologs and constrained by the topology of the phylogenomic tree:
-```db2microsyntree -c <CPUS> -d $(mtdb) -t \
-test_phylo/concatenated.nex.contree -f scos.txt```
+```
+db2microsyntree -c <CPUS> -d $(mtdb) -t \
+test_phylo/concatenated.nex.contree -f scos.txt
+```
