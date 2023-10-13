@@ -86,7 +86,9 @@
 - [ ] error check FAA
 
 ### update_mtdb
-- [ ] optimize dereplication, currently too slow
+- [x] optimize dereplication, currently too slow
+- [ ] initial JGI predb2mtdb fails because assemblyPath doesn't exist as a
+  column, but restarts are fine
 - [ ] update introduction output
 - [ ] need a verbose option
 - [ ] reversion option
