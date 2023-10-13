@@ -271,7 +271,7 @@ def parse_true_ncbi(file_path):
             out.write('#ncbi_acc')
     else:
         with open(file_path, 'r') as raw:
-            true_ncbi = set([x.rstrip() for x in raw])
+            true_ncbi = set([x.rstrip() for x in raw if not x.startswith('#')])
 
     return true_ncbi
 
@@ -510,15 +510,17 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
 
     todel = []
     jgi2ncbi, jgi2biosample = {v: k for k, v in ncbi2jgi.items()}, {}
+    ass_count = 0
 
     for i, row in ncbi_df.iterrows():
         if row['assembly_acc'] in ncbi2jgi:
             jgi2biosample[ncbi2jgi[row['assembly_acc']]] = \
                 row['BioSample Accession']
             todel.append(i)
-        elif row['assembly_acc'] in fails:
-            todel.append(i)
-        else:
+#        elif row['assembly_acc'] in fails:
+ #           pass
+#            todel.append(i)
+        elif row['assembly_acc'] not in fails:
             ass_uid = esearch_ncbi(row['assembly_acc'],
                                    'assembly', 'assembly')
             ncbi_df.at[i, 'uid'] = ass_uid
@@ -537,17 +539,19 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
                 ]): # very crude, but mycocosm does not give the option to be
                 # systematic
                 todel.append(i)
-                jgi2ncbi[ass_name.lower()] = row['assembly_acc']
-                jgi2biosample[ass_name.lower()] = \
+                jgi2ncbi[ass_name.lower() + f'${ass_count}'] = row['assembly_acc']
+                jgi2biosample[ass_name.lower() + f'${ass_count}'] = \
                     row['BioSample Accession']
+                ass_count += 1
             else:
                 fails.add(row['assembly_acc'])
 
     ncbi_jgi_overlap = pd.DataFrame(columns = ncbi_df.columns)
-    for i in reversed(todel):
-        ncbi_jgi_overlap = pd.concat([ncbi_jgi_overlap, ncbi_df.loc[i]])
-        ncbi_df = ncbi_df.drop(i)
-
+    ncbi_jgi_overlap = ncbi_df.loc[todel]
+    ncbi_df = ncbi_df.drop(todel)
+#    for i in reversed(todel):
+ #       ncbi_jgi_overlap = pd.concat([ncbi_jgi_overlap, ncbi_df.loc[i]])
+#        ncbi_df = ncbi_df.drop(i)
     
     return ncbi_df, jgi2ncbi, jgi2biosample, fails, ncbi_jgi_overlap
 
@@ -817,14 +821,14 @@ def rogue_update(
         # acquire the mycocosm master table
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
-        ncbi2jgi = parse_ncbi2jgi(format_path('$MYCODB/../log/ncbi2jgi.tsv'))
-        true_ncbi = parse_true_ncbi(format_path('$MYCODB/../log/true_ncbi.tsv'))
+        ncbi2jgi = parse_ncbi2jgi(update_path + '../ncbi2jgi.tsv')
+        true_ncbi = parse_true_ncbi(update_path + '../true_ncbi.tsv')
         ncbi_df, jgi2ncbi, jgi2biosample, true_ncbi, ncbi_jgi_overlap = \
             rm_ncbi_overlap(ncbi_df, jgi_df, ncbi2jgi, true_ncbi, api = api)
         print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
              flush = True)
-        add_true_ncbi(true_ncbi, format_path('$MYCODB/../log/true_ncbi.tsv'))
-        add_ncbi2jgi(jgi2ncbi, format_path('$MYCODB/../log/ncbi2jgi.tsv'))
+        add_true_ncbi(true_ncbi, update_path + '../true_ncbi.tsv')
+        add_ncbi2jgi(jgi2ncbi, update_path + '../ncbi2jgi.tsv')
         for i, row in jgi_df.iterrows():
             if row['portal'].lower() in jgi2ncbi:
                 jgi_df.at[i, 'biosample'] = jgi2biosample[
@@ -887,7 +891,8 @@ def rogue_update(
         new_dups = duplicates
 
     print('\nAssimilating NCBI (10 download/minute w/API key, 3 w/o)', flush = True)
-    if not os.path.isfile(update_path + date + '.ncbi.predb'):
+    if True:
+#    if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
         ncbi_predb, new_db, ncbi_failed1, new_dups = ncbi2db( 
             update_path, ncbi_df, ref_db = new_db, 
