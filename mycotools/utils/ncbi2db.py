@@ -136,7 +136,7 @@ def main(
             output_str = 'old_assembly_acc\tdb_organism\tncbi_organism\tnew_assembly_acc\n'
             for update in updates:
                 output_str += '\t'.join([str(x) for x in update]) + '\n'
-            with open( out_dir + '/ncbiUpdates.tsv', 'w') as out:
+            with open(out_dir + '/ncbiUpdates.tsv', 'w') as out:
                 out.write(output_str)
             update_check = {i[-2]: i for i in updates if i[0]}
             # dict(update_check) = {assembly_accNEW: [organism, ref organism,
