@@ -255,18 +255,23 @@ def collect_ftps(
             while True:
                 try:
                     esc_count += 1
+                    with requests.get(f'{ftp_path.replace("ftp://", "https://")}') as request:
+                        status_code = request.status_code
                     request = requests.get( 
-                        (ftp_path + '/md5checksums.txt').replace('ftp://','https://'), timeout = 120
+                        (ftp_path + '/md5checksums.txt').replace('ftp://','https://'), 
+                        timeout = 120
                         )
                     break
-                except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
+                except (requests.exceptions.ConnectionError,
+                        requests.exceptions.ReadTimeout,
+                        requests.exceptions.ChunkedEncodingError) as e:
                     if esc_count == 20:
                         eprint(spacer + '\tERROR: Failed to fulfill ftp request!', flush = True)
                         sys.exit(70)
                     count = 0
                     time.sleep(1)
             count += 1
-            if request.status_code != 200:
+            if status_code != 200:
                 eprint(spacer + '\t' + ome + '\tno ' + md5, flush = True)
                 dwnld = 69
             else:
@@ -379,7 +384,8 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
         while True:
             try:
                 esc_count += 1
-                request = requests.get(ftp_link.replace('ftp://','https://'))
+                with requests.get(ftp_link.replace('ftp://','https://')) as request:
+                    status_code = request.status_code
                 break
             except requests.exceptions.ConnectionError:
                 if esc_count == 20:
@@ -388,7 +394,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                 time.sleep(1)
                 count = 0
         count += 1
-        if request.status_code != 200:
+        if status_code != 200:
             eprint(spacer + '\t\t' + file_type + ': ERROR, no file exists', flush = True)
             dwnlds[file_type] = 69
             acc_prots[file_type] = ''
