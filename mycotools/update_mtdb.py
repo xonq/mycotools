@@ -462,13 +462,13 @@ def prep_ncbi_names(ncbi_df):
 
 
 
-def clean_ncbi_df(ncbi_df, group = 'Fungi'):
+def clean_ncbi_df(ncbi_df, kingdom = 'Fungi'):
     ncbi_df = ncbi_df.astype(str).replace(np.nan, '')
     ncbi_df['strain'] = ''
 
-    if group.lower() == 'fungi':
-        # extract group of interest
-        ncbi_df = ncbi_df[ncbi_df['Group'] == group]
+    if kingdom.lower() == 'fungi':
+        # extract group of interest (case sensitive to first letter)
+        ncbi_df = ncbi_df[ncbi_df['Group'] == 'Fungi']
 
     # remove entries without sufficient metadata
     ncbi_df = ncbi_df.dropna(subset = ['genus'])
@@ -803,7 +803,7 @@ def rogue_update(
     pre_ncbi_df0 = dwnld_ncbi_table(update_path + date + '.ncbi.tsv',
                                    group = group) 
     pre_ncbi_df1 = prep_ncbi_names(pre_ncbi_df0)
-    ncbi_df = clean_ncbi_df(pre_ncbi_df1, group = group)
+    ncbi_df = clean_ncbi_df(pre_ncbi_df1, kingdom = kingdom)
     ncbi_df = ncbi_df.rename(columns={'Assembly Accession': 'assembly_acc'})
 
     old_len = len(db['ome'])
@@ -818,6 +818,7 @@ def rogue_update(
         jgi_db_path = update_path + date + '.jgi.mtdb'
         mycocosm_path = update_path + date + '.mycocosm.csv'
         jgi_df = dwnld_mycocosm(mycocosm_path)
+        jgi_df['biosample'] = ''
         # acquire the mycocosm master table
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
@@ -830,7 +831,8 @@ def rogue_update(
         add_true_ncbi(true_ncbi, update_path + '../true_ncbi.tsv')
         add_ncbi2jgi(jgi2ncbi, update_path + '../ncbi2jgi.tsv')
         for i, row in jgi_df.iterrows():
-            if row['portal'].lower() in jgi2ncbi:
+            if row['portal'].lower() in jgi2ncbi \
+                and row['portal'].lower() in jgi2biosample:
                 jgi_df.at[i, 'biosample'] = jgi2biosample[
                     row['portal'].lower()
                     ]
