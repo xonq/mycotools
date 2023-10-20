@@ -8,11 +8,13 @@ import sys
 import gzip
 import time
 import urllib
+import urllib.request
 import requests
 import argparse
 import subprocess
 import numpy as np
 import pandas as pd
+from contextlib import closing
 from Bio import Entrez
 from datetime import datetime
 from mycotools.lib.kontools import intro, outro, format_path, prep_output, eprint, vprint, findExecs
