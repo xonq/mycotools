@@ -255,36 +255,32 @@ def collect_ftps(
             while True:
                 try:
                     esc_count += 1
-                    with requests.get(f'{ftp_path.replace("ftp://", "https://")}') as request:
-                        status_code = request.status_code
-                    request = requests.get( 
-                        (ftp_path + '/md5checksums.txt').replace('ftp://','https://'), 
-                        timeout = 120
-                        )
+                    with closing(urllib.request.urlopen(ftp_path, None, 60)) as r:
+                        with open(output_path + '.tmpmd5', 'wb') as f:
+                            shutil.copyfileobj(r, f)
                     break
                 except (requests.exceptions.ConnectionError,
-                        requests.exceptions.ReadTimeout,
+                        requests.exceptions.ReadTimeout, urllib.error.URLError,
+                        TimeoutError,
                         requests.exceptions.ChunkedEncodingError) as e:
-                    if esc_count == 20:
-                        eprint(spacer + '\tERROR: Failed to fulfill ftp request!', flush = True)
+                    if esc_count == 3:
+                        eprint(spacer + '\tERROR: Network connection failure', flush = True)
                         sys.exit(70)
                     count = 0
                     time.sleep(1)
+
+            dwnld = 0
             count += 1
-            if status_code != 200:
-                eprint(spacer + '\t' + ome + '\tno ' + md5, flush = True)
+            with open( output_path + '.tmpmd5', 'r' ) as raw:
+                for line in raw:
+                    data = line.rstrip().split('  ')
+                    if data:
+                        md5s[ftp_path + '/' + os.path.basename(data[1])] = data[0]
+
+            if not md5s:
+                eprint(f'{spacer}\t{ome}\tno {md5}', flush = True)
                 dwnld = 69
-            else:
-                dwnld = subprocess.call(
-                    ['curl', ftp_path + '/md5checksums.txt', '-o', output_path + '.tmpmd5'], 
-                    stdout = subprocess.PIPE, stderr = subprocess.PIPE
-                    )
-                count += 1
-                with open( output_path + '.tmpmd5', 'r' ) as raw:
-                    for line in raw:
-                        data = line.rstrip().split('  ')
-                        if data:
-                            md5s[ftp_path + '/' + os.path.basename(data[1])] = data[0]
+
             tranname = os.path.basename(ftp_path.replace('/GCA','/GCF'))
             assembly = ftp_path + '/' + basename + '_genomic.fna.gz'
             if assembly in md5s:
@@ -384,13 +380,19 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
         while True:
             try:
                 esc_count += 1
-                with requests.get(ftp_link.replace('ftp://','https://')) as request:
-                    status_code = request.status_code
+                with closing(urllib.request.urlopen(ftp_link, None, 60)) as r:
+                    with open(file_path, 'wb') as f:
+                        shutil.copyfileobj(r, f)
+                status_code = 200
                 break
-            except requests.exceptions.ConnectionError:
-                if esc_count == 20:
-                    eprint(spacer + '\tERROR: Failed to fulfill ftp request!', flush = True)
-                    sys.exit(71)
+            except (requests.exceptions.ConnectionError, urllib.error.URLError,
+                    TimeoutError,
+                    requests.exceptions.ChunkedEncodingError) as e:
+                if esc_count == 3:
+                    eprint(spacer + '\tERROR: Network connection failure', flush = True)
+#                    sys.exit(71)
+                    status_code = 1
+                    break
                 time.sleep(1)
                 count = 0
         count += 1
@@ -412,16 +414,14 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
             continue
 
         count += 1
-        dwnlds[file_type] = subprocess.call(
-            ['curl', ftp_link, '-o', file_path], 
-            stdout = subprocess.PIPE, stderr = subprocess.PIPE
-            )
 
-        if dwnlds[file_type] != 0:
+        if not os.path.isfile(file_path):
+            dwnlds[file_type] = 1
             eprint(spacer + '\t' + file_type + ': ERROR, download failed', flush = True)
             if remove and file_type in {'assembly', 'gff3'}:
                 break
         else:
+            dwnlds[file_type] = 0
             if os.stat(file_path).st_size < 150:
                 eprint(spacer + '\t' + file_type + ': ERROR, file too small', flush = True)
 #                       print('\t' + acc + '\t' + file_type + ' empty', flush = True)
@@ -469,6 +469,7 @@ def dwnld_mngr_no_MD5(
         if not os.path.isfile(file_path):
             run = True
             break
+
     if run:
         exits, count = download_files( 
             data, acc, file_types, output_path, 
