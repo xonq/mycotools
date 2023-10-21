@@ -757,7 +757,7 @@ def ref_update(
 
     tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
-    new_db = assimilate_tax(new_db, tax_dicts) 
+    new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
     dupFiles = { 'fna': {}, 'faa': {}, 'gff3': {} }
 
     if jgi_mtdb and ncbi_mtdb:
@@ -770,6 +770,10 @@ def ref_update(
     else:
         eprint('\nNo updates', flush = True)
         sys.exit(0)
+
+    for ome, row in update_mtdb.items():
+        if row['genus'] in genus_dicts:
+            row['taxonomy'] = genus_dicts[row['genus']]
 
     return new_db, update_mtdb 
 
@@ -942,7 +946,7 @@ def rogue_update(
         rank = 'superkingdom'
     tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
-    new_db = assimilate_tax(new_db, tax_dicts) 
+    new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
     dupFiles = { 'fna': {}, 'faa': {}, 'gff3': {} }
 
     if jgi_mtdb and ncbi_mtdb:
@@ -1187,7 +1191,7 @@ def main():
      
         tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
                                     king=king, rank = rank)
-        addDB = assimilate_tax(addDB, tax_dicts) 
+        addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
 
 
         new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save = args.save)
