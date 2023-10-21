@@ -569,7 +569,7 @@ def cli():
 
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
     tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
-    outdb = assimilate_tax(omedb, tax_dicts)
+    outdb, genus_dicts = assimilate_tax(omedb, tax_dicts)
     outdb.df2db(out_dir + 'predb2mtdb.mtdb')
     sys.exit(0)
 
