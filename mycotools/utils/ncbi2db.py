@@ -21,7 +21,7 @@ from mycotools.lib.dbtools import db2df, df2db, primaryDB
 from mycotools.ncbiDwnld import main as ncbi_dwnld
 from mycotools.predb2mtdb import main as predb2mtdb
 
-def redundancy_check(db, ncbi_df, duplicates, ass_acc):
+def redundancy_check(db, ncbi_df, ass_acc, duplicates = {}):
     '''should expect that ncbi_df (pd.DataFrame()) is only comprised of biosamples that are
     not overlapping with JGI'''
     db['index'], updates, old_rows = db.loc[:, 'ome'], [], {}
@@ -91,7 +91,7 @@ def redundancy_check(db, ncbi_df, duplicates, ass_acc):
     for i in todel_ncbi:
         ncbi_df = ncbi_df.drop(i)
  
-    return ncbi_df, db, updates, old_rows, duplicates
+    return ncbi_df, db, updates, old_rows
 
    
 def main( 
@@ -130,8 +130,8 @@ def main(
     update_check = {}
     if ref_db is not None:
         if len(ref_db) > 0:
-            ncbi_df, ref_db, updates, old_rows, duplicates = redundancy_check( 
-                ref_db, ncbi_df, duplicates, ass_acc
+            ncbi_df, ref_db, updates, old_rows = redundancy_check( 
+                ref_db, ncbi_df, ass_acc
                 )
             output_str = 'old_assembly_acc\tdb_organism\tncbi_organism\tnew_assembly_acc\n'
             for update in updates:
@@ -172,7 +172,7 @@ def main(
              old_ome = update_d[-1]
              ncbi_df.at[assembly_acc, 'ome'] = old_ome
     
-        return ncbi_df.reset_index(), ref_db.reset_index(), failed, duplicates
+        return ncbi_df.reset_index(), ref_db.reset_index(), failed
     else:
         return ncbi_df, ref_db, [], duplicates
 
