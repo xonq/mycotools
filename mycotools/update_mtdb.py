@@ -200,14 +200,15 @@ def parse_dups(file_path):
     return duplicates
 
 
-def addDups(
-    dup_code, dup_entry, file_path
-    ):
-
-    edit = dup_code + '\t' + '\t'.join(dup_entry)
-    log_editor(file_path, dup_code, edit)
+#def add_dups(
+ #   dup_code, dup_entry, file_path
+  #  ):
+#    edit = dup_code + '\t' + '\t'.join(dup_entry)
+ #   log_editor(file_path, dup_code, edit)
 
 def acq_forbid_omes(file_path):
+    """Parse a file with forbidden ome accessions - ome codes that have been
+    used before and are no longer valid"""
     if not os.path.isfile(file_path):
         return set()
     with open(file_path, 'r') as raw:
@@ -215,6 +216,8 @@ def acq_forbid_omes(file_path):
     return relics
 
 def write_forbid_omes(omes, file_path):
+    """Add to a file of forbidden ome accessions so that these are not ever
+    used again, even if the codename is removed from the database"""
     if os.path.isfile(file_path):
         with open(file_path, 'r') as raw:
             old_relics = set([x.rstrip() for x in raw])
@@ -227,8 +230,10 @@ def write_forbid_omes(omes, file_path):
         out.write('\n'.join([str(x) for x in sorted(new_relics)]))
     shutil.move(file_path + '.tmp', file_path)
 
-def parseFailed(file_path = None, rerun = False):
-    
+def parse_failed(file_path = None, rerun = False):
+    """Parse a file that stores the failed accessions and metadata of the
+    attempted acquisition. Return a dictionary that contains the failed
+    accession and its metadata."""
     prev_failed = {}
     if not os.path.isfile(file_path) or rerun:
         with open(file_path, 'w') as out:
@@ -264,7 +269,7 @@ def parse_ncbi2jgi(file_path):
     return ncbi2jgi
 
 def parse_true_ncbi(file_path):
-    """Parse true NCBI data"""
+    """Parse accessions considered to be unique to NCBI"""
     true_ncbi = set()
     if not os.path.isfile(file_path):
         with open(file_path, 'w') as out:
@@ -276,141 +281,40 @@ def parse_true_ncbi(file_path):
     return true_ncbi
 
 def add_true_ncbi(true_ncbi, file_path = None):
+    """Add to a ledger of accessions considered to be unique to NCBI"""
     with open(file_path, 'w') as out:
         out.write('#ncbi_acc\n' + '\n'.join([str(x) for x in list(true_ncbi)]))
 
 def add_ncbi2jgi(jgi2ncbi, file_path = None):
+    """Add to a ledger that seeks to associated NCBI accessions with JGI. This
+    is prone to failure given that the field JGI uses to supply their genome
+    accession is either absent from some NCBI entries, or is in a different
+    field"""
     with open(file_path, 'w') as out:
         out.write('#ncbi_acc\tmycocosm_portal\n')
         for jgi, ncbi in jgi2ncbi.items():
             out.write(ncbi + '\t' + jgi + '\n')
 
-def addFailed(
+def add_failed(
     code, source, version, date,
     file_path    
     ):
-   
+    """Add genomes to the failed acquisition file, including metadata on where
+    it was downloaded, the version attempted to download, and the date of the
+    run"""
+
     version = version.replace('-','').replace(' 00:00:00','') 
     edit = code + '\t' + source + '\t' + version + '\t' + date
     log_editor(file_path, code, edit)
 
-def makeTag( genus, species, strain, assembly_acc, source ):
-    return str(genus) + '_' + str(species) + '_' + \
-        str(strain) + '_' + str(assembly_acc)
-    
-
-# NEED to only remove organisms' specific file types
-def checkFiles(assembly, proteome, gff3):
-
-    assem, prot, gff = False, False, False
-    if assembly and type(assembly) != float:
-        assembly = format_path('$MYCOFNA/' + str(assembly))
-        if os.path.exists(assembly):
-            if os.path.getsize(assembly):
-                assem = True
-            else:
-                os.remove(assembly)
-    else:
-        assem = False
-    if proteome and type(proteome) != float:
-        proteome = format_path('$MYCOFAA/' + str(proteome))
-        if os.path.exists(proteome):
-            if os.path.getsize(proteome):
-                prot = True
-            else:
-                os.remove(proteome)
-    else:
-        prot = True
-    if gff3 and type(gff3) != float:
-        gff3 = format_path('$MYCOGFF3/' + str(gff3))
-        if os.path.exists(gff3):
-            if os.path.getsize(gff3):
-                gff = True
-            else:
-                os.remove(gff3)
-    else:
-        gff = True
-
-    if prot and assem and gff:
-        return True
-
-    return False
-        
-
-
-# NEED TO CHECK FOR BAD OMES TOO
-def checkViability( new_db, old_db, change_db ):
-
-    new_db = new_db.set_index('ome')
-    old_db = old_db.set_index('ome')
-    change_db = change_db.set_index('ome')
-    for key in ['gff3', 'fna', 'faa']:
-        del new_db[key]
-        del old_db[key]
-
-    vchange_db = np.vectorize( lambda x, y, z: y.loc[x] != z.loc[x] )
-    flag_db1 = old_db.assign( **{'flagged': vchange_db( new_db.index, new_db, old_db )})
-    flag_db = flag_db1[flag_db1['flagged'] == True]
-    if type(change_db) is pd.DataFrame:
-        flag_db3 = flag_db.assign( **{'flagged1': vchange_db( flag_db.index, flag_db, change_db) } )
-        flag_db = flag_db3[flag_db3['flagged1'] == True]
-    
-    return flag_db
-
-
-def getMissingEntries( db ):
-
-    missing_db = pd.DataFrame()
-    for i, row in db.iterrows():
-        if not pd.isnull(row['faa']):
-            if not os.path.isfile(os.environ['MYCOFAA'] + '/' + str(row['faa'])):
-                missing_db = missing_db.append(row)
-                continue
-        if not pd.isnull(row['gff3']):
-            if not os.path.isfile(os.environ['MYCOGFF3'] + '/' + str(row['gff3'])):
-                missing_db = missing_db.append(row)
-                continue
-        if not pd.isnull(row['fna']):
-            if not os.path.isfile(os.environ['MYCOFNA'] + '/' + str(row['fna'])):
-                missing_db = missing_db.append(row)
-
-    return missing_db
-
-
-def checkBiofile( row, biotype ):
-    '''Check whether or not the proteome has valid headers. First, if the proteome is specified
-    as `uncur` or `gzipped` then remove `uncur` or `gunzip`. If the proteome does not exist,
-    return code 1. Otherwise, use RE to make sure all headers are `$ome_$accession`. If not, 
-    return code 2.'''
-
-    code = 0
-    ome = row['ome']
-    if not pd.isnull( row[biotype] ):
-        if biotype.lower() == 'proteome':
-            hit = format_path('$MYCOFAA/' + row['faa'])
-            fastadict = fa2dict(hit)
-            for header in fastadict:
-                if not re.search(r'^' + ome + r'\_.+$', header):
-                    code = 2
-                    break
-        else:
-            hit = format_path('$MYCOGFF3/' + row['gff3'])
-            gffdict = gff2list( hit )
-            for line in gffdict:
-                if re.search( r' alias ' + ome + '_', line['attributes'] ):
-                    code = 0
-                elif re.search( r';Alias=' + ome, line['attributes'] ):
-                    code = 0
-            if code == 2:
-                eprint('\tERROR: ' + ome + ' invalid ' + biotype + ' headers', flush = True)
-
-    return code
 
 def dwnld_mycocosm(
     out_file,
     mycocosm_url = 'https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/' + \
         'download-group?flt=&seq=all&pub=all&grp=fungi&srt=released&ord=desc'
     ):
+    """Download the MycoCosm genome data spreadsheet, format to UTF-8 and
+    return a Pandas dataframe of the data"""
 
     if not os.path.isfile(out_file):
         subprocess.call(
@@ -425,11 +329,14 @@ def dwnld_mycocosm(
     jgi_df.columns = [x.replace('"','').replace('"','') for x in jgi_df.columns]
     return jgi_df
 
+
 def dwnld_ncbi_table( 
     ncbi_file,
     ncbi_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/',
     group = 'eukaryotes'
     ):
+    """Download the NCBI genome data spreadsheet for prokaryotes or
+    eukaryotes, and return a Pandas dataframe"""
 
     ncbi_url = ncbi_url + group + '.txt'
     if not os.path.isfile(ncbi_file):
@@ -648,7 +555,7 @@ def ref_update(
     # initialize update
     print('\nInitializing run', flush = True)
     mk_wrk_dirs(update_path)
-#    prev_failed = parseFailed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
+#    prev_failed = parse_failed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
 #    duplicates = parse_dups(format_path('$MYCODB/../log/duplicates.tsv'))
 
 #    forbid_omes = acq_forbid_omes(
@@ -682,7 +589,7 @@ def ref_update(
             jgi_failed.extend(jgi_failed1)
             jgi_mtdb.df2db(jgi_predb_path)
             for failure in jgi_failed:
-                addFailed(failure[0], 'jgi', str(failure[1]), date,
+                add_failed(failure[0], 'jgi', str(failure[1]), date,
                           format_path('$MYCODB/../log/failed.tsv'))
 
         else:
@@ -717,11 +624,11 @@ def ref_update(
             )
 
         for failure in ncbi_failed1:
-            addFailed(failure[0], 'ncbi', str(failure[1]), date,
+            add_failed(failure[0], 'ncbi', str(failure[1]), date,
                       format_path('$MYCODB/../log/failed.tsv'))
 
 #        for dup in new_dups:
- #           addDups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
+ #           add_dups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
         ncbi_predb.to_csv(update_path + date + '.ncbi.predb',
                           sep = '\t', index = None)
     else:
@@ -738,7 +645,7 @@ def ref_update(
                                        cpus = cpus,
                                        remove = remove, spacer = '\t\t')
     for failure in ncbi_failed2:
-        addFailed(failure[0], 'ncbi', str(failure[1]), date,
+        add_failed(failure[0], 'ncbi', str(failure[1]), date,
                   format_path('$MYCODB/../log/failed.tsv'))
     ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
     try:
@@ -790,7 +697,7 @@ def rogue_update(
     # initialize update
     print('\nInitializing run', flush = True)
     mk_wrk_dirs(update_path)
-    prev_failed = parseFailed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
+    prev_failed = parse_failed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
     duplicates = parse_dups(format_path('$MYCODB/../log/duplicates.tsv'))
     forbid_omes = acq_forbid_omes(
         file_path = format_path('$MYCODB/../log/relics.txt')
@@ -843,10 +750,10 @@ def rogue_update(
 
         print('\tDownloading MycoCosm data', flush = True)
         jgi_predb_path = update_path + date + '.jgi.predb2.mtdb'
-        jgi_predb, db, jgi_failed, new_dups = jgi2db( 
+        jgi_predb, db, jgi_failed = jgi2db( 
             jgi_df, db, update_path, jgi_email, jgi_pwd,
             date = date, nonpublished = config['nonpublished'],
-            rerun = rerun, failed_dict = prev_failed, duplicates = duplicates,
+            rerun = rerun, failed_dict = prev_failed,
             jgi2ncbi = jgi2ncbi, repeatmasked = True
             ) # download JGI files and ready predb
 
@@ -868,7 +775,7 @@ def rogue_update(
             jgi_failed.extend(jgi_failed1)
             jgi_mtdb.df2db(jgi_predb_path)
             for failure in jgi_failed:
-                addFailed(failure[0], 'jgi', str(failure[1]), date,
+                add_failed(failure[0], 'jgi', str(failure[1]), date,
                           format_path('$MYCODB/../log/failed.tsv'))
         else:
             jgi_mtdb =  mtdb(jgi_predb_path)
@@ -900,18 +807,18 @@ def rogue_update(
     if True:
 #    if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
-        ncbi_predb, new_db, ncbi_failed1, new_dups = ncbi2db( 
+        ncbi_predb, new_db, ncbi_failed1 = ncbi2db( 
             update_path, ncbi_df, ref_db = new_db, 
             date = date, failed_dict = prev_failed, 
-            rerun = rerun, duplicates = new_dups,
+            rerun = rerun,
             check_MD5 = check_MD5
             )
     
         for failure in ncbi_failed1:
-            addFailed(failure[0], 'ncbi', str(failure[1]), date,
+            add_failed(failure[0], 'ncbi', str(failure[1]), date,
                       format_path('$MYCODB/../log/failed.tsv'))
-        for dup in new_dups:
-            addDups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
+#        for dup in new_dups:
+ #           add_dups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
         refdbncbi = mtdb.pd2mtdb(new_db)
         refdbncbi.df2db(update_path + date + '.ncbi.ref.mtdb')
         ncbi_predb.to_csv(update_path + date + '.ncbi.predb',
@@ -928,7 +835,7 @@ def rogue_update(
                                        forbidden = forbid_omes, cpus = cpus,
                                        remove = remove, spacer = '\t\t')
     for failure in ncbi_failed2:
-        addFailed(failure[0], 'ncbi', str(failure[1]), date,
+        add_failed(failure[0], 'ncbi', str(failure[1]), date,
                   format_path('$MYCODB/../log/failed.tsv'))
     ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
     try:
