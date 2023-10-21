@@ -810,7 +810,7 @@ def rogue_update(
         ncbi_predb, new_db, ncbi_failed1 = ncbi2db( 
             update_path, ncbi_df, ref_db = new_db, 
             date = date, failed_dict = prev_failed, 
-            rerun = rerun,
+            rerun = rerun, duplicates = duplicates,
             check_MD5 = check_MD5
             )
     
