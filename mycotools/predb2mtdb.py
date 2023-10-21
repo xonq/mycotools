@@ -11,6 +11,7 @@ import shutil
 import multiprocessing as mp
 from tqdm import tqdm
 from collections import Counter, defaultdict
+from mycotools.update_mtdb import acq_forbid_omes
 from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gff3Comps, gff2Comps, gtfComps
@@ -565,7 +566,10 @@ def cli():
     predb = read_predb(format_path(sys.argv[1]), spacer = '\t')
     out_dir, wrk_dir = prep_output(os.path.dirname(format_path(sys.argv[1])))
 
-    omedb, failed = main(predb, refDB, wrk_dir, exit = exit, verbose = True)
+    forbid_omes = acq_forbid_omes(file_path = format_path('$MYCODB/../log/relics.txt'))
+
+    omedb, failed = main(predb, refDB, wrk_dir, exit = exit, verbose = True,
+                         forbidden = forbid_omes)
 
     from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
     tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
