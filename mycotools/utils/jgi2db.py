@@ -146,7 +146,7 @@ def JGIredundancyCheck(db, jgi_df, duplicates = {}, ome_col = 'portal',
 
     db = db.reset_index()
 
-    return jgi_df, db, updates, old_omes, duplicates
+    return jgi_df, db, updates, old_omes
 
 
 def runjgi_dwnld(
@@ -259,8 +259,8 @@ def main(
         ref_db['index'] = ref_db['assembly_acc'].copy()
         ref_db = ref_db.set_index( 'index' )
         old_len = len(jgi_df)
-        jgi_df, new_ref_db, updates, old_rows, duplicates = JGIredundancyCheck( 
-            ref_db, jgi_df, duplicates = duplicates, ome_col = ome_col,
+        jgi_df, new_ref_db, updates, old_rows = JGIredundancyCheck( 
+            ref_db, jgi_df, ome_col = ome_col,
             jgi2ncbi = jgi2ncbi
             )
         output_str = 'ome\tdb_organism\tjgi_organism\tassembly_acc\n'
@@ -377,7 +377,7 @@ def main(
         elif not pd.isnull(row['is public']) and row['is public']:
             jgi_premtdb_df.at[i, 'published'] = 1
 
-    return jgi_premtdb_df, new_ref_db.reset_index(), failed, duplicates
+    return jgi_premtdb_df, new_ref_db.reset_index(), failed
 
 
 def cli():
