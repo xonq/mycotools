@@ -4,8 +4,7 @@
 - [ ] Conform old scripts to PEP8 (all)
 - [ ] Build all-in-one stable conda package
 - [ ] Transition code-base to Rust
-- [ ] Universal print class that flushes and formats text spacing well
-  (indexes the print numbers in an accessible way)
+- [ ] implement kon_log class, paying attention to verbosity control
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
