@@ -463,6 +463,7 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
     return ncbi_df, jgi2ncbi, jgi2biosample, fails, ncbi_jgi_overlap
 
 def mk_wrk_dirs(update_path):
+    """Make the download directories in the update path"""
     wrk_dirs = ['faa/', 'fna/', 'gff3/']
     for wrk_dir in wrk_dirs:
         if not os.path.isdir(update_path + wrk_dir):
@@ -470,6 +471,8 @@ def mk_wrk_dirs(update_path):
 
 
 def prepare_ref_db(ref_db, date):
+    """Prepare MTDBs of the data in the reference MTDB that are from the two
+    download sources"""
     ref_db['acquisition_date'] = [date for x in ref_db['acquisition_date']]
     ref_db = ref_db.set_index()
     
@@ -484,11 +487,11 @@ def prepare_ref_db(ref_db, date):
 
     return jgi.mtdb2pd(), ncbi.mtdb2pd()
 
-    
-
-
 
 def internal_redundancy_check(db):
+    """Check the inputted database for overlapping assembly accessions and
+    dereplicate, including those with different versions of the same
+    accession"""
     db = mtdb.pd2mtdb(db).set_index()
     ncbi_db = {k: v for k,v in db.items() if v['source'] == 'ncbi'}
     jgi_db = {k: v for k,v in db.items() if v['source'] == 'jgi'}
@@ -551,6 +554,8 @@ def ref_update(
     jgi = True, group = 'eukaryotes', kingdom = 'Fungi',
     remove = True
     ):
+    """Initialize/Update the primary MTDB based on a reference database
+    acquired external from any existing primary MTDB"""
 # NEED to mark none for new databases' refdb
     # initialize update
     print('\nInitializing run', flush = True)
@@ -685,14 +690,13 @@ def ref_update(
     return new_db, update_mtdb 
 
 
-
-
 def rogue_update(
     db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
     jgi = True, group = 'eukaryotes', kingdom = 'Fungi',
     remove = True
     ):
+    """Initialize/update a standalone primary MTDB"""
 # NEED to mark none for new databases' refdb
     # initialize update
     print('\nInitializing run', flush = True)
@@ -871,42 +875,14 @@ def rogue_update(
 
 
 def rm_raw_data(out_dir):
+    """Remove raw data after completion"""
     for i in ['faa', 'gff3', 'gff', 'xml', 'fna']:
         if os.path.isdir(out_dir + i):
             shutil.rmtree(out_dir + i)
 
 
-def rm_outdated(omes):
-    biofiles, to_del = [], []
-    biofiles.extend(collect_files(os.environ['MYCOGFF3'] + '/', '*'))
-    biofiles.extend(collect_files(os.environ['MYCOFAA'] + '/', '*'))
-    biofiles.extend(collect_files(os.environ['MYCOFNA'] + '/', '*'))
-    to_del.extend(collect_files(os.environ['MYCOFAA'] + '/blastdb/', '*'))
-    for i in biofiles:
-        ome = None
-        ome_prep = os.path.basename(i)
-        if ome_prep.endswith('.gff3'):
-            ome = ome_prep[:-5]
-        elif ome_prep.endswith('.faa'):
-            ome = ome_prep[:-4]
-        elif ome_prep.endswith('.fna'):
-            ome = ome_prep[:-4]
-        else: # safer to preserve independent placements
-            continue 
-        if ome not in omes:
-            to_del.append(i)
-
-    if to_del:
-        data = input('\n' + str(len(to_del)) + ' omes to be deleted.\n' \
-                   + 'Continue [N/y]? ')
-        if data.lower() in {'yes', 'y'}:
-            for i in to_del:
-                os.remove(i)
-        else:
-            raise KeyError('cache removal stopped')
-
-def genSearchDB(update_path, omes):
-
+def gen_algn_db(update_path, omes):
+    """Generate an alignment database for the complete primary MTDB"""
     date = os.path.basename(os.path.abspath(update_path))
     fas = collect_files(os.environ['MYCOFAA'] + '/', '.faa')
     fas = [x for x in fas if os.path.basename(x)[:-6] in omes]
@@ -927,9 +903,11 @@ def genSearchDB(update_path, omes):
         '\nbash ' + update_path + date + '_makeblastdb.sh')
      #bash ' + update_path \
      #   + date + '_mmseqsdb.sh')
-    
-def db2primary(addDB, refDB, save = False, combined = False):
+   
 
+def db2primary(addDB, refDB, save = False, combined = False):
+    """Finalize an update by converting the updated MTDB into the primary
+    MTDB"""
     if save:
         move_ns = shutil.copy
     else:
@@ -975,7 +953,9 @@ def main():
     init_args.add_argument('-p', '--prokaryote', action = 'store_true',
         help = '[PROKARY]: experimental prokaryote MTDB')
     init_args.add_argument('-u', '--update', action = 'store_true')
-    init_args.add_argument('-i', '--init', help = 'Initialize MTDB in dir')
+    init_args.add_argument('-i', '--init', 
+                           help = 'Initialize MTDB in dir; failed inits ' \
+                                + 'must be unlinked via mtdb -u prior to resume')
     init_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
     init_args.add_argument('-r', '--reference', 
         help = '[-i] Initialize primary MTDB using a reference .mtdb')
@@ -1231,7 +1211,7 @@ def main():
     
         eprint('\nGathering annotation statistics', flush = True)
         annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'), 1)
-#        genSearchDB(
+#        gen_algn_db(
  #           update_path, set(full_mtdb['ome'])
   #          )
     else:
