@@ -12,6 +12,57 @@ import subprocess
 from tqdm import tqdm
 from datetime import datetime
 
+class kon_log():
+    '''A print class designed to enable swift string formatting while moving
+    between scripts'''
+
+    def __init__(self, base = 0, spaces = 4, flush = True,
+                 tee = None):
+        '''Initialize a print class with the base index, the number of spaces
+        between bases, whether or not to flush after printing, and a
+        placeholder for a tee variable that will input the path of a log output
+        file to write to'''
+        self._base = base
+        self._spaces = spaces
+        self.flush = flush
+
+    def print(self, print_str, add = 0, stderr = False, flush = None, **kwargs):
+        '''Perform the basic print function'''
+        if flush is None:
+            flush = self.flush
+        else:
+            flush = flush
+        if stderr:
+            print(f"{print_str:>{(self._base + add) * self._spaces}}", 
+                  file = sys.stderr, **kwargs)
+        else:
+            print(f"{print_str:>{(self._base + add) * self._spaces}}", **kwargs)
+
+    def up(self):
+        self._base += 1
+
+    def down(self):
+        if self._base > 0:
+            self._base -= 1
+
+    @property
+    def base(self):
+        return self._base
+
+    @base.setter
+    def base(self, value):
+        if value >= 0:
+            self._x = value
+        else:
+            raise ValueError('base value for print log must be >= 0')
+
+    @base.deleter
+    def base(self):
+        self._base = 0
+
+
+
+
 def checksum(path, cmd = 'sha256', ref = ''):
     if not isinstance(path, list):
         hash_res = subprocess.run([cmd + 'sum', path],
