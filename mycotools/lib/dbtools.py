@@ -704,7 +704,9 @@ def read_tax(taxonomy_string):
 
 # assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database
 # forbid a list of taxonomic classifications you are not interested in and return a new database
-def assimilate_tax(db, tax_dicts, ome_index = 'ome', forbid={'no rank', 'superkingdom', 'subkingdom', 'genus', 'species', 'species group', 'varietas', 'forma'}):
+def assimilate_tax(db, tax_dicts, ome_index = 'ome', 
+                   forbid={'no rank', 'superkingdom', 'subkingdom', 'genus', 
+                           'species', 'species group', 'varietas', 'forma'}):
 
     genera = set(db['genus'])
     tax_dicts = {x: tax_dicts[x] for x in tax_dicts if tax_dicts[x]}
@@ -723,7 +725,7 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome', forbid={'no rank', 'superki
             lambda x: tax_dicts[x['genus']], axis = 1
             )
 
-    return db
+    return db, tax_dicts
 
 def mtdb_disconnect(config, mtdb_config_file = format_path('~/.mycotools/config.json')):
     config['active'] = False

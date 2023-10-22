@@ -4,6 +4,8 @@
 - [ ] Conform old scripts to PEP8 (all)
 - [ ] Build all-in-one stable conda package
 - [ ] Transition code-base to Rust
+- [ ] Universal print class that flushes and formats text spacing well
+  (indexes the print numbers in an accessible way)
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
@@ -38,6 +40,7 @@
 ### dbtools
 - [ ] Vectorize MTDB class
 - [ ] make mtdb compiled class
+- [ ] remove Entrez email login, simplify API access
 
 
 ### extract_mtdb
@@ -99,6 +102,7 @@
 - [ ] *pull failed JGI downloads from NCBI*
 - [ ] remove overlap when rerunning failed genomes
 - [ ] central MTDB repository and reference option
-- [ ] Improve MD5 check (update_mtdb)
+- [ ] Improve MD5 check efficiency (update_mtdb)
+- [ ] print organism name with genome accession
 
 
