@@ -399,7 +399,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                 count = 0
         count += 1
         if status_code != 200:
-            eprint(spacer + '\t\t' + file_type + ': ERROR, no file exists', flush = True)
+#            eprint(spacer + '\t\t' + file_type + ': ERROR, no file exists', flush = True)
             dwnlds[file_type] = 69
             acc_prots[file_type] = ''
             log_editor(output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
