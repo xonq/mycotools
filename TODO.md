@@ -25,8 +25,6 @@
   pseudogene parents or their RNAs (GCA_900074715.1_LAME0)
 - [ ] some pseudogenes fail because they are given an "Alias" without being
   completed (GCA_004920355.1)
-- [ ] 
-
 
 ### db2microsyntree
 - [ ] Allow log removal
@@ -113,5 +111,7 @@
 - [ ] central MTDB repository and reference option
 - [ ] Improve MD5 check efficiency (update_mtdb)
 - [ ] print organism name with genome accession
+- [ ] don't remove files until after predb2mtdb (requires update_mtdb specific
+  function)
 
 
