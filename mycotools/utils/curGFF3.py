@@ -31,7 +31,7 @@ class GeneError(Exception):
     pass
 
 
-def addMissing(gff_list, intron, comps, ome):
+def add_missing(gff_list, intron, comps, ome):
     accepted_types = {'pseudogene', 'pseudogenic_trna', 'trna',
                       'rrna', 'mrna', 'rna', 'transcript', 'gene',
                       'cds', 'exon', 'cds', 'three_prime_utr', 'intron',
@@ -212,6 +212,10 @@ def addMissing(gff_list, intron, comps, ome):
                     # assumes it is derived from an mRNA
                     out_genes[par]['exon'].append(entry)
             else:
+                if entry['type'].lower() in {'3_prime_utr', 'three_prime_utr'}:
+                    entry['type'] = 'three_prime_UTR'
+                elif entry['type'].lower() in {'5_prime_utr', 'five_prime_utr'}:
+                    entry['type'] = 'five_prime_UTR'
                 try:
                     out_genes[par]['etc'].append(entry)
                 except KeyError: # derived from an RNA
@@ -388,7 +392,7 @@ def acquireFormat( gff_list ):
 
     return None
 
-def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
+def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                  cur_seqids = False):
 
     genes, pseudogenes, rnas = [], [], {}
@@ -397,6 +401,9 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
     rrnas = defaultdict(list)
     ptrnas = defaultdict(list)
     transcripts = defaultdict(list)
+    rna_etcs = defaultdict(list)
+    gen_etcs = defaultdict(list)
+    utrs = False
     for i, v in enumerate(cur_list):
         id_ = re.search(comps['id'], v['attributes'])[1]
         if 'gene' in v['type']:
@@ -416,6 +423,19 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                 ptrnas[par].append(id_)
             elif v['type'] == 'RNA':
                 transcripts[par].append(id_)
+        elif 'UTR' in v['type']:
+            utrs = True
+
+    if utrs:
+        for i, v in enumerate(cur_list):
+            if 'UTR' in v['type']:
+                id_ = re.search(comps['id'], v['attributes'])[1]
+                par = re.search(comps['par'], v['attributes'])[1]
+                if par in rnas:
+                    rna_etcs[id_] = par
+                else:
+                    gen_etcs[id_] = par
+    
 
     todel = []
     for par, trna in trnas.items():
@@ -445,7 +465,8 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                 estranged_cds.append((id_, par))
 
     trna_count, rrna_count, ptrna_count, rna_count, etc_count = 1, 1, 1, 1, 1
-    estranged = []
+    gene2alias = {}
+    estranged, gene_estranged = [], [] 
     for i, entry in enumerate(cur_list):
         alias_tag, rna_check = 'Alias=', False
         if 'gene' in entry['type']:
@@ -508,6 +529,7 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                 entry['attributes'] += alias_tag
             else:
                 entry['attributes'] += ';' + alias_tag
+            gene2alias[id_] = alias_tag
         else:
             if 'Alias=' not in entry['attributes']:
                 if 'RNA' in entry['type']:
@@ -522,16 +544,25 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                         else:
                             raise RNAError('unknown RNA type: ' + entry['type'])
                 else:
+                    id_ = re.search(comps['id'], entry['attributes'])[1]
                     try:
                         par = re.search(comps['par'], entry['attributes'])[1]
                     except TypeError: # no parent
                         continue
-                    try:
-                        alias_tag += id_dict[rnas[par]][par]
-                    except KeyError: # no reference gene/reference transcript
-#                       eprint(re.search(comps['id'], entry['attributes'])[1], entry['type'])
-                        estranged.append((i, id_,))
-                        continue
+                    if id_ in gen_etcs:
+                        if par in gene2alias:
+                            alias_tag = gene2alias[par]
+                        elif par in rnas:
+                            alias_tag = id_dict[rnas[id_]][par]
+                        else:
+                            gene_estranged.append((i, par,))
+                    else:
+                        try:
+                            alias_tag += id_dict[rnas[par]][par]
+                        except KeyError: # no reference gene/reference transcript
+#                           eprint(re.search(comps['id'], entry['attributes'])[1], entry['type'])
+                            estranged.append((i, id_,))
+                            continue
                 if entry['attributes'].rstrip().endswith(';'):
                     entry['attributes'] += alias_tag
                 else:
@@ -558,6 +589,13 @@ def compileGenes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                 # however, this will overlook alternately spliced genes in this
                 # rare instance. Ideally, CDS parents should be curated to the
                 # RNA somehow
+    for i, id_ in gene_estranged:
+        if not 'Alias=' in entry['attributes']:
+            if id_ in gene2alias:
+                if cur_list[i]['attributes'].rstrip().endswith(';'):
+                    cur_list[i]['attributes'] += 'Alias=' + gene2alias[id_]
+                else:
+                    cur_list[i]['attributes'] += ';Alias=' + gene2alias[id_]
 
     return cur_list
 
@@ -678,8 +716,8 @@ def curGff3(gff_list, ome, cur_seqids = False):
         if line['type'] == 'intron':
             intron = True
 
-    cur_list, pseudocount = addMissing(gff_list, intron, gff3Comps(), ome)
-    final_list = compileGenes(cur_list, ome, pseudocount,
+    cur_list, pseudocount = add_missing(gff_list, intron, gff3Comps(), ome)
+    final_list = compile_genes(cur_list, ome, pseudocount,
                               cur_seqids = cur_seqids)
 
     return final_list
