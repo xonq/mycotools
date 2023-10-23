@@ -105,6 +105,7 @@ not be translated into the proteome `faa` fasta.
 - exon: parent will be an RNA ID; introns will be curated to exons. `ID=exon_<ACC>_<EXON#>`
 - CDS: CDS ID parent will be an RNA ID; typically contains a
   `protein_id/product_id` field. `ID=CDS_<ACC>_<CDS#>`
+- three_prime_UTR, five_prime_UTR
 
 #### - `gff3` attributes field formatting
 MTDB recognizes several attribute fields, separated by a semi-colon and
