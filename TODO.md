@@ -5,6 +5,8 @@
 - [ ] Build all-in-one stable conda package
 - [ ] Transition code-base to Rust
 - [ ] implement kon_log class, paying attention to verbosity control
+- [ ] kon_log class output to local configuration directory
+- [ ] support compressed databases
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
@@ -17,6 +19,14 @@
 - [ ] *Better root inference*
 - [ ] Assembly query method, i.e. through tblastn
 - [ ] Allow changing the clustering variable
+
+### curGFF3
+- [ ] pseudogenes can have RNAs, and CDSs from NCBI may reference those
+  pseudogene parents or their RNAs (GCA_900074715.1_LAME0)
+- [ ] some pseudogenes fail because they are given an "Alias" without being
+  completed (GCA_004920355.1)
+- [ ] 
+
 
 ### db2microsyntree
 - [ ] Allow log removal
