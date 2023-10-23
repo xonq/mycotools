@@ -11,7 +11,6 @@ import shutil
 import multiprocessing as mp
 from tqdm import tqdm
 from collections import Counter, defaultdict
-from mycotools.update_mtdb import acq_forbid_omes
 from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gff3Comps, gff2Comps, gtfComps
@@ -28,6 +27,15 @@ predb_headers = [
     'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
     'useRestriction (yes/no)', 'published'
     ]
+
+def acq_forbid_omes(file_path):
+    """Parse a file with forbidden ome accessions - ome codes that have been
+    used before and are no longer valid"""
+    if not os.path.isfile(file_path):
+        return set()
+    with open(file_path, 'r') as raw:
+        relics = set([x.rstrip() for x in raw])
+    return relics
 
 def prep_output(base_dir):
     out_dir = mkOutput(base_dir, 'predb2mtdb')
