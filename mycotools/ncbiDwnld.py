@@ -455,6 +455,8 @@ def dwnld_mngr(
         pass
     try:
         if exits['gff3'] != 0:
+            if '$' in acc: # is this correct?
+                t_acc = acc[:acc.find('$')]
             fail = [t_acc, ncbi_df['version'][t_acc]]
             return fail, count
     except KeyError:
@@ -495,6 +497,11 @@ def dwnld_mngr_no_MD5(
         pass
     try:
         if exits['gff3'] != 0:
+            if '$' in acc: # dont know if this should be here
+                t_acc = acc[:acc.find('$')]
+            else:
+                t_acc = acc
+
              fail = [t_acc, ncbi_df['version'][t_acc]]
              return fail, count
     except KeyError:
