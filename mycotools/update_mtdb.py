@@ -645,6 +645,7 @@ def ref_update(
     for key in ncbi_predb.columns:
         ncbi_predb[key] = ncbi_predb[key].fillna('')
     ncbi_premtdb = ncbi_predb.to_dict(orient='list')
+    ncbi_premtdb['version'] = ncbi_premtdb['version'].astype(str)
     ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, mtdb(), update_path,
 #                                       forbidden = forbid_omes, 
                                        cpus = cpus,
@@ -835,6 +836,7 @@ def rogue_update(
     print('\tCurating NCBI data', flush = True)
     ncbi_predb['species'] = ncbi_predb['species'].fillna('')
     ncbi_premtdb = ncbi_predb.to_dict(orient='list')
+    ncbi_premtdb['version'] = ncbi_premtdb['version'].astype(str)
     ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, refdbncbi, update_path,
                                        forbidden = forbid_omes, cpus = cpus,
                                        remove = remove, spacer = '\t\t')
