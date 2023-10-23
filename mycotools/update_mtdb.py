@@ -642,18 +642,20 @@ def ref_update(
                                  sep = '\t')
 
     print('\tCurating NCBI data', flush = True)
-    for key in ncbi_predb.columns:
-        ncbi_predb[key] = ncbi_predb[key].fillna('')
-    ncbi_predb['version'] = ncbi_predb['version'].astype(str)
-    ncbi_premtdb = ncbi_predb.to_dict(orient='list')
-    ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, mtdb(), update_path,
-#                                       forbidden = forbid_omes, 
-                                       cpus = cpus,
-                                       remove = remove, spacer = '\t\t')
-    for failure in ncbi_failed2:
-        add_failed(failure[0], 'ncbi', str(failure[1]), date,
-                  format_path('$MYCODB/../log/failed.tsv'))
-    ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
+    if not os.path.isfile(update_path + date + '.ncbi.predb2.mtdb'):
+        for key in ncbi_predb.columns:
+            ncbi_predb[key] = ncbi_predb[key].fillna('')
+        ncbi_predb['version'] = ncbi_predb['version'].astype(str)
+        ncbi_premtdb = ncbi_predb.to_dict(orient='list')
+        ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, mtdb(), update_path,
+    #                                       forbidden = forbid_omes, 
+                                           cpus = cpus,
+                                           remove = remove, spacer = '\t\t')
+        for failure in ncbi_failed2:
+            add_failed(failure[0], 'ncbi', str(failure[1]), date,
+                      format_path('$MYCODB/../log/failed.tsv'))
+        ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
+
     try:
         ncbi_db = db2df(update_path + date + '.ncbi.predb2.mtdb')
     except pd.errors.EmptyDataError:
@@ -834,17 +836,19 @@ def rogue_update(
                                  sep = '\t')
 
     print('\tCurating NCBI data', flush = True)
-    for key in ncbi_predb.columns:
-        ncbi_predb[key] = ncbi_predb[key].fillna('')
-    ncbi_predb['version'] = ncbi_predb['version'].astype(str)
-    ncbi_premtdb = ncbi_predb.to_dict(orient='list')
-    ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, refdbncbi, update_path,
-                                       forbidden = forbid_omes, cpus = cpus,
-                                       remove = remove, spacer = '\t\t')
-    for failure in ncbi_failed2:
-        add_failed(failure[0], 'ncbi', str(failure[1]), date,
-                  format_path('$MYCODB/../log/failed.tsv'))
-    ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
+    if not os.path.isfile(update_path + date + '.ncbi.predb2.mtdb'):
+        for key in ncbi_predb.columns:
+            ncbi_predb[key] = ncbi_predb[key].fillna('')
+        ncbi_predb['version'] = ncbi_predb['version'].astype(str)
+        ncbi_premtdb = ncbi_predb.to_dict(orient='list')
+        ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, refdbncbi, update_path,
+                                           forbidden = forbid_omes, cpus = cpus,
+                                           remove = remove, spacer = '\t\t')
+        for failure in ncbi_failed2:
+            add_failed(failure[0], 'ncbi', str(failure[1]), date,
+                      format_path('$MYCODB/../log/failed.tsv'))
+        ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
+
     try:
         ncbi_db = db2df(update_path + date + '.ncbi.predb2.mtdb')
     except pd.errors.EmptyDataError:
