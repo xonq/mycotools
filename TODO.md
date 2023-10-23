@@ -41,7 +41,6 @@
 - [ ] make mtdb compiled class
 - [ ] remove Entrez email login, simplify API access
 
-
 ### extract_mtdb
 - [ ] allow for a lineage list from command line (may already be integrated)
 - [ ] stdin argument input
@@ -73,6 +72,7 @@
 - [ ] delete database feature
 - [ ] *fix local password encryption*
 - [ ] overwrite old password
+- [ ] move database feature
 
 ### mtdb
 - [ ] add a log option
