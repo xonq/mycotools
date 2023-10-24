@@ -83,9 +83,11 @@
 - [ ] move database feature
 
 ### mtdb
-- [ ] add a log option
+- [ ] add a log option of connected MTDBs
 - [ ] remove standalone scripts from PATH
 - [ ] look for old ome versions in query
+- [x] add a version querying option
+- [ ] add an option to query log of analyses
 
 ### ncbiDwnld
 - [ ] db check to ensure log is relevant to input
@@ -115,5 +117,3 @@
   function)
 - [ ] Need a manually curated file to correct errors in naming, e.g. Vararia v
   Vavraia, Fibularhizoctonia v Fibulorhizoctonia
-
-
