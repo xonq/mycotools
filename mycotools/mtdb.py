@@ -17,6 +17,9 @@ from mycotools.lib.kontools import format_path, read_json, write_json, eprint
 from mycotools.lib.dbtools import primaryDB, mtdb_connect, mtdb_disconnect, \
     mtdb_initialize, mtdb, loginCheck
 
+def get_version():
+    from importlib.metadata import version
+    print(f'Mycotools version {version("mycotools")}')
 
 def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
     config_dir = format_path('~/.mycotools/')
@@ -44,7 +47,8 @@ def main(argv = sys.argv):
         + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
         + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
         + '\n[-u]\t\t[--unlink]\tUnlink from MTDB' \
-        + '\n[-d]\t\t[--dependency]\tInstall/update dependencies'
+        + '\n[-d]\t\t[--dependency]\tInstall/update dependencies' \
+        + '\n[-v]\t\t[--version]\tPrint Mycotools version and exit'
 
     config = parse_config()
     if any([not x.startswith('-') for x in argv[1:]]):
@@ -65,6 +69,9 @@ def main(argv = sys.argv):
     set_argv = set(argv)
     if {'-h', '--help'}.intersection(set_argv):
         print('\n' + description + '\n', flush = True)
+        sys.exit(0)
+    elif {'-v', '--version'}.intersection(set_argv):
+        get_version()
         sys.exit(0)
        
     if {'-i', '--interface'}.intersection(set_argv):
