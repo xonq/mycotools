@@ -113,5 +113,7 @@
 - [ ] print organism name with genome accession
 - [ ] don't remove files until after predb2mtdb (requires update_mtdb specific
   function)
+- [ ] Need a manually curated file to correct errors in naming, e.g. Vararia v
+  Vavraia, Fibularhizoctonia v Fibulorhizoctonia
 
 
