@@ -59,12 +59,12 @@ def validate_t_and_c(config, discrepancy = False):
 
     # if there isnt a configuration, alert the user to use-restriction policies
     else:
-        print('\nPlease review JGIs use-restricted data policy here: ' \
+        print('\nPlease review JGI use-restricted data policy here: ' \
             + 'https://jgi.doe.gov/user-programs/pmo-overview/policies/' \
             + '\nPlease review GenBank use-restricted data policy here: ' \
-            + 'ncbi.nlm.nih.gov/genbank/'
+            + 'https://ncbi.nlm.nih.gov/genbank/'
             + '\nPlease review how Mycotools handles use-restricted data here:' \
-            + 'https://gitlab.com/xonq/mycotools/-/blob/mycotools/MTDB.md', flush = True)
+            + ' https://github.com/xonq/mycotools/blob/master/MTDB.md', flush = True)
         check = ''
         if check.lower() not in {'y', 'yes'}:
             check = input('\nWARNING: This is a permanent configuration ' \
@@ -75,7 +75,7 @@ def validate_t_and_c(config, discrepancy = False):
                   + 'designations; and acknowledge that you will validate ' \
                   + 'any use-restricted assignments in your local MTDB ' \
                   + 'prior to publication?' \
-                  + '\n\nPlease type [y]es/[N]o if you acknowledge these terms')
+                  + '\n\nPlease type [y]es/[N]o if you acknowledge these terms: ')
         if check.lower() not in {'y', 'yes'}:
             print('\nRerun without --nonpublished', flush = True)
             sys.exit(1)
@@ -1232,10 +1232,12 @@ def main():
         shutil.move(new_path + '.tmp', new_path)
         rm_raw_data(update_path)
         eprint('\nGathering assembly statistics', flush = True)
-        assStats(primaryDB(), format_path('$MYCODB/../data/assemblyStats.tsv'), 1)
+        assStats(primaryDB(), format_path('$MYCODB/../data/assemblyStats.tsv'),
+                 args.cpu)
     
         eprint('\nGathering annotation statistics', flush = True)
-        annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'), 1)
+        annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'),
+                 args.cpu)
 #        gen_algn_db(
  #           update_path, set(full_mtdb['ome'])
   #          )
