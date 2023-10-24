@@ -522,10 +522,10 @@ def main(
             eprint(spacer + '\tERROR: Failed 3 login attempts.', flush = True)
             sys.exit(100)
 
-    if not os.path.exists( output + '/xml' ):
-        os.mkdir( output + '/xml' )
+    if not os.path.exists(output + '/xml'):
+        os.mkdir(output + '/xml')
 # perhaps add a counter here, but one that checks if it is actually querying jgi
-    print('\nRetrieving `xml` directories' flush = True)
+    print('\nRetrieving `xml` directories', flush = True)
     ome_set, count = set(), 0
     for i,row in df.iterrows():
         error_check, attempt = True, 0
@@ -541,7 +541,7 @@ def main(
             elif error_check != -1:
                 time.sleep(0.3)
         if error_check != -1:
-            eprint(f'{spacer}\t{row[ome_col} failed to retrieve XML', 
+            eprint(f'{spacer}\t{row[ome_col]} failed to retrieve XML', 
                 flush = True)
             ome_set.add(row[ome_col])
     
