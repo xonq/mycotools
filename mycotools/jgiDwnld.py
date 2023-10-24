@@ -35,18 +35,21 @@ def jgi_login( user, pwd ):
     return login_cmd
 
 
-def retrieveXML( ome, output ):
+def retrieve_xml(ome, output):
     '''Retrieve JGI xml file tree. First check if it already exists, if not then 
     download it using JGI's prescribed method. Then open the xml and check for 
     the common 'Portal does not exist' error. If so, report.'''
 
-    if os.path.exists( output + '/' + str(ome) + '.xml' ):
-        with open( output + '/' + str(ome) + '.xml', 'r' ) as xml_raw:
+    if os.path.exists(output + '/' + str(ome) + '.xml'):
+        with open(output + '/' + str(ome) + '.xml', 'r') as xml_raw:
             xml_data = xml_raw.read()
         if xml_data == 'Portal does not exist':
-            print( '\tERROR: `' + ome + ' not in JGIs `organism` database.' , flush = True)
+            print('\tERROR: `' + ome + ' not in JGIs `organism` database' , flush = True)
             xml_cmd = 1
-            os.remove( output + '/' + ome + '.xml' )
+            os.remove(output + '/' + ome + '.xml')
+        elif not xml_data:
+            xml_cmd = None
+            os.remove(f'{output}/{ome}.xml')
         else:
             xml_cmd = -1
 
@@ -57,15 +60,18 @@ def retrieveXML( ome, output ):
             str(ome), '-b', 'cookies', '-o', output + '/' + str(ome) + ".xml" ],
             stdout = subprocess.PIPE, stderr = subprocess.PIPE )
         if xml_cmd != 0:
-            print('\tERROR: `xml` directory ' + ome + ' - `curl` error: ' + str(xml_cmd), flush = True)
+            print(f'\tERROR: {ome} xml curl error: {xml_cmd}', flush = True)
 
     if xml_cmd == 0:
-        with open( output + '/' + ome + '.xml', 'r' ) as xml_raw:
+        with open(output + '/' + ome + '.xml', 'r') as xml_raw:
             xml_data = xml_raw.read()
         if xml_data == 'Portal does not exist':
-            print( '\tERROR: `' + ome + ' not in JGIs `organism` database.' , flush = True)
+            print('\tERROR: `' + ome + ' not in JGIs `organism` database' , flush = True)
             xml_cmd = 1
             os.remove( output + '/' + ome + '.xml' )
+        elif not xml_data:
+            xml_cmd = None
+            os.remove(f'{output}/{ome}.xml')
 
     return xml_cmd
 
@@ -512,22 +518,33 @@ def main(
         eprint(spacer + '\tJGI Login Failed. Attempt: ' + str(login_attempt), flush = True)
         time.sleep( 5 )
         login_attempt += 1
-        if login_attempt == 5:
-            eprint(spacer + '\tERROR: Failed login 5 attempts.', flush = True)
-            sys.exit( 100 )
+        if login_attempt == 3:
+            eprint(spacer + '\tERROR: Failed 3 login attempts.', flush = True)
+            sys.exit(100)
 
     if not os.path.exists( output + '/xml' ):
         os.mkdir( output + '/xml' )
 # perhaps add a counter here, but one that checks if it is actually querying jgi
-    print( '\nRetrieving `xml` directories ...' , flush = True)
+    print('\nRetrieving `xml` directories' flush = True)
     ome_set, count = set(), 0
     for i,row in df.iterrows():
-        error_check = retrieveXML( row[ome_col], output + '/xml' )
-        if error_check > 0:
-            ome_set.add( row[ome_col] )
-        if error_check != -1:
+        error_check, attempt = True, 0
+        while error_check != -1 and attempt < 3:
+            attempt += 1
             time.sleep(0.1)
-
+            error_check = retrieve_xml(row[ome_col], output + '/xml')
+            if error_check is None:
+                time.sleep(1)
+                continue
+#            elif error_check > 0:
+ #               ome_set.add(row[ome_col])
+            elif error_check != -1:
+                time.sleep(0.3)
+        if error_check != -1:
+            eprint(f'{spacer}\t{row[ome_col} failed to retrieve XML', 
+                flush = True)
+            ome_set.add(row[ome_col])
+    
     eprint(spacer + 'Downloading JGI files\n\tMaximum rate: 1 file/min' , flush = True)
     
     dwnlds = []
@@ -553,7 +570,7 @@ def main(
         if ran_dwnld:
             time.sleep(60)
         if ome not in ome_set:
-            jgi_login( user, pwd )
+            jgi_login(user, pwd)
             if 'ome' in row.keys():
                 eprint(spacer + row['ome'] + '\t' + ome , flush = True)
             else:
