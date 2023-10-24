@@ -811,7 +811,7 @@ def rogue_update(
         new_dups = duplicates
 
     print('\nAssimilating NCBI (10 download/minute w/API key, 3 w/o)', flush = True)
-    if True:
+    if not os.path.isfile(update_path + date + '.ncbi.predb'):
 #    if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
         ncbi_predb, new_db, ncbi_failed1 = ncbi2db( 
