@@ -41,13 +41,13 @@ from mycotools.assemblyStats import main as assStats
 from mycotools.annotationStats import main as annStats
 
 
-def validate_t_and_c(config):
+def validate_t_and_c(config, discrepancy = False):
     """Validate that user understands and accepts the conditions of
     use-restricted data, and that responsibility over confirming the
     desigination of use-restriction is the user's responsibility"""
 
     # if there is a configuration json, just query that
-    if config:
+    if config and not discrepancy:
         try:
             if config['nonpublished'].lower() in {'yes', 'y'}:
                 nonpublished = 'yes'
@@ -67,7 +67,9 @@ def validate_t_and_c(config):
             + 'https://gitlab.com/xonq/mycotools/-/blob/mycotools/MTDB.md', flush = True)
         check = ''
         if check.lower() not in {'y', 'yes'}:
-            check = input('\nDo you agree to honor the terms and conditions ' \
+            check = input('\nWARNING: This is a permanent configuration ' \
+                  + 'option for the primary MTDB. Do you agree to honor ' \
+                  + 'the terms and conditions ' \
                   + 'of use-restricted JGI and GenBank data; acknowledge that ' \
                   + 'Mycotools may not comprehensively determine use-restricted ' \
                   + 'designations; and acknowledge that you will validate ' \
@@ -851,8 +853,10 @@ def rogue_update(
 
     try:
         ncbi_db = db2df(update_path + date + '.ncbi.predb2.mtdb')
+        ncbi_mtdb = mtdb(update_path + date + '.ncbi.predb2.mtdb')
     except pd.errors.EmptyDataError:
         ncbi_db = pd.DataFrame({x: [] for x in refdbncbi.keys()})
+        ncbi_mtdb = mtdb()
     if len(ncbi_db) > 0:
         df2db(ncbi_db, ncbi_db_path)
         new_db = pd.concat([new_db, ncbi_db])
@@ -938,9 +942,18 @@ def db2primary(addDB, refDB, save = False, combined = False):
             update_ome = base_ome2update_ome[base_ome]
             updates[update_ome] = ome
             del refDB[update_ome]
-        move_ns(addDB['gff3'][i], format_path('$MYCOGFF3/' + ome + '.gff3'))
-        move_ns(addDB['fna'][i], format_path('$MYCOFNA/' + ome + '.fna'))
-        move_ns(addDB['faa'][i], format_path('$MYCOFAA/' + ome + '.faa'))
+        if os.path.isfile(addDB['gff3'][i]):
+            move_ns(addDB['gff3'][i], format_path('$MYCOGFF3/' + ome + '.gff3'))
+        elif not os.path.isfile(format_path('$MYCOGFF3/' + ome + '.gff3')):
+            raise FileNotFoundError(f'{ome} missing gff3 for unknown reason')
+        if os.path.isfile(addDB['fna'][i]):
+            move_ns(addDB['fna'][i], format_path('$MYCOFNA/' + ome + '.fna'))
+        elif not os.path.isfile(format_path('$MYCOFNA/' + ome + '.fna')):
+            raise FileNotFoundError(f'{ome} missing fna for unknown reason')
+        if os.path.isfile(addDB['faa'][i]):
+            move_ns(addDB['faa'][i], format_path('$MYCOFAA/' + ome + '.faa'))
+        elif not os.path.isfile(format_path('$MYCOFAA/' + ome + '.faa')):
+            raise FileNotFoundError(f'{ome} missing faa for unknown reason')
         addDB['gff3'][i] = os.environ['MYCOGFF3'] + ome + '.gff3'
         addDB['fna'][i] = os.environ['MYCOFNA'] + ome + '.fna'
         addDB['faa'][i] = os.environ['MYCOFAA'] + ome + '.faa'
@@ -974,7 +987,8 @@ def main():
     conf_args = parser.add_argument_group('Configuration')
     conf_args.add_argument('--nonpublished', action = 'store_true', 
         help = '[FUNGI]: Include MycoCosm restricted-use')
-    conf_args.add_argument('--ncbi_only', help = '[FUNGI]: Forego MycoCosm', action = 'store_true')
+    conf_args.add_argument('--ncbi_only', help = '[FUNGI]: [-i] Forego MycoCosm', 
+        action = 'store_true')
     conf_args.add_argument('--deviate', action = 'store_true', help = 'Deviate' \
         + ' from existing config without prompting')
 
@@ -985,8 +999,8 @@ def main():
     run_args.add_argument('--forbidden', action = 'store_true', help = 'Rerun forbidden')
     run_args.add_argument('--no_md5', action = 'store_true', help = 'Skip NCBI MD5'
         + ' (expedite large reruns)')
-    run_args.add_argument('--overwrite', action = 'store_true',
-        help = 'Remove entries that violate new MTDB parameters')
+#    run_args.add_argument('--overwrite', action = 'store_true',
+#        help = 'Remove entries that violate new MTDB parameters')
     run_args.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 
@@ -1021,14 +1035,18 @@ def main():
             if os.path.isfile(config_path):
                 config = read_json(format_path(config_path))
     #            rogue_bool = config['rogue']
-                args.nonpublished = config['nonpublished']
-                if not config['jgi'] and args.ncbi_only and not args.overwrite:
-                    eprint('\nERROR: --ncbi_only discrepant with MTDB config; requires --overwrite',
+#                args.nonpublished = config['nonpublished']
+                if bool(args.nonpublished) and not bool(config['nonpublished']):
+                    config['nonpublished'] = validate_t_and_c(config, discrepancy = True)
+                    write_json(config, format_path(config_path))
+                if bool(config['jgi']) and bool(args.ncbi_only): #and not args.overwrite:
+                    eprint('\nERROR: --ncbi_only specified after initialization',
                            flush = True)
                     sys.exit(173)
         elif args.init:
-            eprint('\nERROR: MTDB initialized and linked. Unlink via `mtdb -u`')
-            sys.exit(175)
+            if format_path(args.init) != format_path(os.environ['MYCODB']):
+                eprint('\nERROR: MTDB initialized elsewhere and linked. Unlink via `mtdb -u`')
+                sys.exit(175)
     
     if args.prokaryote or config['branch'] == 'prokaryote':
         nonpublished = True
