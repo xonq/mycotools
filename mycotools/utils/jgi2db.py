@@ -16,7 +16,7 @@ from mycotools.predb2mtdb import main as predb2mtdb
 from mycotools.lib.kontools import intro, outro
 from mycotools.lib.dbtools import db2df, df2db, readLog, log_editor
 from mycotools.jgiDwnld import jgi_login as jgi_login
-from mycotools.jgiDwnld import retrieveXML as retrieveXML
+from mycotools.jgiDwnld import retrieve_xml as retrieve_xml
 from mycotools.jgiDwnld import jgi_dwnld as jgi_dwnld
 
 
@@ -284,14 +284,25 @@ def main(
     if not os.path.exists( output + '/xml' ):
         os.mkdir( output + '/xml' )
 
-    print(spacer + 'Retrieving `xml` directories' , flush = True)
+    print(spacer + 'Retrieving `xml` directories', flush = True)
     ome_set, failed, count = set(), [], 0
     for i, row in jgi_df.iterrows():
-        error_check = retrieveXML( row[ ome_col ], output + '/xml' )
-        if error_check > 0:
-            ome_set.add( row[ ome_col ] )
+        error_check, attempt = True, 0
+        while error_check != -1 and attempt < 3:
+            attempt += 1
+            time.sleep(0.1)
+            error_check = retrieve_xml(row[ome_col], output + '/xml')
+            if error_check is None:
+                time.sleep(1)
+                continue
+#            elif error_check > 0:
+ #               ome_set.add(row[ome_col])
+            elif error_check != -1:
+                time.sleep(0.3)
         if error_check != -1:
-            time.sleep( 0.1 )
+            eprint(f'{spacer}\t{row[ome_col]} failed to retrieve XML',
+                flush = True)
+            ome_set.add(row[ome_col])
 
 
     log_path = output + '/jgi2db.log'
