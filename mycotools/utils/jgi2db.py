@@ -102,7 +102,8 @@ def JGIredundancyCheck(db, jgi_df, duplicates = {}, ome_col = 'portal',
                 todel_db.append(ome)
             else:
                 todel_jgi.append(i)
-        elif biosample in biosamples: # genome_code isn't here, but the biosample is
+        elif biosample in biosamples and biosample.rstrip(): 
+            # genome_code isn't here, but the biosample is
             check_db = db[db['biosample'] == biosample]
             checkOme = list(check_db['ome'])[0]
             if len(check_db) > 1: # more than one entry to the biosample, keep as it is
@@ -231,12 +232,12 @@ def main(
         ome_col = 'portal'
         name_col = 'name'
     else:
-        print(spacer + 'ERROR: invalid headers for ' + mycocosm_output, flush = True)
-        sys.exit( 3 )
+        print(spacer + 'ERROR: invalid MycoCosm tsv headers', flush = True)
+        sys.exit(3)
 
     toDel = []
-    jgi_df = break_name( jgi_df )
-   
+    jgi_df = break_name(jgi_df)
+  
     if not rerun:
         jgi_df = jgi_df.set_index(ome_col)
         jgi_omes = set(jgi_df.index)
