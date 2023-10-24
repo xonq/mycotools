@@ -9,11 +9,11 @@ import copy
 import json
 import time
 import base64
+import urllib
 import getpass
 import hashlib
 import datetime
 from Bio import Entrez
-from urllib.error import HTTPError
 from io import StringIO
 from collections import defaultdict
 from mycotools.lib.kontools import collect_files, eprint, format_path, \
@@ -524,7 +524,7 @@ def hit2taxonomy(
         try:
             tax_handle = Entrez.efetch( db = "Taxonomy", id = taxid, retmode = "xml" )
             break
-        except HTTPError as goon:
+        except urllib.error.HTTPError as goon:
             count += 1
             if count == 5 and skip:
                 print( '\n5 failed HTTP queries. Is NCBI down?' , flush = True)
@@ -638,7 +638,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                 break
             except IndexError:
                 lineages = []
-            except HTTPError:
+            except:
                 time.sleep(1)
                 handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
                 records = Entrez.read(handle)
