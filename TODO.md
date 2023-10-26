@@ -48,6 +48,7 @@
 - [ ] Vectorize MTDB class
 - [ ] make mtdb compiled class
 - [ ] remove Entrez email login, simplify API access
+- [ ] Get taxonomy of non-genus names
 
 ### extract_mtdb
 - [ ] allow for a lineage list from command line (may already be integrated)
@@ -81,6 +82,7 @@
 - [ ] *fix local password encryption*
 - [ ] overwrite old password
 - [ ] move database feature
+- [ ] archive and unarchive genomes
 
 ### mtdb
 - [ ] add a log option of connected MTDBs
@@ -117,3 +119,4 @@
   function)
 - [ ] Need a manually curated file to correct errors in naming, e.g. Vararia v
   Vavraia, Fibularhizoctonia v Fibulorhizoctonia
+- [ ] initialize from a predb
