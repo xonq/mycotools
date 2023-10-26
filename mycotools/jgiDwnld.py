@@ -125,68 +125,6 @@ def checkMatches( match1, match2, match3, match4, xml_data, file_type):
     return matches, preexisting, findall
 
 
-def regex_search(xml_file, ome, file_type, masked = False):
-    with open(xml_file, 'r') as xml:
-        data = xml.read()
-
-
-    gffMatch1 = re.compile(r'filename\="([^ ]+\_GeneCatalog_genes_\d+\.gff\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-    gffMatch2 = re.compile(r'filename\="([^ ]+\_GeneCatalog_genes_\d+\.gff\.gz)".*?url\="([^ ]+)"')
-    umfnaMatch1 = re.compile(r'filename\="(' + ome + '_(?:AssemblyScaffolds|scaffolds|assembly_scaffolds)' + r'\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-    umfnaMatch2 = re.compile(r'filename\="(' + ome + '_(?:AssemblyScaffolds|scaffolds|assembly_scaffolds)' + r'\.fasta\.gz)".*?url\="([^ ]+)"')
-    match3, match4 = None, None
-    if file_type == 'gff':
-        match1 = gffMatch1
-        match2 = gffMatch2
-    elif file_type == 'fna':
-        if masked:
-            match1 = re.compile(r'filename\="(' + ome + '_(?:AssemblyScaffolds_Repeatmasked|masked_scaffolds|assembly_scaffolds_repeatmasked)' + r'\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-            match2 = re.compile(r'filename\="(' + ome + '_(?:AssemblyScaffolds_Repeatmasked|masked_scaffolds|assembly_scaffolds_repeatmasked)' + r'\.fasta\.gz)".*?url\="([^ ]+)"')
-            match3 = re.compile(r'filename\="([^ ]+?maskedAssembly\.gz)".*? url="([^ ]*?maskedAssembly.gz)".*? md5\="([\w\d]+)"')
-        else:
-            match1 = umfnaMatch1
-            match2 = umfnaMatch2
-            match3 = re.compile(r'filename\="([^ ]+?AssembledScaffolds.*?\.gz)".*? url="(.*?AssembledScaffolds[^ ]*?\.gz)".*? md5\="([\w\d]+)"')
-            match4 = re.compile(r'filename\="([^ ]+?AssembledScaffolds.*?\.gz)".*? url="(.*?AssembledScaffolds[^ ]*?\.gz)"')
-
-    elif file_type == 'faa':
-        match1 = re.compile(r'filename\="([^ ]+\_GeneCatalog_proteins_\d+\.aa\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-        match2 = re.compile(r'filename\="([^ ]+\_GeneCatalog_proteins_\d+\.aa\.fasta\.gz)".*?url\="([^ ]+)"')
-        match3 = re.compile(r'filename\="([^ ]+?\.FilteredModels[^ ]+\.proteins\.[^ ]*?\.gz)".*? url\="([^ ]*?)".*? md5\="([\w\d]+)"')
-        match4 = re.compile(r'filename\="([^ ]+?\.FilteredModels[^ ]+\.proteins\.[^ ]*?\.gz)".*? url\="([^ ]*?)"')
-
-    elif file_type == 'gff3':
-        match1 = re.compile(r'filename\="([^ ]+\_GeneCatalog\_\d+\.gff3\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-        match2 = re.compile(r'filename\="([^ ]+\_GeneCatalog\_\d+\.gff3\.gz)".*?url\="([^ ]+)"')
-        match3 = re.compile(r'filename\="([^ ]+?\.FilteredModels3\.gff3\.gz)".*?url\="([^ ]*?)".*?md5\="([\d\w]+)"')
-        match4 = re.compile(r'filename\="([^ ]+?\.FilteredModels3\.gff3\.gz)".*?url\="([^ ]*?)"')
-
-    elif file_type == 'transcript':
-        match1 = re.compile(r'filename\="([^ ]+_GeneCatalog_transcripts_\d+\.nt\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-        match2 = re.compile(r'filename\="([^ ]+\_GeneCatalog_transcripts_\d+\.nt\.fasta\.gz)".*?url\="([^ ]+)"')
-
-    elif file_type == 'AllTranscript':
-        match1 = re.compile(r'filename\="([^ ]+\_all_transcripts_\d+\.nt\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-        match2 = re.compile(r'filename\="([^ ]+\_all_transcripts_\d+\.nt\.fasta\.gz)".*?url\="([^ ]+)"')
-
-    elif file_type == 'est':
-        match1 = re.compile(r'filename\="([^ ]+\_EST_\d+_cluster_consensi\.fasta\.gz)".*?url\="([^ ]+)".*?md5\="([^ ]+)"')
-        match2 = re.compile(r'filename\="([^ ]+\_EST_\d+_cluster_consensi\.fasta\.gz)".*?url\="([^ ]+)"')
-
-    dwnld_type = file_type
-    check = 1
-    matches, preexisting, findall = checkMatches( match1, match2, match3, match4, data, file_type )
-    if not matches:
-        if file_type == 'gff3':
-            dwnld_type = 'gff'
-            matches, preexisting, findall = checkMatches(gffMatch1, gffMatch2, match3, 
-                                                         match4, data, file_type )
-        elif file_type == 'fna' and masked:
-            matches, preexisting, findall = checkMatches(umfnaMatch1, umfnaMatch2, match3,
-                                                         match4, data, file_type)
-            masked = False
-
-
 def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
 
     if ft == 'fna':
@@ -195,16 +133,17 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
         else:
             ft += '$unmasked'
     
-    ft2xt = {'fna$masked': 'assembly', 'fna$unmasked': 'assembly',
-             'gff': 'annotation', 'gff3': 'annotation',
-             'transcripts': 'annotation', 'est': 'ests and est clusters'}
+    ft2xt = {'fna$masked': {'assembly'}, 'fna$unmasked': {'assembly'},
+             'gff': {'annotation'}, 'gff3': {'annotation'},
+             'transcripts': {'annotation'},
+             'est': {'ests and est clusters', 'transcriptome'}}
     ft2fh = {'fna$masked': ['genome assembly (masked)', 
                             'assembled scaffolds (masked)'],
              'fna$unmasked': ['assembled scaffolds (unmasked)',
                             'genome assembly (unmasked)'],
              'gff': ['genes'], 'gff3': ['genes'], 
              'transcripts': ['transcripts'],
-             'est': ['ests']}
+             'est': ['ests', 'transcriptome assembly']}
 
     ft2fn = {'fna$masked': ['masked', 'Genome Assembly (masked)'], 
              'fna$unmasked': ['AssembledScaffolds', 'scaffolds',
@@ -222,7 +161,7 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
         for child in root:
             if 'Files' == child.attrib['name']:
                     for chil1 in child:
-                            if ft2xt[ft] == chil1.attrib['name'].lower():
+                            if chil1.attrib['name'].lower() in ft2xt[ft]:
                                    if ft in {'gff3', 'gff', 'transcripts', 'est'}:
                                        for chil2 in chil1:
                                            if chil2.attrib['name'].lower().startswith('filtered models ('):
