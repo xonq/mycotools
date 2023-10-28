@@ -151,6 +151,11 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
              'gff3': ['GeneCatalog', 'FilteredModels'],
              'transcripts': ['transcripts'],
              'est': ['EST']}
+    ft2fe = {'fna$masked': {'fasta', 'fa', 'fna', 'fsa'},
+             'fna$unmasked': {'fasta', 'fa', 'fna', 'fsa'},
+             'gff': {'gff', 'gff3'}, 'gff3': {'gff', 'gff3'},
+             'transcripts': {'fa', 'fasta', 'fna', 'fsa'},
+             'est': {'fa', 'fasta', 'fna', 'fsa'}}
 
     url, md5, filename = None, False, None
 
@@ -160,33 +165,49 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
     while flip:
         for child in root:
             if 'Files' == child.attrib['name']:
-                    for chil1 in child:
-                            if chil1.attrib['name'].lower() in ft2xt[ft]:
-                                   if ft in {'gff3', 'gff', 'transcripts', 'est'}:
-                                       for chil2 in chil1:
-                                           if chil2.attrib['name'].lower().startswith('filtered models ('):
-                                               chil1 = chil2
-                                               break
-                                   for chil2 in chil1:
-                                            if any(x == chil2.attrib['name'].lower() \
-                                                   for x in ft2fh[ft]):
-                                                for chil3 in chil2:
-                                                    t_url = chil3.attrib['url']
-                                                    if 'get_tape_file' not in t_url \
-                                                        and t_url not in forbidden:
-                                                        if all(x not in chil3.attrib['filename'] \
-                                                               for x in ft2fn[ft]):
-                                                            continue
-                                                        url = chil3.attrib['url']
-                                                        filename = chil3.attrib['filename']
-                                                        # all requirements satisfied
-                                                        try:
-                                                            md5 = chil3.attrib['md5']
-                                                            break
-                                                        # continue on to find an md5, or omit
-                                                        # if exhaustively searched
-                                                        except KeyError:
-                                                            pass
+                for chil1 in child:
+                    if chil1.attrib['name'].lower() in ft2xt[ft]:
+                        if ft in {'gff3', 'gff', 'transcripts', 'est'}:
+                            for chil2 in chil1:
+                                if chil2.attrib['name'].lower().startswith('filtered models ('):
+                                    chil1 = chil2
+                                    break
+                        for chil2 in chil1:
+                            if any(x == chil2.attrib['name'].lower() \
+                                    for x in ft2fh[ft]):
+                                for chil3 in chil2:
+                                    t_url = chil3.attrib['url']
+                                    if 'get_tape_file' not in t_url \
+                                        and t_url not in forbidden:
+                                        if all(x not in chil3.attrib['filename'] \
+                                               for x in ft2fn[ft]):
+                                            continue
+                                        file_ext_srch = \
+                                            re.search(r'\.([^\.]+)$', 
+                                                chil3.attrib['filename'])
+                                        if file_ext_srch is not None:
+                                            file_ext = file_ext_srch[1]
+                                            if file_ext == '.gz':
+                                                file_ext_srch = \
+                                                    re.search(r'\.([^\.]+)\.gz$',
+                                                       chil3.attrib['filename'])
+                                                if file_ext_srch is not None:
+                                                    file_ext = file_ext_srch[1]
+                                            if file_ext not in ft2ft[ft]:
+                                                continue
+                                        else:
+                                            continue
+
+                                        url = chil3.attrib['url']
+                                        filename = chil3.attrib['filename']
+                                        # all requirements satisfied
+                                        try:
+                                            md5 = chil3.attrib['md5']
+                                            break
+                                        # continue on to find an md5, or omit
+                                        # if exhaustively searched
+                                        except KeyError:
+                                            pass
         if not url and ft == 'fna$masked':
             ft = 'fna$unmasked'
             flip = False
