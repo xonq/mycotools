@@ -290,7 +290,6 @@ def main(
         error_check, attempt = True, 0
         while error_check != -1 and attempt < 3:
             attempt += 1
-            time.sleep(0.1)
             error_check = retrieve_xml(row[ome_col], output + '/xml')
             if error_check is None:
                 time.sleep(1)
@@ -362,8 +361,8 @@ def main(
     jgi_df = jgi_df.rename( columns = { 
         'published(s)': 'published',
         ome_col: 'assembly_acc',
-        'fna': 'assemblyPath',
-        'gff3': 'gffPath'
+        'fna_path': 'assemblyPath',
+        'gff3_path': 'gffPath'
         } )
     jgi_df['source'] = 'jgi'
 
