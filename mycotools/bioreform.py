@@ -5,6 +5,7 @@ from mycotools.lib.kontools import sys_start, format_path
 from Bio import SeqIO
 
 def main(in_file, in_fmt, out_fmt):
+    """Use BioPython to convert file formats"""
     SeqIO.convert(in_file, in_fmt, sys.stdout, out_fmt)
 
 def cli():
