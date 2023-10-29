@@ -16,8 +16,8 @@ from mycotools.lib.biotools import fa2dict
 from mycotools.lib.kontools import format_path, eprint
 
 
-def calcMask( contig_list ):
-
+def calcMask(contig_list):
+    """Calculate the percent of the sequence that is masked (lower-cased)"""
     seq = ''.join([x['sequence'] for x in contig_list])
     mask = seq.count('a')
     mask += seq.count('t')
@@ -52,6 +52,7 @@ def n50l50( sortedContigs ):
 
     pass_fa = []
     total, total1000, bp1000, gc, gc1000, gctot, gctot1000 = 0, 0, 0, 0, 0, 0, 0
+    # iterate through the sorted contigs to acquire the number of each base
     for contig in sortedContigs:
         total += contig['len']
         gc += contig['sequence'].lower().count( "g" ) + contig['sequence'].lower().count( 'c' )
@@ -66,11 +67,14 @@ def n50l50( sortedContigs ):
             pass_fa.append( contig )
 
 
+    # iterate through the sorted contigs to calculate the N50 and L50
     out = {}
     count50, count, check = 0, 0, 0
     for contig in sortedContigs:
         count50 += contig['len']
         count += 1
+        # separate the calculations for minimum 1000bp if there are sequences
+        # with less than 1000 bp
         if count50 >= total1000/2:
             if contig['len'] >= 1000 and check != 1:
                 out['n50-1000bp'] = int(contig['len'])
@@ -82,7 +86,7 @@ def n50l50( sortedContigs ):
                 out['l50'] = int(count)
                 break
 
-    try:
+    try: # prepare the output stats
         out['l50%'] = out['l50']/len(sortedContigs)
         out['largest_contig'] = sortedContigs[0]['len']
         out['shortest_contig'] = sortedContigs[-1]['len']
@@ -99,12 +103,11 @@ def n50l50( sortedContigs ):
         maskCount1000 = calcMask( pass_fa )
         out['mask%'] = maskCount / int( total ) * 100
         out['mask%-1000bp'] = maskCount1000 / int( total1000) * 100
-        
-    except KeyError:
+    except KeyError: # no stats acquired ??
         out = {}
 
-
     return out
+
 
 def mngr(assembly_path, ome):
     sortedContigs = sortContigs(assembly_path)
