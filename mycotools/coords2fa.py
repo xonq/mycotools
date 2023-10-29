@@ -10,10 +10,12 @@ from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa
 from mycotools.lib.kontools import sys_start, eprint, format_path
 
-def extractCoords(fa_dict, seqid, coord_start = 0, coord_end = -1, sense = '+', fa_name = ''):
+def extractCoords(fa_dict, seqid, coord_start = 0, 
+                  coord_end = -1, sense = '+', fa_name = ''):
+    """Extract the coordinates of a fasta based on input parameters"""
 
     new_fa, error = {}, ''
-    name = seqid + '_' + str(coord_start) + '-' + str(coord_end) + '_' + sense
+    name = f'{seqid}_{coord_start}-{coord_end}_{sense}'
     if sense == '+':
         new_fa[name] = {
             'sequence': fa_dict[seqid]['sequence'][coord_start:coord_end],
@@ -25,31 +27,40 @@ def extractCoords(fa_dict, seqid, coord_start = 0, coord_end = -1, sense = '+', 
             'description': ''
             }
     if coord_end > len(fa_dict[seqid]['sequence']):
-        error = '\nNOTICE: end coordinate beyond contig edge: ' + fa_name + ' ' + seqid + ' ' + str(coord_end)
+        error = '\nNOTICE: end coordinate beyond contig edge: ' + fa_name \
+              + ' ' + seqid + ' ' + str(coord_end)
 
     return new_fa, error
 
 def cli():
-
+    """Command-line interface for extracting sequences from a FASTA or set of
+    FASTA inputs"""
     usage = 'Input nucleotide fasta/tsv input, extract coordinates\n' \
         + 'coords2fa.py <FA> <SEQID> <START_COORD> <END_COORD> <STRAND_SENSE>' \
-        + '\nExtract full sequence from sense strand: coords2fa.py test.fna scaffold_20 0 -1' \
-        + '\nExtract coordinates from antisense strand: coords2fa.py test.fna scaffold_20 69 420 -' \
+        + '\nExtract full sequence from sense strand: coords2fa.py test.fna ' \
+        + 'scaffold_20 0 -1' \
+        + '\nExtract coordinates from antisense strand: coords2fa.py ' \
+        + 'test.fna scaffold_20 69 420 -' \
         + '\n\n\nBulk extraction tab delimitted row format:' \
-        + '\n#fasta_path\tsequence_id\tstart_coordinate\tend_coordinate\tstrand_sense\t[concat_id]' \
-        +  '\n\ncoords2fa.py coords.tsv'
+        + '\n#fasta_path\tsequence_id\tstart_coordinate\tend_coordinate\t' \
+        + 'strand_sense\t[concat_id]' \
+        + '\n\ncoords2fa.py coords.tsv'
 
+    # parse command-line arguments
     args = sys_start(sys.argv[1:], usage, 1, files = [sys.argv[1]])
 
+    # intialize data structures
     out_fa, error = defaultdict(dict), ''
     try:
         fa_file = format_path(args[0])
-        if fa_file.endswith('/'):
+        if fa_file.endswith('/'): # if it is a directory that was inputted
             fa_name = os.path.basename(fa_file[:-1])
         else:
             fa_name = os.path.basename(fa_file)
 
         fa = fa2dict(fa_file)
+
+        # if the file is empty, raise an index error
         if not fa:
             raise IndexError
         if len(args) < 3:
@@ -57,15 +68,18 @@ def cli():
         elif len(args) < 6:
             args.append('+')
         out_fa, error = extractCoords(
-            fa, args[1], min([int(args[2]), int(args[3])]), max([int(args[2]), int(args[3])]), args[4], fa_name
+            fa, args[1], min([int(args[2]), int(args[3])]), max([int(args[2]), 
+            int(args[3])]), args[4], fa_name
             )
 
+        # print the extracted sequences to stdout in FASTA format
         print(dict2fa(out_fa))
         eprint(error)
         sys.exit(0)
 
-    except IndexError:
+    except IndexError: # fasta was not parseable
         try: 
+            # assume the input is a table of coordinates
             with open(args[0], 'r') as raw:
                 data = [x.rstrip().split('\t') \
                         for x in raw if x and not x.startswith('#')]
@@ -85,12 +99,16 @@ def cli():
         except:
             eprint('\nERROR: incorrectly formatted input', flush = True)
 
+    # for each file and coordinates, prepare for output
     for fa_file, concats in files_data.items():
         fa = fa2dict(format_path(fa_file))
+
+        # extract the file name from the path
         if fa_file.endswith('/'):
             fa_name = os.path.basename(fa_file[:-1])
         else:
             fa_name = os.path.basename(fa_file)
+
         for concat_id, rows in concats.items():
             if rows[0][-1] == '+':
                 sorted_rows = sorted(rows, key = lambda x: x[1])
