@@ -719,7 +719,7 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome',
     if isinstance(db, mtdb):
         for i, genus in enumerate(db['genus']):
             db['taxonomy'][i] = tax_dicts[genus]
-        return mtdb(db)
+        return mtdb(db), tax_dicts
     else:
         db['taxonomy'] = db.apply(
             lambda x: tax_dicts[x['genus']], axis = 1
