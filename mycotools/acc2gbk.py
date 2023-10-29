@@ -10,7 +10,7 @@ from Bio.Seq import Seq
 from mycotools.lib.kontools import eprint, format_path, stdin2str
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps
-from mycotools.acc2gff import dbMain as acc2gff
+from mycotools.acc2gff import db_main as acc2gff
 
 def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
                                'tRNA', 'rRNA', 'RNA', 'pseudogene'}):
@@ -19,6 +19,7 @@ def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
     to the CDS dict for that protein header."""
 
     cds_dict = defaultdict(dict)
+    # parse the gff to acquire the aliases
     for entry in gff_list:
         if entry['type'] in types:
             contig = entry['seqid']
@@ -29,6 +30,7 @@ def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
                 continue
             aliases = alias.split('|') # to address alternate splicing in gene
             # aliases
+            # compile all CDS for each alias
             for alias in aliases:
                 ome = alias[:alias.find('_')]
                 if contig not in cds_dict[ome]:
@@ -103,6 +105,7 @@ def contig2gbk(ome, row, contig, contig_dict,
             elif entry['type'].lower() in {'gene', 'pseudogene'}:
                 entries['gene'].append(entry)
 
+        # for each gene, let it be the parent entry 
         for entry in entries['gene']:
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
 #            eprint(alias)
@@ -114,12 +117,15 @@ def contig2gbk(ome, row, contig, contig_dict,
             id_ = re.search(gff3Comps()['id'], entry['attributes'])[1]
 
             products = {}
+            # try to acquire the product name
             for prod_id, product_search in product_searches.items():
                 try:
                     product = re.search(product_search, entry['attributes'])[1]
                     products[prod_id] = product
                 except TypeError: # no product
                     pass
+
+            # begin process for assigning gene coordinates
             start, end = sorted([int(entry['start']), int(entry['end'])])
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
@@ -130,8 +136,9 @@ def contig2gbk(ome, row, contig, contig_dict,
                 gene_coords = 'complement(' + str(start-init_start_test) \
                     + '..' + str(end-init_start_test) + ')\n                     '
             gbk += gene_coords
-            gbk += '/locus_tag="' + alias + '"\n                     ' 
 
+            # assign etc information to entry
+            gbk += '/locus_tag="' + alias + '"\n                     ' 
             for prod_id, product in products.items():
                 if product:
                     gbk += f'/{prod_id}="' + product + '"\n                     '
@@ -139,9 +146,11 @@ def contig2gbk(ome, row, contig, contig_dict,
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
 
+        # for each RNA entry
         for entry in entries['RNA']:
             gbk += '     ' + entry['type'] + \
                 '                '[:-len(entry['type'])]
+            # acquire the products
             products = {}
             for prod_id, product_search in product_searches.items():
                 try:
@@ -152,9 +161,10 @@ def contig2gbk(ome, row, contig, contig_dict,
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             id_ = re.search(gff3Comps()['par'], entry['attributes'])[1]
 
+            # append to the final gene coordinates
             if final_coords:
                 gbk += final_coords
-            else:
+            else: # if there is not alternative splicing
                 start, end = sorted([int(entry['start']),
                                      int(entry['end'])])
                 if entry['strand'] == '+':
@@ -164,6 +174,8 @@ def contig2gbk(ome, row, contig, contig_dict,
                     gene_coords = 'complement(' + str(start-init_start_test) \
                         + '..' + str(end-init_start_test) + ')\n                     '
                 gbk += gene_coords
+
+            # add the etcs
             gbk += '/locus_tag="' + alias + '"\n                     ' 
 
             for prod_id, product in products.items():
@@ -174,17 +186,18 @@ def contig2gbk(ome, row, contig, contig_dict,
             gbk += '/source="' + entry['source'] + '"\n'
             gbk += '                     /transcript_id="' + id_ + '"\n'
 
+        # for each CDS entry
         if entries['CDS']:
             entry = entries['CDS'][0]
             strand = entry['strand']
             cds_coords = ''
-            if strand == '+':
+            if strand == '+': # sense strand, easy set-up
                 for cds in entries['CDS']:
                     coords = [cds['start'] - init_start_test, 
                               cds['end'] - init_start_test]
                     max_c, min_c = max(coords), min(coords)
                     cds_coords += str(min_c) + '..' + str(max_c) + ','
-            else:
+            else: # antisense, prepare the negative coordinate list
                 for cds in entries['CDS']:
                     coords = [cds['start'] - init_start_test, 
                               cds['end'] - init_start_test]
@@ -195,6 +208,7 @@ def contig2gbk(ome, row, contig, contig_dict,
             cds_coords_list = cds_coords.split(',')
             final_coords = '' 
             total_len = 0
+            # prepare the coordinates for each set of sequence
             for coord in cds_coords_list[:-1]:
                 if total_len + len(coord) < 57 or total_len == 0:
                     final_coords += coord + ','
@@ -234,6 +248,8 @@ def contig2gbk(ome, row, contig, contig_dict,
             if entry['phase'] != '.':
                 gbk += '/phase="' + entry['phase'] + '"\n                     '
             gbk += '/source="' + entry['source'] + '"\n'
+
+            # acquire the sequence for the protein
             try:
                 inputSeq = faa[alias]['sequence']
             except KeyError:
@@ -266,6 +282,7 @@ def contig2gbk(ome, row, contig, contig_dict,
     seqLines = [assSeq[i:i+60] for i in range(0, len(assSeq), 60)]
     count = -59
 
+    # format the header
     gbk += 'ORIGIN\n'
     for line in seqLines:
         count += 60
@@ -279,7 +296,7 @@ def contig2gbk(ome, row, contig, contig_dict,
     return gbk
 
 def gen_gbk(ome_dict, row, fna, faa, ome, product_searches, full = False):
-
+    """manage generating the GBK for each contiguous sequence"""
     gbk = {}
     for contig, contig_dict in ome_dict.items():
         gbk[contig] = contig2gbk(ome, row, contig, contig_dict, 
@@ -289,6 +306,7 @@ def gen_gbk(ome_dict, row, fna, faa, ome, product_searches, full = False):
     return gbk
 
 def ome_main(ome, gff_lists, row, product_searches = {'product': r'product=([^;]+)'}):
+    """Create a genbank for the whole genome"""
     gbks = defaultdict(list)
     faa, fna = fa2dict(row['faa']), fa2dict(row['fna'])
     for key, gffs in gff_lists.items():
@@ -304,6 +322,7 @@ def ome_main(ome, gff_lists, row, product_searches = {'product': r'product=([^;]
 
 def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'}, 
          full = False):
+    """Generate a genbank for each inputed gff, its associated fna, and ome"""
     cds_dict = col_CDS(gff_list, 
             types = {'gene', 'CDS', 'exon', 'mRNA', 
                      'tRNA', 'rRNA', 'RNA', 'pseudogene'})
@@ -345,6 +364,8 @@ def cli():
         accs = []
         for acc in accs_prep:
             accs.extend(acc)
+    # if it is a single accession or coming from standard input, then acquire
+    # that
     elif args.accession:
         if args.accession == '-':
             data = stdin2str()
@@ -358,11 +379,13 @@ def cli():
                 accs = args.accession.split()
             else:
                 accs = [args.accession]
+    # if there is no gff then no input was received
     elif not args.gff:
         raise FileNotFoundError('need input file or accession')
 
+    # only full genomes for args.full, no accessions
     if args.full:
-        if any('_' in x for x in accs):
+        if any('_' in x for x in accs): # _ is forbidden from ome codes
             eprint('\nERROR: -f requires omes, not accessions', flush = True)
             sys.exit(3)
 
@@ -384,28 +407,28 @@ def cli():
 
     # various output formats
     gbk_dict = {}
-    if args.gff:
+    if args.gff: # use an inputted gff
         gbk_dict = main(gff2list(format_path(args.gff)), db, {'product': regex},
                         full = args.full)
-    elif not args.full:
+    elif not args.full: # acquire an inputted gff from the accessions
         gffs = acc2gff(db, accs, args.cpu)
         for ome, gff in gffs.items():
             gbk_dict[ome] = main(gff, db, {'product': regex})[ome]
-    else:
+    else: # acquire a gff for each inputted ome
         gffs = {ome: db[ome]['gff3'] for ome in accs}
         for ome, gff_p in gffs.items():
             gbk_dict[ome] = main(gff2list(gff_p), db, {'product': regex}, args.full)[ome]
     
-    if args.ome:
+    if args.ome: # output a file for each genome inputted
         for ome, gbks in gbk_dict.items():
             with open(ome + '.acc2gbk.gbk', 'w') as out:
                 out.write('\n'.join([gbk for gbk in gbks]))
-    elif args.seqid:
+    elif args.seqid: # output a file for each contig inputted
         for ome, gbks in gbk_dict.items():
             for contig, gbk in gbks.items():
-                with open(ome + '_' + contig + '.gbk', 'w') as out:
+                with open(contig + '.gbk', 'w') as out:
                     out.write(gbk)
-    else:
+    else: # otherwise just print to stdout
         for ome, gbks in gbk_dict.items():
             for contig, gbk in gbks.items():
                 print(gbk, flush = True)

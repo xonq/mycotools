@@ -9,7 +9,7 @@ from collections import defaultdict
 from mycotools.lib.kontools import eprint, format_path, file2list, stdin2str
 from mycotools.lib.dbtools import primaryDB, mtdb
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
-from mycotools.acc2gff import grabGffAcc
+from mycotools.acc2gff import grab_gff_acc
 
 def prepGffOutput(hit_list, gff_path, cpu = 1):
 
@@ -19,7 +19,7 @@ def prepGffOutput(hit_list, gff_path, cpu = 1):
         mp_cmds.append([gff_list, hit])
     with mp.Pool(processes = cpu) as pool:
         gff_list_strs = pool.starmap(
-            grabGffAcc, mp_cmds
+            grab_gff_acc, mp_cmds
             )
     gff_strs = [list2gff(x) for x in gff_list_strs]
     gff_str = '##gff-version 3\n'

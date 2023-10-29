@@ -10,6 +10,7 @@ from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.kontools import format_path, eprint, stdin2str
 
 def extract_mtdb_accs_exp(fa_dict, accs):
+    """fast extraction of accession with no inner coordinates"""
     return {acc: fa_dict[acc] for acc in accs}
 
 def extract_mtdb_accs(fa_dict, accs, spacer = ''):

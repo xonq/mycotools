@@ -9,14 +9,11 @@ from mycotools.lib.biotools import gff2list, list2gff
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.kontools import format_path, stdin2str
 
-def grabGffAcc( gff_list, acc, term = 'Alias=' ):
+def grab_gff_acc( gff_list, acc, term = 'Alias=' ):
     '''grab acc from alias'''
 
     alias = term + acc
     alias_on = alias + ';'
-#    elif ' alias "' in gff_list[0]['attributes']:
- #       alias = 'alias "' + acc + '"'
-  #      alias_on = 'alias "' + acc + '"'
     out_list = [ 
         x for x in gff_list \
         if x['attributes'].endswith(alias) or \
@@ -25,8 +22,8 @@ def grabGffAcc( gff_list, acc, term = 'Alias=' ):
     return out_list
 
 
-def grabGffAccs(gff_list, acc_list, ome = None):
-
+def grab_gff_accs(gff_list, acc_list, ome = None):
+    """grab entries with any of a list of aliases"""
     aliases, ends = set(), set()
     for acc in acc_list:
         aliases.add('Alias=' + acc)
@@ -44,33 +41,35 @@ def grabGffAccs(gff_list, acc_list, ome = None):
         return out_list
 
 
-def gffMain(gffData, accs):
-    accGffs = {}
-    if isinstance(gffData, str):
-        gff = gff2list(gffData)
+def gff_main(gff_data, accs):
+    """acquire a dictionary of gffs for each accession as a key"""
+    acc_gffs = {}
+    if isinstance(gff_data, str):
+        gff = gff2list(gff_data)
     else:
-        gff = gffData
+        gff = gff_data
     for acc in accs:
-        accGffs[acc] = grabGffAcc(gff, acc)
-    return accGffs
+        acc_gffs[acc] = grab_gff_acc(gff, acc)
+    return acc_gffs
 
 
-def dbMain(db, accs, cpus = 1):
-
+def db_main(db, accs, cpus = 1):
+    """Grab a gff for accessions that may have multiple ome codes"""
     omes = set([x[:x.find('_')] for x in accs])
     db = db.set_index('ome')
-    grabAcc_cmds = []
+    grab_acc_cmds = []
+    # for each ome code, prepare a command to acquire the accessions
     for ome in list(omes):
-        omeAccs = [acc for acc in accs if acc.startswith(ome + '_')]
+        ome_accs = [acc for acc in accs if acc.startswith(ome + '_')]
         gff_list = gff2list(db[ome]['gff3'])
-#        grabAcc_res = [grabGffAccs(gff_list, omeAccs, ome)]
-        grabAcc_cmds.append([gff_list, omeAccs, ome])
+#        grab_acc_res = [grab_gff_accs(gff_list, ome_accs, ome)]
+        grab_acc_cmds.append([gff_list, ome_accs, ome])
 
     with mp.Pool(processes = cpus) as pool:
-        grabAcc_res = pool.starmap(grabGffAccs, grabAcc_cmds)
+        grab_acc_res = pool.starmap(grab_gff_accs, grab_acc_cmds)
 
     gffs = {}
-    for res in grabAcc_res:
+    for res in grab_acc_res:
         gffs[res[1]] = res[0]
 
     return gffs
@@ -92,12 +91,15 @@ def cli():
     parser.add_argument('--cpu', type = int, default = mp.cpu_count())
     args = parser.parse_args()
 
+    # if there is an input file, extract the accessions from that
     if args.input:
-        input_file = format_path( args.input )
+        input_file = format_path(args.input)
         with open(input_file, 'r') as raw:
             accs = [x.rstrip().split('\t')[args.column-1] for x in raw]
+    # no input and accession
     elif not args.accession:
         raise ValueError('need input file or accession')
+    # parse accession input into a list of acc or accs
     else:
         if '-' == args.accession:
             data = stdin2str()
@@ -117,24 +119,29 @@ def cli():
     else:
         cpu = mp.cpu_count()
 
-    db_path = format_path( args.mtdb )
+    # if no gff is provided, then acquire it from the primary database
+    db_path = format_path(args.mtdb)
     if not args.gff:
-        db = mtdb( format_path(args.mtdb) )
-        gff_lists = dbMain( db, accs, cpus = args.cpu )
+        db = mtdb(format_path(args.mtdb))
+        gff_lists = db_main(db, accs, cpus = args.cpu)
+    # otherwise just use what is available
     else:
-        gff_path = format_path( args.gff )
-        gff_lists = gffMain(gffData, accs)
+        gff_path = format_path(args.gff)
+        gff_lists = gff_main(gff_data, accs)
 
+    # if there is an inputted accession, then print the output to stdout
     if args.accession:
-        print( list2gff(gff_lists[list(gff_lists.keys())[0]]).rstrip() , flush = True)
+        print(list2gff(gff_lists[list(gff_lists.keys())[0]]).rstrip(), flush = True)
+    # if it is specified output, open a folder for it
     elif args.ome:
         output = mkOutput(os.getcwd() + '/', 'acc2gff')
         for ome in gff_strs:
             if gff_lists[ome]:
-                with open( output + ome + '.accs.gff3', 'w' ) as out:
-                    out.write( list2gff(gff_lists[ome]) )
+                with open(output + ome + '.accs.gff3', 'w') as out:
+                    out.write(list2gff(gff_lists[ome]))
             else:
                 eprint('ERROR: ' + ome + ' failed, no accessions retrieved', flush = True)
+    # print to stdout each gff_list
     else:
         out_str = ''
         for ome in gff_lists:
@@ -144,7 +151,7 @@ def cli():
                 eprint('ERROR: ' + ome + ' does not have accession', flush = True)
         print(out_str)
 
-    sys.exit( 0 )
+    sys.exit(0)
 
 if __name__ == '__main__':
     cli()
