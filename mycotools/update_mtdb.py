@@ -354,10 +354,8 @@ def prep_ncbi_names(ncbi_df):
 
     ncbi_df['strain'] = ''
     for i, row in ncbi_df.iterrows():
-        organism = row['#Organism/Name'].split(' ')
-        organism = [ 
-            x.replace('[','').replace(']','').replace('(','').replace(')','') for x in organism 
-            ]
+        organism = \
+          row['#Organism/Name'].replace('[','').replace(']','').replace('(','').replace(')','').split()
         ncbi_df.at[i, 'genus'] = organism[0]
         if len(organism) > 1:
             ncbi_df.at[i, 'species'] = organism[1]
@@ -373,7 +371,6 @@ def prep_ncbi_names(ncbi_df):
 
 def clean_ncbi_df(ncbi_df, kingdom = 'Fungi'):
     ncbi_df = ncbi_df.astype(str).replace(np.nan, '')
-    ncbi_df['strain'] = ''
 
     if kingdom.lower() == 'fungi':
         # extract group of interest (case sensitive to first letter)
@@ -690,6 +687,7 @@ def ref_update(
 
     for ome, row in update_mtdb.items():
         if row['genus'] in genus_dicts:
+            print(genus_dicts[row['genus']])
             row['taxonomy'] = genus_dicts[row['genus']]
 
     return new_db, update_mtdb 
@@ -742,14 +740,14 @@ def rogue_update(
         # acquire the mycocosm master table
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
-        ncbi2jgi = parse_ncbi2jgi(update_path + '../ncbi2jgi.tsv')
-        true_ncbi = parse_true_ncbi(update_path + '../true_ncbi.tsv')
+        ncbi2jgi = parse_ncbi2jgi(update_path + 'ncbi2jgi.tsv')
+        true_ncbi = parse_true_ncbi(update_path + 'true_ncbi.tsv')
         ncbi_df, jgi2ncbi, jgi2biosample, true_ncbi, ncbi_jgi_overlap = \
             rm_ncbi_overlap(ncbi_df, jgi_df, ncbi2jgi, true_ncbi, api = api)
         print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
              flush = True)
-        add_true_ncbi(true_ncbi, update_path + '../true_ncbi.tsv')
-        add_ncbi2jgi(jgi2ncbi, update_path + '../ncbi2jgi.tsv')
+        add_true_ncbi(true_ncbi, update_path + 'true_ncbi.tsv')
+        add_ncbi2jgi(jgi2ncbi, update_path + 'ncbi2jgi.tsv')
         for i, row in jgi_df.iterrows():
             if row['portal'].lower() in jgi2ncbi \
                 and row['portal'].lower() in jgi2biosample:
