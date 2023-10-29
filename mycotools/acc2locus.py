@@ -5,14 +5,15 @@ import re
 import sys
 import argparse
 import multiprocessing as mp
+from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, format_path, file2list, stdin2str
 from mycotools.lib.dbtools import primaryDB, mtdb
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
 from mycotools.acc2gff import grab_gff_acc
 
-def prepGffOutput(hit_list, gff_path, cpu = 1):
-
+def prep_gff_output(hit_list, gff_path, cpu = 1):
+    """Prepare an output file for gffs"""
     gff_list = gff2list(gff_path)
     mp_cmds = []
     for hit in hit_list:
@@ -30,8 +31,8 @@ def prepGffOutput(hit_list, gff_path, cpu = 1):
 
     return gff_str
 
-def prepFaaOutput(hit_list, proteome_path):
-
+def prep_faa_output(hit_list, proteome_path):
+    """Prepare and output file for proteomes"""
     proteome_dict = fa2dict(proteome_path)
     clus_fa = {}
     for hit in hit_list:
@@ -39,174 +40,124 @@ def prepFaaOutput(hit_list, proteome_path):
 
     return dict2fa(clus_fa)
 
-def compileCDS(gff_list, accs_list = []):
-
+def compile_alias_coords(gff_list, accs_list = []):
+    """Compile the coordinates of all genes and RNAs of a given gff into a
+    dictionary that is accessed through the sequence ID, followed by the
+    alias of each sequence"""
     accs_set = set(accs_list)
-    gene = False
+    alias_comp = re.compile(gff3Comps()['Alias'])
+
+    # gather the coordinates for each RNA and genes without RNAs 
+    coord_dict = defaultdict(lambda: defaultdict(list))
+    gene2alia = defaultdict(lambda: defaultdict(list))
+    alia2seqid = {}
     for entry in gff_list:
-        if entry['type'] == 'CDS':
-            break
-        else:
-            entry = None
+        seqid = entry['seqid']
+        if 'gene' in entry['type']:
+            # account for alternately spliced aliases
+            alias = alias_comp.search(entry['attributes'])[1]
+            for al in alias.split('|'):
+                gene2alia[seqid][al].extend([entry['start'], entry['end']])
+                alia2seqid[al] = seqid
+        elif 'RNA' in entry['type']:
+            alias = alias_comp.search(entry['attributes'])[1]
+            coord_dict[seqid][alias].extend([entry['start'], entry['end']])
+           
+    # are there genes without RNA?
+    gene_keys = set(k for k in chain(*list(gene2alia.values())))
+    rna_keys = set(k for k in chain(*list(coord_dict.values())))
+    missing = gene_keys.difference(rna_keys)
+    for key in list(missing):
+        seqid = alia2seqid[key]
+        coord_dict[seqid][key] = gene2alia[seqid][key]
 
-    # need to make this predict in a better way
-    prot_comps = [ 
-    r'Alias=([^;]*)', r';Name=(.*?);', r'alias ([^;]*)', r'protein_id\=(.*?;|.*?$)', 
-    r'proteinId (\d+)', r'gene_id "(.*?)"', r'Parent=(.*?)$'
-    ]
-    for tag in prot_comps:
-        if re.search(tag, entry['attributes']):
-            prot_comp = re.compile(tag)
-            if tag == prot_comps[-1]:
-                gene = True
-            break
-
-    if gene:
-        mRNA_dict = {}
-        for entry in [x for x in gff_list if x['type'] == 'mRNA']:
-            gene = re.search(r'Alias=([^;]*)', entry['attributes'])[1]
-            mRNA = re.search(r'ID=([^;]*)', entry['attributes'])[1]
-            mRNA_dict[mRNA] = gene
-
-    cds_dict = {}
-    for entry in gff_list:
-        if entry['type'] == 'CDS':
-            if entry['seqid'] not in cds_dict:
-                cds_dict[entry['seqid']] = defaultdict(list)
-            prot = prot_comp.search(entry['attributes'])[1]
-            if gene:
-                prot = mRNA_dict[prot]
-            cds_dict[entry['seqid']][prot].extend([entry['start'], entry['end']])
-            
+    # compile output structures for the queried sequences
     acc2seqid = {}
-    for seqid in cds_dict:
-        for prot in cds_dict[seqid]:
-            cds_dict[seqid][prot].sort()
-            if prot in accs_set:
-                acc2seqid[prot] = seqid
-    #    cds_dict[seqid] = sorted(cds_dict[seqid].keys(), key = lambda k: cds_dict[seqid][k][0]])
-        cds_dict[seqid] = {
+    for seqid in coord_dict:
+        for alias in coord_dict[seqid]:
+            coord_dict[seqid][alias].sort()
+            if alias in accs_set:
+                acc2seqid[alias] = seqid
+    #    coord_dict[seqid] = sorted(coord_dict[seqid].keys(), key = lambda k: coord_dict[seqid][k][0]])
+        coord_dict[seqid] = {
             k: v for k, v in sorted(
-                cds_dict[seqid].items(), key = lambda x: x[1][0]
+                coord_dict[seqid].items(), key = lambda x: x[1][0]
                 )
             }
 
-    return cds_dict, acc2seqid
+    return coord_dict, acc2seqid
 
 
-def compileCDS_mycotools(gff_list, accs_list):
-    '''
-    Inputs the gff_list and organism ome code. Compiles CDS entries for loci parsing and outputs:
-    cds_dict = {contig: {protein: [[CDSstart, CDSstop]] } }
-    Sorts the cds_dict for each protein from smallest to largest
-    '''
-
-    accs_set = set(accs_list)
-    cds_dict, fail = {}, False
-    for entry in gff_list:
-        if entry['type'] == 'CDS':
-            if entry['seqid'] not in cds_dict:
-                cds_dict[entry['seqid']] = defaultdict(list)
-            prot_prep_i0 = entry['attributes'].index(';Alias=')
-            try:
-                prot_prep_i1 = entry['attributes'][prot_prep_i0+1:].index(';') + prot_prep_i0+1
-            except ValueError:
-                prot_prep_i1 = len(entry['attributes'])
-            prot = entry['attributes'][prot_prep_i0:prot_prep_i1].replace(';Alias=','')
-#            if prot not in cds_dict[entry['seqid']] and prot:
- #               cds_dict[entry['seqid']][prot] = []
-            if not prot:
-                print(entry['attributes'], prot_prep_i0, prot_prep_i1)
-                if not fail:
-                    print('\tWARNING: proteins in gff with no Alias', flush = True)
-                fail = True
-                continue
-            cds_dict[entry['seqid']][prot].extend(
-                [entry['start'], entry['end']]
-                )
-
-    acc2seqid = {}
-    for seqid in cds_dict:
-        for prot in cds_dict[seqid]:
-            if prot in accs_set:
-                acc2seqid[prot] = seqid
-            cds_dict[seqid][prot].sort()
-#        cds_dict[seqid] = list(sorted(cds_dict[seqid].keys(), key = lambda k: cds_dict[seqid][k][0]))
-        cds_dict[seqid] = {
-            k: v for k, v in sorted(
-                cds_dict[seqid].items(), key = lambda x: x[1][0]
-                )
-            }
-    # dict(cds_dict) = {seqid: {prot: [sorted_coords]}}
-
-    return cds_dict, acc2seqid
-
-
-def prep_outputXgene(prot_dict, acc, plusminus):
-
-    prot_list = list(prot_dict.keys())
-    index = prot_list.index(acc)
+def prep_outputXgene(coords_dict, acc, plusminus):
+    """Prep the output for each gene accession using the coordinates
+    dictionary as a sorting mechanism, and return the list of accession names"""
+    alias_list = list(coords_dict.keys())
+    index = alias_list.index(acc)
     if index - plusminus < 0:
         lower = 0
     else:
         lower = int(index - plusminus)
     upper = int(index + plusminus) + 1
-    out_index = prot_list[lower:upper]
+    out_index = alias_list[lower:upper]
 
     return out_index
 
-def prep_outputXbase(prot_dict, acc, plusminus):
-
-    prot_list = list(prot_dict.keys())
-    index = prot_list.index(acc)
-    start, end = prot_dict[acc][0], prot_dict[acc][1]
+def prep_outputXbase(coords_dict, acc, plusminus):
+    """Prep the output based on the coordinates of a list of accessions if they
+    are within the range of the bases alotted, provided by plusminus"""
+    alias_list = list(coords_dict.keys())
+    index = alias_list.index(acc)
+    start, end = coords_dict[acc][0], coords_dict[acc][1]
     low_bound, high_bound = start - plusminus, end + plusminus
-    for i1, prot in enumerate(prot_list):
-        coords = prot_dict[prot]
+    # acquire the indices of the accessions that fit the boundary
+    for i1, prot in enumerate(alias_list):
+        coords = coords_dict[prot]
         high = coords[-1]
         if high >= low_bound:
             break
-    for rev_i2, prot in enumerate(prot_list[::-1]):
-        coords = prot_dict[prot]
+    for rev_i2, prot in enumerate(alias_list[::-1]):
+        coords = coords_dict[prot]
         low = coords[0]
         if low <= high_bound:
             break
-    i2 = len(prot_list) - rev_i2
-    out_index = prot_list[i1:i2]
+    i2 = len(alias_list) - rev_i2
+    out_index = alias_list[i1:i2]
 
     return out_index
 
-def grab_between(prot_dict, accs):
-    prot_list = list(prot_dict.keys())
-    a0i = prot_list.index(accs[0])
-    a1i = prot_list.index(accs[1])
+def grab_between(coords_dict, accs):
+    """Grab the accessions that are between two particular accessions by
+    accessing their indices"""
+    alias_list = list(coords_dict.keys())
+    a0i = alias_list.index(accs[0])
+    a1i = alias_list.index(accs[1])
     mini = min(a0i, a1i)
     maxi = max(a0i, a1i)
-    out_index = prot_list[mini:maxi+1]
+    out_index = alias_list[mini:maxi+1]
     return out_index
 
 def main(gff_list, accs, plusminus = 10, mycotools = False,
          geneGff = False, nt = False, between = False):
-
+    """Input a GFF data structure, and accessions, then return a dictionary set
+    for each sequence ID to key the accessions that meet the coordinate
+    extraction parameters"""
     out_indices = {}
-    if mycotools:
-        cds_dict, acc2seqid = compileCDS_mycotools(gff_list, accs)
-    else:
-        cds_dict, acc2seqid = compileCDS(gff_list, accs)
-    if between:
+    # compile the coordinates of all genes and RNAs that hit an accession
+    coords_dict, acc2seqid = compile_alias_coords(gff_list, accs)
+    if between: # if looking for accessions between a set of accessions
         seqid = list(acc2seqid.values())[0]
-        out_indices[accs[0]] = grab_between(cds_dict[seqid], accs)
-    elif nt:
+        out_indices[accs[0]] = grab_between(coords_dict[seqid], accs)
+    elif nt: # if looking for accessions that are +/- a number of nucleotides
         for acc, seqid in acc2seqid.items():
-            out_indices[acc] = prep_outputXbase(cds_dict[seqid], acc,
+            out_indices[acc] = prep_outputXbase(coords_dict[seqid], acc,
                                                 plusminus)
-    else:
+    else: # if looking for accessions that are +/- a number of accessions
         for acc, seqid in acc2seqid.items():
-            out_indices[acc] = prep_outputXgene(cds_dict[seqid], acc, 
+            out_indices[acc] = prep_outputXgene(coords_dict[seqid], acc, 
                                                 plusminus)
 
     out_indices = {k: v for k, v in out_indices.items() if v}
-    if geneGff:
+    if geneGff: # if a gff of the RNA entries is desired
         geneGffs_prep = {acc: {} for acc in out_indices}
         gene_sets = {acc: set(genes) for acc, genes in out_indices.items()}
         for entry in gff_list:
@@ -336,13 +287,13 @@ def cli():
                 ome = acc[:acc.find('_')]
                 gff, prot = db[ome]['gff3'], db[ome]['faa']
             if len(out_indices[acc]) > 0:
-                gff_str = prepGffOutput( 
+                gff_str = prep_gff_output( 
                     out_indices[acc], gff, cpu = args.cpu
                 )
                 with open(acc + '.locus.gff3', 'w') as out:
                     out.write(gff_str)
                 if prot:
-                    prot_str = prepFaaOutput(
+                    prot_str = prep_faa_output(
                         out_indices[acc], prot
                         )
                     with open(acc + '.locus.faa', 'w') as out:
