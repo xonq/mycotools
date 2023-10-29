@@ -12,13 +12,18 @@ from mycotools.lib.kontools import format_path, eprint
 
 
 def compile_alia(gff_path, output, ome = None):
+    # Prepare the data structures for population
     gff = gff2list(gff_path)
     prot_dict, exon_dict, mrna_dict, trna_dict, orna_dict, pseudogene_dict, gene_dict = \
         defaultdict(list), defaultdict(list), defaultdict(list), \
         defaultdict(list), defaultdict(list), defaultdict(list), \
         defaultdict(list)
+
+    # iterate through the GFF entries and add them to their respective type
+    # dictionary
     for entry in gff:
         try:
+            # extract the alias from the attributes field
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
         except TypeError:
             raise TypeError(f'entry without MTDB alias: {entry}')
@@ -37,6 +42,7 @@ def compile_alia(gff_path, output, ome = None):
         elif entry['type'] == 'pseudogene':
             pseudogene_dict[alias].append(sorted((entry['start'], entry['end'])))
 
+    # calculate the lengths of each specific type
     gene_lens = sorted([v[1] - v[0] for v in chain(*list(gene_dict.values()))])
     prot_lens = sorted([v[1] - v[0] for v in chain(*list(prot_dict.values()))])
     exon_lens = sorted([v[1] - v[0] for v in chain(*list(exon_dict.values()))])
@@ -46,7 +52,7 @@ def compile_alia(gff_path, output, ome = None):
     pseudogene_lens = sorted([v[1] - v[0] \
                              for v in chain(*list(pseudogene_dict.values()))])
 
-
+    # calculate the number of each specific type
     gene_len = len(gene_lens)
     prot_len = len(prot_lens)
     exon_len = len(exon_lens)
@@ -56,6 +62,7 @@ def compile_alia(gff_path, output, ome = None):
     pseu_len = len(pseudogene_lens)
     med_genes = gene_lens[round(gene_len/2) - 1]
 
+    # if no output, then print data to stdout
     if not output:
         mean_genes = sum(gene_lens)/gene_len
         print('{:<25}'.format('GENES:') + str(gene_len), flush = True)
@@ -115,10 +122,7 @@ def compile_alia(gff_path, output, ome = None):
             mean_pseudogenes = sum(pseudogene_lens)/pseu_len
             med_pseudogenes = pseudogene_lens[round(pseu_len/2) - 1]
 
-
-
-
-
+    # populate a dictionary of the statistics for each type
     geneStats = {
         'gene_len': sum(gene_lens), 'genes': gene_len,
         'mean_gene': mean_genes, 'median_gene': med_genes
@@ -161,75 +165,6 @@ def compile_alia(gff_path, output, ome = None):
     return ome, geneStats
 
 
-
-
-def compileExon( gff_path, output, ome = None ):
-    '''
-    Inputs: `gff_path` or mycotoolsDB file
-    Outputs: summary annotation statistics
-    Import the gff, find the first exon, and test which protein regular
-    expression pattern to use. For each line in the gff, if it is an exon grab
-    the protein and include it in `exon_dict`. Extend the start and stop
-    coordinates for that exon. For each protein in the `exon_dict`, sort the
-    entry, add the exon length to the total by subtracting the smallest entry
-    from the largest for that protein. Append this value to the length list for
-    median evaluation. Sort the `len_list` and calculate/output annotation
-    statistics.
-    '''
-
-    gff = gff2list( gff_path )
-    exon_dict = {}
-
-    for index in range(len(gff)):
-        if gff[index]['type'].lower() == 'exon':
-            break
-
-    protComp = re.compile( r';Parent\=([^;]*)' )
-    if not protComp.search( gff[index]['attributes'] ):
-        protComp = re.compile( r'gene_id "(.*?)"' )
-        if not protComp.search( gff[index]['attributes'] ):
-            protComp = re.compile( r'name "(.*?)"\;' )
-            if not protComp.search( gff[index]['attributes'] ):
-                protComp = re.compile( r'ID=(.*?);' )
-    for line in gff:
-        if line['type'].lower() == 'exon':
-            prot = protComp.search( line['attributes'] )[1]
-            if prot not in exon_dict:
-                exon_dict[ prot ] = []
-            exon_dict[ prot ].extend( [ int( line['start'] ), int( line['end'] ) ] )
-
-    total, len_list = 0, []
-    for prot in exon_dict:
-        exon_dict[ prot ].sort()
-        total += exon_dict[prot][-1] - exon_dict[prot][0]
-        len_list.append( exon_dict[prot][-1] - exon_dict[prot][0] )
-
-    len_list.sort()
-    try:
-        if len( len_list ) % 2 == 0:
-            median = len_list[int(len(len_list)/2 - 1)]
-        else:
-            median = (len_list[round(len(len_list)/2 - 1)] + len_list[round(len(len_list)/2 - 2)])/2
-    except IndexError:
-        eprint('ERROR: ' + os.path.basename(gff_path) + ' - no exons detected. Skipping', flush = True)
-        return None
-
-    if any( line for line in gff if line['type'] == 'intron' ):
-        eprint('ERROR: ' + os.path.basename(gff_path) + ' - introns detected. Exons only considered', flush = True)
-
-    if not output:
-        print( '{:<25}'.format('GENE LENGTH:') + str(total) , flush = True)
-        print( '{:<25}'.format('GENES:') + str(len(exon_dict)), flush = True)
-        print( '{:<25}'.format('MEAN GENE LENGTH:') + str(total/len(exon_dict)), flush = True)
-        print( '{:<25}'.format('MEDIAN GENE LENGTH:') + str(median), flush = True)
-    geneStats = {
-        'total_len': total, 'genes': len(exon_dict), 
-        'mean_len': total/len(exon_dict), 'median_len': median 
-        }
-
-    return ome, geneStats
-
-
 def main(in_path, log_path = None, cpus = 1, db = None):
 
     if in_path[-4:] not in {'.gtf', '.gff', 'gff3'} or db:
@@ -252,7 +187,6 @@ def main(in_path, log_path = None, cpus = 1, db = None):
             if ome not in prevOmes:
                 cmds.append((db[ome]['gff3'], True, ome,))
         with mp.Pool(processes = cpus) as pool:
-#            res = pool.starmap(compileExon, cmds)
             res = pool.starmap(compile_alia, cmds)
 
         outPrep = {}
@@ -277,7 +211,6 @@ def main(in_path, log_path = None, cpus = 1, db = None):
                 for ome in out:
                     write.write(ome + '\t' + out[ome] + '\n')
     else:
-#        ome, geneStats = compileExon(in_path, log_path)
         ome, geneStats = compile_alia(in_path, log_path)
 #        if log_path:
         
