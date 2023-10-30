@@ -577,20 +577,36 @@ def hit2taxonomy(
 def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                     rank = 'kingdom'):
 
+    tax_dicts, need_tax = {}, set()
     if isinstance(df, mtdb) or isinstance(df['taxonomy'], list):
         df = df.set_index('ome')
-        tax_dicts = {v['genus']: read_tax(v['taxonomy']) for k, v in df.items()}
+        for k, v in df.items():
+            tax_json = read_tax(v['taxonomy'])
+            if any(v for k, v in tax_json.items() \
+                   if k not in {'genus', 'species', 'strain'}):
+                   tax_dicts[v['genus']] = tax_json
+            else:
+                need_tax.add(v['genus'])
+#        tax_dicts = {v['genus']: read_tax(v['taxonomy']) for k, v in df.items()}
     else:
         df['taxonomy'] = df['taxonomy'].fillna({})
-        tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
+        for k, v in df.iterrows():
+            tax_json = read_tax(v['taxonomy'])
+            if any(v for k, v in tax_json.items() \
+                   if k not in {'genus', 'species', 'strain'}):
+                   tax_dicts[v['genus']] = tax_json
+            else:
+                need_tax.add(v['genus'])
+#        tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
             
-
     count = 0
 
-    for genus in tax_dicts:
-        if any(tax_dicts[genus][x] for x in tax_dicts[genus] \
-            if x not in {'genus', 'species', 'strain'}):
-            continue
+    need_tax = set(need_tax).difference(set(tax_dicts.keys()))
+
+    for genus in sorted(need_tax):
+    #    if any(tax_dicts[genus][x] for x in tax_dicts[genus] \
+     #       if x not in {'genus', 'species', 'strain'}):
+      #      continue
         print('\t' + genus, flush = True)
 # if there is no api key, sleep for a second after 3 queries
 # if there is an api key, sleep for a second after 10 queries
@@ -616,7 +632,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                     break
                 time.sleep(1)
         count += 1
-        if len(ids) == 0:
+        if not ids:
             print('\t\tNo taxonomy information', flush = True)
             continue
 
@@ -638,7 +654,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                 break
             except IndexError:
                 lineages = []
-            except:
+            except urllib.error.HTTPError:
                 time.sleep(1)
                 handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
                 records = Entrez.read(handle)
