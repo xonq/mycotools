@@ -176,6 +176,8 @@ def predb2mtdb(predb):
         predb['previous_ome'] = \
             ['' for x in predb[list(predb.keys())[0]]]
     for i, code in enumerate(predb['genus']):
+        if not code:
+            raise ValueError(f'no genus detected for genus {i}')
         toAdd = {
             'assembly_acc': predb['assembly_acc'][i],
             'ome': predb['previous_ome'][i].lower(),
