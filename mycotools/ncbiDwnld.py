@@ -101,7 +101,7 @@ def compile_log( output_path, remove = False ):
     if not os.path.isfile( output_path + 'ncbiDwnld.log' ):
         with open( output_path + 'ncbiDwnld.log', 'w' ) as out:
             out.write('#ome\tassembly_acc\tassembly\tproteome\tgff3\ttranscript\t' + \
-            'assemMD5\tprotMD5\tgff3MD5\ttransMD5\tgenome_id(s)')
+            'fna_md5\tfaa_md5\tgff3_md5\ttrans_md5\tgenome_id(s)')
 
         # too risky, too many things can go wrong and then users would be in a
         # loop, but necessary for huge downloads
@@ -115,8 +115,8 @@ def compile_log( output_path, remove = False ):
                     ass_prots[data[0]] = { 
                         'assembly_acc': str(data[1]), 'fna': str(data[2]), 
                         'faa': str(data[3]), 'gff3': str(data[4]), 
-                        'transcript': str(data[5]), 'assembly_md5': str(data[6]),
-                        'proteome_md5': str(data[7]), 'gff3_md5': str(data[8]),
+                        'transcript': str(data[5]), 'fna_md5': str(data[6]),
+                        'faa_md5': str(data[7]), 'gff3_md5': str(data[8]),
                         'transcript_md5': str(data[9]), 'genome_id': data[10].split(',')
                         }
 
@@ -225,7 +225,8 @@ def collect_ftps(
                 failed.append([accession, row['version']])
             continue
 
-        if ncbi_column in {'assembly', 'genome', 'uid'}: # be confident it is the most
+        if ncbi_column in {'Assembly Accession', 'assembly', 
+                           'genome', 'uid'}: # be confident it is the most
         # recent assembly UID
             genome_id = [str(max([int(i) for i in genome_id]))]
 
@@ -375,7 +376,8 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
             file_path = output_dir + 'transcript/' + \
                 os.path.basename(acc_prots[file_type])
 
-        if os.path.isfile( file_path ):
+
+        if os.path.isfile(file_path):
             count += 1
             md5_cmd = subprocess.run([
                 'md5sum', file_path],
@@ -383,6 +385,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
             md5_res = md5_cmd.stdout.decode('utf-8')
             md5_find = re.search(r'\w+', md5_res)
             md5 = md5_find[0]
+
             if md5 == acc_prots[file_type + '_md5']:
                 eprint(spacer + '\t' + file_type + ': ' + os.path.basename(file_path), flush = True)
                 dwnlds[file_type] = 0

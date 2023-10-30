@@ -329,6 +329,7 @@ def dwnld_mycocosm(
     except UnicodeDecodeError:
         jgi_df = pd.read_csv( out_file, encoding = 'utf-8' )
     jgi_df.columns = [x.replace('"','').replace('"','') for x in jgi_df.columns]
+    
     return jgi_df
 
 
@@ -350,23 +351,49 @@ def dwnld_ncbi_table(
  
     return ncbi_df
 
-def prep_ncbi_names(ncbi_df):
+def prep_taxa_cols(df, col = '#Organism/Name'):
 
-    ncbi_df['strain'] = ''
-    for i, row in ncbi_df.iterrows():
+    df['strain'] = ''
+    for i, row in df.iterrows():
         organism = \
-          row['#Organism/Name'].replace('[','').replace(']','').replace('(','').replace(')','').split()
-        ncbi_df.at[i, 'genus'] = organism[0]
+          re.sub(r'[^ a-zA-Z0-9]', '', row[col]).split()
+        df.at[i, 'genus'] = organism[0]
         if len(organism) > 1:
-            ncbi_df.at[i, 'species'] = organism[1]
+            df.at[i, 'species'] = organism[1]
             if len(organism) > 2:
-                ncbi_df.at[i, 'strain'] = ''.join(organism[2:])
-                ncbi_df.at[i, 'strain'] = re.sub(r'[^a-zA-Z0-9]', '', ncbi_df['strain'][i])
+                df.at[i, 'strain'] = ''.join(organism[2:])
         else:
-            ncbi_df.at[i, 'species'] = 'sp.'
+            df.at[i, 'species'] = 'sp.'
 
-    return ncbi_df
+    return df
 
+
+def prep_jgi_cols(jgi_df, name_col = 'name'):
+
+    jgi_df['publication(s)'] = jgi_df['publication(s)'].astype(str)
+    for i, row in jgi_df.iterrows():
+        taxa = re.sub(r'[^ a-zA-Z0-9\.]', '', row[name_col]).split()
+        jgi_df.at[i, 'genus'] = taxa[0].replace('.','')
+        jgi_df.at[i, 'publication(s)'] = jgi_df.at[i, 'publication(s)'].replace('"""','')
+        if len(taxa) > 1:
+            jgi_df.at[i, 'species'] = taxa[1]
+            if len(taxa) > 2:
+                jgi_df.at[i, 'strain'] = ''.join(taxa[2:])
+                vers_search = re.search(r'v(\d+\.\d+$)', jgi_df['strain'][i])
+                if vers_search is not None:
+                    version = vers_search[1]
+                    jgi_df.at[i, 'version'] = float(version)
+                    jgi_df.at[i, 'strain'] = jgi_df['strain'][i][:-len(vers_search[0])]
+                else:
+                    jgi_df.at[i, 'version'] = 0
+                jgi_df.at[i, 'strain'] = jgi_df.at[i, 'strain'].replace('.','')
+        else:
+            jgi_df.at[i, 'species'] = 'sp.'
+
+    jgi_df = jgi_df.sort_values(by = 'version', ascending = False)
+    jgi_df = jgi_df.drop_duplicates('portal')
+
+    return jgi_df
 
 
 def clean_ncbi_df(ncbi_df, kingdom = 'Fungi'):
@@ -418,6 +445,9 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
     jgi2ncbi, jgi2biosample = {v: k for k, v in ncbi2jgi.items()}, {}
     ass_count = 0
 
+    jgi_names = {f"{v['genus']}_{v['species']}_{v['strain']}" \
+                 for k, v in mycocosm_df.iterrows()}
+
     for i, row in ncbi_df.iterrows():
         if row['assembly_acc'] in ncbi2jgi:
             jgi2biosample[ncbi2jgi[row['assembly_acc']]] = \
@@ -447,6 +477,14 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
                 todel.append(i)
                 jgi2ncbi[ass_name.lower() + f'${ass_count}'] = row['assembly_acc']
                 jgi2biosample[ass_name.lower() + f'${ass_count}'] = \
+                    row['BioSample Accession']
+                ass_count += 1
+            elif f"{row['genus']}_{row['species']}_{row['strain']}" \
+                 in jgi_names:
+                todel.append(i)
+                jgi2ncbi[f"{row['genus']}_{row['species']}_{row['strain']}"] = \
+                    row['assembly_acc']
+                jgi2biosample[f"{row['genus']}_{row['species']}_{row['strain']}_{ass_count}"] = \
                     row['BioSample Accession']
                 ass_count += 1
             else:
@@ -720,7 +758,7 @@ def rogue_update(
     ncbi_db_path = update_path + date + '.ncbi.mtdb'
     pre_ncbi_df0 = dwnld_ncbi_table(update_path + date + '.ncbi.tsv',
                                    group = group) 
-    pre_ncbi_df1 = prep_ncbi_names(pre_ncbi_df0)
+    pre_ncbi_df1 = prep_taxa_cols(pre_ncbi_df0)
     ncbi_df = clean_ncbi_df(pre_ncbi_df1, kingdom = kingdom)
     ncbi_df = ncbi_df.rename(columns={'Assembly Accession': 'assembly_acc'})
 
@@ -737,6 +775,7 @@ def rogue_update(
         mycocosm_path = update_path + date + '.mycocosm.csv'
         jgi_df = dwnld_mycocosm(mycocosm_path)
         jgi_df['biosample'] = ''
+        jgi_df = prep_jgi_cols(jgi_df, 'name')
         # acquire the mycocosm master table
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
@@ -744,6 +783,8 @@ def rogue_update(
         true_ncbi = parse_true_ncbi(update_path + 'true_ncbi.tsv')
         ncbi_df, jgi2ncbi, jgi2biosample, true_ncbi, ncbi_jgi_overlap = \
             rm_ncbi_overlap(ncbi_df, jgi_df, ncbi2jgi, true_ncbi, api = api)
+
+
         print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
              flush = True)
         add_true_ncbi(true_ncbi, update_path + 'true_ncbi.tsv')
@@ -810,18 +851,21 @@ def rogue_update(
         new_db = db
         new_dups = duplicates
 
+
     print('\nAssimilating NCBI (10 download/minute w/API key, 3 w/o)', flush = True)
     new_db['version'] = new_db['version'].astype(str)
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
 #    if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
+
         ncbi_predb, new_db, ncbi_failed1 = ncbi2db( 
             update_path, ncbi_df, ref_db = new_db, 
             date = date, failed_dict = prev_failed, 
             rerun = rerun, duplicates = duplicates,
             check_MD5 = check_MD5
             )
-    
+
+
         for failure in ncbi_failed1:
             add_failed(failure[0], 'ncbi', str(failure[1]), date,
                       format_path('$MYCODB/../log/failed.tsv'))
@@ -842,6 +886,7 @@ def rogue_update(
             ncbi_predb[key] = ncbi_predb[key].fillna('')
         ncbi_predb['version'] = ncbi_predb['version'].astype(str)
         ncbi_premtdb = ncbi_predb.to_dict(orient='list')
+        ncbi_premtdb['restriction'] = ['0' for x in ncbi_premtdb['assemblyPath']]
         ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, refdbncbi, update_path,
                                            forbidden = forbid_omes, cpus = cpus,
                                            remove = remove, spacer = '\t\t')
