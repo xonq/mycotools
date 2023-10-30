@@ -445,7 +445,10 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
     jgi2ncbi, jgi2biosample = {v: k for k, v in ncbi2jgi.items()}, {}
     ass_count = 0
 
+    # could vectorize these
     jgi_names = {f"{v['genus']}_{v['species']}_{v['strain']}" \
+                 for k, v in mycocosm_df.iterrows()}
+    jgi_gen_sp = {f"{v['genus']}_{v['species']}" \
                  for k, v in mycocosm_df.iterrows()}
 
     for i, row in ncbi_df.iterrows():
@@ -487,6 +490,15 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
                 jgi2biosample[f"{row['genus']}_{row['species']}_{row['strain']}_{ass_count}"] = \
                     row['BioSample Accession']
                 ass_count += 1
+            elif not row['strain'].rstrip() \
+                 and f'{row["genus"]}_{row["species"]}' in jgi_gen_sp:
+                # unfortunately we cannot validate that this is either a JGI or
+                # NCBI unique specimen, but to err on the side of caution we
+                # should remove it. 
+                todel.append(i)
+                gen_sp = f'{row["genus"]}_{row["species"]}'
+                jgi2ncbi[gen_sp] = row['assembly_acc']
+                jgi2biosample[gen_sp] = row['BioSample Accession']
             else:
                 fails.add(row['assembly_acc'])
 
