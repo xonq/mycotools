@@ -33,32 +33,6 @@ def compileLog( log_path ):
 
 
 
-def break_name( jgi_df, name_col = 'name' ):
-
-    for i, row in jgi_df.iterrows():
-        taxa = row[name_col].split(' ')
-        jgi_df.at[i, 'genus'] = taxa[0]
-        if len(taxa) > 1:
-            jgi_df.at[i, 'species'] = taxa[1]
-            if len( taxa ) > 2:
-                jgi_df.at[i, 'strain'] = ''.join(taxa[2:])
-                vers_search = re.search(r'v(\d+\.\d+$)', jgi_df['strain'][i])
-                if vers_search is not None:
-                    version = vers_search[1]
-                    jgi_df.at[i, 'version'] = version
-                    jgi_df.at[i, 'strain'] = jgi_df['strain'][i][:-len(vers_search[0])]
-                else:
-                    jgi_df.at[i, 'version'] = 0
-                jgi_df.at[i, 'strain'] = re.sub(r'[^a-zA-Z0-9]', '', jgi_df.at[i, 'strain'])
-        else:
-            jgi_df.at[i, 'species'] = 'sp.'
-
-    jgi_df = jgi_df.sort_values(by = 'version', ascending = False)
-    jgi_df = jgi_df.drop_duplicates('portal')
-
-    return jgi_df
-
-
 def JGIredundancyCheck(db, jgi_df, duplicates = {}, ome_col = 'portal',
                        jgi2ncbi = {}):
     '''everything in jgi_df (pd.DataFrame()) should be have a valid biosample 
@@ -236,7 +210,6 @@ def main(
         sys.exit(3)
 
     toDel = []
-    jgi_df = break_name(jgi_df)
   
     if not rerun:
         jgi_df = jgi_df.set_index(ome_col)
@@ -258,7 +231,7 @@ def main(
     print(spacer + 'Redundancy check', flush = True)
     if isinstance(ref_db, pd.DataFrame):
         ref_db['index'] = ref_db['assembly_acc'].copy()
-        ref_db = ref_db.set_index( 'index' )
+        ref_db = ref_db.set_index('index')
         old_len = len(jgi_df)
         jgi_df, new_ref_db, updates, old_rows = JGIredundancyCheck( 
             ref_db, jgi_df, ome_col = ome_col,
