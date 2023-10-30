@@ -1130,8 +1130,8 @@ def main():
         # make date the acquisition time
         orig_mtdb = mtdb(primaryDB())
         update_path = format_path('$MYCODB/../' + 'log/' + date + '/')
-        if not os.path.isdir( update_path ):
-            os.mkdir( update_path )
+        if not os.path.isdir(update_path):
+            os.mkdir(update_path)
         shutil.copy(primaryDB(), update_path)
 
         if config['branch'] == 'prokaryote':
@@ -1149,6 +1149,7 @@ def main():
                                     king=king, rank = rank)
         addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
 
+        write_forbid_omes(set(addDB['ome']), format_path('$MYCODB/../log/relics.txt'))
 
         new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save = args.save)
         new_db_path = format_path('$MYCODB/' + date + '.mtdb')
@@ -1257,10 +1258,11 @@ def main():
 
     if not args.save: # add the predb2mtdb and remove files
 #        df2db(db, format_path('$MYCODB/' + date + '.mtdb'))
-        write_forbid_omes(set(new_db['ome']), format_path('$MYCODB/../log/relics.txt'))
         # output new database and new list of omes
 
         eprint('\nMoving data into database', flush = True)
+        write_forbid_omes(set(new_db['ome']), format_path('$MYCODB/../log/relics.txt'))
+
         new_mtdb = mtdb.pd2mtdb(new_db)
         new_path = format_path('$MYCODB/' + date + '.mtdb')
         if format_path(db_path) == new_path:
@@ -1288,7 +1290,8 @@ def main():
     else:
         # NEED to: insert note aboutrunning updatedb on predb
         df2db(db, format_path(update_path + date + '.mtdb'))
-        write_forbid_omes(set(db['ome']), format_path('$MYCODB/../log/relics.txt'))
+        eprint(f'\nUpdate ready for `mtdb u -a` at ' \
+            +  f'{format_path(update_path + date + ".mtdb")}')
         # output new database and new list of omes
 
 
