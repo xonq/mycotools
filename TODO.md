@@ -101,7 +101,7 @@
 
 ### update_mtdb
 - [x] optimize dereplication, currently too slow
-- [ ] initial JGI predb2mtdb fails because assemblyPath doesn't exist as a
+- [x] initial JGI predb2mtdb fails because assemblyPath doesn't exist as a
   column, but restarts are fine
 - [ ] update introduction output
 - [ ] need a verbose option
@@ -120,3 +120,5 @@
 - [ ] Need a manually curated file to correct errors in naming, e.g. Vararia v
   Vavraia, Fibularhizoctonia v Fibulorhizoctonia
 - [ ] initialize from a predb
+- [ ] option to remove entries that have been removed from genbank
+- [ ] option to not dereplicate by genus and species alone
