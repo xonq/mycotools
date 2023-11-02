@@ -16,6 +16,8 @@ from mycotools.lib.dbtools import mtdb, primaryDB
 # as an order and as a genus
 
 def infer_rank(db, lineage):
+    """Identify the taxonomic rank associated with an inputted lineage of
+    interest"""
     linlow, rank = lineage.lower(), None
     for ome, row in db.items():
         if linlow in set([x.lower() for x in row['taxonomy'].values()]):
@@ -32,6 +34,8 @@ def infer_rank(db, lineage):
                             
 
 def extract_unique(db, allowed = 1, sp = True):
+    """Extract unique species (sp = True) or strains (sp = False) from an
+    MTDB"""
     keys = copy.deepcopy(list(db.keys()))
     random.shuffle(keys)
     prep_db0 = {x: db[x] for x in keys}
@@ -55,12 +59,12 @@ def extract_unique(db, allowed = 1, sp = True):
     return prep_db1
 
 def extract_tax(db, lineages):
+    """Extract specific taxonomic lineages of interest based on their rank"""
     if isinstance(lineages, str):
         lineages = [lineages]
     lineages = set(x.lower() for x in lineages)
     rank_dict = {k: infer_rank(db, k) for k in list(lineages)}
     ranks = list(set(rank_dict.values()))
-
 
     new_db = mtdb().set_index()
     for ome in db:
@@ -74,6 +78,7 @@ def extract_tax(db, lineages):
     return new_db
 
 def extract_ome(db, omes):
+    """Extract a list of genome codes (omes) of interest"""
     new_db = mtdb().set_index()
     for i in db:
         if i in omes:
@@ -81,11 +86,13 @@ def extract_ome(db, omes):
     return new_db
 
 def extract_source(db, source):
+    """Extract an MTDB with genomes from a particular source"""
     return mtdb({ome: row for ome, row in db.items() \
                    if row['source'].lower() == source.lower()}, 
                    index = 'ome')
 
 def extract_pub(db):
+    """Extract only published and usable genomes"""
     new_db = mtdb().set_index()
     for ome, row in db.items():
         if row['published']:
@@ -97,6 +104,7 @@ def main(
     lineage_list = [], omes_set = set(),
     source = None, nonpublished = False, inverse = False
     ):
+    """Python entry point for extract_mtdb"""
 
     db = db.set_index('ome')
     if unique_strains:
