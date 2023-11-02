@@ -118,35 +118,39 @@ def mngr(assembly_path, ome):
 def main(in_path, log_path = None, cpus = 1, db = None):
 
     stats = {}
-
+    # if running from a database file prepare a tsv for output
     if in_path.endswith('db') or db:
         head = '#ome\tn50-1000bp\tl50-1000bp\tl50%-1000bp\tn50\tl50\tl50%\tlargest_contig\tshortest_contig\tcontigs' + \
             '\tcontigs-1000bp\tassembly_len\tassembly_len-1000bp\tgc\tgc-1000bp\tmask%\tmask%-1000bp'
 
-        prevOmes = {}
+        # parse the output file if it currently exists to avoid redundant runs
+        prev_omes = {}
         if log_path:
-            if not os.path.isfile( log_path ):
-                with open( log_path, 'w' ) as log_open:
-                    log_open.write( head )
+            if not os.path.isfile(log_path):
+                with open(log_path, 'w') as log_open:
+                    log_open.write(head)
             else:
                 with open(log_path, 'r') as raw:
                     for line in raw:
                         if not line.startswith('#'):
                             omeI = line.index('\t')
                             ome = line[:omeI]
-                            prevOmes[ome] = line[omeI+1:].rstrip()
+                            prev_omes[ome] = line[omeI+1:].rstrip()
 
+        # import the MTDB file
         if not db:
             db = mtdb(in_path).set_index()
 
+        # create commands for each row
         cmds = []
         for ome in db:
             row = db[ome]
-            if row['fna'] and ome not in prevOmes:
+            if row['fna'] and ome not in prev_omes:
                 cmds.append((row['fna'], ome,))
         with mp.Pool(processes=cpus) as pool:
             results = pool.starmap(mngr, cmds)
 
+        # compile the results
         calcs = {}
         for res in results:
             if res[1]:
@@ -154,22 +158,25 @@ def main(in_path, log_path = None, cpus = 1, db = None):
             else:
                 eprint('\t\tERROR:\t' + ome, flush = True)
 
+        # sort the results by the ome code alphabetically
         calcs = {
             k: v for k,v in \
             sorted(
-                {**calcs, **prevOmes}.items(), 
+                {**calcs, **prev_omes}.items(), 
                 key = lambda x: x[0]
                 )
             }
 
+        # write results to the log file if a path was supplied
         if log_path:
-            with open(log_path, 'w') as logWrite:
-                logWrite.write(head + '\n')
+            with open(log_path, 'w') as log_writer:
+                log_writer.write(head + '\n')
                 for ome in calcs:
                     data = calcs[ome]
-                    logWrite.write(
+                    log_writer.write(
                         ome + '\t' + data + '\n'
                         )
+        # print to standard out otherwise
         else:
             print(head, flush = True)
             for ome in calcs:
@@ -178,21 +185,25 @@ def main(in_path, log_path = None, cpus = 1, db = None):
                     ome + '\t' + data, flush = True
                     )
 
+    # if there is not a database then run for the input file
     else:
         sortedContigs = sortContigs(in_path)
-        calculations = n50l50( sortedContigs )
+        calculations = n50l50(sortedContigs)
         if calculations:
-            stats[ os.path.basename( os.path.abspath(in_path)) ] = n50l50( sortedContigs )
+            stats[os.path.basename(os.path.abspath(in_path))] = n50l50(sortedContigs)
         else:
             eprint('\tERROR:\t' + in_path, flush = True)
 
+        # print the stats to standard out, depending on if there are contigs
+        # less than 1000 bp
         for stat in stats:
             if stats[stat]['shortest_contig'] >= 1000:
-                stats[stat] = { 
-                    info: stats[stat][info]  for info in stats[stat] if '1000bp' not in info 
-                }
+                stats[stat] = {info: stats[stat][info] \
+                               for info in stats[stat] \
+                               if '1000bp' not in info}
             for info in stats[stat]:
-                print( '{:<25}'.format( info.upper() + ':' ) + str( stats[stat][info] ) , flush = True)
+                print('{:<25}'.format(info.upper() + ':') \
+                    + str(stats[stat][info]), flush = True)
             
 
 def cli():
@@ -202,7 +213,7 @@ def cli():
         sys.exit(1)
     if len(sys.argv) < 2:
         print( usage , flush = True)
-        sys.exit( 1 )
+        sys.exit(1)
 
     in_path = format_path(sys.argv[1])
     if len(sys.argv) > 2:
