@@ -13,10 +13,13 @@ def soft_main(filetypes, db, output_path, print_link = False, verbose = False):
     """Symlink or print files from each file_type"""
 
     db = db.set_index('ome')
+    # symlink files
     if not print_link:
+        # make the directories for each requested file type
         for ftype in filetypes:
             if not os.path.isdir(output_path + ftype):
                 os.mkdir(output_path + ftype)
+        # grab the files for each genome code
         for ome, row in db.items():
             for ftype in filetypes:
                 if os.path.isfile(row[ftype]):
@@ -29,6 +32,7 @@ def soft_main(filetypes, db, output_path, print_link = False, verbose = False):
                 else:
                     vprint('\tERROR: ' + ome + ' ' + ftype, flush = True,
                            v = verbose)
+    # simply print the link for each file
     else:
         for ome, row in db.items():
             for ftype in filetypes:
@@ -39,10 +43,12 @@ def hard_main(filetypes, db, output_path):
     """Hard copy files from filetypes to their filetype output directory"""
 
     db = db.set_index('ome')
+    # create the directories to output each file type
     for ftype in filetypes:
         if not os.path.isdir(output_path + ftype):
             os.mkdir(output_path + ftype)
 
+    # copy each file by genome
     for ome, row in db.items():
         for ftype in filetypes:
             try:
