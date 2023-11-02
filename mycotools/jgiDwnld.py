@@ -76,63 +76,19 @@ def retrieve_xml(ome, output):
     return xml_cmd
 
 
-def checkMatches( match1, match2, match3, match4, xml_data, file_type):
-
-    findall, preexisting = False, None
-    matches = match1.search(xml_data)
-#    print(matches, 0)
-    if matches is None or 'get_tape_file' in matches[0]:
-        matches = match2.search(xml_data)
-        #print(matches, 1)
-        if matches is None or 'get_tape_file' in matches[0]:
-            if match3:
-                matches = match3.search(xml_data)
-                #print(matches, 3)
-                if matches is None or 'get_tape_file' in matches[0]:
-                    if match4:
-                        matches = match4.search(xml_data)
-                 #       print(matches, 4)
-            if matches is None or 'get_tape_file' in matches[0]:
-                matches = match1.findall(xml_data)
-                #print(matches, 5)
-                matches = [x for x in matches \
-                           if not any('get_tape_file' in y for y in x)]
-                #print(matches, 6)
-                findall = True
-                if not matches: # changed from if to if not 20210624
-                    matches = match2.findall(xml_data)
-                    #print(matches, 7)
-                    matches = [ x for x in matches if 'get_tape_file' not in x ]
-                    #print(matches, 8)
-                    if not matches and match3:
-                        matches = match3.findall(xml_data)
-                   #     print(matches, 9)
-                        matches = [ x for x in matches if 'get_tape_file' not in x ]
-                  #      print(matches, 10)
-                        if not matches and match4:
-                            matches = match4.findall(xml_data)
-                 #           print(matches, 11)
-                            matches = [x for x in matches if 'get_tape_file' not in x]
-                #            print(matches, 12)
-                if len(matches) > 0:
-                    matches = matches[0]
-                else:
-                    if file_type != 'gff3':
-                        print('\t\tERROR: no ' + file_type + ' detected.', flush = True)
-                    matches = None
-                    preexisting = True
-
-    return matches, preexisting, findall
-
-
 def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
+    """Parse the XML data to obtain the file types of interest based on
+    predefined hashes that contain the known subdirectories associated with JGI
+    organization"""
 
     if ft == 'fna':
         if masked:
             ft += '$masked'
         else:
             ft += '$unmasked'
-    
+
+    # set the initial hashes for the XML hierarchy - relate file types to their
+    # hierarchy structure
     ft2xt = {'fna$masked': {'assembly'}, 'fna$unmasked': {'assembly'},
              'gff': {'annotation'}, 'gff3': {'annotation'},
              'transcripts': {'annotation'},
@@ -159,24 +115,36 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
 
     url, md5, filename = None, False, None
 
+    # parse the XML file
     tree = ET.parse(xml_file)
     root = tree.getroot()
     flip = True
+
+    # flip is a way to rerun the loop if the file type changes (e.g. from
+    # masked to unmasked); parse through the XML hiearchy in accord with the
+    # hashes established above
     while flip:
         for child in root:
+            # conserved subdirectory we need
             if 'Files' == child.attrib['name']:
                 for chil1 in child:
+                    # does this subdirectory match what we need for our
+                    # filetype?
                     if chil1.attrib['name'].lower() in ft2xt[ft]:
+                        # we only want the filtered models for annotations/RNA
                         if ft in {'gff3', 'gff', 'transcripts', 'est'}:
                             for chil2 in chil1:
                                 if chil2.attrib['name'].lower().startswith('filtered models ('):
                                     chil1 = chil2
                                     break
+                        # continue parsing toward the files of interest
                         for chil2 in chil1:
                             if any(x == chil2.attrib['name'].lower() \
                                     for x in ft2fh[ft]):
                                 for chil3 in chil2:
                                     t_url = chil3.attrib['url']
+                                    # we want to avoid tape files as we cannot
+                                    # download them readily
                                     if 'get_tape_file' not in t_url \
                                         and t_url not in forbidden:
                                         if all(x not in chil3.attrib['filename'] \
@@ -208,6 +176,9 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
                                         # if exhaustively searched
                                         except KeyError:
                                             pass
+
+        # if the unmasked genome is not present, then query for the masked and
+        # vice versa
         if not url and ft == 'fna$masked':
             ft = 'fna$unmasked'
             flip = False
@@ -216,11 +187,14 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
             flip = False
         else:
             break
+
     return filename, url, md5
 
 
 def handle_redirect_307(dwnld_data, dwnld, dwnld_url, file_type, xml_file,
                        masked, url, urls, spacer):
+    """Handle a redirection error by identifying a new file URL to download
+    from, or return the original if none exist"""
     print(spacer +'\t' + dwnld + ' link has moved. ' \
         + 'Trying a different link.', flush = True)
     filename, n_url, dwnld_md5 = parse_xml(file_type, xml_file, 
@@ -235,12 +209,13 @@ def handle_redirect_307(dwnld_data, dwnld, dwnld_url, file_type, xml_file,
 
 
 def no_md5_checks(dwnld, md5, spacer):
+    """If there is no MD5, simply check the file has content in it"""
     check_size = subprocess.run( 
             ['wc', '-l', dwnld], 
             stdout = subprocess.PIPE 
             )
     check_size_res = check_size.stdout.decode('utf-8')
-    print(spacer + '\tFile exists - no md5 to check.', flush = True)
+    print(spacer + '\t\tFile exists - no md5 to check.', flush = True)
     check_size_find = re.search(r'\d+', check_size_res)
     size = check_size_find[0]
     if int(size) < 10:
@@ -273,7 +248,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
     gather a new URL and restart after another minute wait. This is an unfortunate
     circumnavigation of JGI's cryptic maximum ping / time before booting.'''
 
-
+    # prepare data structures
     prefix = 'https://genome.jgi.doe.gov'
     xml_file = f'{output}xml/{ome}.xml'
     preexisting, check = False, 1
@@ -284,10 +259,14 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
 
     ran_dwnld = False
 
-    filename, url, dwnld_md5 = parse_xml(file_type, xml_file, masked = masked)
+    # acquire the filename, URL, and MD5 from the xml for the file type of
+    # interest
+    filename, url, dwnld_md5 = parse_xml(file_type, xml_file, 
+                                         masked = masked)
     if not dwnld_md5:
         dwnld_md5 = None
 
+    # if there is a URL present, begin the downloading process
     if url:
         f_urls = {url}
         md5 = False 
@@ -297,6 +276,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
         dwnld_url = prefix + url.replace('&amp;', '&')
    
         dwnld = output + file_type + '/' + os.path.basename(dwnld_url)
+        # if the file currently exists, then check its MD5
         if os.path.exists(dwnld):
             if dwnld_md5:
                 md5_cmd = subprocess.run([
@@ -310,6 +290,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                 curl_cmd = 0
                 check = dwnld
                 preexisting = True
+            # if the MD5 does not equal the download MD5 then check the file
             else:
                 while True:
                     try:
@@ -335,6 +316,8 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                             print(spacer + '\tmd5 does not match.', flush = True)
                         break
 
+        # while the MD5 doesn't match, or there is a curl error, try up to 3
+        # times to download the file
         while md5 != dwnld_md5 and curl_cmd != 0 and attempt < 3:
             attempt += 1
             curl_cmd = subprocess.call( 
@@ -346,7 +329,8 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
 
             if curl_cmd == 0:
                 check = dwnld
-                
+
+                # acquire the MD5
                 if dwnld_md5:
                     md5_cmd = subprocess.run( 
                             ["md5sum", dwnld], 
@@ -361,38 +345,42 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                         if not os.path.isfile(dwnld):
                             attempt += 1
                             continue
+                # if there is no MD5 attempt the crude file check
                 if not dwnld_md5:
-                        try:
-                            with open(dwnld, 'r') \
-                                as dwnld_data_raw:
-                                dwnld_data = dwnld_data_raw.read()
-                            if re.search('307 Temporary Redirect', dwnld_data):
-                                t_url, dwnld_url, dwnld, f_urls = handle_redirect_307(dwnld_data, 
-                                                                            dwnld, 
-                                                                            dwnld_url,
-                                                                            file_type, xml_file,
-                                                                            masked, url, f_urls,
-                                                                            spacer)
-                                
-                                if t_url == url:
-                                    print(spacer + '\t\tNo valid alternative', flush = True)
-                                    attempt = 4
-                                    break
-                                else:
-                                    url = t_url
+                    try:
+                        with open(dwnld, 'r') \
+                            as dwnld_data_raw:
+                            dwnld_data = dwnld_data_raw.read()
+                        if re.search('307 Temporary Redirect', dwnld_data):
+                            t_url, dwnld_url, dwnld, f_urls = \
+                                handle_redirect_307(dwnld_data, 
+                                                    dwnld, 
+                                                    dwnld_url,
+                                                    file_type, xml_file,
+                                                    masked, url, f_urls,
+                                                    spacer)
+                            
+                            if t_url == url:
+                                print(spacer + '\t\tNo valid alternative', flush = True)
+                                attempt = 4
+                                break
                             else:
-                                md5 = no_md5_checks(dwnld, md5, spacer)
-                                if not md5:
-                                    break
-                        except FileNotFoundError:
-                            pass
-                        except UnicodeDecodeError:
-                            pass
-                        # this is slow, and was arbitrarily set to not overping JGI
-                        time.sleep(60)
+                                url = t_url
+                        else:
+                            md5 = no_md5_checks(dwnld, md5, spacer)
+                            if not md5:
+                                break
+                    except FileNotFoundError:
+                        pass
+                    except UnicodeDecodeError:
+                        pass
+                    # this is slow, and was arbitrarily set to not overping JGI
+                    time.sleep(60)
 
+                # the download may have failed, so prepare to retry
                 elif md5 != dwnld_md5 and attempt == 1:
-                    print(f'{spacer}\tERROR: md5 does not match JGI. Attempt {attempt}', flush = True)
+                    print(f'{spacer}\tERROR: md5 does not match JGI. ' \
+                        + f'Attempt {attempt}', flush = True)
                     curl_cmd = -1
                     check = 2
                     while True:
@@ -401,12 +389,12 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                                 as dwnld_data_raw:
                                 dwnld_data = dwnld_data_raw.read()
                             if re.search('307 Temporary Redirect', dwnld_data ):
-                                t_url, dwnld_url, dwnld, f_urls = handle_redirect_307(
-                                                                           dwnld_data, dwnld, 
-                                                                           dwnld_url,
-                                                                           file_type, xml_file,
-                                                                           masked, url, f_urls,
-                                                                           spacer)
+                                t_url, dwnld_url, dwnld, f_urls = \
+                                    handle_redirect_307(dwnld_data, dwnld, 
+                                                        dwnld_url,
+                                                        file_type, xml_file,
+                                                        masked, url, f_urls,
+                                                        spacer)
                                 if t_url == url:
                                     print(spacer + '\t\tNo valid alternative', flush = True)
                                     attempt = 4
@@ -419,6 +407,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                             pass
                             break
                         time.sleep(60)
+                # if there are two fails, attempt a new URL
                 elif md5 != dwnld_md5 and attempt == 2:
                     print(f'{spacer}\tERROR: md5 does not match JGI. Attempt {attempt}', 
                           flush = True)
@@ -443,6 +432,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                     + f'{curl_cmd}\n{spacer}\tAttempt {attempt}', flush = True)
                 check = 2
 
+        # three strikes and the file is out
         if attempt == 3:
             if md5 != dwnld_md5:
                 print(spacer + '\tExcluding from database - potential failure', flush = True)
@@ -450,11 +440,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
             if curl_cmd != 0:
                 print(spacer + '\tFile failed to download', flush = True)
 
-#    else:
- #       print('\t\tfailed', flush = True)
-
     return check, preexisting, file_type, ran_dwnld
-
 
 
 def main( 
