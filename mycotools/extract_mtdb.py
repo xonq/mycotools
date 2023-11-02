@@ -137,7 +137,7 @@ def cli():
     parser = argparse.ArgumentParser( description = \
        'Extracts a MycotoolsDB from arguments. E.g.\t`mtdb extract ' + \
        '-l Atheliaceae`' )
-    parser.add_argument('-l', '--lineage')
+    parser.add_argument('-l', '--lineage', default = '')
     parser.add_argument('-s', '--source')
     parser.add_argument('-n', '--nonpublished', action = 'store_true', 
         help = 'Include restricted')
