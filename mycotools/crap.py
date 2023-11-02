@@ -49,11 +49,15 @@ os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
 
 def parse_conversion_file(conversion_file):
+    """Parse a file with info to convert gene names to custom names"""
     with open(conversion_file, 'r') as raw:
         data = [x.rstrip().split('\t') for x in raw]
     return {x[0]: x[1] for x in data}
 
 def prep_gff(gff, prots, comps, hits = set(), par_dict = {}):
+    """Prepare an inputted GFF file for CRAP analysis by acquiring the protein
+    IDs that will be used to search downstream."""
+
     RNA = False
     for entry in gff:
         if ';SearchQuery=' in entry['attributes']:
@@ -108,7 +112,10 @@ def prep_gff(gff, prots, comps, hits = set(), par_dict = {}):
                 hits.add(protID)
     return par_dict, hits, RNA, gff
 
+
 def rogue_locus(locusID, rnaGFF, wrk_dir, query2color, labels = True):
+    """Output the locus GFF and locus SVGs for an inputted rnaGFF derived from
+    grabbing a hit's locus"""
     with open(wrk_dir + 'genes/' + locusID + '.locus.genes', 'w') as out:
             out.write(list2gff(rnaGFF))
     svg_path = wrk_dir + 'svg/' + locusID + '.locus.svg'
@@ -119,6 +126,8 @@ def rogue_locus(locusID, rnaGFF, wrk_dir, query2color, labels = True):
 
 
 def input_genes2input_hgs(input_genes, gene2hg):
+    """Translated inputted genes into their homolog group (HG) based on an
+    inputted dictionary of genes to homolog groups"""
     input_hgs = {}
     for gene in input_genes:
         try:
@@ -128,12 +137,17 @@ def input_genes2input_hgs(input_genes, gene2hg):
             eprint('\t' + gene + ' will be ignored.', flush = True)
     return input_hgs
 
+
 def compile_hg_fa(db, gene_list, query):
+    """Compile and output a fasta of a homolog group"""
     fa_dict = acc2fa(db, gene_list)
     return query, fa_dict
 
 
 def check_fa_size(fas, max_size):
+    """Determine the fastas/query genes that need to have their homolog groups
+    submitted to sequence similarity clustering and those that can be directly
+    submitted to tree building"""
     fas4clus, fas4trees = {}, {}
     for query, fa in fas.items():
         print('\t' + query + '\t' + str(len(fa)) + ' genes', flush = True)
@@ -149,8 +163,9 @@ def check_fa_size(fas, max_size):
 
     return fas4clus, fas4trees
 
+
 def write_seq_clus(gene_module, focal_gene, db, output_path, out_fa):
-#    gene_module = cluster_dict[clusters[focal_gene]]
+    """Output a fasta of the sequence clustering results"""
     try:
         fa_dict = acc2fa(db, gene_module)
     except KeyError:
@@ -174,6 +189,8 @@ def run_fa2clus(
     interval = 0.1, spacer = '\t\t\t', error = False, 
     algorithm = 'linclust'
     ):
+    """Manage the sequence similarity clustering pipeline, fa2clus from the
+    Mycotools software suite."""
 
     dmnd_dir = output + 'dmnd/'
     if not os.path.isdir(dmnd_dir):
