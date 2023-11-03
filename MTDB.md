@@ -162,7 +162,7 @@ assumed to be "published" for non-restricted use. "However, some submitters may 
 
 *There may be edge-case examples
 of use-restricted NCBI data, however NCBI cannot provide oversight for their
-particular restrictions, and thus MTDB cannot assimilate these data.* A git
+particular restrictions, and thus MTDB cannot determine what is use-restricted.* A git
 issue can be raised for isolated examples, which can then be incorporated into
 a manually curated exceptions file; for local handling, simply empty the
 publication field for the associated row. MTDBs are user-assimilated databases,
