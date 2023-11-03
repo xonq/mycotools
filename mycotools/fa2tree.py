@@ -19,58 +19,66 @@ from clipkit import clipkit
 class PhyloError(Exception):
     pass
 
-def mafftRun(name, fasta, out_dir, hpc, verbose = True, cpus = 1, spacer = '\t'):
 
-    cmd = [
-        'mafft', '--auto', '--thread', '-' + str(cpus), fasta
-        ]
+def run_mafft(name, fasta, out_dir, hpc, verbose = True, 
+              cpus = 1, spacer = '\t'):
+    """Call Mafft to align an inputted fasta and either output commands for
+    sequential execution on an HPC, or run directly through subprocess"""
 
+    cmd = ['mafft', '--auto', '--thread', '-' + str(cpus), fasta]
+
+    # run the command directly
     if not hpc:
         print(spacer + 'Aligning', flush = True)
         with open(out_dir + name + '.mafft', 'w') as out_file:
             if verbose:
                 run_mafft = subprocess.call(cmd, stdout = out_file)
             else:
-                run_mafft = subprocess.call(cmd, stdout = out_file, stderr = subprocess.DEVNULL)
+                run_mafft = subprocess.call(cmd, stdout = out_file, 
+                                        stderr = subprocess.DEVNULL)
          
         if run_mafft != 0:
             eprint(spacer + '\tERROR: mafft failed: ' + str(run_mafft), flush = True)
             if os.path.isfile(out_dir + name + '.mafft'):
                 os.remove(out_dir + name + '.mafft')	
             raise PhyloError
+    # prepare an execution script for the HPC submission
     else:
         with open(out_dir + name + '_mafft.sh', 'w') as out:
             if '#PBS' in hpc:
-                out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
+                out.write(hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
                 ' > ' + out_dir + '/' + name + '.mafft' + \
                 '\ncd ' + out_dir + '\nqsub ' + name + '_clipkit.sh')
             else:
-                 out.write( hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
+                 out.write(hpc + '\n\n' + ' '.join([str(x) for x in cmd]) + \
 		' > ' + out_dir + '/' + name + '.mafft' + \
                 '\ncd ' + out_dir + '\nsbatch ' + name + '_clipkit.sh')
         
     return out_dir + '/' + name + '.mafft'
 
 
-def trimRun(name, mafft, out_dir, hpc, param, 
+def run_clipkit(name, mafft_name, out_dir, hpc, param, 
             verbose, cpus = 1, spacer = '\t'):
-
-    name2 = out_dir + os.path.basename(mafft) + '.clipkit'
-    cmd = ['clipkit', mafft, '--output', name2]
-    cmd.extend(param)
+    """Execute ClipKIT from a complete Mafft run"""
+    clipkit_out_name = out_dir + os.path.basename(mafft_name) + '.clipkit'
+    # execute immediately
     if not hpc:
         print(spacer + 'Trimming', flush = True)
 #        if verbose:
         run_clipkit = clipkit(
-	    input_file_path=mafft,
-	    output_file_path=name2,
-	    mode="smart-gap",
-        )
-        if not os.path.isfile(out_dir + name2):
-            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(run_clipkit) , flush = True)  
+    	    input_file_path=mafft_name,
+	        output_file_path=clipkit_out_name,
+	        mode="smart-gap",
+            )
+        # no output file, the run failed
+        if not os.path.isfile(out_dir + clipkit_out_name):
+            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(run_clipkit), 
+                   flush = True)  
             raise PhyloError
-
+    # prepare a command for HPC execution
     else:
+        cmd = ['clipkit', mafft_name, '--output', clipkit_out_name]
+        cmd.extend(param)
         with open(out_dir + name + '_clipkit.sh', 'w') as out:
             if '#PBS' in hpc:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
@@ -81,23 +89,35 @@ def trimRun(name, mafft, out_dir, hpc, param,
                     ' '.join([str(x) for x in cmd]) + '\n\ncd ' + out_dir \
                     + '\nsbatch ' + name + '_tree.sh' )
     
-    return name2
+    return clipkit_out_name
 
 
 def run_mf(clipkit_files, out_dir, constraint = False, 
            verbose = False, cpus = 1, spacer = '\t', scripts = False):
+    """Run ModelFinder on its own in preparation for multigene phylogeny
+    reconstruction"""
+    # set the CPUs for each ModelFinder run arbitrarily
     cpus_per_cmd = 3
+    # determine the concurrent ModelFinder runs that are possible
     concurrent_cmds = round((cpus - 1)/4 - 0.5) # round down
+
+    # prepare a scaffold for each command
     cmds = [['iqtree', '-m', 'MFP+MERGE', '-nt', 'AUTO',
              '-B', '1000', '-s', f_, '--prefix', 
              out_dir + os.path.basename(f_)] \
             for f_ in clipkit_files]
+    # append the topological constraint to each command if it is present
     if constraint:
         [x.extend(['-g', constraint]) for x in cmds]
+
+    # if scripts of each ModelFinder run are desired to be run independently
     if scripts:
         return {os.path.basename(v): cmds[i] for i, v in enumerate(clipkit_files)}
+
+    # otherwise parallelize and run ModelFinder directly
     multisub(cmds, verbose = verbose, processes = concurrent_cmds)
 
+    # parse and identify the evolutionary models determined by ModelFinder
     models = {}
     for f_ in clipkit_files:
         with open(out_dir + os.path.basename(f_) + '.log', 'r') as raw:
@@ -109,22 +129,31 @@ def run_mf(clipkit_files, out_dir, constraint = False,
 
     return models
 
-def prepare_nexus(concat_fa, models, spacer = '\t'):
 
+def prepare_nexus(concat_fa, models, spacer = '\t'):
+    """Prepare a NEXUS file of the concatenated sequence coordinates and their
+    associated evolutionary models to feed into IQTree for multigene phylogeny
+    reconstruction."""
     nex_data = '#nexus\nbegin sets;'
     index = 1
     for i, trimmed_f in enumerate(list(models.keys())):
+        # determine the length of the fasta
         trim_fa = fa2dict(trimmed_f)
         len0 = len(trim_fa[list(trim_fa.keys())[0]]['sequence'])
+        # if some alignments aren't the same length then there is some cryptic
+        # issue, likely user-caused
         if not all(len(x['sequence']) == len0 for x in trim_fa.values()):
             eprint(spacer + '\tERROR: alignment sequences are not same length ' \
                    + trimmed_f, flush = True)
             sys.exit(17)
+        # adjust the index of the coordinates of each sequence based on the
+        # previous sequences' length
         new_index = index + len0
         nex_data += '\n    charset part' + str(i + 1) + ' = ' \
                   + str(index) + '-' + str(new_index - 1) + ';'
         index = new_index
 
+        # concatenate the sequences
         for seq, data in trim_fa.items():
             if '_' in seq:
                 ome = seq[:seq.find('_')]
@@ -133,6 +162,7 @@ def prepare_nexus(concat_fa, models, spacer = '\t'):
             if ome in concat_fa:
                 concat_fa[ome]['sequence'] += data['sequence']
 
+    # build the NEXUS string
     nex_data += '\n    charpartition mine = '
     for i, model in enumerate(models.values()):
         nex_data += model + ':part' + str(i+1) + ','
@@ -140,11 +170,15 @@ def prepare_nexus(concat_fa, models, spacer = '\t'):
 
     return nex_data, concat_fa 
 
+
 def run_partition_tree(fa_file, nex_file, constraint,
                        verbose, cpus, spacer = '\t'):
+    """Prepare and execute the command for multigene phylogeny
+    reconstruction"""
     cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-nt', str(cpus),
            '-B', '1000', '--sampling', 'GENESITE'] # this is not using the
            # specified CPUs, but instead the most efficient
+    # add a topological constraint if necessary
     if constraint:
         cmd.extend(['-g', constraint])
     print(spacer + 'Tree building', flush = True)
@@ -156,21 +190,26 @@ def run_partition_tree(fa_file, nex_file, constraint,
     return run_tree
 
 
-
-def treeRun(name, clipkit_file, out_dir, hpc, constraint,
+def run_tree_reconstruction(prefix, clipkit_file, out_dir, hpc, constraint,
             verbose, fast = False, cpus = 1, spacer = '\t'):
+    """Manage and execute phylogeny reconstruction from an inputted ClipKIT
+    output trimmed alignment."""
 
-    tree_file = out_dir + os.path.basename(clipkit_file)
+    tree_file = out_dir + os.path.baseprefix(clipkit_file)
+    # prepare a fasttree ommand
     if fast:
         cmd = ['fasttree', '-out', tree_file + '.treefile', clipkit_file]
         if constraint:
             cmd.extend(['-constraints', constraint])
+    # prepare an iqtree command
     else:
         # the following will identify the optimum number of threads
         cmd = ['iqtree', '-s', clipkit_file, '-B', '1000', '-nt', str(cpus),
                '--prefix', tree_file]
         if constraint:
             cmd.extend(['-g', constraint])
+    
+    # execute in the current terminal
     if not hpc:
         print(spacer + 'Tree building', flush = True)
         if fast:
@@ -178,18 +217,71 @@ def treeRun(name, clipkit_file, out_dir, hpc, constraint,
         if verbose:
             run_tree = subprocess.call(cmd)
         else:
-            run_tree = subprocess.call(
-                cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
-                )
+            run_tree = subprocess.call(cmd, 
+                stdout = subprocess.DEVNULL, 
+                stderr = subprocess.DEVNULL)
         if fast:
             shutil.move(cmd[2], cmd[2][:-4])
         if run_tree != 0:
-            eprint(spacer + '\tERROR: tree failed: ' + str(run_tree), flush = True)
+            eprint(spacer + '\tERROR: tree failed: ' + str(run_tree), 
+            flush = True)
             raise PhyloError
+    # prepare an .sh file for user execution, or sequential execution from the
+    # previous scripts
     else: 
         vprint('\nOutputting bash script `tree.sh`.\n', v = verbose, flush = True)
-        with open(out_dir + name + '_tree.sh', 'w') as out:
+        with open(out_dir + prefix + '_tree.sh', 'w') as out:
             out.write(hpc + '\n\n' + ' '.join([str(x) for x in cmd]))
+
+
+def prep_fasta_path_input(fasta_path, output_dir):
+    """Prepare the output directories and collect the files from an input that
+    is a fasta path (file or directory)"""
+    if os.path.isfile(fasta_path):
+        if not output_dir:
+            dir_name = re.sub(r'\..*?$', '_tree', 
+                        os.path.basename(os.path.abspath(fasta_path)))
+            out_dir = output_dir + '/' + dir_name
+            if not os.path.isdir(out_dir):
+                os.mkdir(out_dir)
+            out_dir = format_path(out_dir)
+        else:
+            if not os.path.isdir(output_dir):
+                os.mkdir(output_dir)
+            out_dir = format_path(output_dir)
+
+        wrk_dir = out_dir + 'working/'
+        if not os.path.isdir(wrk_dir):
+            os.mkdir(wrk_dir)
+
+        files = [fasta_path]
+    elif os.path.isdir(fasta_path):
+        if not output_dir:
+            out_dir = mkOutput(output_dir_prep, 'fa2tree')
+        else:
+            if not os.path.isdir(output_dir):
+                os.mkdir(output_dir)
+            out_dir = format_path(output_dir)
+
+        wrk_dir = out_dir + 'working/'
+        if not os.path.isdir(wrk_dir):
+            os.mkdir(wrk_dir)
+
+        files = collect_files(fasta_path, '*')
+        check_fas = set(files)
+        new_fas = []
+        for f in files:
+            if f + '.mafft.clipkit' not in check_fas:
+                if f + '.mafft' not in check_fas:
+                    new_fas.append(f)
+                else:
+                    shutil.copy(f + '.mafft', wrk_dir + os.path.basename(f) \
+                                                      + '.mafft')
+            else:
+                shutil.copy(f + '.mafft.clipkit',
+                            wrk_dir + os.path.basename(f) + '.mafft.clipkit')
+        files = new_fas
+    return out_dir, wrk_dir, files
 
 
 def main( 
@@ -199,66 +291,31 @@ def main(
     tree_stop = False, flag_incomplete = True, start = 0, partition = False,
     clip_list = []
     ):
+    """Python entry-point for fa2tree. Build a phylogeny from an inputted fasta
+    of homologs. Align (mafft) -> trim (clipkit) -> ModelFinder (multigene
+    mode) -> tree reconstruction (fasttree/iqtree)."""
 
-
+    # prepare the scaffold of an HPC command if that is requested
     hpc, hpc_prep = False, False
     if slurm:
-        vprint('\nHPC mode, preparing submission scripts (Slurm)\n', v = verbose, flush = True)
-        hpc_prep = '#!/bin/bash\n#SBATCH --time=24:00:00\n#SBATCH --nodes=1\n' + \
-            '#SBATCH --ntasks-per-node=' + str(cpus) + '\n#SBATCH -A ' + project + '\n' + \
-            '#SBATCH --mem=' + str(mem)
+        vprint('\nHPC mode, preparing submission scripts (Slurm)\n', 
+               v = verbose, flush = True)
+        hpc_prep = '#!/bin/bash\n#SBATCH --time=24:00:00\n' \
+                 + '#SBATCH --nodes=1\n#SBATCH --ntasks-per-node=' \
+                 + f'{cpus}\n#SBATCH -A {project}\n' \
+                 + f'#SBATCH --mem={mem}'
 #            '\n\nsource activate ' + source
     elif torque:
-        vprint('\nHPC mode, preparing submission scripts (PBS)\n', v = verbose, flush = True)
-        hpc_prep = '#PBS -l walltime=10:00:00\n#PBS -l nodes=1:ppn=4\n#PBS -A ' + project
+        vprint('\nHPC mode, preparing submission scripts (PBS)\n', 
+               v = verbose, flush = True)
+        hpc_prep = '#PBS -l walltime=10:00:00\n#PBS -l nodes=1:ppn=4\n#PBS ' \
+                 + '-A ' + project
     if not partition and hpc_prep:
         hpc = hpc_prep
 
     output_dir_prep = os.getcwd() + '/'
     if isinstance(fasta_path, str):
-        if os.path.isfile(fasta_path):
-            if not output_dir:
-                dir_name = re.sub(r'\..*?$', '_tree', os.path.basename( os.path.abspath(fasta_path)))
-                out_dir = output_dir + '/' + dir_name
-                if not os.path.isdir(out_dir):
-                    os.mkdir(out_dir)
-                out_dir = format_path(out_dir)
-            else:
-                if not os.path.isdir(output_dir):
-                    os.mkdir(output_dir)
-                out_dir = format_path(output_dir)
-
-            wrk_dir = out_dir + 'working/'
-            if not os.path.isdir(wrk_dir):
-                os.mkdir(wrk_dir)
-
-            files = [fasta_path]
-        elif os.path.isdir(fasta_path):
-            if not output_dir:
-                out_dir = mkOutput(output_dir_prep, 'fa2tree')
-            else:
-                if not os.path.isdir(output_dir):
-                    os.mkdir(output_dir)
-                out_dir = format_path(output_dir)
-
-            wrk_dir = out_dir + 'working/'
-            if not os.path.isdir(wrk_dir):
-                os.mkdir(wrk_dir)
-
-            files = collect_files(fasta_path, '*')
-            check_fas = set(files)
-            new_fas = []
-            for f in files:
-                if f + '.mafft.clipkit' not in check_fas:
-                    if f + '.mafft' not in check_fas:
-                        new_fas.append(f)
-                    else:
-                        shutil.copy(f + '.mafft', wrk_dir + os.path.basename(f) \
-                                                          + '.mafft')
-                else:
-                    shutil.copy(f + '.mafft.clipkit',
-                                wrk_dir + os.path.basename(f) + '.mafft.clipkit')
-            files = new_fas
+        out_dir, wrk_dir, files = prep_fasta_path_input(fasta_path, output_dir)
     else:
         if not output_dir:
             out_dir = mkOutput(output_dir_prep, 'fa2tree')
@@ -383,7 +440,7 @@ def main(
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
                 if not alignment:
-                    mafft = mafftRun(name, os.path.abspath(fasta), wrk_dir, hpc, 
+                    mafft = run_mafft(name, os.path.abspath(fasta), wrk_dir, hpc, 
                                      verbose, cpus, spacer = spacer)
                 else:
                     mafft = fasta
@@ -400,7 +457,7 @@ def main(
                 else:
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
-                clipkit_out = trimRun(name, mafft, wrk_dir, hpc, clip_list,
+                clipkit_out = run_clipkit(name, mafft, wrk_dir, hpc, clip_list,
                                       verbose, spacer = spacer)
             trimmed_files.append(clipkit_out)
         else:
@@ -427,7 +484,7 @@ def main(
         for trimmed_f in trimmed_files:
             name_prep = re.search(r'.*?/*([^/]+)/*$', trimmed_f)[1]
             name = re.sub(r'\.mafft\.clipkit$', '', name_prep)
-            treeRun(name, trimmed_f, out_dir, hpc, constraint,
+            run_tree_reconstruction(name, trimmed_f, out_dir, hpc, constraint,
                     verbose, fast, cpus, spacer = spacer)
     else:
         if align_stop:
