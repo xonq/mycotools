@@ -135,11 +135,15 @@ CDS coordinates that can be tied to an mRNA with a gene parent.
 ### data assimilation
 #### - JGI
 `mtdb update` will prioritize MycoCosm (JGI) genomes over NCBI by referencing
-the submitter field in NCBI assembly metadata. Each unique Portal is retrieved from the
+the submitter field in NCBI assembly metadata. NCBI genomes that lack a strain
+will be excluded if there is a JGI genome of the same species. For JGI
+downloading, each unique Portal (genome accession) is retrieved from the
 MycoCosm primary table. 
 
 ##### JGI use restriction
 Use restriction metadata is applied from the associated field in the MycoCosm primary table.
+By default, use-restricted JGI data is excluded and must be specifically
+requested via `--nonpublished` in `mtdb update`.
 IT IS USER RESPONSIBILITY TO VERIFY THE VALIDITY OF AUTOMATICALLY APPLIED USE-RESTRICTION LABELS.
 Please review [JGI policy on use-restricted data](https://jgi.doe.gov/user-programs/pmo-overview/policies/).
 
