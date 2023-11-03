@@ -30,7 +30,7 @@ make routine comparative genomic analyses accessible
 ### `.mtdb` file format standard
 Because MTDBs are essentially tab-delimitted spreadsheets, the database can be
 scaled by extracting rows of interest using
-`bash`/[extractDB.py](https://gitlab.com/xonq/mycotools/-/blob/primary/mycotools/USAGE.md#creating-modular-databases)
+`bash`/[mtdb extract](https://gitlab.com/xonq/mycotools/-/blob/primary/mycotools/USAGE.md#creating-modular-databases)
 and feeding the scaled MTDB into [Mycotools scripts](https://gitlab.com/xonq/mycotools/-/blob/primary/mycotools/USAGE.md). Master MTDB files are
 labelled `YYYYmmdd.mtdb` based on the date the update began; the most recent
 `mtdb` in the primary MTDB folder will be used as the primary database.
