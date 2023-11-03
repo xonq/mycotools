@@ -60,8 +60,7 @@ def trimRun(name, mafft, out_dir, hpc, param,
     cmd.extend(param)
     if not hpc:
         print(spacer + 'Trimming', flush = True)
-        if verbose:
-	    print(spacer + cmd)
+#        if verbose:
         run_clipkit = clipkit(
 	    input_file_path=mafft,
 	    output_file_path=name2,
