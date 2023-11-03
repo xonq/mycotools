@@ -25,7 +25,7 @@ assimilates all NCBI and MycoCosm (Joint Genome Institute) genomes into a databa
 - The MycotoolsDB (MTDB) uniformly curates the numerous iterations of
   the `gff` into a consistent standard
 - The `.mtdb` database format enables swift transitions from analyses with datasets of 100,000s genomes to as few as a lineage of interest
-- Mycotools software suite includes modules to automate routine-complex
+- Mycotools [software suite](https://github.com/xonq/mycotools/blob/master/USAGE.md) includes modules to automate routine-complex
   comparative genomics
 
 <p align="center">
