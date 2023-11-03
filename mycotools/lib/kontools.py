@@ -503,7 +503,7 @@ def dictSplit( Dict, factor ):
     return list_dict
 
 
-def sys_start( args, usage, min_len, dirs = [], files = [] ):
+def sys_start(args, usage, min_len, dirs = [], files = []):
     """args is a sys.argv typically, or a list of arguments.
     usage is the usage statement without formatting.
     min_len is the minimum number of arguments that should exist.
@@ -511,19 +511,19 @@ def sys_start( args, usage, min_len, dirs = [], files = [] ):
     files is a list of items that should be files"""
 
     if '-h' in args or '--help' in args:
-        print( '\n' + usage + '\n' , flush = True)
-        sys.exit( 1 )
-    elif len( args ) < min_len:
-        print( '\n' + usage + '\n' , flush = True)
-        sys.exit( 2 )
-    elif not all( os.path.isfile( format_path(x) ) for x in files ):
-        print( '\n' + usage , flush = True)
-        eprint( 'ERROR: input file(s) do not exist\n' , flush = True)
-        sys.exit( 3 )
-    elif not all( os.path.isfile( format_path(x) ) for x in dirs ):
-        print( '\n' + usage , flush = True)
-        eprint( 'ERROR: input directory does not exist\n' , flush = True)
-        sys.exit( 4 )
+        print('\n' + usage + '\n' , flush = True)
+        sys.exit(1)
+    elif len(args) < min_len:
+        print('\n' + usage + '\n' , flush = True)
+        sys.exit(2)
+    elif not all(os.path.isfile(format_path(x)) for x in files):
+        print('\n' + usage , flush = True)
+        eprint('ERROR: input file(s) do not exist\n', flush = True)
+        sys.exit(3)
+    elif not all(os.path.isfile(format_path(x)) for x in dirs):
+        print('\n' + usage , flush = True)
+        eprint('ERROR: input directory does not exist\n', flush = True)
+        sys.exit(4)
 
     return args
 
