@@ -1,6 +1,7 @@
 - [ ] Conserved log class
     - [ ] Must be capable of determining if the run is congruent or new
 - [ ] Annotate code (all)
+    - [ ] add type constraints to functions
 - [ ] Conform old scripts to PEP8 (all)
 - [ ] Build all-in-one stable conda package
 - [ ] Transition code-base to Rust
@@ -122,3 +123,4 @@
 - [ ] initialize from a predb
 - [ ] option to remove entries that have been removed from genbank
 - [ ] option to not dereplicate by genus and species alone
+- [ ] main MTDB files for prokaryotes and fungi uploaded and that can be parsed
