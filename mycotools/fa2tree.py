@@ -13,6 +13,8 @@ from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
     format_path, intro, outro, findExecs, mkOutput, multisub
 from mycotools.lib.biotools import fa2dict, dict2fa
+from clipkit import clipkit
+
 
 class PhyloError(Exception):
     pass
@@ -59,15 +61,14 @@ def trimRun(name, mafft, out_dir, hpc, param,
     if not hpc:
         print(spacer + 'Trimming', flush = True)
         if verbose:
-            run_clipkit = subprocess.call(cmd, stdout = subprocess.PIPE)
-        else:
-            run_clipkit = subprocess.call( 
-                cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
-                )
-        if run_clipkit != 0:
+	    print(spacer + cmd)
+        run_clipkit = clipkit(
+	    input_file_path=mafft,
+	    output_file_path=name2,
+	    mode="smart-gap",
+        )
+        if not os.path.isfile(out_dir + name2):
             eprint(spacer + '\tERROR: `clipkit` failed: ' + str(run_clipkit) , flush = True)  
-            if os.path.isfile(out_dir + name2):
-                os.remove(out_dir + name2)
             raise PhyloError
 
     else:
