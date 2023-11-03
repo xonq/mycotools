@@ -9,6 +9,7 @@ import re
 import sys
 import copy
 import argparse
+from itertools import chain
 from collections import defaultdict
 from mycotools.lib.biotools import gff2list, list2gff, fa2dict, dict2fa, \
     gtfComps, gff3Comps, gff2Comps
@@ -83,10 +84,12 @@ def intron2exon(gff, gene_comp = re.compile(r'gene_id \"(.*?)\"')):
                 'start_codon': [], 
                 'stop_codon': [], 
                 'strand': str(entry['strand']), 
-                'raw': [] 
+                'cds': [],
+                'exon': [],
+                'raw': [],
             }
-        if entry['type'] in gene_info[gene]:
-            gene_info[gene][entry['type']].append(
+        if entry['type'].lower() in gene_info[gene]:
+            gene_info[gene][entry['type'].lower()].append(
                 [int(entry['start']), int(entry['end'])] 
             )
         gene_info[gene]['raw'].append(entry)
@@ -96,25 +99,57 @@ def intron2exon(gff, gene_comp = re.compile(r'gene_id \"(.*?)\"')):
     intron_genes = {
         gene: gene_info[gene] for gene in gene_info if gene_info[gene]['intron']
         }
+    cds_no_exon = {gene: {'cds': info['cds'], 'raw': info['raw']} \
+                   for gene, info in gene_info.items() \
+                   if not gene_info[gene]['intron'] \
+                   and not gene_info[gene]['exon'] \
+                   and gene_info[gene]['cds']}
+
     exon_coords = {}
+    for gene, data in cds_no_exon.items():
+        exon_coords[gene] = [[min(data['cds'][0]), max(data['cds'][0])]]
+        if len(data['cds']) > 1:
+            raise ValueError(f'no introns but multiple CDS entries for {gene}')
+
     for gene in intron_genes:
 #        if intron_genes[gene]['intron']:
         exon_coords[gene] = []
         intron_genes[gene]['intron'].sort(key = lambda x: x[0])
     
         if intron_genes[gene]['strand'] == '+':
-            exon_coords[gene].append([intron_genes[gene]['start_codon'][0][0]])
+            if intron_genes[gene]['start_codon']:
+                exon_coords[gene].append([intron_genes[gene]['start_codon'][0][0]])
+            else:
+                exon_coords[gene].append([min([int(x['start']) for x in \
+                                              intron_genes[gene]['raw']])])
             for intron in intron_genes[gene]['intron']:
                 exon_coords[gene][-1].append(intron[0] - 1)
                 exon_coords[gene].append([intron[1] + 1])
-            exon_coords[gene][-1].append(intron_genes[gene]['stop_codon'][0][1])
+            if intron_genes[gene]['stop_codon']:
+                exon_coords[gene][-1].append(intron_genes[gene]['stop_codon'][0][1])
+            else:
+                exon_coords[gene][-1].append(max([int(x['end']) \
+                                                  for x in \
+                                                  intron_genes[gene]['raw']]))
 
         else:
-            exon_coords[gene].append([intron_genes[gene]['stop_codon'][0][0]])
+            if intron_genes[gene]['stop_codon']:
+                exon_coords[gene].append([intron_genes[gene]['stop_codon'][0][0]])
+            else:
+                exon_coords[gene].append([max(list(chain(*[
+                                            (int(x['start']), int(x['end'])) \
+                                            for x in \
+                                            intron_genes[gene]['raw']])))])
             for intron in intron_genes[gene]['intron']:
                 exon_coords[gene][-1].append(intron[0] - 1)
                 exon_coords[gene].append([intron[1] + 1])
-            exon_coords[gene][-1].append(intron_genes[gene]['start_codon'][0][1])
+            if intron_genes[gene]['start_codon']:
+                exon_coords[gene][-1].append(intron_genes[gene]['start_codon'][0][1])
+            else:
+                exon_coords[gene][-1].append(min(list(chain(*[
+                                                (int(x['start']), int(x['end'])) \
+                                                for x in \
+                                                intron_genes[gene]['raw']]))))
 
     gff2 = []
     for entry in gff1:
@@ -122,9 +157,12 @@ def intron2exon(gff, gene_comp = re.compile(r'gene_id \"(.*?)\"')):
         if gene not in exon_coords:
             gff2.append(entry)
     for gene in exon_coords:
-        add_data = [
-            entry for entry in intron_genes[gene]['raw'] if entry['type'] != 'intron' 
-        ]
+        try:
+            add_data = [
+                entry for entry in intron_genes[gene]['raw'] if entry['type'] != 'intron' 
+            ]
+        except KeyError: # no intron, just a cds
+            add_data = [entry for entry in cds_no_exon[gene]['raw']]
         scaffold = list(add_data)[0]
         for exon in exon_coords[gene]:
             new_entry = dict(scaffold)
@@ -309,7 +347,7 @@ def add_genes(gtf, safe = True,
     tran_compile = re.compile(comps['transcript'])
     gene_compile = re.compile(comps['id'])
     gene_dict_prep, gene_dict = {}, {}
-    for entry in gtf:
+    for i, entry in enumerate(gtf):
         gene = gene_compile.search(entry['attributes'])[1]
         try:
             tran = tran_compile.search(entry['attributes'])[1]
@@ -338,9 +376,13 @@ def add_genes(gtf, safe = True,
                )
         elif 'RNA' in entry['type']:
             gene_dict_prep[gene]['rna'][tran] = entry
+        elif 'transcript' == entry['type'].lower():
+            gtf[i]['type'] = 'mRNA'
+            gene_dict_prep[gene]['rna'][tran] = gtf[i]
 
     gene_dict_prep = fill_transcripts(gene_dict_prep)
     gene_dict, flagged, failed = conservativeRemoval(gene_dict_prep)
+
 
     check, insert_list = set(), []
     for index, entry in enumerate(gtf):
@@ -365,7 +407,8 @@ def add_genes(gtf, safe = True,
             new_entry['start'] = min(start_stop_coords)
             new_entry['end'] = max(start_stop_coords)
 
-
+            
+    #        toadd = set()
             # for each existing entry in the rnas of gene_dict, append a new
             if gene_dict[gene]['rna']:
                 for rna, rna_entry in gene_dict[gene]['rna']:
@@ -374,6 +417,12 @@ def add_genes(gtf, safe = True,
             else:
                 # for each transcript id in the exon information
                 for rna, coords in gene_dict[gene]['exon'].items():
+                    # if there isn't an annotated exon, but there is a cds
+#                    if not coords:
+ #                       if gene_dict[gene]['cds'][rna]:
+  #                          coords = gene_dict[gene]['cds'][rna]
+   #                         gene_dict[gene]['exon'] = coords
+    #                        toadd.add(gene)
                     # if there aren't CDS then its an ambiguous RNA (tRNA/rRNA)
                     if not gene_dict[gene]['cds'][rna]:
                         rna_type = 'RNA' # usually tRNA, but its not a safe assumption
@@ -400,6 +449,20 @@ def add_genes(gtf, safe = True,
 
     for insert in insert_list:
         gtf.insert(insert[0], insert[1])
+
+ #   insert_list = []
+#    if toadd:
+  #      for index, entry in enumerate(gtf):
+   #         gene = gene_compile.search(entry['attributes'])[1]
+    #        if gene in toadd:
+     #           if entry['type'] == 'CDS':
+      #              new_entry = copy.deepcopy(entry)
+       #             new_entry['type'] = 'exon'
+        #        insert_list.append([index, new_entry])
+
+     #   for insert in insert_list:
+      #      gtf.insert(insert[0], insert[1])
+
 
     return gtf, failed, flagged
 
@@ -570,6 +633,10 @@ def sortGFF(unsorted_gff, idComp):
 
     sorting_groups, oldGene = {}, None
     for i, entry in enumerate(unsorted_gff):
+        if entry['type'].lower() not in {'mrna', 'rrna', 'trna', 'five_prime_utr',
+                                 'three_prime_utr', 'gene', 'pseudogene',
+                                 'pseudogenic_trna', 'cds', 'exon'}:
+            continue
         seqid = entry['seqid']
         if seqid not in sorting_groups:
             sorting_groups[seqid] = {}
@@ -630,6 +697,9 @@ def main(gff_path, prefix, fail = True):
 
     if prefix:
         out_gff = sortGFF(unsortedGff, re.compile(gff3Comps()['Alias']))
+        for i, entry in enumerate(out_gff):
+            entry['start'] = int(entry['start'])
+            entry['end'] = int(entry['end'])
         gff = rename_and_organize(out_gff)
     else:
         gff = unsortedGff
