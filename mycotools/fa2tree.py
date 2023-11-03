@@ -9,11 +9,23 @@ import sys
 import shutil
 import argparse
 import subprocess
+import contextlib
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
     format_path, intro, outro, findExecs, mkOutput, multisub
 from mycotools.lib.biotools import fa2dict, dict2fa
 from clipkit import clipkit
+
+# adopted from https://stackoverflow.com/a/2829036 for verbosity control
+class DummyFile(object):
+    def write(self, x): pass
+
+@contextlib.contextmanager
+def nostdout():
+    save_stdout = sys.stdout
+    sys.stdout = DummyFile()
+    yield
+    sys.stdout = save_stdout
 
 
 class PhyloError(Exception):
@@ -57,28 +69,44 @@ def run_mafft(name, fasta, out_dir, hpc, verbose = True,
     return out_dir + '/' + name + '.mafft'
 
 
-def run_clipkit(name, mafft_name, out_dir, hpc, param, 
+def run_clipkit(name, mafft_name, out_dir, hpc, gappy, 
             verbose, cpus = 1, spacer = '\t'):
     """Execute ClipKIT from a complete Mafft run"""
+
     clipkit_out_name = out_dir + os.path.basename(mafft_name) + '.clipkit'
+    if gappy:
+        mode = "gappy"
+    else:
+        mode = "smart-gap"
+        gappy = None
+
     # execute immediately
     if not hpc:
         print(spacer + 'Trimming', flush = True)
-#        if verbose:
-        run_clipkit = clipkit(
-    	    input_file_path=mafft_name,
-	        output_file_path=clipkit_out_name,
-	        mode="smart-gap",
-            )
+        if verbose:
+            clipkit_out = clipkit(
+        	    input_file_path=mafft_name,
+	            output_file_path=clipkit_out_name,
+	            mode=mode, gaps=gappy
+                )
+        else:
+            with nostdout():
+                clipkit_out = clipkit(
+        	        input_file_path=mafft_name,
+	                output_file_path=clipkit_out_name,
+	                mode=mode, gaps=gappy
+                    )
+
         # no output file, the run failed
         if not os.path.isfile(out_dir + clipkit_out_name):
-            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(run_clipkit), 
+            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(clipkit_out), 
                    flush = True)  
             raise PhyloError
     # prepare a command for HPC execution
     else:
         cmd = ['clipkit', mafft_name, '--output', clipkit_out_name]
-        cmd.extend(param)
+        if gappy:
+            cmd.extend(['-m', 'gappy', '-g', str(gappy)])
         with open(out_dir + name + '_clipkit.sh', 'w') as out:
             if '#PBS' in hpc:
                 out.write( hpc + '\n\n' + #cmd1 + '\n' + 
@@ -237,6 +265,7 @@ def run_tree_reconstruction(prefix, clipkit_file, out_dir, hpc, constraint,
 def prep_fasta_path_input(fasta_path, output_dir):
     """Prepare the output directories and collect the files from an input that
     is a fasta path (file or directory)"""
+    # start from a file input
     if os.path.isfile(fasta_path):
         if not output_dir:
             dir_name = re.sub(r'\..*?$', '_tree', 
@@ -255,6 +284,7 @@ def prep_fasta_path_input(fasta_path, output_dir):
             os.mkdir(wrk_dir)
 
         files = [fasta_path]
+    # start from a directory of fastas
     elif os.path.isdir(fasta_path):
         if not output_dir:
             out_dir = mkOutput(output_dir_prep, 'fa2tree')
@@ -284,12 +314,245 @@ def prep_fasta_path_input(fasta_path, output_dir):
     return out_dir, wrk_dir, files
 
 
+def prep_fasta_list_input(fastas, output_dir):
+    if not output_dir:
+        out_dir = mkOutput(output_dir_prep, 'fa2tree')
+    else:
+        if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
+        out_dir = format_path(output_dir)
+    wrk_dir = out_dir + 'working/'
+    if not os.path.isdir(wrk_dir):
+        os.mkdir(wrk_dir)
+    files = []
+    for path in fastas:
+        if os.path.isdir(path):
+            files.extend([format_path(x) for x in collect_files(path, '*')])
+        else:
+            files.append(path)
+    return out_dir, wrk_dir, files
+
+
+def nonfasta2fasta(files, conv_dir):
+    """Use BioPython to convert non-fastas into fastas"""
+    from Bio import SeqIO
+    for i, f_ in enumerate(files):
+        out_name = conv_dir + os.path.basename(
+            re.search(r'(.*)\.[^.]+$', f_)[1] + '.fa'
+            )
+        if not os.path.isfile(out_name):
+            if f_.endswith(('.nexus', '.nex', '.nxs',)):
+                records = SeqIO.parse(f_, 'nexus')
+                SeqIO.write(records, out_name, 'fasta')
+            elif f_.endswith(('.phylip', '.phy', '.ph',)):
+                records = SeqIO.parse(f_, 'phylip')
+                SeqIO.write(records, out_name, 'fasta')
+            elif f_.endswith(('.clustal', '.clus',)):
+                records = SeqIO.parse(f_, 'clustal')
+                SeqIO.write(records, out_name, 'fasta')
+            else:
+                continue
+        files[i] = out_name
+    return files
+
+
+def identify_incomplete_files(files, flag_incomplete, wrk_dir):
+    """Identify fastas that do not have every genome represented in any other
+    file and handle this as an error or warning and genome deletion."""
+    ome2fa2gene = defaultdict(dict)
+    incomp_omes = {}
+    # identify files with missing sequences
+    for f in files:
+        if f.endswith('/'):
+            f = f[:-1]
+        fa_dict = fa2dict(f)
+        incomp_omes[os.path.basename(f)] = []
+        # populate a hash with each gene for each ome associated with each
+        # fasta
+        for seq in fa_dict:
+            ome = seq[:seq.find('_')]
+            if f not in ome2fa2gene[ome]:
+                incomp_omes[os.path.basename(f)].append(ome)
+                ome2fa2gene[ome][f] = seq
+            # a multigene partition cannot be reconstructed for a genome with
+            # multiple genes in the same alignment
+            else:
+                eprint('\nERROR: multiple sequences for a ' \
+                     + 'single ome in ' + f, flush = True)
+                sys.exit(5)
+
+    # identify the files with missing genomes and the missing omes themselves
+    del_omes = set()
+    incomp_files, comp_files = {}, []
+    for f, omes in incomp_omes.items():
+        if len(omes) < len(ome2fa2gene):
+            missing_omes = set(ome2fa2gene.keys()).difference(set(omes))
+            incomp_files[f] = sorted(missing_omes)
+            del_omes = del_omes.union(missing_omes)
+        else:
+            comp_files.append(f)
+
+    # if there are incomplete files, then run through the flagging process
+    if incomp_files:
+        incomp_files = {k: v for k,v in sorted(incomp_files.items(), 
+                                               key = lambda x: len(x[1]))}
+        # it is an error if genomes are missing and it isn't explicitly
+        # permitted
+        if flag_incomplete:
+            eprint('\nERROR: omes without sequences in all fastas: ', flush = True)
+        else:
+            eprint('\nWARNING: omes removed without sequences in all \
+                    fastas: ', flush = True)
+        for f, omes in incomp_files.items():
+            eprint('\t' + f + ': ' + ','.join([x for x in omes]), flush = True)
+        if comp_files:
+            eprint('\tComplete files: ' + ','.join(comp_files), flush = True)
+        else:
+            eprint('\tNo complete files', flush = True)
+        # exit if incomplete flags
+        if flag_incomplete:
+            sys.exit(6)
+        # otherwise remove the genomes from each fasta that are not present in
+        # all of them
+        else:
+            new_files = []
+            for fasta in files:
+                fasta_name = os.path.basename(fasta)
+                fa = fa2dict(fasta)
+                new_fa = {k: v for k, v in fa.items() \
+                          if k[:k.find('_')] not in del_omes}
+                with open(wrk_dir + fasta_name + '.tmp', 'w') as out:
+                    out.write(dict2fa(new_fa))
+                os.rename(wrk_dir + fasta_name + '.tmp', 
+                          wrk_dir + fasta_name)
+                new_files.append(wrk_dir + fasta_name)
+            files = new_files
+
+    return files, ome2fa2gene, del_omes
+
+
+def algn_mngr(start, files, wrk_dir, hpc, gappy, verbose, cpus, spacer):
+    """Manage the alignment and trimming executor for inputted fasta files"""
+
+    trimmed_files = []
+    for fasta in files:
+        name = re.search(r'.*?/*([^/]+)/*$', fasta)[1]
+        fasta_name = os.path.basename(os.path.abspath(fasta))
+        clipkit = wrk_dir + fasta_name + '.clipkit'
+
+        # if the starting point is a non-aligned fasta
+        if start == 0:
+            mafft = wrk_dir + fasta_name + '.mafft'
+            clipkit = mafft + '.clipkit'
+            try:
+                # check if it exists
+                if os.stat(mafft):
+                    vprint('\nAlignment exists', v = verbose, flush = True)
+                else:
+                    raise ValueError
+            except (FileNotFoundError, ValueError) as e:
+                # otherwise run the alignment
+                if not alignment:
+                    mafft = run_mafft(name, os.path.abspath(fasta), wrk_dir, hpc, 
+                                     verbose, cpus, spacer = spacer)
+                else:
+                    mafft = fasta
+        # else the starting point is an alignment or trimmed alignment
+        else:
+            mafft = fasta
+            clipkit = mafft + '.clipkit'
+
+        # if the starting point is an alignment or trimmed alignment
+        if start == 0 or start == 1: 
+            try:
+                # check for a trimmed fasta
+                if os.stat(clipkit):
+                    vprint('\nTrim exists', v = verbose, flush = True)
+                    clipkit_out = clipkit
+                else:
+                    raise ValueError
+            except (FileNotFoundError, ValueError) as e:
+                clipkit_out = run_clipkit(name, mafft, wrk_dir, hpc, gappy,
+                                          verbose, spacer = spacer)
+            trimmed_files.append(clipkit_out)
+        else:
+            trimmed_files.append(fasta)
+
+    return trimmed_files
+
+
+def convert_seq_to_ome_name(trimmed_files, conv_dir):
+    """Convert the inputted sequence name to its genome name"""
+    new_trimmed_files = []
+    for trimmed_f in trimmed_files:
+        new_f = conv_dir + os.path.basename(trimmed_f)
+        in_fa = fa2dict(trimmed_f)
+        out_fa = {}
+        for seq, data in in_fa.items():
+            ome = seq[:seq.find('_')]
+            out_fa[ome] = data
+        with open(new_f, 'w') as out:
+            out.write(dict2fa(out_fa))
+        new_trimmed_files.append(new_f)
+    trimmed_files = new_trimmed_files
+
+    return new_trimmed_files
+
+
+def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
+                  ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep):
+    """Manage the execution of the multigene phylogeny execution from
+    ModelFinding forward"""
+
+    # stop at the end of the alignment and output a command
+    if align_stop:
+        # run modelfinding script generator
+        script_dict = run_mf(trimmed_files, wrk_dir, constraint,
+                        verbose, cpus, spacer = spacer + '\t',
+                        scripts = True)
+        for f, cmd in script_dict.items():
+            # output a script, SLURM formatted or otherwise
+            with open(out_dir + f + '.sh', 'w') as out:
+                if hpc_prep: # doesnt work with PBS/Torque
+                    out.write(f'{hpc_prep}\n#SBATCH --output={f}_tree\n' \
+                            + f'#SBATCH --error={f}_tree\n' \
+                            + f'#SBATCH --job-name={f}_tree\n')
+                out.write(' '.join(cmd))
+        print(spacer + 'Alignments outputed', flush = True)
+        sys.exit(0)
+
+    print(spacer + 'Model finding', flush = True)
+    models = run_mf(trimmed_files, wrk_dir, constraint,
+                    verbose, cpus, spacer = spacer + '\t')
+
+    # build the concatenated NEXUS 
+    print(spacer + 'Concatenating', flush = True)
+    empty_concat_fa = {ome: {'description': '', 'sequence': ''}
+                 for ome in ome2fa2gene if ome not in del_omes}
+    nex_data, concat_fa = prepare_nexus(empty_concat_fa, models)
+    with open(out_dir + 'concatenated.fa', 'w') as out:
+        out.write(dict2fa(concat_fa))
+    with open(out_dir + 'concatenated.nex', 'w') as out:
+        out.write(nex_data)
+
+    # stop and allow the user to build the tree
+    if tree_stop:
+        print(spacer + 'Concatenated nexus and fasta outputted', 
+              flush = True)
+        sys.exit(0)
+
+    # run the multigene phylogeny reconstruction
+    run_partition_tree(out_dir + 'concatenated.fa', 
+                       out_dir + 'concatenated.nex', constraint,
+                       verbose, cpus, spacer = spacer)
+
+
 def main( 
     fasta_path, slurm = False, torque = False, fast = False, project = '', 
     output_dir = None, verbose = True, alignment = False, constraint = False,
     ome_conv = False, mem = '60GB', cpus = 1, spacer = '\t\t', align_stop = False, 
     tree_stop = False, flag_incomplete = True, start = 0, partition = False,
-    clip_list = []
+    gappy = None
     ):
     """Python entry-point for fa2tree. Build a phylogeny from an inputted fasta
     of homologs. Align (mafft) -> trim (clipkit) -> ModelFinder (multigene
@@ -314,214 +577,55 @@ def main(
         hpc = hpc_prep
 
     output_dir_prep = os.getcwd() + '/'
+    # the fasta data should be a path if it is a string
     if isinstance(fasta_path, str):
         out_dir, wrk_dir, files = prep_fasta_path_input(fasta_path, output_dir)
+    # otherwise the fasta should be a provided list of fastas
     else:
-        if not output_dir:
-            out_dir = mkOutput(output_dir_prep, 'fa2tree')
-        else:
-            if not os.path.isdir(output_dir):
-                os.mkdir(output_dir)
-            out_dir = format_path(output_dir)
-        wrk_dir = out_dir + 'working/'
-        if not os.path.isdir(wrk_dir):
-            os.mkdir(wrk_dir)
-        files = []
-        for path in fasta_path:
-            if os.path.isdir(path):
-                files.extend([format_path(x) for x in collect_files(path, '*')])
-            else:
-                files.append(path)
+        out_dir, wrk_dir, files = prep_fasta_list_input(fasta_path, output_dir)
 
+    # create a directory for converting files
     conv_dir = wrk_dir + 'conv/'
     if not os.path.isdir(conv_dir):
         os.mkdir(conv_dir)
 
-    # check for non fasta inputs
+    # check for non fasta inputs - if these files exist in a directory then
+    # they will be used anyway
     if any(f_.endswith(('.nexus', '.nex', '.nxs', 
                         '.phylip', '.phy', '.ph',
                         '.clustal', '.clus',)) \
            for f_ in files):
         print(spacer + 'Converting to fastas', flush = True)
-        from Bio import SeqIO
-        for i, f_ in enumerate(files):
-            out_name = conv_dir + os.path.basename(
-                re.search(r'(.*)\.[^.]+$', f_)[1] + '.fa'
-                )
-            if not os.path.isfile(out_name):
-                if f_.endswith(('.nexus', '.nex', '.nxs',)):
-                    records = SeqIO.parse(f_, 'nexus')
-                    SeqIO.write(records, out_name, 'fasta')
-                elif f_.endswith(('.phylip', '.phy', '.ph',)):
-                    records = SeqIO.parse(f_, 'phylip')
-                    SeqIO.write(records, out_name, 'fasta')
-                elif f_.endswith(('.clustal', '.clus',)):
-                    records = SeqIO.parse(f_, 'clustal')
-                    SeqIO.write(records, out_name, 'fasta')
-                else:
-                    continue
-            files[i] = out_name
+        files = nonfasta2fasta(files, conv_dir)
 
+    # only proceed with fastas from the inputted files
     files = [x for x in files \
              if x.endswith(('fasta', 'fa', 'fna', 'faa', 'fsa'))]
 
-    del_omes = set()
     if partition: #multigene partition mode
-        ome2fa2gene = defaultdict(dict)
-        incomp_omes = {}
-        for f in files:
-            if f.endswith('/'):
-                f = f[:-1]
-            fa_dict = fa2dict(f)
-            incomp_omes[os.path.basename(f)] = []
-            for seq in fa_dict:
-                ome = seq[:seq.find('_')]
-                if f not in ome2fa2gene[ome]:
-                    incomp_omes[os.path.basename(f)].append(ome)
-                    ome2fa2gene[ome][f] = seq
-                else:
-                    eprint('\nERROR: multiple sequences for a ' \
-                         + 'single ome in ' + f, flush = True)
-                    sys.exit(5)
+        files, ome2fa2gene, del_omes = identify_incomplete_files(files,
+                                                                 flag_incomplete,
+                                                                 wrk_dir)
 
-        incomp_files, comp_files = {}, []
-        for f, omes in incomp_omes.items():
-            if len(omes) < len(ome2fa2gene):
-                incomp_files[f] = sorted(
-                    set(ome2fa2gene.keys()).difference(set(omes))
-                    )
-            else:
-                comp_files.append(f)
+    # manage the alignment and trimming
+    trimmed_files = algn_mngr(start, files, wrk_dir, hpc, gappy, 
+                              verbose, cpus, spacer)
 
-        if incomp_files:
-            incomp_files = {k: v for k,v in sorted(incomp_files.items(), 
-                                                   key = lambda x: len(x[1]))}
-            if flag_incomplete:
-                eprint('\nERROR: omes without sequences in all fastas: ', flush = True)
-            else:
-                eprint('\nWARNING: omes removed without sequences in all \
-                        fastas: ', flush = True)
-            for f, omes in incomp_files.items():
-                eprint('\t' + f + ': ' + ','.join([x for x in omes]), flush = True)
-                del_omes = del_omes.union(set(omes))
-            if comp_files:
-                eprint('\tComplete files: ' + ','.join(comp_files), flush = True)
-            else:
-                eprint('\tNo complete files', flush = True)
-            if flag_incomplete:
-                sys.exit(6)
-            else:
-                new_files = []
-                for fasta in files:
-                    fasta_name = os.path.basename(fasta)
-                    fa = fa2dict(fasta)
-                    new_fa = {k: v for k, v in fa.items() \
-                              if k[:k.find('_')] not in del_omes}
-                    with open(wrk_dir + fasta_name + '.tmp', 'w') as out:
-                        out.write(dict2fa(new_fa))
-                    os.rename(wrk_dir + fasta_name + '.tmp', 
-                              wrk_dir + fasta_name)
-                    new_files.append(wrk_dir + fasta_name)
-                files = new_files
-
-
-    trimmed_files = []
-    for fasta in files:
-        name = re.search(r'.*?/*([^/]+)/*$', fasta)[1]
-        fasta_name = os.path.basename(os.path.abspath(fasta))
-        clipkit = wrk_dir + fasta_name + '.clipkit'
-        if start == 0:
-            mafft = wrk_dir + fasta_name + '.mafft'
-            clipkit = mafft + '.clipkit'
-            try:
-                if os.stat(mafft):
-                    vprint('\nAlignment exists', v = verbose, flush = True)
-                else:
-                    raise ValueError
-            except (FileNotFoundError, ValueError) as e:
-                if not alignment:
-                    mafft = run_mafft(name, os.path.abspath(fasta), wrk_dir, hpc, 
-                                     verbose, cpus, spacer = spacer)
-                else:
-                    mafft = fasta
-        else:
-            mafft = fasta
-            clipkit = mafft + '.clipkit'
-
-
-        if start == 0 or start == 1: 
-            try:
-                if os.stat(clipkit):
-                    vprint('\nTrim exists', v = verbose, flush = True)
-                    clipkit_out = clipkit
-                else:
-                    raise ValueError
-            except (FileNotFoundError, ValueError) as e:
-                clipkit_out = run_clipkit(name, mafft, wrk_dir, hpc, clip_list,
-                                      verbose, spacer = spacer)
-            trimmed_files.append(clipkit_out)
-        else:
-            trimmed_files.append(fasta)
-
-
+    # convert the sequences to genome codenames    
     if ome_conv:
-        new_trimmed_files = []
-        for trimmed_f in trimmed_files:
-            new_f = conv_dir + os.path.basename(trimmed_f)
-            in_fa = fa2dict(trimmed_f)
-            out_fa = {}
-            for seq, data in in_fa.items():
-                ome = seq[:seq.find('_')]
-                out_fa[ome] = data
-            with open(new_f, 'w') as out:
-                out.write(dict2fa(out_fa))
-            new_trimmed_files.append(new_f)
-        trimmed_files = new_trimmed_files
+        trimmed_files = convert_seq_to_ome_name(trimmed_files, conv_dir)
 
-
-
+    # reconstruct a single gene phylogeny
     if not partition:
         for trimmed_f in trimmed_files:
             name_prep = re.search(r'.*?/*([^/]+)/*$', trimmed_f)[1]
             name = re.sub(r'\.mafft\.clipkit$', '', name_prep)
             run_tree_reconstruction(name, trimmed_f, out_dir, hpc, constraint,
                     verbose, fast, cpus, spacer = spacer)
+    # run multigene partition model phylogeny mode
     else:
-        if align_stop:
-            script_dict = run_mf(trimmed_files, wrk_dir, constraint,
-                            verbose, cpus, spacer = spacer + '\t',
-                            scripts = True)
-            for f, cmd in script_dict.items():
-                with open(out_dir + f + '.sh', 'w') as out:
-                    if hpc_prep:
-                        out.write(f'{hpc_prep}\n#SBATCH --output={f}_tree\n' \
-                                + f'#SBATCH --error={f}_tree\n' \
-                                + f'#SBATCH --job-name={f}_tree\n')
-                    out.write(' '.join(cmd))
-            print(spacer + 'Alignments outputed', flush = True)
-            sys.exit(0)
-
-        print(spacer + 'Model finding', flush = True)
-        models = run_mf(trimmed_files, wrk_dir, constraint,
-                        verbose, cpus, spacer = spacer + '\t')
-
-        print(spacer + 'Concatenating', flush = True)
-        empty_concat_fa = {ome: {'description': '', 'sequence': ''}
-                     for ome in ome2fa2gene if ome not in del_omes}
-        nex_data, concat_fa = prepare_nexus(empty_concat_fa, models)
-        with open(out_dir + 'concatenated.fa', 'w') as out:
-            out.write(dict2fa(concat_fa))
-        with open(out_dir + 'concatenated.nex', 'w') as out:
-            out.write(nex_data)
-
-        if tree_stop:
-            print(spacer + 'Concatenated nexus and fasta outputted', 
-                  flush = True)
-            sys.exit(0)
-
-        run_partition_tree(out_dir + 'concatenated.fa', 
-                           out_dir + 'concatenated.nex', constraint,
-                           verbose, cpus, spacer = spacer)
+        multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
+                      ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep)
 
     if hpc:
         if slurm:
@@ -535,12 +639,14 @@ def main(
 def cli():
 
     parser = argparse.ArgumentParser( 
-        description = 'Takes in a multifasta, or directory/list of fastas [partition]  ' + \
-        ' aligns (mafft), trims (clipkit), and infers phylogeny \
-        (iqtree/fastree). When using non-Mycotools fastas for multigene \
-        partition analysis, all accessions must be formatted as \
-        "<GENOME>_<ACCESSION>" and each <GENOME> needs to be in ALL fastas'
-        )
+        description = 'Takes in a multifasta, or directory/list of ' \
+                    + 'fastas/alignments [partition] aligns (mafft) ' \
+                    + 'trims (clipkit), and reconstructs phylogeny ' \
+                    + '(iqtree/fastree). When using non-Mycotools ' \
+                    + 'fastas for multigene partition analysis, all ' \
+                    + 'accessions must be formatted as ' \
+                    + '"<GENOME>_<ACCESSION>" and each <GENOME> needs ' \
+                    + 'to be in ALL fastas')
 
     io_opt = parser.add_argument_group('Input options')
     io_opt.add_argument('-i', '--input', required = True,
@@ -598,17 +704,17 @@ def cli():
     if output:
         if not output.endswith('/'):
             output += '/' # bring to mycotools path expectations
+
     if args.gappy:
-        clip_list = ['-m', 'gappy', '-g', args.gappy]
-    else:
-        clip_list = []
-
-
+        if args.gappy > 1:
+            eprint('\nERROR: gappy threshold must be less than 1')
+            sys.exit(3)
+    
     args_dict = {
         'Fasta': args.input, 'Fast': args.fast, 
         'Multigene partition': args.partition, 'Input alignments': bool(args.align),
         'Input trimmed': bool(args.trim), 'Constraint': args.constraint,
-        'Ome conversion': args.ome, 'ClipKIT parameters': ' '.join(clip_list),
+        'Ome conversion': args.ome, 'Gappy threshold': args.gappy,
         'Alignment stop': args.stop_align, 'Concatenation stop': args.stop_cat,
         'Ignore missing': args.missing, 'Torque': args.torque, 'Slurm': args.slurm, 
         'HPC project': args.project, 'Output': output, 'CPUs': args.cpus
@@ -633,7 +739,7 @@ def cli():
         torque = args.torque, project = args.project,
         output_dir = output, verbose = bool(args.verbose), 
         alignment = args.align, constraint = format_path(args.constraint),
-        ome_conv = args.ome, clip_list = clip_list,
+        ome_conv = args.ome, gappy = args.gappy,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
         flag_incomplete = bool(not args.missing), start = start,
         partition = bool(args.partition), cpus = args.cpus
