@@ -308,6 +308,7 @@ def main(
     files = [x for x in files \
              if x.endswith(('fasta', 'fa', 'fna', 'faa', 'fsa'))]
 
+    del_omes = set()
     if partition: #multigene partition mode
         ome2fa2gene = defaultdict(dict)
         incomp_omes = {}
@@ -345,12 +346,27 @@ def main(
                         fastas: ', flush = True)
             for f, omes in incomp_files.items():
                 eprint('\t' + f + ': ' + ','.join([x for x in omes]), flush = True)
+                del_omes = del_omes.union(set(omes))
             if comp_files:
                 eprint('\tComplete files: ' + ','.join(comp_files), flush = True)
             else:
                 eprint('\tNo complete files', flush = True)
             if flag_incomplete:
                 sys.exit(6)
+            else:
+                new_files = []
+                for fasta in files:
+                    fasta_name = os.path.basename(fasta)
+                    fa = fa2dict(fasta)
+                    new_fa = {k: v for k, v in fa.items() \
+                              if k[:k.find('_')] not in del_omes}
+                    with open(wrk_dir + fasta_name + '.tmp', 'w') as out:
+                        out.write(dict2fa(new_fa))
+                    os.rename(wrk_dir + fasta_name + '.tmp', 
+                              wrk_dir + fasta_name)
+                    new_files.append(wrk_dir + fasta_name)
+                files = new_files
+
 
     trimmed_files = []
     for fasta in files:
@@ -434,7 +450,7 @@ def main(
 
         print(spacer + 'Concatenating', flush = True)
         empty_concat_fa = {ome: {'description': '', 'sequence': ''}
-                     for ome in ome2fa2gene if ome not in incomp_omes}
+                     for ome in ome2fa2gene if ome not in del_omes}
         nex_data, concat_fa = prepare_nexus(empty_concat_fa, models)
         with open(out_dir + 'concatenated.fa', 'w') as out:
             out.write(dict2fa(concat_fa))
