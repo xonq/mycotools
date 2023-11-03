@@ -16,7 +16,7 @@ release - please join me in this aspiration.
 Bring broadscale comparative genomics to the masses. 
 
 Mycotools is a compilation of computational biology tools and database
-([MycotoolsDB](https://github.com/xonq/mycotools/blob/master/MTDB.md)) software
+([MycotoolsDB/MTDB](https://github.com/xonq/mycotools/blob/master/MTDB.md)) software
 that facilitate large-scale comparative genomics. MycotoolsDB dereplicates and locally
 assimilates all NCBI and MycoCosm (Joint Genome Institute) genomes into a database schema with uniform file curation, scalability, and automation as guiding principles. 
 
