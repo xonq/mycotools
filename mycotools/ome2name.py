@@ -6,33 +6,30 @@ import sys
 from mycotools.lib.kontools import format_path, sys_start, eprint
 from mycotools.lib.dbtools import primaryDB, mtdb
 
-forbidden = [
-    '/', '\\', '[', ']', '|', '+', '=', '(', ')',
-    '{', '}', ':', ';', '<', '>', '?', '&', '*', '^',
-    '%', '@', '#', '$', '~'
-    ]
 
-def parseArgs(args):
+def parse_args(args):
+    """Parse the command-line arguments of the script"""
 
-    genus, species, strain, ome_code, goOn, alternative = True, True, True, \
-        True, True, True
-    allowable = {
-        '_', '-', '!',
-        '`', ',', '.',
-        '~', "'", '"'
-        }
+    # metadata is true until otherwise
+    genus, species, strain = True, True, True
+    ome_code, go_on, alternative = True, True, True,
+    allowable = {'_', '-', '!',
+                '`', ',', '.',
+                '~', "'", '"'}
 
     for arg in args[2:]:
-        if len( arg ) > 1:
-            if arg[0] in { '"', "'" }:
+        if len(arg) > 1:
+            # replace beginning and ending quotations
+            if arg[0] in {'"', "'"}:
                 arg = arg[1:]
                 if arg[-1] in {'"', "'"}:
                     arg = arg[:-1]
-        if os.path.isfile( format_path(arg) ):
-            if not goOn:
-                eprint( '\nERROR: multiple files' , flush = True)
-            db = mtdb( arg )
-            goOn = False
+
+        if os.path.isfile(format_path(arg)):
+            if not go_on:
+                eprint('\nERROR: multiple files' , flush = True)
+            db = mtdb(arg)
+            go_on = False
             continue
         for let in arg:
             if let == 'g':
@@ -48,15 +45,27 @@ def parseArgs(args):
             elif let in allowable:
                 forbidden.append( let )
 
-    if goOn:
-        db = mtdb( primaryDB() )
+    # import primary MTDB
+    if go_on:
+        db = mtdb(primaryDB())
 
-    with open( args[1], 'r' ) as raw_input:
+    # read input data
+    with open(args[1], 'r') as raw_input:
         data_input = raw_input.read()
 
     return db, data_input, genus, species, strain, ome_code, alternative
 
-def main( db, data_input, genus, species, strain, ome_code, alternative ):
+
+def main(db, data_input, genus, species, strain, ome_code, alternative):
+    """Python entry point for converting MTDB genome accessions to taxonomic
+    metadata"""
+
+    # forbidden characters 
+    forbidden = [
+        '/', '\\', '[', ']', '|', '+', '=', '(', ')',
+        '{', '}', ':', ';', '<', '>', '?', '&', '*', '^',
+        '%', '@', '#', '$', '~'
+        ]
 
     db = db.set_index()
     for ome, row in db.items():
@@ -76,15 +85,17 @@ def main( db, data_input, genus, species, strain, ome_code, alternative ):
         if ome_code:
             name += ome + '_'
         name = name[:-1]
+        # remove forbidden characters
         for i in forbidden:
-            name = name.replace( i, '' )
-        data_input = re.sub( ome, name, data_input )
+            name = name.replace(i, '')
+        # change the ome code with the name
+        data_output = re.sub(ome, name, data_input)
 
-    return data_input.rstrip()
+    return data_output.rstrip()
 
 
 def cli():
-
+    """Command line entry point"""
     usage = 'USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE>' \
         + ' [MYCODB] asvg*&\nDEFAULTS: master db, see script for default' \
         + ' forbidden characters' + \
@@ -92,11 +103,11 @@ def cli():
         'optional mycotools db, string of forbidden characters\n' + \
         '"o" no ome | "g" no genus | "s" no species | "v" no strain' + \
         ' | "a" no source accession'
-    args = sys_start( sys.argv, usage, 2, files = [sys.argv[1]] )
-    db, data_input, g, sp, st, ome_code, alt = parseArgs(args)
+    args = sys_start(sys.argv, usage, 2, files = [sys.argv[1]])
+    db, data_input, g, sp, st, ome_code, alt = parse_args(args)
     data_output = main(db, data_input, g, sp, st, ome_code, alt)
-    print( data_output , flush = True)
-    sys.exit( 0 )
+    print(data_output, flush = True)
+    sys.exit(0)
 
 
 if __name__ == '__main__':
