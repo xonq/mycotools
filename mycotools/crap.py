@@ -47,12 +47,12 @@ from mycotools.db2microsyntree import compile_homolog_groups
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
 
-
 def parse_conversion_file(conversion_file):
     """Parse a file with info to convert gene names to custom names"""
     with open(conversion_file, 'r') as raw:
         data = [x.rstrip().split('\t') for x in raw]
     return {x[0]: x[1] for x in data}
+
 
 def prep_gff(gff, prots, comps, hits = set(), par_dict = {}):
     """Prepare an inputted GFF file for CRAP analysis by acquiring the protein
@@ -60,65 +60,78 @@ def prep_gff(gff, prots, comps, hits = set(), par_dict = {}):
 
     RNA = False
     for entry in gff:
+        # skip this if it has the SearchQuery tag
         if ';SearchQuery=' in entry['attributes']:
             continue
+
+        # acquire the gene IDs for queries based on if the gene is in the prots
+        # !! this may be problematic for alternately spliced proteins
         if entry['type'] == 'gene':
-            geneID = re.search(comps['id'], entry['attributes'])[1]
-            if geneID in prots:
-                entry['attributes'] += ';SearchQuery=' + geneID
-                hits.add(geneID)
-            elif geneID in par_dict:
-                entry['attributes'] += ';SearchQuery=' + par_dict[geneID]
-                del par_dict[geneID]
+            gene_id = re.search(comps['id'], entry['attributes'])[1]
+            if gene_id in prots:
+                entry['attributes'] += ';SearchQuery=' + gene_id
+                hits.add(gene_id)
+            elif gene_id in par_dict:
+                entry['attributes'] += ';SearchQuery=' + par_dict[gene_id]
+                del par_dict[gene_id]
             else:
-                protID = re.search(comps['prot'], entry['attributes'])[1]
-                if protID in prots:
-                    entry['attributes'] += ';SearchQuery=' + protID
-                    hits.add(protID)
+                prot_id = re.search(comps['prot'], entry['attributes'])[1]
+                if prot_id in prots:
+                    entry['attributes'] += ';SearchQuery=' + prot_id
+                    hits.add(prot_id)
+
+        # if RNA in the gff, preferentially grab the prots from it to avoid
+        # making assumptions about alternate splicing
         elif 'RNA' in entry['type']:
             RNA = True
-            rnaID = re.search(comps['id'], entry['attributes'])[1]
-            parID = re.search(comps['par'], entry['attributes'])[1]
+            rna_id = re.search(comps['id'], entry['attributes'])[1]
+            par_id = re.search(comps['par'], entry['attributes'])[1]
             try:
-                protID = re.search(comps['prot'], entry['attributes']).groups()[1]
-                if protID in prots:
-                    entry['attributes'] += ';SearchQuery=' + protID
-                    par_dict[parID] = protID
-                    hits.add(protID)
+                prot_id = re.search(comps['prot'], entry['attributes']).groups()[1]
+                if prot_id in prots:
+                    entry['attributes'] += ';SearchQuery=' + prot_id
+                    par_dict[par_id] = prot_id
+                    hits.add(prot_id)
                     continue
             except TypeError:
                 pass
-            if parID in prots:
-                entry['attributes'] += ';SearchQuery=' + parID
-                hits.add(parID)
-            elif rnaID in par_dict:
-                entry['attributes'] += ';SearchQuery=' + par_dict[rnaID]
-                par_dict[parID] = par_dict[rnaID]
-                del par_dict[rnaID]
+
+            # is the parent the accession the USER wants?
+            if par_id in prots:
+                entry['attributes'] += ';SearchQuery=' + par_id
+                hits.add(par_id)
+            # is the RNA the accession the USER wants?
+            elif rna_id in par_dict:
+                entry['attributes'] += ';SearchQuery=' + par_dict[rna_id]
+                par_dict[par_id] = par_dict[rna_id]
+                del par_dict[rna_id]
+            # otherwise is a protein within the RNA attributes?
             else:
-                protID = re.search(comps['prot'], entry['attributes'])[1]
-                if protID in prots:
-                    entry['attributes'] += ';SearchQuery=' + protID
-                    hits.add(protID)
+                prot_id = re.search(comps['prot'], entry['attributes'])[1]
+                if prot_id in prots:
+                    entry['attributes'] += ';SearchQuery=' + prot_id
+                    hits.add(prot_id)
+
+        # grab the protein IDs from the CDS as well
         elif entry['type'] == 'CDS':
             try:
-                protID = re.search(comps['prot'], entry['attributes'])[1]
+                prot_id = re.search(comps['prot'], entry['attributes'])[1]
             except TypeError: # protein field not available
                 continue
-            if protID in prots:
-                entry['attributes'] += ';SearchQuery=' + protID
-                parID = re.search(comps['par'], entry['attributes'])[1]
-                par_dict[parID] = protID
-                hits.add(protID)
+            if prot_id in prots:
+                entry['attributes'] += ';SearchQuery=' + prot_id
+                par_id = re.search(comps['par'], entry['attributes'])[1]
+                par_dict[par_id] = prot_id
+                hits.add(prot_id)
     return par_dict, hits, RNA, gff
 
 
-def rogue_locus(locusID, rnaGFF, wrk_dir, query2color, labels = True):
-    """Output the locus GFF and locus SVGs for an inputted rnaGFF derived from
+def rogue_locus(locus_id, rnaGFF, wrk_dir, query2color, labels = True):
+    """Output the locus GFF and locus SVGs for an inputted GFF derived by 
     grabbing a hit's locus"""
-    with open(wrk_dir + 'genes/' + locusID + '.locus.genes', 'w') as out:
+    with open(wrk_dir + 'genes/' + locus_id + '.locus.genes', 'w') as out:
             out.write(list2gff(rnaGFF))
-    svg_path = wrk_dir + 'svg/' + locusID + '.locus.svg'
+    svg_path = wrk_dir + 'svg/' + locus_id + '.locus.svg'
     gff2svg(
         rnaGFF, svg_path, product_dict = query2color, labels = labels,
         prod_comp = r';SearchQuery=([^;]+$)', width = 10, null = 'na'
@@ -192,16 +205,22 @@ def run_fa2clus(
     """Manage the sequence similarity clustering pipeline, fa2clus from the
     Mycotools software suite."""
 
+    # output Diamond data to a diamond directory
     dmnd_dir = output + 'dmnd/'
     if not os.path.isdir(dmnd_dir):
         os.mkdir(dmnd_dir)
+
+    # create an output path and a log path for the inputted gene
     output_path = output + str(focal_gene) 
     log_path = output + '.' + str(focal_gene) + '.log'
+
+    # parse an existing fa2clus_log
     if os.path.isfile(log_path):
         fa2clus_log = read_json(log_path)
     else:
         fa2clus_log = {'algorithm': 'null'}
     try:
+        # deprecated, hierarchical is not implemented
         if fa2clus_log['algorithm'] == 'hierarchical':
             raise ClusteringError # go straight to hierarchical
         cluster, null, overshot, fa2clus_log = fa2clus(
@@ -231,6 +250,7 @@ def run_fa2clus(
         else:
             raise le
 
+    # write the sequences of the cluster to a FASTA
     write_seq_clus(cluster, focal_gene, db, 
                    output_path, output + '../' + str(out_name) + '.fa')
 
@@ -242,6 +262,13 @@ def outgroup_mngr(
     clus_cons = 0.4, direction = -1, cpus = 1, interval = 0.1,
     verbose = False, spacer = '\t\t\t\t', error = False
     ):
+    """Determine an outgroup in a set of homologs based on the query "focal"
+    sequence: grab a cluster of sequences within the homologs that is larger
+    than the set of homologs initially determined, then root on a random
+    sequence from the clusters"""
+
+    """NEEDS better annotation."""
+
     """There needs to be a run in the fa2clus_log['successes'] for this
     function to operate, or else an IndexError will result"""
 
@@ -362,7 +389,10 @@ def outgroup_mngr(
     
 
 def make_output(base_dir, new_log):
+    """Make the output directories for a CRAP run and initialize a log"""
 
+    # make the output directory based on the date (can use kontools.mk_output
+    # for this in the future)
     if not base_dir:
 #        if not os.path.exists(base_dir):
  #           eprint('\nERROR: base output directory missing: ' + base_dir, flush = True)
@@ -376,15 +406,16 @@ def make_output(base_dir, new_log):
             os.mkdir(base_dir)
         output_dir = format_path(base_dir)
 
-
-    logPath = output_dir + '.craplog.json'
-    parseLog(logPath, new_log, output_dir)
+    # initialize a log in the output directory
+    log_path = output_dir + '.craplog.json'
+    parse_log(log_path, new_log, output_dir)
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
 
     wrk_dir = output_dir + 'working/'
     global svg_dir # needs to be global for etetree
 
+    # create the output directories
     svg_dir = wrk_dir + 'svg/'
     gff_dir = wrk_dir + 'genes/'
     tre_dir = wrk_dir + 'trees/'
@@ -399,54 +430,46 @@ def make_output(base_dir, new_log):
     
 
 def gene2hg2ome2hg(gene2hg):
+    """Acquire a hash {ome: {gene: hg}}"""
     ome_gene2hg = {}
-    for gene, og in gene2hg.items():
+    for gene, hg in gene2hg.items():
         ome = gene[:gene.find('_')]
         if ome not in ome_gene2hg:
             ome_gene2hg[ome] = {}
-        ome_gene2hg[ome][gene] = og
+        ome_gene2hg[ome][gene] = hg
     return ome_gene2hg
 
 
-def compileGenesByOme(inputs, wrk_dir):
-    locusIDs, omeGenes = [], {}
-    for query in inputs:
-        fa = fa2dict(wrk_dir + str(query) + '.fa')
-        locusIDs.extend(list(fa.keys()))
+def compile_genes_by_omes(search_fas, conversion_dict, omes = set()):
+    """For each hit in each fasta, relate it to its query and genome code"""
+    query_genes = {}
 
-        for locusID in locusIDs:
-            ome = locusID[:locusID.find('_')]
-            if ome not in omeGenes:
-                omeGenes[ome] = []
-            omeGenes[ome].append(locusID)
-    omeGenes = {ome: list(set(genes)) for ome, genes in omeGenes.items()}
-
-    return omeGenes
-
-def compile_genesXome4queries(search_fas, conversion_dict, omes = set()):
-    queryGenes = {}
+    # for each query fasta
     for query, fa in search_fas.items():
-        locusIDs = list(fa.keys())
-        for locusID in locusIDs:
-            ome = locusID[:locusID.find('_')]
+        # grab the locus ID anchors as the hit accession
+        locus_ids = list(fa.keys())
+        # relate each hit to its converted query name
+        for locus_id in locus_ids:
+            ome = locus_id[:locus_id.find('_')]
             if ome not in omes:
                 continue
-            if ome not in queryGenes:
-                queryGenes[ome] = {}
-            if locusID not in queryGenes[ome]:
-                queryGenes[ome][locusID] = []
-            queryGenes[ome][locusID].append(conversion_dict[query])
+            if ome not in query_genes:
+                query_genes[ome] = {}
+            if locus_id not in query_genes[ome]:
+                query_genes[ome][locus_id] = []
+            query_genes[ome][locus_id].append(conversion_dict[query])
 
+    # if any gene has multiple query hits, then merge them together and keep
+    # record of the merges that occurred to keep their order uniform downstream
     merges = []
-    for ome in queryGenes:
-        for locusID in queryGenes[ome]:
-            if len(queryGenes[ome][locusID]) > 1:
-                queryGenes[ome][locusID] = sorted(queryGenes[ome][locusID])
-            merges.append(tuple(queryGenes[ome][locusID]))
+    for ome in query_genes:
+        for locus_id in query_genes[ome]:
+            if len(query_genes[ome][locus_id]) > 1:
+                query_genes[ome][locus_id] = sorted(query_genes[ome][locus_id])
+            merges.append(tuple(query_genes[ome][locus_id]))
     merges = list(set(merges))
 
-    return queryGenes, merges
-
+    return query_genes, merges
 
 
 def extract_locus_hg(gff3, ome, genesTograb, ogs, ome_gene2hg, 
@@ -466,34 +489,34 @@ def extract_locus_hg(gff3, ome, genesTograb, ogs, ome_gene2hg,
         return
 
     extractedGenes, new_hgs = {}, []
-    for locusID, genes in out_indices.items():
+    for locus_id, genes in out_indices.items():
         startI, endI = None, None
         for i, gene in enumerate(genes):
             try:
-                geneGffs[locusID][i]['attributes'] += ';HG=' + str(ome_gene2hg[gene])
+                geneGffs[locus_id][i]['attributes'] += ';HG=' + str(ome_gene2hg[gene])
             except KeyError: #gene not in gene2hg
-                geneGffs[locusID][i]['attributes'] += ';HG=na'
+                geneGffs[locus_id][i]['attributes'] += ';HG=na'
                 continue
             if ome_gene2hg[gene] not in ogs:
                 new_hgs.append(ome_gene2hg[gene])
-            if gene == locusID or ome_gene2hg[gene] in ogs:
+            if gene == locus_id or ome_gene2hg[gene] in ogs:
                 if startI is None:
                     startI = i
                 else:
                     endI = i
         if not endI:
             endI = startI
-        extractedGenes[locusID] = geneGffs[locusID][startI:endI+1]
+        extractedGenes[locus_id] = geneGffs[locus_id][startI:endI+1]
 
-    for locusID, geneGff in extractedGenes.items():
-        with open(wrk_dir + 'genes/' + locusID + '.locus.genes', 'w') as out:
+    for locus_id, geneGff in extractedGenes.items():
+        with open(wrk_dir + 'genes/' + locus_id + '.locus.genes', 'w') as out:
             out.write(list2gff(geneGff))
 
     return ome, extractedGenes, new_hgs
 
 def extract_locus_svg_hg(extractedGenes, wrk_dir, hg2color, labels):
-    for locusID, geneGff in extractedGenes.items():
-        svg_path = wrk_dir + 'svg/' + locusID + '.locus.svg'
+    for locus_id, geneGff in extractedGenes.items():
+        svg_path = wrk_dir + 'svg/' + locus_id + '.locus.svg'
         gff2svg(
             geneGff, svg_path, product_dict = hg2color, prod_comp = r';HG=([^;]+$)', 
             width = 10, null = 'na', labels = labels, gen_new_colors = False
@@ -516,31 +539,31 @@ def extract_locus_gene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_
         return
 
     extractedGenes = {}
-    for locusID, genes in out_indices.items():
-        if os.path.isfile(wrk_dir + 'svg/' + locusID + '.locus.svg'):
+    for locus_id, genes in out_indices.items():
+        if os.path.isfile(wrk_dir + 'svg/' + locus_id + '.locus.svg'):
             # NEED to rerun if there's a change in output parameters
             continue
         startI, endI = None, None
         for i, gene in enumerate(genes):
             if gene in gene2query:
-                geneGffs[locusID][i]['attributes'] += ';SearchQuery=' + '|'.join(gene2query[gene])
+                geneGffs[locus_id][i]['attributes'] += ';SearchQuery=' + '|'.join(gene2query[gene])
                 if startI is None:
                     startI = i
                 else:
                     endI = i
             else:
-                geneGffs[locusID][i]['attributes'] += ';SearchQuery=na'
+                geneGffs[locus_id][i]['attributes'] += ';SearchQuery=na'
                 continue
         if not endI:
             endI = startI
-        extractedGenes[locusID] = geneGffs[locusID][startI:endI+1]
+        extractedGenes[locus_id] = geneGffs[locus_id][startI:endI+1]
 
-    for locusID, geneGff in extractedGenes.items():
-        with open(wrk_dir + 'genes/' + locusID + '.locus.genes', 'w') as out:
+    for locus_id, geneGff in extractedGenes.items():
+        with open(wrk_dir + 'genes/' + locus_id + '.locus.genes', 'w') as out:
             out.write(list2gff(geneGff))
 
-    for locusID, geneGff in extractedGenes.items():
-        svg_path = wrk_dir + 'svg/' + locusID + '.locus.svg'
+    for locus_id, geneGff in extractedGenes.items():
+        svg_path = wrk_dir + 'svg/' + locus_id + '.locus.svg'
         gff2svg(
             geneGff, svg_path, product_dict = query2color, labels = labels,
             prod_comp = r';SearchQuery=([^;]+$)', width = 8, null = 'na'
@@ -714,26 +737,26 @@ def init_log(
         }
     return log_dict
 
-def parseLog(logPath, new_log, out_dir):
+def parse_log(log_path, new_log, out_dir):
     wrk_dir = out_dir + 'working/'
     clus_dir = wrk_dir + 'clus/'
     try:
-        oldLog = read_json(logPath)
+        old_log = read_json(log_path)
     except FileNotFoundError:
-        oldLog = None
+        old_log = None
 
     rereun_search = False
-    if oldLog:
+    if old_log:
         try:
-            with open(oldLog['db_path'], 'rb') as raw:
+            with open(old_log['db_path'], 'rb') as raw:
                 db5 = hashlib.md5(raw.read()).hexdigest()
- #           if db5 != oldLog['db']: if md5 changes do somethign
+ #           if db5 != old_log['db']: if md5 changes do somethign
 #                rerun_search = True
-            if oldLog['search'] != new_log['search']:
+            if old_log['search'] != new_log['search']:
                 if os.path.isdir(out_dir):
                     shutil.rmtree(out_dir)
                 return
-            elif oldLog['bitscore'] != new_log['bitscore']:
+            elif old_log['bitscore'] != new_log['bitscore']:
                 fas = collect_files(wrk_dir, 'fa')
                 for fa in fas:
                     os.remove(fa)
@@ -742,12 +765,12 @@ def parseLog(logPath, new_log, out_dir):
                     os.remove(fa)
                 if os.path.isdir(wrk_dir + 'tree/'):
                     shutil.rmtree(wrk_dir + 'tree/')
-            elif oldLog['plusminus'] != new_log['plusminus']:
+            elif old_log['plusminus'] != new_log['plusminus']:
                 if os.path.isdir(wrk_dir + 'genes/'):
                     shutil.rmtree(wrk_dir + 'genes/')
                 if os.path.isdir(wrk_dir + 'svg/'):
                     shutil.rmtree(wrk_dir + 'svg/')
-            elif oldLog['labels'] != new_log['labels']:
+            elif old_log['labels'] != new_log['labels']:
                 if os.path.isdir(wrk_dir + 'svg/'):
                     shutil.rmtree(wrk_dir + 'svg/')
         except KeyError:
@@ -755,7 +778,7 @@ def parseLog(logPath, new_log, out_dir):
                 '\tERROR: log file corrupted. Hoping for the best.', 
                 flush = True
                 )
-    write_json(new_log, logPath)
+    write_json(new_log, log_path)
 
 
 def crap_mngr(
@@ -1074,7 +1097,7 @@ def search_main(
             search_fas[query][query] = query_fa[query]
     
     print('\nChecking hit fasta sizes', flush = True)
-    genes2query, merges = compile_genesXome4queries(
+    genes2query, merges = compile_genes_by_omes(
         search_fas,
         conversion_dict, 
         set(db['ome'])
