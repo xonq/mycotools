@@ -472,53 +472,69 @@ def compile_genes_by_omes(search_fas, conversion_dict, omes = set()):
     return query_genes, merges
 
 
-def extract_locus_hg(gff3, ome, genesTograb, ogs, ome_gene2hg, 
+def extract_locus_hg(gff3, ome, genes_to_grab, hgs, ome_gene2hg, 
                      plusminus, wrk_dir, labels = True):
+    """Manage the generation of GFFs and SVGs of each locus for all hits"""
+
     try:
         gff_list = gff2list(gff3)
     except FileNotFoundError:
-        eprint('\t\t\tWARNING: ' + ome + ' mycotoolsdb entry without GFF3', flush = True)
+        eprint(f'\t\t\tWARNING: {ome} MTDB entry without GFF3', flush = True)
         return
-    genesTograb = [x for x in genesTograb if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
+
+    # grab the locus for the genes that do not currently have a locus SVG
+    # (and thus also not a locus GFF)
+    genes_to_grab = [x for x in genes_to_grab \
+                     if not os.path.isfile(f'{wrk_dir}svg/{x}.locus.svg')]
     try:
-        out_indices, geneGffs = acc2locus(gff_list, genesTograb, 
+        out_indices, rna_gff = acc2locus(gff_list, genes_to_grab, 
                                           plusminus, mycotools = True, 
                                           geneGff = True, nt = True)
     except KeyError:
-        eprint('\t\t\tWARNING: ' + ome + ' could not parse gff', flush = True)
+        eprint(f'\t\t\tWARNING: {ome} could not parse GFF', flush = True)
         return
 
-    extractedGenes, new_hgs = {}, []
+    # parse the loci and the genes associated with each locus, with the
+    # locus_id set to the query accession used above
+    extracted_genes, new_hgs = {}, []
     for locus_id, genes in out_indices.items():
-        startI, endI = None, None
+        start_i, end_i = None, None
+        # for each gene in the locus, append its HG number (if it exists) to
+        # the attributes, otherwise set it is na
         for i, gene in enumerate(genes):
             try:
-                geneGffs[locus_id][i]['attributes'] += ';HG=' + str(ome_gene2hg[gene])
-            except KeyError: #gene not in gene2hg
-                geneGffs[locus_id][i]['attributes'] += ';HG=na'
+                rna_gff[locus_id][i]['attributes'] += \
+                    f';HG={ome_gene2hg[gene]}'
+            except KeyError:
+                rna_gff[locus_id][i]['attributes'] += ';HG=na'
                 continue
-            if ome_gene2hg[gene] not in ogs:
+            if ome_gene2hg[gene] not in hgs:
                 new_hgs.append(ome_gene2hg[gene])
-            if gene == locus_id or ome_gene2hg[gene] in ogs:
-                if startI is None:
-                    startI = i
+            # if this gene is in the query HGs
+            if gene == locus_id or ome_gene2hg[gene] in hgs:
+                # set the start index if it has not been already
+                if start_i is None:
+                    start_i = i
+                # otherwise set the ending index
                 else:
-                    endI = i
-        if not endI:
-            endI = startI
-        extractedGenes[locus_id] = geneGffs[locus_id][startI:endI+1]
+                    end_i = i
+        # use the final ending index (or just the start gene) to index and
+        # set the boundaries for the locus based on if it hits the locus
+        if not end_i:
+            end_i = start_i
+        extracted_genes[locus_id] = rna_gff[locus_id][start_i:end_i+1]
 
-    for locus_id, geneGff in extractedGenes.items():
+    for locus_id, rna_gff in extracted_genes.items():
         with open(wrk_dir + 'genes/' + locus_id + '.locus.genes', 'w') as out:
-            out.write(list2gff(geneGff))
+            out.write(list2gff(rna_gff))
 
-    return ome, extractedGenes, new_hgs
+    return ome, extracted_genes, new_hgs
 
-def extract_locus_svg_hg(extractedGenes, wrk_dir, hg2color, labels):
-    for locus_id, geneGff in extractedGenes.items():
+def extract_locus_svg_hg(extracted_genes, wrk_dir, hg2color, labels):
+    for locus_id, rna_gff in extracted_genes.items():
         svg_path = wrk_dir + 'svg/' + locus_id + '.locus.svg'
         gff2svg(
-            geneGff, svg_path, product_dict = hg2color, prod_comp = r';HG=([^;]+$)', 
+            rna_gff, svg_path, product_dict = hg2color, prod_comp = r';HG=([^;]+$)', 
             width = 10, null = 'na', labels = labels, gen_new_colors = False
             )
 
@@ -531,45 +547,45 @@ def extract_locus_gene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_
         return
     accs = [x for x in accs if not os.path.isfile(wrk_dir + 'svg/' + x + '.locus.svg')]
     try:
-        out_indices, geneGffs = acc2locus(gff_list, accs, 
+        out_indices, rna_gff = acc2locus(gff_list, accs, 
                                           plusminus, mycotools = True, 
                                           geneGff = True, nt = True)
     except KeyError:
         eprint('\t\t\tWARNING: ' + ome + ' could not parse gff', flush = True)
         return
 
-    extractedGenes = {}
+    extracted_genes = {}
     for locus_id, genes in out_indices.items():
         if os.path.isfile(wrk_dir + 'svg/' + locus_id + '.locus.svg'):
             # NEED to rerun if there's a change in output parameters
             continue
-        startI, endI = None, None
+        start_i, end_i = None, None
         for i, gene in enumerate(genes):
             if gene in gene2query:
-                geneGffs[locus_id][i]['attributes'] += ';SearchQuery=' + '|'.join(gene2query[gene])
-                if startI is None:
-                    startI = i
+                rna_gff[locus_id][i]['attributes'] += ';SearchQuery=' + '|'.join(gene2query[gene])
+                if start_i is None:
+                    start_i = i
                 else:
-                    endI = i
+                    end_i = i
             else:
-                geneGffs[locus_id][i]['attributes'] += ';SearchQuery=na'
+                rna_gff[locus_id][i]['attributes'] += ';SearchQuery=na'
                 continue
-        if not endI:
-            endI = startI
-        extractedGenes[locus_id] = geneGffs[locus_id][startI:endI+1]
+        if not end_i:
+            end_i = start_i
+        extracted_genes[locus_id] = rna_gff[locus_id][start_i:end_i+1]
 
-    for locus_id, geneGff in extractedGenes.items():
+    for locus_id, rna_gff in extracted_genes.items():
         with open(wrk_dir + 'genes/' + locus_id + '.locus.genes', 'w') as out:
-            out.write(list2gff(geneGff))
+            out.write(list2gff(rna_gff))
 
-    for locus_id, geneGff in extractedGenes.items():
+    for locus_id, rna_gff in extracted_genes.items():
         svg_path = wrk_dir + 'svg/' + locus_id + '.locus.svg'
         gff2svg(
-            geneGff, svg_path, product_dict = query2color, labels = labels,
+            rna_gff, svg_path, product_dict = query2color, labels = labels,
             prod_comp = r';SearchQuery=([^;]+$)', width = 8, null = 'na'
             )
    
-    return extractedGenes
+    return extracted_genes
 
 
 def svg2node(node):
