@@ -572,12 +572,12 @@ def hit2taxonomy(
 
     return tax_dict, sleep
 
-# gather taxonomy by querying NCBI
-# if `api_key` is set to `1`, it assumes the `Entrez.api` method has been called already
-def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
-                    rank = 'kingdom'):
+
+def prepare_tax_dicts(df):
+    """Identify the genera that do not have higher taxonomy ascribed to them"""
 
     tax_dicts, need_tax = {}, set()
+    # is the df of mtdb class or have a taxonomy column as a list?
     if isinstance(df, mtdb) or isinstance(df['taxonomy'], list):
         df = df.set_index('ome')
         for k, v in df.items():
@@ -587,7 +587,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                    tax_dicts[v['genus']] = tax_json
             else:
                 need_tax.add(v['genus'])
-#        tax_dicts = {v['genus']: read_tax(v['taxonomy']) for k, v in df.items()}
+    # otherwise it is a pandas dataframe
     else:
         df['taxonomy'] = df['taxonomy'].fillna({})
         for k, v in df.iterrows():
@@ -597,19 +597,95 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
                    tax_dicts[v['genus']] = tax_json
             else:
                 need_tax.add(v['genus'])
-#        tax_dicts = {x['genus']: read_tax(x['taxonomy']) for i,x in df.iterrows()}
-            
-    count = 0
-
     need_tax = set(need_tax).difference(set(tax_dicts.keys()))
+    return need_tax, tax_dicts
 
+
+def query_ncbi4taxonomy(genus, api_key, king, count = 0):
+    # gather taxonomy from information present in the genus column 
+    # and query NCBI using Entrez
+    ids = None
+    fails = 0
+    while True:
+        try:
+            search_term = str(genus) + ' [GENUS]'
+            handle = Entrez.esearch(db='Taxonomy', term=search_term)
+            ids = Entrez.read(handle)['IdList']
+            break
+        except RuntimeError:
+            fails += 1
+            if fails > 3:
+                break
+            time.sleep(1)
+            count = 0
+    count += 1
+    if not ids:
+        print('\t\tNo taxonomy information', flush = True)
+        return None, None
+
+    # for each taxID acquired, fetch the actual taxonomy information
+    taxid = 0
+    for tax in ids:
+        if not api_key and count == 2:
+            time.sleep(1)
+            count = 0
+        elif api_key and count == 9:
+            time.sleep(1)
+            count = 0
+    count += 1
+    for attempt in range(3):
+        try:
+            handle = Entrez.efetch(db="Taxonomy", id=tax, remode="xml")
+            records = Entrez.read(handle)
+            lineages = records[0]['LineageEx']
+            break
+        except IndexError:
+            lineages = []
+        except urllib.error.HTTPError:
+            time.sleep(1)
+            handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
+            records = Entrez.read(handle)
+            lineages = records[0]['LineageEx']
+            break
+
+    # for each lineage, if it is a part of the kingdom, `king`, 
+    # use that TaxID if there are multiple TaxIDs, use the first one found
+    if king:
+        for lineage in lineages:
+            if lineage['Rank'].lower() == rank.lower():
+                if lineage['ScientificName'].lower() == king:
+                    taxid = tax
+                    if len(ids) > 1:
+                        print('\t\tTax ID(s): ' + str(ids), flush = True)
+                    break
+    else:
+        for lineage in lineages:
+            taxid = tax 
+   
+    if taxid == 0:
+        print('\t\tNo taxonomy information', flush = True)
+        return None, None
+
+    # for each taxonomic classification, add it to the taxonomy dictionary string
+    # append each taxonomy dictionary string to a list of dicts
+    genus_tax = {}
+    for tax in lineages:
+         genus_tax[tax['Rank'].lower()] = tax['ScientificName']
+
+    return genus_tax, count
+
+
+def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
+                    rank = 'kingdom'):
+    """Gather taxonomy for an MTDB or deprecated pd MTDB by querying NCBI's
+    taxonomy hierarchy"""
+    need_tax, tax_dicts = prepare_tax_dicts(df)
+
+    count = 0
     for genus in sorted(need_tax):
-    #    if any(tax_dicts[genus][x] for x in tax_dicts[genus] \
-     #       if x not in {'genus', 'species', 'strain'}):
-      #      continue
         print('\t' + genus, flush = True)
-# if there is no api key, sleep for a second after 3 queries
-# if there is an api key, sleep for a second after 10 queries
+        # if there is no api key, sleep for a second after 3 queries
+        # if there is an api key, sleep for a second after 10 queries
         if not api_key and count == 2:
             time.sleep(1)
             count = 0
@@ -617,90 +693,27 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
             time.sleep(1)
             count = 0
 
-# gather taxonomy from information present in the genus column and query NCBI using Entrez
-        ids = None
-        fails = 0
-        while True:
-            try:
-                search_term = str(genus) + ' [GENUS]'
-                handle = Entrez.esearch(db='Taxonomy', term=search_term)
-                ids = Entrez.read(handle)['IdList']
-                break
-            except RuntimeError:
-                fails += 1
-                if fails > 3:
-                    break
-                time.sleep(1)
-        count += 1
-        if not ids:
-            print('\t\tNo taxonomy information', flush = True)
-            continue
-
-# for each taxID acquired, fetch the actual taxonomy information
-        taxid = 0
-        for tax in ids:
-            if not api_key and count == 2:
-                time.sleep(1)
-                count = 0
-            elif api_key and count == 9:
-                time.sleep(1)
-                count = 0
-        count += 1
-        for attempt in range(3):
-            try:
-                handle = Entrez.efetch(db="Taxonomy", id=tax, remode="xml")
-                records = Entrez.read(handle)
-                lineages = records[0]['LineageEx']
-                break
-            except IndexError:
-                lineages = []
-            except urllib.error.HTTPError:
-                time.sleep(1)
-                handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
-                records = Entrez.read(handle)
-                lineages = records[0]['LineageEx']
-                break
-
-# for each lineage, if it is a part of the kingdom, `king`, use that TaxID
-# if there are multiple TaxIDs, use the first one found
-        if king:
-            for lineage in lineages:
-                if lineage['Rank'].lower() == rank.lower():
-                    if lineage['ScientificName'].lower() == king:
-                        taxid = tax
-                        if len(ids) > 1:
-                            print('\t\tTax ID(s): ' + str(ids), flush = True)
-                        break
-        else:
-            for lineage in lineages:
-                taxid = tax 
-       
-        if taxid == 0:
-            print('\t\tNo taxonomy information', flush = True)
-            continue
-
-# for each taxonomic classification, add it to the taxonomy dictionary string
-# append each taxonomy dictionary string to a list of dicts
-        tax_dicts[genus] = {}
-        for tax in lineages:
-             tax_dicts[genus][tax['Rank'].lower()] = tax['ScientificName']
+        genus_tax, count = query_ncbi4taxonomy(genus, api_key, king, count)
+        if genus_tax:
+            tax_dicts[genus] = genus_tax
     
         count += 1
         if count == 3 or count == 10:
             if not api_key:
-                time.sleep( 1 )
+                time.sleep(1)
                 count = 0
             elif api_key:
                 if count == 10:
-                    time.sleep( 1 )
+                    time.sleep(1)
                     count = 0
 
     return tax_dicts
 
-# read taxonomy by conterting the string into a dictionary using `json.loads`
+
 def read_tax(taxonomy_string):
-   
-    tax_strs = ['kingdom', 'phylum', 'subphylum', 'class', 'order', 'family', 'subfamily']
+    """Read taxonomy from an MTDB by converting the string into a dictionary"""
+    tax_strs = ['kingdom', 'phylum', 'subphylum', 'class', 
+                'order', 'family', 'subfamily']
     if taxonomy_string: 
         if isinstance(taxonomy_string, str):
             dict_string = taxonomy_string.replace("'",'"')
