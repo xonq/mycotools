@@ -117,7 +117,7 @@ def compile_log(output_path, remove = False):
                         'faa': str(data[3]), 'gff3': str(data[4]), 
                         'transcript': str(data[5]), 'fna_md5': str(data[6]),
                         'faa_md5': str(data[7]), 'gff3_md5': str(data[8]),
-                        'transcript_md5': str(data[9]), 'genome_id': data[10].split(',')
+                        'transcript_md5': str(data[9]), 'genome_id': data[10]
                         }
 
     return ass_prots
@@ -377,29 +377,42 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
         if ftp_link == '':
             dwnlds[file_type] = 15
             continue
-        esc_count = 0
-        while True:
-            try:
-                esc_count += 1
-                with closing(urllib.request.urlopen(ftp_link, None, 20)) as r:
-                    with open(file_path, 'wb') as f:
-                        shutil.copyfileobj(r, f)
-                status_code = 200
+ #       esc_count = 0
+        for esc_count in range(3):
+            count += 1
+            dwnld = subprocess.call(['curl', ftp_link, '-o', 
+                                        file_path + '.tmp',
+                                        '--connect-timeout', '5'],
+                                        stdout = subprocess.PIPE, 
+                                        stderr = subprocess.PIPE)
+            if not dwnld:
+                os.rename(file_path + '.tmp', file_path)
                 break
-            except (requests.exceptions.ConnectionError, urllib.error.URLError,
-                    TimeoutError,
-                    requests.exceptions.ChunkedEncodingError) as e:
-                if esc_count == 3:
-                    eprint(spacer + '\tERROR: Connection/link failure', flush = True)
-#                    sys.exit(71)
-                    status_code = 1
-                    break
+            else:
                 time.sleep(1)
                 count = 0
+                
+#            try:
+#            esc_count += 1
+#                with closing(urllib.request.urlopen(ftp_link, None, 20)) as r:
+ #                   with open(file_path, 'wb') as f:
+  #                      shutil.copyfileobj(r, f)
+#                status_code = 200
+                #    break
+#            except (requests.exceptions.ConnectionError, urllib.error.URLError,
+ #                   TimeoutError,
+  #                  requests.exceptions.ChunkedEncodingError) as e:
+#                if esc_count == 3:
+ #                   eprint(spacer + '\tERROR: Connection/link failure', flush = True)
+#                    sys.exit(71)
+#                    status_code = 1
+#                    break
+ #               time.sleep(1)
+  #              count = 0
+  #      count += 1
 
-        count += 1
-        if status_code != 200:
-#            eprint(spacer + '\t\t' + file_type + ': ERROR, no file exists', flush = True)
+        if dwnld:
+            eprint(spacer + '\t\tERROR: ' + file_type + ' failed', flush = True)
             dwnlds[file_type] = 69
             acc_prots[file_type] = ''
             log_editor(output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
@@ -410,16 +423,14 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                 str(acc_prots['faa_md5']) + '\t' + \
                 str(acc_prots['gff3_md5']) + '\t' + \
                 str(acc_prots['transcript_md5']) + '\t' + \
-                str(acc_prots['genome_id']]))
+                str(acc_prots['genome_id']))
             if remove and file_type in {'fna', 'gff3'}:
                 break
             continue
 
-        count += 1
-
         if not os.path.isfile(file_path):
             dwnlds[file_type] = 1
-            eprint(spacer + '\t' + file_type + ': ERROR, download failed', flush = True)
+            eprint(spacer + '\t\tERROR: ' + file_type + ' missing', flush = True)
             if remove and file_type in {'fna', 'gff3'}:
                 break
         else:
