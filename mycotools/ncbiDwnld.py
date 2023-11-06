@@ -95,7 +95,7 @@ def prepare_folders( output_path, gff, prot, assem, transcript ):
     return file_types  
 
 
-def compile_log( output_path, remove = False ):
+def compile_log(output_path, remove = False):
 
     ass_prots = {}
     if not os.path.isfile( output_path + 'ncbiDwnld.log' ):
@@ -106,7 +106,7 @@ def compile_log( output_path, remove = False ):
         # too risky, too many things can go wrong and then users would be in a
         # loop, but necessary for huge downloads
     else:
-        with open( output_path + 'ncbiDwnld.log', 'r' ) as raw:
+        with open(output_path + 'ncbiDwnld.log', 'r') as raw:
             for line in raw:
                 if not line.startswith('#'):
                     data = [x.rstrip() for x in line.split('\t')]
@@ -202,7 +202,7 @@ def collect_ftps(
 
         elif pd.isnull(row[column]) or not row[column]: # ignore blank entries
             ass_prots[str(accession)] = {
-                'accession': accession, 'fna': '',
+                'assembly_acc': accession, 'fna': '',
                 'faa': '', 'gff3': '', 'transcript': '',
                 'fna_md5': '', 'faa_md5': '',
                 'gff3_md5': '', 'transcript_md5': '', 'genome_id': ''
@@ -232,13 +232,13 @@ def collect_ftps(
 
         icount = 0
         for ID in genome_id:
-            if count:
+            if icount:
                 new_acc = str(accession) + '$' + str(icount)
             else:
                 new_acc = accession
 # obtain the path from a summary of the ftp directory and create the standard paths for proteomes and assemblies
             ass_prots[str(new_acc)] = {
-                'accession': accession, 'fna': '', 'faa': '', 
+                'assembly_acc': accession, 'fna': '', 'faa': '', 
                 'gff3': '', 'transcript': '', 'fna_md5': '',
                 'faa_md5': '', 'gff3_md5': '', 
                 'transcript_md5': '', 'genome_id': ID
@@ -249,7 +249,7 @@ def collect_ftps(
             ftp_path = str(record['DocumentSummarySet']['DocumentSummary'][0]['FtpPath_GenBank'])
 
             if not ftp_path:
-                eprint(spacer + '\t' + accession + ' failed to return any FTP path', flush = True)
+                eprint(spacer + '\t' + new_acc + ' failed to return any FTP path', flush = True)
                 failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
                 continue
 
@@ -262,44 +262,24 @@ def collect_ftps(
                               allow_redirects = True)
             if r.status_code != 200:
                 dwnld = -1
-
-            md5_path = ftp_path.replace('ftp://', 'https://') + '/md5checksums.txt'
-#            while dwnld != -1:
- #               esc_count += 1
-  #              try:
-   #                 with closing(urllib.request.urlopen(md5_path, None, 5)) as r:
-    #                    with open(output_path + '.tmpmd5', 'wb') as f:
-     #                       shutil.copyfileobj(r, f)
-      #              break
-       #         except (requests.exceptions.ConnectionError,
-        #                requests.exceptions.ReadTimeout, urllib.error.URLError,
-         #               TimeoutError,
-          #              requests.exceptions.ChunkedEncodingError) as e:
-           #         if esc_count == 3:
-            #            eprint(spacer + '\tERROR: Network connection failure', flush = True)
-             #           sys.exit(70)
-              #      count = 0
-               #     time.sleep(1)
-#            dwnld = 0
-
-            dwnld = subprocess.call(['curl', md5_path, '-o', 
-                                    output_path + '.tmpmd5',
-                                    '--connect-timeout', '5'],
-                                    stdout = subprocess.PIPE, 
-                                    stderr = subprocess.PIPE)
-
-            count += 1
+            else:
+                md5_path = ftp_path.replace('ftp://', 'https://') + '/md5checksums.txt'
+    
+                dwnld = subprocess.call(['curl', md5_path, '-o', 
+                                        output_path + '.tmpmd5',
+                                        '--connect-timeout', '5'],
+                                        stdout = subprocess.PIPE, 
+                                        stderr = subprocess.PIPE)
+    
+                count += 1
             if dwnld == 0:
-                with open( output_path + '.tmpmd5', 'r' ) as raw:
+                with open(output_path + '.tmpmd5', 'r') as raw:
                     for line in raw:
                         data = line.rstrip().split('  ')
                         if data:
                             md5s[ftp_path + '/' + os.path.basename(data[1])] = data[0]
             else:
                 md5s = {}
-            if not md5s:
-#                eprint(f'{spacer}\t{accession}\tno md5', flush = True)
-                dwnld = 69
 
             tranname = os.path.basename(ftp_path.replace('/GCA','/GCF'))
             assembly = ftp_path + '/' + basename + '_genomic.fna.gz'
@@ -337,7 +317,7 @@ def collect_ftps(
                 '\t' + ID
                 )
             ass_prots[str(new_acc)] = {
-                'accession': accession, 'fna': assembly, 'fna_md5': ass_md5,
+                'assembly_acc': accession, 'fna': assembly, 'fna_md5': ass_md5,
                 'faa': proteome, 'faa_md5': prot_md5,
                 'gff3': gff3, 'gff3_md5': gff_md5,
                 'transcript': transcript, 'transcript_md5': trans_md5,
@@ -359,7 +339,7 @@ def collect_ftps(
 def download_files(acc_prots, acc, file_types, output_dir, count,
                    remove = False, spacer = '\t\t'):
 
-    esc_count, dwnlds = 0, {}
+    dwnlds = {}
     for file_type in file_types:
         ftp_link = acc_prots[file_type]
         dwnlds[file_type] = -1
@@ -376,7 +356,6 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
             file_path = output_dir + 'transcript/' + \
                 os.path.basename(acc_prots[file_type])
 
-
         if os.path.isfile(file_path):
             count += 1
             md5_cmd = subprocess.run([
@@ -390,7 +369,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                 eprint(spacer + '\t' + file_type + ': ' + os.path.basename(file_path), flush = True)
                 dwnlds[file_type] = 0
                 continue
-        elif os.path.isfile( file_path[:-3] ):
+        elif os.path.isfile(file_path[:-3]):
             eprint(spacer + '\t' + file_type + ': ' + os.path.basename(file_path), flush = True)
             dwnlds[file_type] = 0
             continue
@@ -398,10 +377,11 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
         if ftp_link == '':
             dwnlds[file_type] = 15
             continue
+        esc_count = 0
         while True:
             try:
                 esc_count += 1
-                with closing(urllib.request.urlopen(ftp_link, None, 60)) as r:
+                with closing(urllib.request.urlopen(ftp_link, None, 20)) as r:
                     with open(file_path, 'wb') as f:
                         shutil.copyfileobj(r, f)
                 status_code = 200
@@ -410,26 +390,27 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                     TimeoutError,
                     requests.exceptions.ChunkedEncodingError) as e:
                 if esc_count == 3:
-                    eprint(spacer + '\tERROR: Network connection failure', flush = True)
+                    eprint(spacer + '\tERROR: Connection/link failure', flush = True)
 #                    sys.exit(71)
                     status_code = 1
                     break
                 time.sleep(1)
                 count = 0
+
         count += 1
         if status_code != 200:
 #            eprint(spacer + '\t\t' + file_type + ': ERROR, no file exists', flush = True)
             dwnlds[file_type] = 69
             acc_prots[file_type] = ''
             log_editor(output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
-                '\t' + str(acc_prots['accession']) + '\t' + str(acc_prots['fna']) + \
+                '\t' + str(acc_prots['assembly_acc']) + '\t' + str(acc_prots['fna']) + \
                 '\t' + str(acc_prots['faa']) + '\t' + str(acc_prots['gff3']) + \
                 '\t' + str(acc_prots['transcript']) + '\t' + \
                 str(acc_prots['fna_md5']) + '\t' + \
                 str(acc_prots['faa_md5']) + '\t' + \
                 str(acc_prots['gff3_md5']) + '\t' + \
                 str(acc_prots['transcript_md5']) + '\t' + \
-                str(','.join([str(x) for x in acc_prots['genome_id']])))
+                str(acc_prots['genome_id']]))
             if remove and file_type in {'fna', 'gff3'}:
                 break
             continue
@@ -541,7 +522,7 @@ def main(
     file_types = prepare_folders( 
         output_path, gff3, proteome, assembly, transcript
         )
-    ass_prots = compile_log(output_path, remove )
+    ass_prots = compile_log(output_path, remove)
 
     # check if ncbi_df is a dataframe, and import if not
     if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
