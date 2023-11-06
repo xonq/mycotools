@@ -226,7 +226,8 @@ def cli():
     parser.add_argument('-g', '--gff', help = 'Input GFF file')
     parser.add_argument('-f', '--faa', help = 'Input protein fasta file')
     parser.add_argument('-s', '--sep', help = 'Separator for input file.', default = '\n')
-    parser.add_argument('-d', '--mtdb', default = primaryDB(), help = 'MTDB; DEFAULT: master')
+    parser.add_argument('-d', '--mtdb', default = primaryDB(), 
+        help = 'MTDB; DEFAULT: primary')
     parser.add_argument('--cpu', type = int, default = 1)
     args = parser.parse_args()
 
