@@ -460,8 +460,12 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
  #           pass
 #            todel.append(i)
         elif row['assembly_acc'] not in fails:
+
             ass_uid = esearch_ncbi(row['assembly_acc'],
                                    'assembly', 'assembly')
+            if not ass_uid:
+                fails.add(row['assembly_acc'])
+                continue
             ncbi_df.at[i, 'uid'] = ass_uid
             summary = esummary_ncbi(max(ass_uid), 'assembly')
             ass_name_prep = \
