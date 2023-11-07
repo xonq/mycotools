@@ -50,6 +50,7 @@
 - [ ] make mtdb compiled class
 - [ ] remove Entrez email login, simplify API access
 - [ ] Get taxonomy of non-genus names
+- [ ] get taxonomy XML - if it exists - instead of independent queries
 
 ### extract_mtdb
 - [ ] allow for a lineage list from command line (may already be integrated)
@@ -94,6 +95,7 @@
 
 ### ncbiDwnld
 - [ ] db check to ensure log is relevant to input
+- [ ] convert downloading to NCBI datasets
 
 ### predb2mtdb
 - [ ] source to reference the annotation source
