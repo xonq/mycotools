@@ -523,7 +523,7 @@ def hit2taxonomy(
                 print( '\n5 failed HTTP queries. Is NCBI down?' , flush = True)
                 sys.exit( 100 )
             if 500 <= goon.code <= 599:
-                time.sleep( 1 )
+                time.sleep(1)
             sleep = True
 
     count = 0
@@ -535,22 +535,22 @@ def hit2taxonomy(
             time.sleep(1)
             count += 1
             if count == 5:
-                eprint( '\nERROR: 5 failed taxonomy queries. ' + str(taxid) , flush = True)
-                eprint( tax_handle , flush = True)
+                eprint('\nERROR: 5 failed taxonomy queries. ' + str(taxid), flush = True)
+                eprint(tax_handle, flush = True)
                 for line in tax_handle:
-                    print( line , flush = True)
+                    print(line , flush = True)
                 if skip:
-                    sys.exit( 1 )
+                    sys.exit(1)
                 records = False
                 break
-            tax_handle = Entrez.efetch( db = "Taxonomy", id = taxid, retmode = "xml" )
+            tax_handle = Entrez.efetch(db = "Taxonomy", id = taxid, retmode = "xml")
             if 'latin-1' in str(tax_handle):
                 count = 0
             
-                eprint( '\tERROR: latin-1 encoding' , flush = True)
+                eprint('\tERROR: latin-1 encoding' , flush = True)
                 for line in tax_handle:
-                    print( line , flush = True)
-                time.sleep( 300 )
+                    print(line , flush = True)
+                time.sleep(30)
                 Entrez.email = email
                 Entrez.api_key = api
             sleep = True
@@ -612,19 +612,20 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
             break
         except:
             time.sleep(3)
+            count = 0
 
     count += 1
     if not ids:
-        print('\t\tNo taxonomy information', flush = True)
+        print('\t\tTaxonomy extraction failed', flush = True)
         return None, count 
 
     # for each taxID acquired, fetch the actual taxonomy information
     taxid = 0
     for tax in ids:
-        if not api_key and count == 2:
+        if not api_key and count >= 2:
             time.sleep(1)
             count = 0
-        elif api_key and count == 9:
+        elif api_key and count >= 9:
             time.sleep(1)
             count = 0
     count += 1
@@ -640,6 +641,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
         except:
             time.sleep(3)
             lineages = []
+            count = 0
 #            handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
  #           records = Entrez.read(handle)
   #          lineages = records[0]['LineageEx']
@@ -683,10 +685,10 @@ def gather_taxonomy(df, api_key = None, king='fungi',
         print('\t' + genus, flush = True)
         # if there is no api key, sleep for a second after 3 queries
         # if there is an api key, sleep for a second after 10 queries
-        if not api_key and count == 2:
+        if not api_key and count >= 2:
             time.sleep(1)
             count = 0
-        elif api_key and count == 9:
+        elif api_key and count >= 9:
             time.sleep(1)
             count = 0
 
@@ -694,16 +696,6 @@ def gather_taxonomy(df, api_key = None, king='fungi',
         if genus_tax:
             tax_dicts[genus] = genus_tax
     
-        count += 1
-        if count == 3 or count == 10:
-            if not api_key:
-                time.sleep(1)
-                count = 0
-            elif api_key:
-                if count == 10:
-                    time.sleep(1)
-                    count = 0
-
     return tax_dicts
 
 
