@@ -39,6 +39,7 @@ from mycotools.jgiDwnld import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
 from mycotools.predb2mtdb import main as predb2mtdb
+from mycotools.predb2mtdb import predb_headers
 from mycotools.assemblyStats import main as assStats
 from mycotools.annotationStats import main as annStats
 
@@ -928,7 +929,7 @@ def rogue_update(
         new_db_path = update_path + date + '.checkpoint.jgi.mtdb'
         if not os.path.isfile(new_db_path): 
             if len(jgi_db) > 0:
-                df2db( jgi_db, jgi_db_path )
+                df2db(jgi_db, jgi_db_path)
                 if not db is None:
                     new_db = pd.concat([jgi_db, db])
                 else:
@@ -978,6 +979,9 @@ def rogue_update(
             ncbi_predb[key] = ncbi_predb[key].fillna('')
         ncbi_predb['version'] = ncbi_predb['version'].astype(str)
         ncbi_premtdb = ncbi_predb.to_dict(orient='list')
+        for col in predb_headers:
+            if col not in ncbi_premtdb:
+                ncbi_premtdb[col] = ['' for x in ncbi_predb[key]]
         ncbi_premtdb['restriction'] = ['0' for x in ncbi_premtdb['assemblyPath']]
         ncbi_mtdb, ncbi_failed2 = predb2mtdb(ncbi_premtdb, refdbncbi, update_path,
                                            forbidden = forbid_omes, cpus = cpus,
@@ -1107,14 +1111,14 @@ def main():
 
     init_args = parser.add_argument_group('Initializiation')
     init_args.add_argument('-p', '--prokaryote', action = 'store_true',
-        help = '[PROKARY]: experimental prokaryote MTDB')
+        help = '[PROKARY, -i]: experimental prokaryote MTDB')
     init_args.add_argument('-u', '--update', action = 'store_true')
     init_args.add_argument('-i', '--init', 
                            help = 'Initialize MTDB in dir; failed inits ' \
                                 + 'must be unlinked via mtdb -u prior to resume')
     init_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
     init_args.add_argument('-r', '--reference', 
-        help = '[-i] Initialize primary MTDB using a reference .mtdb')
+        help = '[-i]: Initialize primary MTDB using a reference .mtdb')
     init_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
 #    init_args.add_argument('--reinit', action = 'store_true', help = 'Redownload all web data')
 #    parser.add_argument('--rogue', action = 'store_true', 
@@ -1123,13 +1127,13 @@ def main():
     conf_args = parser.add_argument_group('Configuration')
     conf_args.add_argument('--nonpublished', action = 'store_true', 
         help = '[FUNGI]: Include MycoCosm restricted-use')
-    conf_args.add_argument('--ncbi_only', help = '[FUNGI]: [-i] Forego MycoCosm', 
+    conf_args.add_argument('--ncbi_only', help = '[FUNGI, -i]: Forego MycoCosm', 
         action = 'store_true')
     conf_args.add_argument('-l', '--lineage', 
-                           help = '[-i, -r] Lineage(s) to initialize MTDB with')
+                           help = '[-i, -r]: Lineage(s) to initialize MTDB with')
     conf_args.add_argument('-rk', '--rank',
-                           help = '[-i, -l] Rank(s) that positionally ' \
-                                + 'correspond to lineages')
+                           help = '[-i, -l]: Rank(s) that positionally ' \
+                                + 'correspond to -l')
 #    conf_args.add_argument('--deviate', action = 'store_true', help = 'Deviate' \
  #       + ' from existing config without prompting')
 
@@ -1220,8 +1224,10 @@ def main():
                 eprint('\nERROR: MTDB linked. Unlink via `mtdb -u`')
                 sys.exit(175)
 
+    # prokaryote is nonpublished by default because it is all GenBank
     if args.prokaryote:
         nonpublished = True
+    # archaic placeholder for reference / rogue DB setup
     elif args.nonpublished and rogue_bool: 
         nonpublished = validate_t_and_c(config)
     else:
@@ -1421,6 +1427,7 @@ def main():
 
 
     outro(start_time)
+
 
 def cli():
     main()
