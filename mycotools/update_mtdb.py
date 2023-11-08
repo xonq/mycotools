@@ -440,6 +440,7 @@ def clean_ncbi_df(ncbi_df, kingdom = 'Fungi'):
 
     return ncbi_df
 
+
 def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
     """Acquire MycoCosm assembly accessions from NCBI.
     pd.DataFrame(ncbi_df) = post clean ncbi_df;
@@ -792,7 +793,10 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
                           for x in lineage_constraints['genus'])
         lineage_constraints = {k: v for k, v in lineage_constraints.items() \
                                if k != 'genus'}
+
+    print(lineage_constraints, flush = True)
     for genus, tax in tax_dicts.items():
+        print(tax, flush = True)
         for rank, lineages in lineage_constraints.items():
             lineages = set(lineages)
             if rank in tax:
