@@ -785,6 +785,8 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
                                 king = kingdom, rank = query_rank,
                                 tax_dicts = tax_dicts)
 
+    lineage_constraints = {k: set(v) for k, v in lineage_constraints.items()}
+
     # extract genera that pass
     passing_tax = set()
     if 'genus' in lineage_constraints:
@@ -794,14 +796,13 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
         lineage_constraints = {k: v for k, v in lineage_constraints.items() \
                                if k != 'genus'}
 
-    print(lineage_constraints, flush = True)
     for genus, tax in tax_dicts.items():
-        print(tax, flush = True)
         for rank, lineages in lineage_constraints.items():
-            lineages = set(lineages)
             if rank in tax:
                 if any(x.lower() in lineages for x in tax[rank]):
                     passing_tax.add(genus)
+
+    print(passing_tax)
     df = df[df['genus'].isin(passing_tax)]
     return tax_dicts, df
 
