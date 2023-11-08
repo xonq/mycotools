@@ -102,6 +102,16 @@ this is in alpha-testing and needs to improve vectorization to scale more effici
 mtdb update -i <INIT_DIRECTORY> -p
 ```
 
+#### SPECIFIC LINEAGES
+To initialize a curated database of specific lineages of Fungi append
+`--lineage` and `--rank` to your intialization command. Add `-p` for
+prokaryotes:
+
+```bash
+mtdb update -i <INIT_DIRECTORY> --lineage "Pezizomycotina,Agaricomycotina" \
+--rank "subphylum,subphylum"
+```
+
 <br />
 
 ### Reference initialization
