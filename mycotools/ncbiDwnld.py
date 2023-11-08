@@ -258,8 +258,14 @@ def collect_ftps(
             basename = os.path.basename(ftp_path)
 
             dwnld = 0
-            r = requests.head(ftp_path.replace('ftp://', 'https://'),
-                              allow_redirects = True)
+            for attempt in range(3):
+                try:
+                    r = requests.head(ftp_path.replace('ftp://', 'https://'),
+                                      allow_redirects = True)
+                    break
+                except:
+                    time.sleep(1)
+            
             if r.status_code != 200:
                 dwnld = -1
             else:
