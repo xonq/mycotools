@@ -788,8 +788,9 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
     for genus, tax in tax_dicts.items():
         for rank, lineages in lineage_constraints.items():
             lineages = set(lineages)
-            if any(x.lower() in lineages for x in tax[rank]):
-                passing_tax.add(genus)
+            if rank in tax:
+                if any(x.lower() in lineages for x in tax[rank]):
+                    passing_tax.add(genus)
     df = df[df['genus'].isin(passing_tax)]
     return tax_dicts, df
 
@@ -1205,7 +1206,7 @@ def main():
         if os.path.isfile(config_path):
             config = read_json(format_path(config_path))
             # for LEGACY installs:
-            if 'lineage_constraints' is not in config:
+            if 'lineage_constraints' not in config:
                 config['lineage_constraints'] = {}
                 write_json(config, config_path)
         elif not args.init:
