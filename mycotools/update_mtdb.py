@@ -758,7 +758,6 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
     that hit a dictionary of lineages of interest"""
 
     # begin extracting lineages of interest and store tax_dicts for later
-    print('\nExtracting lineages from NCBI', flush = True)
     if 'taxonomy' not in df.columns:
         df['taxonomy'] = [{} for x in range(len(df))]
     if kingdom.lower() == 'fungi':
@@ -833,6 +832,7 @@ def rogue_update(
     if lineage_constraints:
         lineage_path = update_path + date + '.ncbi.posttax.df'
         if not os.path.isfile(lineage_path):
+            print('\nExtracting lineages from NCBI', flush = True)
             tax_dicts, ncbi_df = extract_constraint_lineages(ncbi_df, 
                                                       ncbi_api, kingdom,
                                                       lineage_constraints,
@@ -862,6 +862,7 @@ def rogue_update(
         if lineage_constraints:
             lineage_path = update_path + date + '.jgi.posttax.df'
             if not os.path.isfile(lineage_path):
+                print('\tExtracting lineages from MycoCosm', flush = True)
                 tax_dicts, jgi_df = extract_constraint_lineages(jgi_df, 
                                                         ncbi_api, kingdom,
                                                         lineage_constraints,
@@ -869,17 +870,12 @@ def rogue_update(
                 jgi_df.to_csv(lineage_path, sep = '\t', index = None)
             else:
                 jgi_df = pd.read_csv(lineage_path, sep = '\t')
-               
-
-
-
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
         ncbi2jgi = parse_ncbi2jgi(update_path + 'ncbi2jgi.tsv')
         true_ncbi = parse_true_ncbi(update_path + 'true_ncbi.tsv')
         ncbi_df, jgi2ncbi, jgi2biosample, true_ncbi, ncbi_jgi_overlap = \
             rm_ncbi_overlap(ncbi_df, jgi_df, ncbi2jgi, true_ncbi, api = api)
-
 
         print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
              flush = True)
