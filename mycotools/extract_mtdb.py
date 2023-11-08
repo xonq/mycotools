@@ -11,6 +11,7 @@ import argparse
 from collections import defaultdict
 from mycotools.lib.kontools import file2list, intro, outro, format_path, eprint
 from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.db2files import mtdb_main as gen_full_mtdb
 
 # NEED to fix when same lineage multiple ranks, e.g. Tremellales sp. will be listed
 # as an order and as a genus
@@ -156,11 +157,13 @@ def cli():
         help = 'Inverse [source|lineage(s)|nonpublished]')
     parser.add_argument('-ol', '--ome', help = "File w/list of omes" )
     parser.add_argument('-ll', '--lineages', help = 'File w/list of lineages' )
+    parser.add_argument('-m', '--new_mtdb', action = 'store_true',
+                        help = 'Create MTDB directory hierarchy')
     parser.add_argument('--headers', action = 'store_true')
     parser.add_argument('-d', '--mtdb', help = '- for stdin', default = primaryDB())
-    parser.add_argument('-o', '--output' )
+    parser.add_argument('-o', '--output')
     args = parser.parse_args()
-    db_path = format_path( args.mtdb )
+    db_path = format_path(args.mtdb)
 
 
 #    if (args.lineage or args.lineages) and not args.rank:
@@ -172,10 +175,10 @@ def cli():
 
     args.lineage = args.lineage.replace('"','').replace("'",'')
 
-    output = 'stdout'
+    output = ''
     if args.output:
-        output = format_path( args.output )
-        if not output.endswith( '/' ):
+        output = format_path(args.output)
+        if not output.endswith('/'):
             tag = ''
                        
             if args.lineage:
@@ -186,7 +189,7 @@ def cli():
                 tag += args.source.lower()
             if not args.nonpublished:
                 tag += '_pub'
-            output += '/' + os.path.basename( db_path ) + tag
+            output += '/' + os.path.basename(db_path) + tag
         
     if args.mtdb == '-':
         data = ''
@@ -214,10 +217,13 @@ def cli():
         omes_set = omes, source = args.source, unique_species = args.allowed_sp, 
         nonpublished = args.nonpublished, inverse = args.inverse
         )
-    if args.output:
-        new_db.df2db( output )
+    if args.new_mtdb:
+        gen_full_mtdb(new_db, format_path(output),
+            format_path(os.environ['MYCODB'] + '/../'))
+    elif args.output:
+        new_db.df2db(output)
     else:
-        new_db.df2db( headers = bool(args.headers) )
+        new_db.df2db(headers = bool(args.headers))
 
     sys.exit(0)
 
