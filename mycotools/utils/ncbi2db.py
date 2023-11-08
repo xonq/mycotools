@@ -174,7 +174,7 @@ def main(
     
         return ncbi_df.reset_index(), ref_db.reset_index(), failed
     else:
-        return ncbi_df, ref_db, [], duplicates
+        return ncbi_df, ref_db, [] #, duplicates
 
 
 if __name__ == '__main__':
