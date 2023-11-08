@@ -6,13 +6,19 @@ import argparse
 from mycotools.lib.dbtools import loginCheck, primaryDB, mtdb
 from mycotools.lib.kontools import format_path, read_json, collect_files
 
-# NEED delete database feature
 def rm_outdated(omes, yes = False):
+    """Remove outdated genomes after compiling them"""
+
     biofiles, to_del = [], []
-    biofiles.extend(collect_files(os.environ['MYCOGFF3'] + '/', '*'))
-    biofiles.extend(collect_files(os.environ['MYCOFAA'] + '/', '*'))
-    biofiles.extend(collect_files(os.environ['MYCOFNA'] + '/', '*'))
-    to_del.extend(collect_files(os.environ['MYCOFAA'] + '/blastdb/', '*'))
+    # compile the files
+    biofiles.extend([f"{os.environ['MYCOGFF3']}/{x}" \
+		     for x in os.listdir(os.environ['MYCOGFF3'])])
+    biofiles.extend([f"{os.environ['MYCOFAA']}/{x}" \
+		     for x in os.listdir(os.environ['MYCOFAA'])])
+    biofiles.extend([f"{os.environ['MYCOFNA']}/{x}" \
+		     for x in os.listdir(os.environ['MYCOFNA'])])
+
+    # remove each biofile
     for i in biofiles:
         ome = None
         ome_prep = os.path.basename(i)
@@ -28,7 +34,7 @@ def rm_outdated(omes, yes = False):
             to_del.append(i)
 
     if to_del:
-        if not yes:
+        if yes:
             data = 'y'
         else:
             data = input(f'\n{len(to_del)} omes to be deleted.\n' \
@@ -43,7 +49,7 @@ def rm_outdated(omes, yes = False):
 def restrictions(db, restr_list, mtdb_config = format_path('~/.mycotools/config.json'),
                  yes = False):
     mtdb_config = read_json(mtdb_config)
-    restr_path = mtdb_config[mtdb_config['active']]['MYCODB'] + '../log/restricted.tsv'
+    restr_path = mtdb_config[mtdb_config['active']]['MYCODB'] + '../log/failed.tsv'
 
     try:    
         with open(restr_path, 'r') as raw:
