@@ -20,7 +20,7 @@ from mycotools.jgiDwnld import retrieve_xml as retrieve_xml
 from mycotools.jgiDwnld import jgi_dwnld as jgi_dwnld
 
 
-def compileLog( log_path ):
+def compileLog(log_path):
 
     log = {}
     if not os.path.isfile(log_path):
@@ -32,16 +32,15 @@ def compileLog( log_path ):
     return log
 
 
-
-def JGIredundancyCheck(db, jgi_df, duplicates = {}, ome_col = 'portal',
+def jgi_redundancy_check(db, jgi_df, duplicates = {}, ome_col = 'portal',
                        jgi2ncbi = {}):
     '''everything in jgi_df (pd.DataFrame()) should be have a valid biosample 
        at this point.
        db will have the index set at "assembly_acc"'''
 
     db['version'].fillna(0.0)
-    jgi_df['version'] = jgi_df.loc[:, 'version'].replace( np.nan, '0.0' )
-    preOmes, biosamples = set( copy.deepcopy(db.index)), set(db['biosample'])
+    jgi_df['version'] = jgi_df.loc[:, 'version'].replace(np.nan, '0.0')
+    preOmes, biosamples = set(copy.deepcopy(db.index)), set(db['biosample'])
     updates, old_omes, todel_db, todel_jgi = {}, {}, [], []
 
     for i, row in jgi_df.iterrows():
@@ -233,7 +232,7 @@ def main(
         ref_db['index'] = ref_db['assembly_acc'].copy()
         ref_db = ref_db.set_index('index')
         old_len = len(jgi_df)
-        jgi_df, new_ref_db, updates, old_rows = JGIredundancyCheck( 
+        jgi_df, new_ref_db, updates, old_rows = jgi_redundancy_check( 
             ref_db, jgi_df, ome_col = ome_col,
             jgi2ncbi = jgi2ncbi
             )
@@ -241,8 +240,8 @@ def main(
         if isinstance(updates, dict):
             for ome, update in updates.items():
                 output_str += '\t'.join([str(x) for x in update]) + '\t' + ome + '\n'
-            with open( output + '/jgiUpdates.tsv', 'w' ) as out:
-                out.write( output_str )
+            with open(output + '/jgiUpdates.tsv', 'w') as out:
+                out.write(output_str)
         else:
             updates.to_csv(f'{output}/jgiUpdates.tsv', sep = '\t')
 #        update_check = {i[-1]: i[0:3] for i in updates if i[0]}
