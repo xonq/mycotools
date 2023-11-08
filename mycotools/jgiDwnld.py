@@ -19,11 +19,11 @@ import xml.etree.ElementTree as ET
 from mycotools.lib.kontools import eprint, format_path, outro, intro
 from mycotools.lib.dbtools import loginCheck
 
-def jgi_login( user, pwd ):
+def jgi_login(user, pwd):
     '''Login via JGI's prescribed method by creating a cookie cache and 
     downloading JGI's sign-in file.'''
 
-    null = os.path.expanduser( '~/.nulljgi_dwnld' )
+    null = os.path.expanduser('~/.nulljgi_dwnld')
         
     login_cmd = subprocess.call(
         ['curl', 
@@ -44,7 +44,7 @@ def retrieve_xml(ome, output):
         with open(output + '/' + str(ome) + '.xml', 'r') as xml_raw:
             xml_data = xml_raw.read()
         if xml_data == 'Portal does not exist':
-            print('\tERROR: `' + ome + ' not in JGIs `organism` database' , flush = True)
+            print('\tERROR: `' + ome + ' not in JGIs `organism` database', flush = True)
             xml_cmd = 1
             os.remove(output + '/' + ome + '.xml')
         elif not xml_data:
@@ -54,11 +54,11 @@ def retrieve_xml(ome, output):
             xml_cmd = -1
 
     else:
-        xml_cmd = subprocess.call( [
+        xml_cmd = subprocess.call([
             'curl', 
-            "https://genome.jgi.doe.gov/portal/ext-api/downloads/get-directory?organism=" +
-            str(ome), '-b', 'cookies', '-o', output + '/' + str(ome) + ".xml" ],
-            stdout = subprocess.PIPE, stderr = subprocess.PIPE )
+            "https://genome.jgi.doe.gov/portal/ext-api/downloads/get-directory?organism=" \
+             + str(ome), '-b', 'cookies', '-o', f'{output}/{ome}.xml'],
+            stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         if xml_cmd != 0:
             print(f'\tERROR: {ome} xml curl error: {xml_cmd}', flush = True)
 
@@ -66,9 +66,9 @@ def retrieve_xml(ome, output):
         with open(output + '/' + ome + '.xml', 'r') as xml_raw:
             xml_data = xml_raw.read()
         if xml_data == 'Portal does not exist':
-            print('\tERROR: `' + ome + ' not in JGIs `organism` database' , flush = True)
+            print('\tERROR: `' + ome + ' not in JGIs `organism` database', flush = True)
             xml_cmd = 1
-            os.remove( output + '/' + ome + '.xml' )
+            os.remove(output + '/' + ome + '.xml')
         elif not xml_data:
             xml_cmd = None
             os.remove(f'{output}/{ome}.xml')
@@ -155,13 +155,13 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
                                                 chil3.attrib['filename'])
                                         if file_ext_srch is not None:
                                             file_ext = file_ext_srch[1]
-                                            if file_ext == '.gz':
+                                            if file_ext == 'gz':
                                                 file_ext_srch = \
                                                     re.search(r'\.([^\.]+)\.gz$',
                                                        chil3.attrib['filename'])
                                                 if file_ext_srch is not None:
                                                     file_ext = file_ext_srch[1]
-                                            if file_ext not in ft2ft[ft]:
+                                            if file_ext not in ft2fe[ft]:
                                                 continue
                                         else:
                                             continue
@@ -527,17 +527,17 @@ def main(
                 if type(check) != int:
                     df.at[i, new_typ + '_path'] = output + '/' + new_typ + \
                         '/' + os.path.basename(check)
-                    check = os.path.basename( os.path.abspath( check ) )
+                    check = os.path.basename( os.path.abspath(check))
                 elif type(check) == int:
                     ome_set.add(row[ome_col])
                 eprint(spacer + '\t' + new_typ + ': exit status ' + str(check), flush = True)
         else:
             eprint(spacer + ome + ' failed.' , flush = True)
 
-    if os.path.exists( 'cookies' ):
-        os.remove( 'cookies' )
-    if os.path.exists( os.path.expanduser( '~/.null' )):
-        os.remove( os.path.expanduser( '~/.null' ))
+    if os.path.exists('cookies'):
+        os.remove('cookies')
+    if os.path.exists(os.path.expanduser('~/.null')):
+        os.remove(os.path.expanduser('~/.null'))
 
     if 'gff3' in df.columns:
         del df['gff3']
@@ -579,7 +579,7 @@ def cli():
     if not args.assembly and not args.proteome \
         and not args.transcript \
         and not args.est and not args.gff:
-        eprint( '\nERROR: You must choose at least one download option.' , flush = True)
+        eprint('\nERROR: You must choose at least one download option.' , flush = True)
 
     ncbi_email, ncbi_api, user, pwd = loginCheck( ncbi = False )
 #    user = input( 'JGI username: ' )
@@ -595,13 +595,13 @@ def cli():
             'EST': args.est
             }
 
-    start_time = intro( 'Download JGI files', args_dict )
+    start_time = intro('Download JGI files', args_dict)
    
     if os.path.isfile(args.input): 
         with open(args.input, 'r') as raw:
             for line in raw:
                 if 'assembly_acc' in line.rstrip().split('\t'):
-                    df = pd.read_csv( args.input, sep = '\t', index_col = None)
+                    df = pd.read_csv(args.input, sep = '\t', index_col = None)
                 else:
                     df = pd.read_csv(args.input, sep='\t', header = None)
                 break
