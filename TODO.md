@@ -8,6 +8,7 @@
 - [ ] implement kon_log class, paying attention to verbosity control
 - [ ] kon_log class output to local configuration directory
 - [ ] support compressed databases
+- [ ] register mycotools with NCBI
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
@@ -85,6 +86,7 @@
 - [ ] overwrite old password
 - [ ] move database feature
 - [ ] archive and unarchive genomes
+- [ ] remove logfiles as parting of clearing the cache
 
 ### mtdb
 - [ ] add a log option of connected MTDBs
