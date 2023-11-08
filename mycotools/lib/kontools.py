@@ -410,8 +410,8 @@ def format_path(path, force_dir = False):
  #       return None # removed this because let it be handled on the other end
  #   try: 
     if path:
-        path = os.path.expanduser( path )
-        path = expandEnvVar( path )
+        path = os.path.expanduser(path)
+        path = expandEnvVar(path)
     #    path = os.path.abspath( path )
     #    except TypeError:
       #      return None again, let this be handled on the other end to increase
@@ -422,14 +422,17 @@ def format_path(path, force_dir = False):
                 path += '/'
         else:
             if path.endswith('/'):
-                if not os.path.isdir( path ):
+                if not os.path.isdir(path):
                     path = path[:-1]
             else:
-                if os.path.isdir( path ):
+                if os.path.isdir(path):
                     path += '/'
             if not path.startswith('/'):
                 path = os.getcwd() + '/' + path
-    
+
+    path = path.replace('/./', '/')
+    path = re.sub(r'[^/]+/\.\./', '', path)
+
     return path
 
 
