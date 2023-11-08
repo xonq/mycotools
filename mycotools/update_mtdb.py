@@ -30,7 +30,9 @@ from collections import defaultdict
 from mycotools.lib.dbtools import db2df, df2db, gather_taxonomy, assimilate_tax, \
     primaryDB, loginCheck, log_editor, mtdb, mtdb_connect, \
     mtdb_initialize
-from mycotools.lib.kontools import intro, outro, format_path, eprint, prep_output, collect_files, read_json, write_json
+from mycotools.lib.kontools import intro, outro, format_path, eprint, \
+                                   prep_output, collect_files, read_json, \
+                                   write_json, split_input
 from mycotools.lib.biotools import fa2dict, gff2list
 from mycotools.ncbiDwnld import esearch_ncbi, esummary_ncbi, main as ncbiDwnld
 from mycotools.jgiDwnld import main as jgiDwnld
@@ -87,7 +89,8 @@ def validate_t_and_c(config, discrepancy = False):
 def gen_config(
     branch = 'fungi', forbidden = '',
     repo = None,
-    rogue = False, nonpublished = False, jgi = False
+    rogue = False, nonpublished = False, jgi = False,
+    rank2lineages = {}
     ):
 
     config = {
@@ -96,7 +99,8 @@ def gen_config(
         'branch': branch,
         'nonpublished': nonpublished,
         'rogue': rogue,
-        'jgi': jgi
+        'jgi': jgi,
+        'lineage_constraints': rank2lineages
     }
 
     return config
@@ -109,7 +113,7 @@ def add_vars(init_dir, dbtype):
 
 def initDB(init_dir, branch, envs, dbtype, date = None, 
            rogue = False, nonpublished = False, jgi = True,
-           repo = None):
+           repo = None, rank2lineages = {}):
     '''Initialize database in `init_dir`'''
 
     new_dirs = [
@@ -120,17 +124,17 @@ def initDB(init_dir, branch, envs, dbtype, date = None,
         init_dir + 'log/',
         init_dir + 'data/db/'
     ]
-    output = prep_output( init_dir, cd = True )
+    output = prep_output(init_dir, cd = True)
     if not output.endswith('/'):
         output += '/'
     for new_dir in new_dirs:
-        if not os.path.isdir( new_dir ):
-            os.mkdir( new_dir )
+        if not os.path.isdir(new_dir):
+            os.mkdir(new_dir)
 
     config = gen_config(branch = branch, rogue = rogue, 
                         forbidden = '$MYCODB/log/forbidden.tsv',
                         nonpublished = nonpublished, jgi = jgi,
-                        repo = repo)
+                        repo = repo, rank2lineages = rank2lineages)
     write_json(config, init_dir + 'config/mtdb.json', indent = 1)
 
     if not rogue:
@@ -312,8 +316,9 @@ def add_failed(
 
 def dwnld_mycocosm(
     out_file,
-    mycocosm_url = 'https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/' + \
-        'download-group?flt=&seq=all&pub=all&grp=fungi&srt=released&ord=desc'
+    mycocosm_url = 'https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/' \
+                 + 'download-group?flt=&seq=all&pub=all&grp=fungi&srt=' \
+                 + 'released&ord=desc'
     ):
     """Download the MycoCosm genome data spreadsheet, format to UTF-8 and
     return a Pandas dataframe of the data"""
@@ -747,11 +752,54 @@ def ref_update(
     return new_db, update_mtdb 
 
 
+def extract_constraint_lineages(df, ncbi_api, kingdom,
+                                lineage_constraints, tax_dicts):
+    """Extract genera from NCBI and JGI Pandas dataframes 
+    that hit a dictionary of lineages of interest"""
+
+    # begin extracting lineages of interest and store tax_dicts for later
+    print('\nExtracting lineages from NCBI', flush = True)
+    if 'taxonomy' not in df.columns:
+        df['taxonomy'] = [{} for x in range(len(df))]
+    if kingdom.lower() == 'fungi':
+        query_rank = 'kingdom'
+    else:
+        query_rank = 'superkingdom'
+
+    # skip querying ncbi if we are only gathering the genus
+    if not set(lineage_constraints.keys()).difference({'genus'}):
+        passing_tax = set(x[0].upper() + x[1:] \
+                          for x in lineage_constraints['genus'])
+        df = df[df['genus'].isin(passing_tax)]
+        return tax_dicts, df
+
+    tax_dicts = gather_taxonomy(df, api_key = ncbi_api,
+                                king = kingdom, rank = query_rank,
+                                tax_dicts = tax_dicts)
+
+    # extract genera that pass
+    passing_tax = set()
+    if 'genus' in lineage_constraints:
+        # add constraint genera immediately
+        passing_tax = set(x[0].upper() + x[1:] \
+                          for x in lineage_constraints['genus'])
+        lineage_constraints = {k: v for k, v in lineage_constraints.items() \
+                               if k != 'genus'}
+    for genus, tax in tax_dicts.items():
+        for rank, lineages in lineage_constraints.items():
+            lineages = set(lineages)
+            if any(x.lower() in lineages for x in tax[rank]):
+                passing_tax.add(genus)
+    df = df[df['genus'].isin(passing_tax)]
+    return tax_dicts, df
+
+
+
 def rogue_update(
     db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
     jgi = True, group = 'eukaryotes', kingdom = 'Fungi',
-    remove = True
+    remove = True, lineage_constraints = {}
     ):
     """Initialize/update a standalone primary MTDB"""
 # NEED to mark none for new databases' refdb
@@ -778,6 +826,21 @@ def rogue_update(
     ncbi_df = clean_ncbi_df(pre_ncbi_df1, kingdom = kingdom)
     ncbi_df = ncbi_df.rename(columns={'Assembly Accession': 'assembly_acc'})
 
+    # begin extracting lineages of interest and store tax_dicts for later
+    tax_dicts = {v['genus']: v['taxonomy'] for k, v in db.iterrows() \
+                 if any(y for x, y in v['taxonomy'].items() \
+                        if x not in {'genus', 'species', 'strain'})}
+    if lineage_constraints:
+        lineage_path = update_path + date + '.ncbi.posttax.df'
+        if not os.path.isfile(lineage_path):
+            tax_dicts, ncbi_df = extract_constraint_lineages(ncbi_df, 
+                                                      ncbi_api, kingdom,
+                                                      lineage_constraints,
+                                                      tax_dicts)
+            ncbi_df.to_csv(lineage_path, sep = '\t', index = None)
+        else:
+            ncbi_df = pd.read_csv(lineage_path, sep = '\t')
+
     old_len = len(db['ome'])
     new_len = len(db['ome'])
     if old_len - new_len:
@@ -789,10 +852,27 @@ def rogue_update(
         print('\nAssimilating MycoCosm (1 download/minute)', flush = True)
         jgi_db_path = update_path + date + '.jgi.mtdb'
         mycocosm_path = update_path + date + '.mycocosm.csv'
+
+        # acquire the mycocosm master table
         jgi_df = dwnld_mycocosm(mycocosm_path)
         jgi_df['biosample'] = ''
         jgi_df = prep_jgi_cols(jgi_df, 'name')
-        # acquire the mycocosm master table
+
+        # extract JGI lineages of interest and store tax_dicts for later
+        if lineage_constraints:
+            lineage_path = update_path + date + '.jgi.posttax.df'
+            if not os.path.isfile(lineage_path):
+                tax_dicts, jgi_df = extract_constraint_lineages(jgi_df, 
+                                                        ncbi_api, kingdom,
+                                                        lineage_constraints,
+                                                        tax_dicts)
+                jgi_df.to_csv(lineage_path, sep = '\t', index = None)
+            else:
+                jgi_df = pd.read_csv(lineage_path, sep = '\t')
+               
+
+
+
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
         ncbi2jgi = parse_ncbi2jgi(update_path + 'ncbi2jgi.tsv')
@@ -1049,8 +1129,13 @@ def main():
         help = '[FUNGI]: Include MycoCosm restricted-use')
     conf_args.add_argument('--ncbi_only', help = '[FUNGI]: [-i] Forego MycoCosm', 
         action = 'store_true')
-    conf_args.add_argument('--deviate', action = 'store_true', help = 'Deviate' \
-        + ' from existing config without prompting')
+    conf_args.add_argument('-l', '--lineage', 
+                           help = '[-i, -r] Lineage(s) to initialize MTDB with')
+    conf_args.add_argument('-rk', '--rank',
+                           help = '[-i, -l] Rank(s) that positionally ' \
+                                + 'correspond to lineages')
+#    conf_args.add_argument('--deviate', action = 'store_true', help = 'Deviate' \
+ #       + ' from existing config without prompting')
 
     run_args = parser.add_argument_group('Runtime')
     run_args.add_argument('--save', action = 'store_true', 
@@ -1073,6 +1158,12 @@ def main():
     elif args.reference and not args.init:
         eprint('\nERROR: --reference requires a --init directory', flush = True)
         sys.exit(14)
+    elif args.lineage and not args.rank:
+        eprint('\nERROR: --lineage requires --rank')
+        sys.exit(16)
+    elif args.lineage and not args.init:
+        eprint('\nERROR: --lineage requires --init')
+        sys.exit(17)
     elif args.reference:
         if args.add:
             eprint('\nERROR: --add and --reference are incompatible')
@@ -1087,13 +1178,37 @@ def main():
     else:
         jgi = True
 
-    
-    config = {'branch': None, 'nonpublished': None}
+    # acquire the lineages inputted
+    rank2lineages = {}
+    permitted_ranks = {'phylum', 'subphylum', 'class', 
+                       'order', 'family', 'genus'}
+    if args.lineage:
+        lineage_constraints = split_input(args.lineage)
+        rank_constraints = split_input(args.rank)
+        if len(lineage_constraints) != len(rank_constraints):
+            eprint('\nERROR: --lineage must be same length as --rank')
+            sys.exit(18)
+        for rank in rank_constraints:
+            if rank.lower() not in permitted_ranks:
+                eprint(f'\nERROR: accepted ranks: {permitted_ranks}')
+                sys.exit(22)
+        rank2lineages = defaultdict(set)
+        for i, v in enumerate(lineage_constraints):
+            rank2lineages[rank_constraints[i]].add(v.lower())
+        rank2lineages = {k.lower(): sorted(v) for k, v \
+                         in sorted(rank2lineages.items(), 
+                                   key = lambda x: x[0])}
+
+    # parse and check configuration nonpublished arguments
+    config = {}
     if 'MYCODB' in os.environ:
+        config_path = format_path('$MYCODB/../config/mtdb.json')
+        if os.path.isfile(config_path):
+            config = read_json(format_path(config_path))
+        elif not args.init:
+            eprint('\nERROR: corrupted MycotoolsDB - no configuration found')
+            sys.exit(21)
         if not args.init: # is MYCODB initialized?
-            config_path = format_path('$MYCODB/../config/mtdb.json')
-            if os.path.isfile(config_path):
-                config = read_json(format_path(config_path))
     #            rogue_bool = config['rogue']
 #                args.nonpublished = config['nonpublished']
                 if bool(args.nonpublished) and not bool(config['nonpublished']):
@@ -1104,25 +1219,22 @@ def main():
                            flush = True)
                     sys.exit(173)
         elif args.init:
-            if format_path(args.init) != format_path(os.environ['MYCODB']):
-                eprint('\nERROR: MTDB initialized elsewhere and linked. Unlink via `mtdb -u`')
+            if format_path(args.init) != \
+               format_path(os.environ['MYCODB'] + '../../'):
+                eprint('\nERROR: MTDB linked. Unlink via `mtdb -u`')
                 sys.exit(175)
-    
-    if args.prokaryote or config['branch'] == 'prokaryote':
+
+    if args.prokaryote:
         nonpublished = True
     elif args.nonpublished and rogue_bool: 
         nonpublished = validate_t_and_c(config)
-    elif args.nonpublished and not rogue_bool:
-        eprint('\nERROR: Specify --rogue to assimilate use-restricted data.' , flush = True)
-        sys.exit(5)
     else:
         nonpublished = False
 
 #    branch = 'stable'
-
     db_path = primaryDB()
     args_dict = { 
-        'Database': db_path, 'Update': args.update, 'Initialize': args.init,
+        'Primary MTDB': db_path, 'Update': args.update, 'Initialize': args.init,
         'Add': format_path(args.add), #'Rogue': rogue_bool, 
         'Include Restricted': bool(nonpublished), 'Resume': args.resume,
         'Retry failed': args.failed, 'Retry forbidden': args.forbidden,
@@ -1173,7 +1285,6 @@ def main():
 
         new_mtdb.df2db(new_db_path)
 
-
 #        if update_omes and args.clear_cache:
  #           for update_ome in update_omes:
   #              ome_gff3 = os.environ['MYCOGFF3'] + update_ome + '.gff3'
@@ -1206,14 +1317,15 @@ def main():
         output, config = initDB( 
             init_dir, dbtype, envs, dbtype, date = date, 
             rogue = rogue_bool, nonpublished = nonpublished,
-            jgi = jgi, repo = format_path(args.reference)
+            jgi = jgi, repo = format_path(args.reference),
+            rank2lineages = rank2lineages
             )
         for env in envs:
-            os.environ[ env ] = envs[ env ]
+            os.environ[env] = envs[env]
         orig_db = db2df(mtdb()) # initialize a new database
         update_path = output + 'log/' + date + '/'
-        if not os.path.isdir( update_path ):
-            os.mkdir( update_path )
+        if not os.path.isdir(update_path):
+            os.mkdir(update_path)
         mtdb_initialize(init_dir, init = True) #init_dir + 'config/mtdb.json', init = True)
     else:
         output = format_path('$MYCODB/..')
@@ -1257,7 +1369,8 @@ def main():
             orig_db, update_path, date, args.failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = args.cpu, 
             check_MD5 = not bool(args.no_md5), jgi = jgi, group = group,
-            kingdom = king, remove = not args.save
+            kingdom = king, remove = not args.save, 
+            lineage_constraints = config['lineage_constraints']
             )
     else:
         if any(not x for x in ref_db['published']) and not args.nonpublished:
