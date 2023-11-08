@@ -325,15 +325,21 @@ def dwnld_mycocosm(
     return a Pandas dataframe of the data"""
 
     if not os.path.isfile(out_file):
-        subprocess.call(
-            ['curl', mycocosm_url, '-o', out_file + '.tmp'],
-            stdout = subprocess.PIPE
-            )
-        shutil.move(out_file + '.tmp', out_file)
+        for attempt in range(3):
+            curl_cmd = subprocess.call(
+                ['curl', mycocosm_url, '-o', out_file + '.tmp'],
+                stdout = subprocess.PIPE
+                )
+            if not curl_cmd:
+                shutil.move(out_file + '.tmp', out_file)
+                break
+        if curl_cmd:
+            eprint('\nERROR: failed to retrieve MycoCosm table', flush = True)
+                
     try:
-        jgi_df = pd.read_csv( out_file, encoding = 'cp1252' )
+        jgi_df = pd.read_csv(out_file, encoding = 'cp1252')
     except UnicodeDecodeError:
-        jgi_df = pd.read_csv( out_file, encoding = 'utf-8' )
+        jgi_df = pd.read_csv(out_file, encoding = 'utf-8')
     jgi_df.columns = [x.replace('"','').replace('"','') for x in jgi_df.columns]
     
     return jgi_df
@@ -1411,6 +1417,8 @@ def main():
             pass
         shutil.move(new_path + '.tmp', new_path)
         rm_raw_data(update_path)
+        eprint('\nMTDB update complete', flush = True)
+
         eprint('\nGathering assembly statistics', flush = True)
         assStats(primaryDB(), format_path('$MYCODB/../data/assemblyStats.tsv'),
                  args.cpu)
