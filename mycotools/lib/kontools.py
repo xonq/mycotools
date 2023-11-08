@@ -430,9 +430,10 @@ def format_path(path, force_dir = False):
             if not path.startswith('/'):
                 path = os.getcwd() + '/' + path
 
-    path = path.replace('/./', '/')
-    path = re.sub(r'[^/]+/\.\./', '', path)
-
+        path = path.replace('/./', '/')
+        while '/../' in path:
+            path = re.sub(r'[^/]+/\.\./', '', path)
+    
     return path
 
 
