@@ -145,7 +145,7 @@ def runjgi_dwnld(
             check, preexisting, new_typ, ran_dwnld = jgi_dwnld( 
                 ome, typ, output, masked = masked
             )
-            if type(check) != int:
+            if not isinstance(check, int):
                 jgi_df.at[i, new_typ + '_path'] = output + '/' + new_typ + \
                     '/' + check
                 check = os.path.basename( os.path.abspath( check ) )
@@ -252,10 +252,10 @@ def main(
 
 
     print(spacer + 'Logging into JGI', flush = True)
-    jgi_login( user, pwd )
+    jgi_login(user, pwd)
 
-    if not os.path.exists( output + '/xml' ):
-        os.mkdir( output + '/xml' )
+    if not os.path.exists(output + '/xml'):
+        os.mkdir(output + '/xml')
 
     print(spacer + 'Retrieving `xml` directories', flush = True)
     ome_set, failed, count = set(), [], 0
@@ -278,7 +278,7 @@ def main(
 
 
     log_path = output + '/jgi2db.log'
-    log = compileLog( log_path )
+    log = compileLog(log_path)
     if not rerun:
         prev_omes = set(jgi_df[ome_col])
         for ome in log:
@@ -294,18 +294,18 @@ def main(
     print(spacer + 'Downloading JGI data' , flush = True)
     dwnlds = []
     if assembly:
-        dwnlds.append( 'fna' )
+        dwnlds.append('fna')
     if gff3:
-        dwnlds.append( 'gff3' )
+        dwnlds.append('gff3')
     if proteome:
-        dwnlds.append( 'faa' )
+        dwnlds.append('faa')
 
     for typ in dwnlds:
-        if not os.path.isdir( output + '/' + typ ):
-            os.mkdir( output + '/' + typ )
+        if not os.path.isdir(output + '/' + typ):
+            os.mkdir(output + '/' + typ)
         if typ == 'gff3':
-            if not os.path.isdir( output + '/gff3' ):
-                os.mkdir( output + '/gff3')
+            if not os.path.isdir(output + '/gff3'):
+                os.mkdir(output + '/gff3')
 
     if all(x in log for x in list(jgi_df[ome_col])) and not rerun:
         print(spacer + '\tAll downloaded, rerun off', flush = True)
@@ -326,17 +326,17 @@ def main(
                 spacer
                 )
 
-    if os.path.exists( 'cookies' ):
-        os.remove( 'cookies' )
-    if os.path.exists( os.path.expanduser( '~/.nullJGIdwnld' )):
-        os.remove( os.path.expanduser( '~/.nullJGIdwnld' ))
+    if os.path.exists('cookies'):
+        os.remove('cookies')
+    if os.path.exists(os.path.expanduser('~/.nullJGIdwnld')):
+        os.remove(os.path.expanduser('~/.nullJGIdwnld'))
 
-    jgi_df = jgi_df.rename( columns = { 
+    jgi_df = jgi_df.rename(columns = { 
         'published(s)': 'published',
         ome_col: 'assembly_acc',
         'fna_path': 'assemblyPath',
         'gff3_path': 'gffPath'
-        } )
+        })
     jgi_df['source'] = 'jgi'
 
     for ome_d in failed: # add back the failed entries that were attempted updates
