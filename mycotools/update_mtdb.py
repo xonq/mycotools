@@ -472,13 +472,13 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
  #           pass
 #            todel.append(i)
         elif row['assembly_acc'] not in fails:
-
             ass_uid = esearch_ncbi(row['assembly_acc'],
                                    'assembly', 'assembly')
             if not ass_uid:
                 fails.add(row['assembly_acc'])
                 continue
             ncbi_df.at[i, 'uid'] = ass_uid
+            # this is a huge bottleneck, taking approximately 1s per query
             summary = esummary_ncbi(max(ass_uid), 'assembly')
             ass_name_prep = \
                 summary['DocumentSummarySet']['DocumentSummary'][0]['AssemblyName']
@@ -526,6 +526,7 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
 #        ncbi_df = ncbi_df.drop(i)
     
     return ncbi_df, jgi2ncbi, jgi2biosample, fails, ncbi_jgi_overlap
+
 
 def mk_wrk_dirs(update_path):
     """Make the download directories in the update path"""
@@ -879,15 +880,15 @@ def rogue_update(
                 jgi_df = pd.read_csv(lineage_path, sep = '\t')
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
-        ncbi2jgi = parse_ncbi2jgi(update_path + 'ncbi2jgi.tsv')
-        true_ncbi = parse_true_ncbi(update_path + 'true_ncbi.tsv')
+        ncbi2jgi = parse_ncbi2jgi(update_path + '../ncbi2jgi.tsv')
+        true_ncbi = parse_true_ncbi(update_path + '../true_ncbi.tsv')
         ncbi_df, jgi2ncbi, jgi2biosample, true_ncbi, ncbi_jgi_overlap = \
             rm_ncbi_overlap(ncbi_df, jgi_df, ncbi2jgi, true_ncbi, api = api)
 
         print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
              flush = True)
-        add_true_ncbi(true_ncbi, update_path + 'true_ncbi.tsv')
-        add_ncbi2jgi(jgi2ncbi, update_path + 'ncbi2jgi.tsv')
+        add_true_ncbi(true_ncbi, update_path + '../true_ncbi.tsv')
+        add_ncbi2jgi(jgi2ncbi, update_path + '../ncbi2jgi.tsv')
         for i, row in jgi_df.iterrows():
             if row['portal'].lower() in jgi2ncbi \
                 and row['portal'].lower() in jgi2biosample:
