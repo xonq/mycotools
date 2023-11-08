@@ -616,7 +616,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
 
     count += 1
     if not ids:
-        print('\t\tTaxonomy extraction failed', flush = True)
+        print('\t\tTaxID acquisition failed', flush = True)
         return None, count 
 
     # for each taxID acquired, fetch the actual taxonomy information
@@ -628,7 +628,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
         elif api_key and count >= 9:
             time.sleep(1)
             count = 0
-    count += 1
+
     for attempt in range(5):
         try:
             handle = Entrez.efetch(db="Taxonomy", id=tax, remode="xml")
@@ -647,6 +647,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
   #          lineages = records[0]['LineageEx']
    #         break
 
+    count += 1
     # for each lineage, if it is a part of the kingdom, `king`, 
     # use that TaxID if there are multiple TaxIDs, use the first one found
     if king:
@@ -655,14 +656,14 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
                 if lineage['ScientificName'].lower() == king:
                     taxid = tax
                     if len(ids) > 1:
-                        print('\t\tTax ID(s): ' + str(ids), flush = True)
+                        print('\t\tMultiple Tax IDs: ' + str(ids), flush = True)
                     break
     else:
         for lineage in lineages:
             taxid = tax 
    
     if taxid == 0:
-        print('\t\tNo taxonomy information', flush = True)
+        print(f'\t\tNo taxon matches {king}', flush = True)
         return None, count 
 
     # for each taxonomic classification, add it to the taxonomy dictionary string
