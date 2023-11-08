@@ -802,7 +802,6 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
                 if any(x.lower() in lineages for x in tax[rank]):
                     passing_tax.add(genus)
 
-    print(passing_tax)
     df = df[df['genus'].isin(passing_tax)]
     return tax_dicts, df
 
@@ -837,6 +836,8 @@ def rogue_update(
     pre_ncbi_df1 = prep_taxa_cols(pre_ncbi_df0)
     ncbi_df = clean_ncbi_df(pre_ncbi_df1, kingdom = kingdom)
     ncbi_df = ncbi_df.rename(columns={'Assembly Accession': 'assembly_acc'})
+
+    print(ncbi_df)
 
     # begin extracting lineages of interest and store tax_dicts for later
     tax_dicts = {v['genus']: v['taxonomy'] for k, v in db.iterrows() \
