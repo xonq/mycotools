@@ -794,7 +794,6 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
     return tax_dicts, df
 
 
-
 def rogue_update(
     db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
@@ -1205,6 +1204,10 @@ def main():
         config_path = format_path('$MYCODB/../config/mtdb.json')
         if os.path.isfile(config_path):
             config = read_json(format_path(config_path))
+            # for LEGACY installs:
+            if 'lineage_constraints' is not in config:
+                config['lineage_constraints'] = {}
+                write_json(config, config_path)
         elif not args.init:
             eprint('\nERROR: corrupted MycotoolsDB - no configuration found')
             sys.exit(21)
@@ -1213,7 +1216,7 @@ def main():
 #                args.nonpublished = config['nonpublished']
                 if bool(args.nonpublished) and not bool(config['nonpublished']):
                     config['nonpublished'] = validate_t_and_c(config, discrepancy = True)
-                    write_json(config, format_path(config_path))
+                    write_json(config, config_path)
                 if bool(config['jgi']) and bool(args.ncbi_only): #and not args.overwrite:
                     eprint('\nERROR: --ncbi_only specified after initialization',
                            flush = True)
@@ -1283,7 +1286,6 @@ def main():
 
         new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save = args.save)
         new_db_path = format_path('$MYCODB/' + date + '.mtdb')
-
 
         new_mtdb.df2db(new_db_path)
 
