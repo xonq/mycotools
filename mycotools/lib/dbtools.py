@@ -411,32 +411,24 @@ def primaryDB(path = '$MYCODB'):
 # imports database, converts into df
 # returns database dataframe
 def db2df(data, stdin = False):
+    """Deprecated legacy Pandas implementation of MTDB import"""
     import pandas as pd, pandas
     columns = mtdb.columns
     if isinstance(data, mtdb):
         db_df = pd.DataFrame(data.reset_index())
     elif not stdin:
-        data = format_path( data )
-        db_df = pd.read_csv( data, sep='\t' )
-        if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
-            db_df = pd.read_csv( data, sep = '\t', header = None )
+        data = format_path(data)
+        db_df = pd.read_csv(data, sep='\t')
+        if 'ome' not in set(db_df.columns) and 'assembly_acc' not in set(db_df.columns):
+            db_df = pd.read_csv(data, sep = '\t', header = None)
     else:
-        db_df = pd.read_csv( StringIO(data), sep='\t' )
-        if 'ome' not in set( db_df.columns ) and 'assembly_acc' not in set( db_df.columns ):
-            db_df = pd.read_csv( StringIO(data), sep = '\t', header = None )
+        db_df = pd.read_csv(StringIO(data), sep='\t')
+        if 'ome' not in set(db_df.columns) and 'assembly_acc' not in set(db_df.columns):
+            db_df = pd.read_csv(StringIO(data), sep = '\t', header = None)
 
     db_df = db_df.fillna('')
 
-    if len(db_df.keys()) == 16: # legacy conversion TO BE DEPRECATED
-        eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
-        db_df.columns = [
-            'ome', 'genus', 'species', 'strain', 'version',
-            'biosample', 'fna', 'faa', 'gff3', 'taxonomy', 'ecology',
-            'eco_conf',
-            'source', 'published', 'assembly_acc', 'acquisition_date'
-            ]
-    else:
-        db_df.columns = columns
+    db_df.columns = columns
     for i, row in db_df.iterrows():
         db_df.at[i, 'taxonomy'] = read_tax(
             row['taxonomy']
@@ -456,7 +448,7 @@ def db2df(data, stdin = False):
 
     return db_df
 
-def df2std( df ):
+def df2std(df):
     '''
     Standardized organization of database columns. DEPRECATED pandas MTDB
     '''
@@ -470,6 +462,7 @@ def df2std( df ):
 # exports as database file into `db_path`. If rescue is set to 1, save in home folder if output doesn't exist
 # if rescue is set to 0, do not output database if output dir does not exit
 def df2db(df, db_path, header = False, overwrite = False, std_col = True, rescue = True):
+    """Deprecated output pandas MTDB implementation to file"""
     import pandas as pd, pandas
 
     df = df.set_index('ome')
@@ -485,7 +478,7 @@ def df2db(df, db_path, header = False, overwrite = False, std_col = True, rescue
             db_path = os.path.normpath(db_path) + '_' + str(number)
 
     if std_col:
-        df = df2std( df )
+        df = df2std(df)
 
     while True:
         try:
@@ -573,14 +566,16 @@ def hit2taxonomy(
     return tax_dict, sleep
 
 
-def prepare_tax_dicts(df):
+def prepare_tax_dicts(df, tax_dicts = {}):
     """Identify the genera that do not have higher taxonomy ascribed to them"""
 
-    tax_dicts, need_tax = {}, set()
+    need_tax = set()
     # is the df of mtdb class or have a taxonomy column as a list?
     if isinstance(df, mtdb) or isinstance(df['taxonomy'], list):
         df = df.set_index('ome')
         for k, v in df.items():
+            if v['genus'] in tax_dicts:
+                continue
             tax_json = read_tax(v['taxonomy'])
             if any(v for k, v in tax_json.items() \
                    if k not in {'genus', 'species', 'strain'}):
@@ -591,6 +586,8 @@ def prepare_tax_dicts(df):
     else:
         df['taxonomy'] = df['taxonomy'].fillna({})
         for k, v in df.iterrows():
+            if v['genus'] in tax_dicts:
+                continue
             tax_json = read_tax(v['taxonomy'])
             if any(v for k, v in tax_json.items() \
                    if k not in {'genus', 'species', 'strain'}):
@@ -601,27 +598,25 @@ def prepare_tax_dicts(df):
     return need_tax, tax_dicts
 
 
-def query_ncbi4taxonomy(genus, api_key, king, count = 0):
-    # gather taxonomy from information present in the genus column 
-    # and query NCBI using Entrez
-    ids = None
-    fails = 0
-    while True:
+def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
+    """gather taxonomy from information present in the genus column 
+    and query NCBI using Entrez"""
+
+    # acquire the TaxIDs related to the genus
+    ids = []
+    for attempt in range(5):
         try:
             search_term = str(genus) + ' [GENUS]'
             handle = Entrez.esearch(db='Taxonomy', term=search_term)
             ids = Entrez.read(handle)['IdList']
             break
-        except RuntimeError:
-            fails += 1
-            if fails > 3:
-                break
-            time.sleep(1)
-            count = 0
+        except:
+            time.sleep(3)
+
     count += 1
     if not ids:
         print('\t\tNo taxonomy information', flush = True)
-        return None, None
+        return None, count 
 
     # for each taxID acquired, fetch the actual taxonomy information
     taxid = 0
@@ -633,20 +628,22 @@ def query_ncbi4taxonomy(genus, api_key, king, count = 0):
             time.sleep(1)
             count = 0
     count += 1
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             handle = Entrez.efetch(db="Taxonomy", id=tax, remode="xml")
             records = Entrez.read(handle)
-            lineages = records[0]['LineageEx']
+            if records:
+                lineages = records[0]['LineageEx']
+            else:
+                lineages = []
             break
-        except IndexError:
+        except:
+            time.sleep(3)
             lineages = []
-        except urllib.error.HTTPError:
-            time.sleep(1)
-            handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
-            records = Entrez.read(handle)
-            lineages = records[0]['LineageEx']
-            break
+#            handle = Entrez.efetch(db="Taxonomy", id=tax, remode = "xml")
+ #           records = Entrez.read(handle)
+  #          lineages = records[0]['LineageEx']
+   #         break
 
     # for each lineage, if it is a part of the kingdom, `king`, 
     # use that TaxID if there are multiple TaxIDs, use the first one found
@@ -664,7 +661,7 @@ def query_ncbi4taxonomy(genus, api_key, king, count = 0):
    
     if taxid == 0:
         print('\t\tNo taxonomy information', flush = True)
-        return None, None
+        return None, count 
 
     # for each taxonomic classification, add it to the taxonomy dictionary string
     # append each taxonomy dictionary string to a list of dicts
@@ -675,11 +672,11 @@ def query_ncbi4taxonomy(genus, api_key, king, count = 0):
     return genus_tax, count
 
 
-def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
-                    rank = 'kingdom'):
+def gather_taxonomy(df, api_key = None, king='fungi',
+                    rank = 'kingdom', tax_dicts = {}):
     """Gather taxonomy for an MTDB or deprecated pd MTDB by querying NCBI's
     taxonomy hierarchy"""
-    need_tax, tax_dicts = prepare_tax_dicts(df)
+    need_tax, tax_dicts = prepare_tax_dicts(df, tax_dicts)
 
     count = 0
     for genus in sorted(need_tax):
@@ -693,7 +690,7 @@ def gather_taxonomy(df, api_key = None, king='fungi', ome_index = 'ome',
             time.sleep(1)
             count = 0
 
-        genus_tax, count = query_ncbi4taxonomy(genus, api_key, king, count)
+        genus_tax, count = query_ncbi4taxonomy(genus, api_key, king, rank, count)
         if genus_tax:
             tax_dicts[genus] = genus_tax
     
