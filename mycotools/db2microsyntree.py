@@ -491,7 +491,8 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
         run_tree(align_file, wrk_dir, constraint = constraint, iqtree = 'iqtree',
                  model = 'GTR2+FO+ASC+R5', verbose = False, cpus = cpus)
         # too bulky to justify keeping
-        os.remove(cc_arr_path + '.npy')
+        if os.path.isfile(cc_arr_path + '.npy'):
+            os.remove(cc_arr_path + '.npy')
 
     return ome2i, gene2hg, i2ome, hg2gene, ome2pairs, cooccur_dict
 
