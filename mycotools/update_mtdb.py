@@ -259,9 +259,9 @@ def parse_failed(file_path = None, rerun = False):
 
     return prev_failed
 
-def parse_ncbi2jgi(file_path):
+def parse_jgi2ncbi(file_path):
     """Parse previously collected NCBI to JGI data to limit querying"""
-    ncbi2jgi = {}
+    jgi2ncbi = {}
     if not os.path.isfile(file_path):
         with open(file_path, 'w') as out:
             out.write('#ncbi_acc\tmycocosm_portal')
@@ -271,9 +271,9 @@ def parse_ncbi2jgi(file_path):
                 if not line.startswith('#'):
                     d = line.rstrip().split('\t')
                     ncbi, jgi = d[0], d[1].lower()
-                    ncbi2jgi[ncbi] = jgi
+                    jgi2ncbi[jgi] = ncbi
 
-    return ncbi2jgi
+    return jgi2ncbi
 
 def parse_true_ncbi(file_path):
     """Parse accessions considered to be unique to NCBI"""
@@ -292,7 +292,7 @@ def add_true_ncbi(true_ncbi, file_path = None):
     with open(file_path, 'w') as out:
         out.write('#ncbi_acc\n' + '\n'.join([str(x) for x in list(true_ncbi)]))
 
-def add_ncbi2jgi(jgi2ncbi, file_path = None):
+def add_jgi2ncbi(jgi2ncbi, file_path = None):
     """Add to a ledger that seeks to associated NCBI accessions with JGI. This
     is prone to failure given that the field JGI uses to supply their genome
     accession is either absent from some NCBI entries, or is in a different
@@ -441,7 +441,17 @@ def clean_ncbi_df(ncbi_df, kingdom = 'Fungi'):
     return ncbi_df
 
 
-def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
+def exec_rm_overlap(ncbi_df, todel_i):
+    """Execute the removal of JGI redundancy from NCBI genomes and create a
+    DataFrame that represents the overlapping genomes"""
+    todel = ncbi_df.index.intersection(todel_i)
+    ncbi_jgi_overlap = pd.DataFrame(columns = ncbi_df.columns)
+    ncbi_jgi_overlap = ncbi_df.loc[todel]
+    ncbi_df = ncbi_df.drop(todel)
+    return ncbi_jgi_overlap, ncbi_df
+
+
+def rm_ncbi_overlap(ncbi_df, mycocosm_df, jgi2ncbi, fails = set(), api = 3):
     """Acquire MycoCosm assembly accessions from NCBI.
     pd.DataFrame(ncbi_df) = post clean ncbi_df;
     set(mycocosm_omes) = set of lower-cased mycocosm genome codes;
@@ -455,7 +465,7 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
         )
 
     todel = []
-    jgi2ncbi, jgi2biosample = {v: k for k, v in ncbi2jgi.items()}, {}
+    ncbi2jgi, jgi2biosample = {v: k for k, v in jgi2ncbi.items()}, {}
     ass_count = 0
 
     # could vectorize these
@@ -463,7 +473,6 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
                  for k, v in mycocosm_df.iterrows()}
     jgi_gen_sp = {f"{v['genus']}_{v['species']}" \
                  for k, v in mycocosm_df.iterrows()}
-
     for i, row in ncbi_df.iterrows():
         if row['assembly_acc'] in ncbi2jgi:
             jgi2biosample[ncbi2jgi[row['assembly_acc']]] = \
@@ -518,15 +527,13 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, ncbi2jgi, fails = set(), api = 3):
                 jgi2biosample[gen_sp] = row['BioSample Accession']
             else:
                 fails.add(row['assembly_acc'])
-
-    ncbi_jgi_overlap = pd.DataFrame(columns = ncbi_df.columns)
-    ncbi_jgi_overlap = ncbi_df.loc[todel]
-    ncbi_df = ncbi_df.drop(todel)
 #    for i in reversed(todel):
  #       ncbi_jgi_overlap = pd.concat([ncbi_jgi_overlap, ncbi_df.loc[i]])
 #        ncbi_df = ncbi_df.drop(i)
-    
-    return ncbi_df, jgi2ncbi, jgi2biosample, fails, ncbi_jgi_overlap
+
+    ncbi_df, ncbi_jgi_overlap = exec_rm_overlap(ncbi_df, todel)
+
+    return ncbi_df, jgi2ncbi, jgi2biosample, fails, ncbi_jgi_overlap, todel
 
 
 def mk_wrk_dirs(update_path):
@@ -884,21 +891,33 @@ def rogue_update(
                 jgi_df = pd.read_csv(lineage_path, sep = '\t')
 
         print('\tSearching NCBI for MycoCosm overlap', flush = True)
-        ncbi2jgi = parse_ncbi2jgi(update_path + '../ncbi2jgi.tsv')
-        true_ncbi = parse_true_ncbi(update_path + '../true_ncbi.tsv')
-        ncbi_df, jgi2ncbi, jgi2biosample, true_ncbi, ncbi_jgi_overlap = \
-            rm_ncbi_overlap(ncbi_df, jgi_df, ncbi2jgi, true_ncbi, api = api)
+        jgi_ncbi_overlap_file = f'{update_path}/redundant_ncbi.tsv'
+        jgi2ncbi = parse_jgi2ncbi(update_path + '../jgi2ncbi.tsv')
+        ncbi_df = ncbi_df.set_index('assembly_acc', drop = False)
+        if os.path.isfile(jgi_ncbi_overlap_file):
+            with open(jgi_ncbi_overlap_file, 'r') as raw:
+                todel_i = [x.rstrip() for x in raw]
+            ncbi_df, ncbi_jgi_overlap = exec_rm_overlap(ncbi_df, todel_i)
+        else:
+            true_ncbi = parse_true_ncbi(update_path + '../supported_ncbi.tsv')
+            ncbi_df, jgi2ncbi, jgi2biosample, \
+            true_ncbi, ncbi_jgi_overlap, todel_i \
+                = rm_ncbi_overlap(ncbi_df, jgi_df, jgi2ncbi, 
+                                  true_ncbi, api = api)
 
-        print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
-             flush = True)
-        add_true_ncbi(true_ncbi, update_path + '../true_ncbi.tsv')
-        add_ncbi2jgi(jgi2ncbi, update_path + '../ncbi2jgi.tsv')
-        for i, row in jgi_df.iterrows():
-            if row['portal'].lower() in jgi2ncbi \
-                and row['portal'].lower() in jgi2biosample:
-                jgi_df.at[i, 'biosample'] = jgi2biosample[
-                    row['portal'].lower()
-                    ]
+            print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
+                 flush = True)
+            with open(jgi_ncbi_overlap_file + '.tmp', 'w') as out:
+                out.write('\n'.join([x for x in todel_i]))
+            os.rename(jgi_ncbi_overlap_file + '.tmp', jgi_ncbi_overlap_file)
+            add_true_ncbi(true_ncbi, update_path + '../supported_ncbi.tsv')
+            add_jgi2ncbi(jgi2ncbi, update_path + '../jgi2ncbi.tsv')
+            for i, row in jgi_df.iterrows():
+                if row['portal'].lower() in jgi2ncbi \
+                    and row['portal'].lower() in jgi2biosample:
+                    jgi_df.at[i, 'biosample'] = jgi2biosample[
+                        row['portal'].lower()
+                        ]
 
         print('\tDownloading MycoCosm data', flush = True)
         jgi_predb_path = update_path + date + '.jgi.predb2.mtdb'
@@ -955,7 +974,6 @@ def rogue_update(
         new_db = db
         new_dups = duplicates
 
-
     print('\nAssimilating NCBI (10 download/minute w/API key, 3 w/o)', flush = True)
     new_db['version'] = new_db['version'].astype(str)
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
@@ -968,7 +986,6 @@ def rogue_update(
             rerun = rerun, duplicates = duplicates,
             check_MD5 = check_MD5
             )
-
 
         for failure in ncbi_failed1:
             add_failed(failure[0], 'ncbi', str(failure[1]), date,
