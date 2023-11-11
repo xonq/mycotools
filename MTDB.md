@@ -47,7 +47,7 @@ Tab-delimited file, with one row per genome and ordered columns:
 `psicub1`/`cryneo24.1` `[a-zA-Z0-9\.]`
 - `genus`: Genus name; `[a-zA-Z]`
 - `species`: Species name; `[a-zA-Z]`
-- `strain`: Strain name; `[a-zA-Z0-9]`
+- `strain`: Strain name; `[a-zA-Z0-9\-\.]`
 - `taxonomy`: NCBI taxonomy `JSON` object derived from genus
 - `version`: MycoCosm version/NCBI modification date
 - `source`: Genome source, e.g. 'ncbi'/'jgi'/'lab'; `[a-z0-9\.]`
