@@ -640,7 +640,8 @@ def prep_output(output, mkdir = True, require_newdir = False, cd = False):
 
     return output
 
-def mkOutput(base_dir, program, reuse = True, suffix = datetime.now().strftime('%Y%m%d')):
+def mkOutput(base_dir, program, reuse = True, 
+             suffix = datetime.now().strftime('%Y%m%d')):
     if not os.path.isdir(format_path(base_dir)):
         raise FileNotFoundError(base_dir + ' does not exist')
     if suffix:
@@ -661,7 +662,7 @@ def mkOutput(base_dir, program, reuse = True, suffix = datetime.now().strftime('
         return out_dir + '/'
 
 
-def checkDep( dep_list = [], var_list = [], exempt = set() ):
+def checkDep(dep_list = [], var_list = [], exempt = set()):
     '''Checks all dependencies in path from list, optional exemption set'''
 
     failedVars = []
