@@ -76,30 +76,47 @@ def run_clipkit(name, mafft_name, out_dir, hpc, gappy,
     clipkit_out_name = out_dir + os.path.basename(mafft_name) + '.clipkit'
     if gappy:
         mode = "gappy"
+        cmd = ['clipkit', mafft_name, '--output', clipkit_out_name, 
+               '-m', 'gappy', str(gappy)]
     else:
+        cmd = ['clipkit', mafft_name, '--output', clipkit_out_name]
         mode = "smart-gap"
         gappy = None
+
 
     # execute immediately
     if not hpc:
         print(spacer + 'Trimming', flush = True)
-        if verbose:
-            clipkit_out = clipkit(
-        	    input_file_path=mafft_name,
-	            output_file_path=clipkit_out_name,
-	            mode=mode, gaps=gappy
-                )
+        if not verbose:
+            run_clipkit = subprocess.call(cmd, stdout = subprocess.PIPE)
         else:
-            with nostdout():
-                clipkit_out = clipkit(
-        	        input_file_path=mafft_name,
-	                output_file_path=clipkit_out_name,
-	                mode=mode, gaps=gappy
-                    )
+            run_clipkit = subprocess.call( 
+                cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
+                )
+#            clipkit_out = clipkit.execute(
+ #       	    input_file=mafft_name,
+#	            output_file=clipkit_out_name,
+ #               output_file_format='fasta',
+  #              input_file_format='fasta',
+   #             use_log = False,
+    #            complement = False,
+	 #           mode=mode, gaps=gappy
+      #          )
+       # else:
+        #    with nostdout():
+         #       clipkit_out = clipkit.execute(
+        #	        input_file=mafft_name,
+	     #           output_file=clipkit_out_name,
+          #          output_file_format='fasta',
+           #         input_file_format='fasta',
+            #        use_log = False,
+             #       complement = False,
+	          #      mode=mode, gaps=gappy
+               #     )
 
         # no output file, the run failed
-        if not os.path.isfile(out_dir + clipkit_out_name):
-            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(clipkit_out), 
+        if not os.path.isfile(clipkit_out_name):
+            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(run_clipkit), 
                    flush = True)  
             raise PhyloError
     # prepare a command for HPC execution
@@ -223,7 +240,7 @@ def run_tree_reconstruction(prefix, clipkit_file, out_dir, hpc, constraint,
     """Manage and execute phylogeny reconstruction from an inputted ClipKIT
     output trimmed alignment."""
 
-    tree_file = out_dir + os.path.baseprefix(clipkit_file)
+    tree_file = out_dir + os.path.basename(clipkit_file)
     # prepare a fasttree ommand
     if fast:
         cmd = ['fasttree', '-out', tree_file + '.treefile', clipkit_file]
@@ -431,7 +448,8 @@ def identify_incomplete_files(files, flag_incomplete, wrk_dir):
     return files, ome2fa2gene, del_omes
 
 
-def algn_mngr(start, files, wrk_dir, hpc, gappy, verbose, cpus, spacer):
+def algn_mngr(start, files, wrk_dir, hpc, gappy, alignment,
+              verbose, cpus, spacer):
     """Manage the alignment and trimming executor for inputted fasta files"""
 
     trimmed_files = []
@@ -609,7 +627,7 @@ def main(
 
     # manage the alignment and trimming
     trimmed_files = algn_mngr(start, files, wrk_dir, hpc, gappy, 
-                              verbose, cpus, spacer)
+                              alignment, verbose, cpus, spacer)
 
     # convert the sequences to genome codenames    
     if ome_conv:
