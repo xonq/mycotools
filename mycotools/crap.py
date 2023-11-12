@@ -811,7 +811,7 @@ def crap_mngr(
         )
 
     if info:
-        return
+        return query2color
 
     print('\t\tExtracting loci and generating synteny diagrams', flush = True)
     extract_loci_cmds = []
