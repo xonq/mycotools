@@ -70,8 +70,8 @@ def gff2svg(
                 int(i['strand'] + '1'), product_dict[product],
                 product[:max_size+1]])
             # append the lengths independently to lens
-            lens[i['seqid']].append( int(i['start']) )
-            lens[i['seqid']].append( int(i['end']) )
+            lens[i['seqid']].append(int(i['start']))
+            lens[i['seqid']].append(int(i['end']))
 
     for seq in seqs:
         # sort each contig length set, start becomes the smallest
