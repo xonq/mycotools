@@ -581,10 +581,11 @@ def cli():
     omedb, failed = main(predb, refDB, wrk_dir, exit = exit, verbose = True,
                          forbidden = forbid_omes)
 
-    from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
-    tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
-    outdb, genus_dicts = assimilate_tax(omedb, tax_dicts)
-    outdb.df2db(out_dir + 'predb2mtdb.mtdb')
+#    from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
+#    tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
+ #   outdb, genus_dicts = assimilate_tax(omedb, tax_dicts)
+  #  outdb.df2db(out_dir + 'predb2mtdb.mtdb')
+    ome2db.df2db(out_dir + 'predb2mtdb.mtdb')
     sys.exit(0)
 
 
