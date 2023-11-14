@@ -82,7 +82,7 @@ def extract_ome(db, omes):
     """Extract a list of genome codes (omes) of interest"""
     new_db = mtdb().set_index()
     for i in db:
-        if i in omes:
+        if i in list(omes):
             new_db[i] = db[i]
     return new_db
 
@@ -118,7 +118,7 @@ def main(
         new_db = extract_tax(db, lineage_list)
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif omes_set:
-        new_db = extract_ome(db, omes)
+        new_db = extract_ome(db, omes_set)
     # if none of these are specified then create a `new_db` variable to work for later
     else:
         new_db = db
