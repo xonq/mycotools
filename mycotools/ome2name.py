@@ -68,6 +68,7 @@ def main(db, data_input, genus, species, strain, ome_code, alternative):
         ]
 
     db = db.set_index()
+    ome2name = {}
     for ome, row in db.items():
         name = ''
         if genus:
@@ -88,10 +89,18 @@ def main(db, data_input, genus, species, strain, ome_code, alternative):
         # remove forbidden characters
         for i in forbidden:
             name = name.replace(i, '')
-        # change the ome code with the name
-        data_output = re.sub(ome, name, data_input)
+        ome2name[ome] = name
 
-    return data_output.rstrip()
+    # sort so the longest ome codes are replaced first and thus smaller
+    # versions do not replace sub versions of larger
+    ome2name = {k: v for k, v in sorted(ome2name.items(),
+                                  key = lambda x: len(x[0]),
+                                  reverse = True)}
+    for k, v in ome2name.items():
+        # change the ome code with the name
+        data_input = data_input.replace(k, v)
+
+    return data_input.rstrip()
 
 
 def cli():
