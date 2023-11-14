@@ -747,7 +747,7 @@ def ref_update(
     tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
     new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
-    dupFiles = { 'fna': {}, 'faa': {}, 'gff3': {} }
+    dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
