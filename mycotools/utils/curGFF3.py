@@ -73,18 +73,50 @@ def add_missing(gff_list, intron, comps, ome):
         elif entry['type'] == 'CDS':
             try: # attempt to acquire the parent
                 par = re.search(comps['par'], entry['attributes'])[1]
+                if par in rna_changes:
+                    entry['attributes'] = re.sub(comps['par'], 'Parent=' \
+                                                 + rna_changes[par],
+                                                 entry['attributes'])
+                    par = rna_changes[par]
+                if par in rnas: # if the parent is an RNA, acquire the gene
+                    rna_par = par
+                    par = rnas[par] # change par to gene
+                else:
+                    rna_par = None
             except TypeError:
-                continue # if there isn't a parent then skip it
-            if par in rna_changes:
-                entry['attributes'] = re.sub(comps['par'], 'Parent=' \
-                                             + rna_changes[par],
-                                             entry['attributes'])
-                par = rna_changes[par]
-            if par in rnas: # if the parent is an RNA, acquire the gene
-                rna_par = par
-                par = rnas[par] # change par to gene
-            else:
-                rna_par = None
+                # a CDS without a parent is an assumed translated product
+                # and needs a gene and RNA
+                if ';pseudo=true' in entry['attributes'].lower():
+                    pseudo = True
+                else:
+                    pseudo = False
+                rna_par = 'mrna-' + id_
+                par = 'gene-' + id_
+                if pseudo:
+                    par = 'pseudo' + par
+                rnas[rna_par] = par
+                out_genes[par] = {
+                    'gene': [], 'tmrna': [], 'rna': [], 
+                    'cds': [], 'exon': [], 'texon': [], 
+                    'etc': [], 'pseudo': pseudo
+                    } # create an entry for the genes
+    
+                entry_scaf = copy.deepcopy(entry)
+                entry_scaf['attributes'] = entry_scaf['attributes'].replace(f'ID={id_}',
+                                                        f'ID={rna_par};Parent={par}')
+                entry_scaf['type'] = 'mRNA'
+                out_genes[par]['rna'].append(entry_scaf)
+                gene_scaf = copy.deepcopy(entry)
+                gene_scaf['type'] = 'gene'
+                if pseudo:
+                    gene_scaf['type'] = 'pseudogene'
+                gene_scaf['attributes'] = gene_scaf['attributes'].replace(f'ID={id_}',
+                                                                          f'ID={par}')
+                out_genes[par]['gene'].append(gene_scaf)
+                entry['attributes'] = entry['attributes'].replace(f'ID={id_}', 
+                                                                  f'ID=cds-{id_};Parent={rna_par}')
+                id_ = 'cds-' + id_
+
             search = re.search(comps['prot'], entry['attributes'])
             if search: # search for protein
                 prot = search.groups()[0] # try the first search
@@ -147,10 +179,10 @@ def add_missing(gff_list, intron, comps, ome):
                 addEntry['type'] = 'gene'
                 geneID = id_.replace('rna-', 'gene-')
                 if geneID == id_:
-                    if id_.startswith('trna'):
-                        geneID = 'gene-' + id_
-                    else:
-                        raise RNAError(f'RNA ID annotated as gene: {entry}')
+#                    if id_.startswith('trna'):
+                    geneID = 'gene-' + id_
+ #                   else:
+#                        raise RNAError(f'RNA ID annotated as gene: {entry}')
                 addEntry['attributes'] = re.sub(r'ID=' + id_, 'ID=' + geneID, addEntry['attributes'])
                 #addEntry['attributes'].replace('ID=rna-', 'ID=gene-')
                 addEntry['attributes'] = addEntry['attributes'].replace(entry['type'], 'gene')
@@ -271,7 +303,6 @@ def add_missing(gff_list, intron, comps, ome):
             geneInfo['tmrna'][0]['type'] = 'mRNA'
             for cds in geneInfo['cds']:
                 cds['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + new_id, cds['attributes'])
-
             
         if geneInfo['rna']:
 #            if geneInfo['rna'][0]['type'] != 'mRNA' and not geneInfo['cds']:
@@ -374,7 +405,7 @@ def add_missing(gff_list, intron, comps, ome):
                                          entry['attributes'])
     return out_list, pseudocount
 
-def acquireFormat( gff_list ):
+def acquire_format(gff_list):
 
     prot_comp = re.compile(gff3Comps()['id'])
     gene = False
@@ -705,8 +736,6 @@ def rename_and_organize(gff_list):
                 out_gff.extend(sorted(entries[1:], key = lambda x: x['start']))
 
     return out_gff
-        
-  
 
 
 def curGff3(gff_list, ome, cur_seqids = False):
@@ -726,10 +755,11 @@ def curGff3(gff_list, ome, cur_seqids = False):
 def main(gff_path, ome, cur_seqids = False):
 
     if isinstance(gff_path, str):
-        gff = gff2list( format_path(gff_path) )
+        gff = gff2list(format_path(gff_path))
     elif isinstance(gff_path, list):
         gff = gff_path
-    typ = acquireFormat( gff )
+#    typ = acquire_format(gff)
+    typ = True
 
     if not typ:
         eprint('\tERROR: type unknown ', flush = True)
@@ -743,10 +773,10 @@ def main(gff_path, ome, cur_seqids = False):
 
 def cli():
     usage = 'Imports gene coordinates file gff3, ome and curates headers'
-    sys_start( sys.argv, usage, 3, files = [sys.argv[1]] )
-    cur_gff = main( format_path(sys.argv[1]), sys.argv[2] )
-    print( list2gff( cur_gff ) , flush = True)
-    sys.exit( 0 )
+    sys_start(sys.argv, usage, 3, files = [sys.argv[1]])
+    cur_gff = main(format_path(sys.argv[1]), sys.argv[2])
+    print(list2gff(cur_gff), flush = True)
+    sys.exit(0)
 
 
 if __name__ == '__main__':
