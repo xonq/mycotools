@@ -188,13 +188,27 @@ def calc_gc(gene):
 def gff2list(gff_info, path = True, error = True):
 
     gff_list_dict = []
+    data = []
     if path:
-        with open( gff_info, 'r' ) as raw_gff:
-            data = [x.split('\t') for x in raw_gff.read().split('\n') \
-                    if x and not x.startswith('#')]
+        with open(gff_info, 'r') as raw_gff:
+            for line in raw_gff:
+                d = line.rstrip()
+                if d and not d.startswith('#'):
+                    data.append(d.split('\t'))
+                elif d.startswith('##FASTA'):
+                    break
+#            data = [x.split('\t') for x in raw_gff.read().split('\n') \
+ #                   if x and not x.startswith('#')]
     else:
-        data = [x.split('\t') for x in gff_info.split('\n') \
-                if x and not x.startswith('#')]
+        for line in gff_info.split('\n'):
+            if not line.startswith('#') and line:
+                d = line.split('\t')
+                data.append(d)
+            elif line.startswith('##FASTA'):
+                break
+            
+#        data = [x.split('\t') for x in gff_info.split('\n') \
+ #               if x and not x.startswith('#')]
     try:
         for col_list in data:
             gff_list_dict.append({
@@ -209,7 +223,7 @@ def gff2list(gff_info, path = True, error = True):
     except ValueError:
         raise ValueError(str(col_list[4:6]) + ' invalid integer ' \
                         + 'conversion: ' + str(col_list))
-            
+
     return gff_list_dict
 
 
