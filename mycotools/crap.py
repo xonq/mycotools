@@ -591,14 +591,21 @@ def extract_locus_gene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_
 def svg2node(node):
     if node.is_leaf():
         try:
-            accName = re.search(r'_([^_]+_[^_]+$)', node.name)[1]
+            accName = re.search(r'([^_]+_[^_]+$)', node.name)[1]
             svg_path = svg_dir + accName + '.locus.svg'
             nodeFace = faces.ImgFace(svg_path)
             nodeFace.margin_top = 5
             nodeFace.margin_bottom = 5
             nodeFace.border.margin = 1
             faces.add_face_to_node(nodeFace, node, column = 0)
+        # assume the node is an ome code
         except TypeError:
+            svg_path = svg_dir + node.name + '.locus.svg'
+            nodeFace = faces.ImgFace(svg_path)
+            nodeFace.margin_top = 5
+            nodeFace.margin_bottom = 5
+            nodeFace.border.margin = 1
+            faces.add_face_to_node(nodeFace, node, column = 0)
             pass
 
 def svgs2tree(input_gene, og, tree_data, db, tree_path,
