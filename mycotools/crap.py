@@ -539,7 +539,8 @@ def extract_locus_svg_hg(extracted_genes, wrk_dir, hg2color, labels):
             )
 
 
-def extract_locus_gene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_dir, labels = True):
+def extract_locus_gene(gff3, ome, accs, gene2query, 
+                       plusminus, query2color, wrk_dir, labels = True):
     try:
         gff_list = gff2list(gff3)
     except FileNotFoundError:
@@ -591,14 +592,21 @@ def extract_locus_gene(gff3, ome, accs, gene2query, plusminus, query2color, wrk_
 def svg2node(node):
     if node.is_leaf():
         try:
-            accName = re.search(r'_([^_]+_[^_]+$)', node.name)[1]
+            accName = re.search(r'([^_]+_[^_]+$)', node.name)[1]
             svg_path = svg_dir + accName + '.locus.svg'
             nodeFace = faces.ImgFace(svg_path)
             nodeFace.margin_top = 5
             nodeFace.margin_bottom = 5
             nodeFace.border.margin = 1
             faces.add_face_to_node(nodeFace, node, column = 0)
+        # assume the node is an ome code
         except TypeError:
+            svg_path = svg_dir + node.name + '.locus.svg'
+            nodeFace = faces.ImgFace(svg_path)
+            nodeFace.margin_top = 5
+            nodeFace.margin_bottom = 5
+            nodeFace.border.margin = 1
+            faces.add_face_to_node(nodeFace, node, column = 0)
             pass
 
 def svgs2tree(input_gene, og, tree_data, db, tree_path,
@@ -656,6 +664,7 @@ def merge_color_palette(merges, query2color):
     return query2color
 
 def extend_color_palette(hgs, color_dict):
+    hgs = [str(x) for x in hgs]
     new_hgs = set(hgs).difference(set(color_dict.keys()))
     colors = getColors(len(hgs))
     new_colors = list(set(colors).difference(set(color_dict.values())))
@@ -664,7 +673,7 @@ def extend_color_palette(hgs, color_dict):
         try:
             color_dict[str(v)] = new_colors[i-cor_i]
         except IndexError:
-            eprint('\nWARNING: input too large for discrete arrow colors', flush = True)
+            eprint('\t\t\tWARNING: input too large for discrete arrow colors', flush = True)
             cor_i = i
             new_colors = colors
             color_dict[str(v)] = new_colors[i-cor_i]

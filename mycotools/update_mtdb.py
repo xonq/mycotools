@@ -1139,11 +1139,10 @@ def main():
 
     init_args = parser.add_argument_group('Initializiation')
     init_args.add_argument('-p', '--prokaryote', action = 'store_true',
-        help = '[PROKARY, -i]: experimental prokaryote MTDB')
+        help = '[PROKARY, -i]: Initialize prokaryote MTDB')
     init_args.add_argument('-u', '--update', action = 'store_true')
     init_args.add_argument('-i', '--init', 
-                           help = 'Initialize MTDB in dir; failed inits ' \
-                                + 'must be unlinked via mtdb -u prior to resume')
+                           help = 'Initialize MTDB in dir')
     init_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
     init_args.add_argument('-r', '--reference', 
         help = '[-i]: Initialize primary MTDB using a reference .mtdb')
