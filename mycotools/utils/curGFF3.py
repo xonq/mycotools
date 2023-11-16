@@ -44,8 +44,8 @@ def add_missing(gff_list, intron, comps, ome):
         if entry['type'].lower() not in accepted_types:
             if 'RNA' in entry['type']: # converts snRNAs
                 entry['type'] = 'RNA'
-            else:
-                continue
+#            else:
+ #               continue
         entry['attributes'] = \
             entry['attributes'].replace('proteinId', 'protein_id')
         entry['attributes'] = \
@@ -230,6 +230,10 @@ def add_missing(gff_list, intron, comps, ome):
             try:
                 par = re.search(comps['par'], entry['attributes'])[1]
             except TypeError: # skip no parents, should be a flag
+                out_genes[id_] = {
+                    'gene': [entry], 'tmrna': [], 'rna': [], 'cds': [], 
+                    'exon': [], 'texon': [], 'etc': [], 'pseudo': False 
+                    }
                 continue
             if entry['type'] == 'exon':
                 if par in rna_changes:
@@ -495,8 +499,9 @@ def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
             except TypeError: # missing alias, might be stripped from before
                 estranged_cds.append((id_, par))
 
-    trna_count, rrna_count, ptrna_count, rna_count, etc_count = 1, 1, 1, 1, 1
-    gene2alias = {}
+    trna_count, rrna_count, ptrna_count, rna_count = 1, 1, 1, 1
+    etc_counts = defaultdict(int)
+    gene2alias, nongene_par, par2par = {}, {}, {}
     estranged, gene_estranged = [], [] 
     for i, entry in enumerate(cur_list):
         alias_tag, rna_check = 'Alias=', False
@@ -509,9 +514,9 @@ def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                         for rna,alias in id_dict[id_].items():
                             alias_tag += alias + '|'
                     else: # no CDS associated with mRNA
-                        alias = ome + '_etc' + str(etc_count)
+                        alias = ome + '_etc' + str(etc_counts['etc'])
                         alias_tag += alias + '|'
-                        etc_count += 1
+                        etc_counts['etc'] += 1
                         for rna in mrnas[id_]:
                             id_dict[id_][rna] = alias
                             
@@ -551,10 +556,16 @@ def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                     id_dict[id_][rna] = alias
                     alias_tag += alias + '|'
                     rna_count += 1
-            if not rna_check and id_ not in pseudogenes: # no association with RNA
-                alias = ome + '_etc' + str(etc_count)
-                alias_tag += alias + '|'
-                etc_count += 1
+            if not rna_check:
+                if id_ not in pseudogenes: # no association with RNA
+                    alias = ome + '_etc' + str(etc_counts['etc'])
+                    alias_tag += alias + '|'
+                    etc_counts['etc'] += 1
+                else:
+                    alias = ome + '_pseudogene' + str(pseudocount)
+                    alias_tag += alias + '|'
+                    pseudocount += 1
+                
             alias_tag = alias_tag[:-1]
             if entry['attributes'].rstrip().endswith(';'):
                 entry['attributes'] += alias_tag
@@ -579,6 +590,15 @@ def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                     try:
                         par = re.search(comps['par'], entry['attributes'])[1]
                     except TypeError: # no parent
+                        alias_tag += f'{ome}_{entry["type"].lower()}{etc_counts[entry["type"]]}'
+#                        alias_tag += f'{ome}_{etc_counts[entry["type"]]}'
+                        etc_counts[entry['type']] += 1
+                        gene2alias[id_] = alias_tag
+                        if entry['attributes'].rstrip().endswith(';'):
+                            entry['attributes'] = entry['attributes'].rstrip() + alias_tag
+                        else:
+                            entry['attributes'] += f';{alias_tag}'
+                        nongene_par[id_] = alias_tag
                         continue
                     if id_ in gen_etcs:
                         if par in gene2alias:
@@ -593,6 +613,7 @@ def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
                         except KeyError: # no reference gene/reference transcript
 #                           eprint(re.search(comps['id'], entry['attributes'])[1], entry['type'])
                             estranged.append((i, id_,))
+                            par2par[id_] = par
                             continue
                 if entry['attributes'].rstrip().endswith(';'):
                     entry['attributes'] += alias_tag
@@ -601,25 +622,36 @@ def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
 
     for i, id_ in estranged:
         if not 'Alias=' in entry['attributes']:
-            gene = rnas[id_]
-            try: # acquire from the RNA retroactively
+            if id_ in rnas:
+                gene = rnas[id_]
+                try: # acquire from the RNA retroactively
+                    if cur_list[i]['attributes'].rstrip().endswith(';'):
+                        cur_list[i]['attributes'] += 'Alias=' + id_dict[gene][id_]
+                    else:
+                        cur_list[i]['attributes'] += ';Alias=' + id_dict[gene][id_]
+                except KeyError: # acquire from the gene
+                    if cur_list[i]['attributes'].rstrip().endswith(';'):
+                        cur_list[i]['attributes'] += 'Alias=' + id_dict[gene][gene]
+                    else:
+                        cur_list[i]['attributes'] += ';Alias=' \
+                                                  +  id_dict[gene][gene]
+                    id_dict[gene][id_] = id_dict[gene][gene]
+                    # this assumes that for the case where CDSs' parents are genes,
+                    # and mRNAs thus aren't related to the CDS alias directly, then
+                    # the RNA can be related to the alias through just the gene;
+                    # however, this will overlook alternately spliced genes in this
+                    # rare instance. Ideally, CDS parents should be curated to the
+                    # RNA somehow
+            else:
+                while id_ in par2par:
+                    id_ = par2par[id_]
+                alias = nongene_par[id_]
                 if cur_list[i]['attributes'].rstrip().endswith(';'):
-                    cur_list[i]['attributes'] += 'Alias=' + id_dict[gene][id_]
+                    cur_list[i]['attributes'] += alias
                 else:
-                    cur_list[i]['attributes'] += ';Alias=' + id_dict[gene][id_]
-            except KeyError: # acquire from the gene
-                if cur_list[i]['attributes'].rstrip().endswith(';'):
-                    cur_list[i]['attributes'] += 'Alias=' + id_dict[gene][gene]
-                else:
-                    cur_list[i]['attributes'] += ';Alias=' \
-                                              +  id_dict[gene][gene]
-                id_dict[gene][id_] = id_dict[gene][gene]
-                # this assumes that for the case where CDSs' parents are genes,
-                # and mRNAs thus aren't related to the CDS alias directly, then
-                # the RNA can be related to the alias through just the gene;
-                # however, this will overlook alternately spliced genes in this
-                # rare instance. Ideally, CDS parents should be curated to the
-                # RNA somehow
+                    cur_list[i]['attributes'] += ';' + alias
+
+
     for i, id_ in gene_estranged:
         if not 'Alias=' in entry['attributes']:
             if id_ in gene2alias:
@@ -633,11 +665,13 @@ def compile_genes(cur_list, ome, pseudocount = 0, comps = gff3Comps(),
 
 def rename_and_organize(gff_list):
     alias2geneid, geneid2alias = {}, {}
-    scaf2gene2entries = defaultdict(lambda: defaultdict(lambda: {'gene': None, 'rna': {}}))
+    scaf2gene2entries = defaultdict(lambda: defaultdict(lambda: {'gene': None, 'rna': {}, 'etc': {}}))
+    #scaf2gene2entries = defaultdict(lambda: defaultdict(lambda: {'gene': {}, 'rna': {}}))
+
     todel = []
     for i, entry in enumerate(gff_list):
+        seqid = entry['seqid']
         if entry['type'] in {'pseudogene', 'gene'}:
-            seqid = entry['seqid']
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             alias_list = alias.split('|')
             if len(alias_list) > 1:
@@ -654,6 +688,21 @@ def rename_and_organize(gff_list):
                                          entry['attributes'])
             scaf2gene2entries[seqid][gene_id]['gene'] = [entry]
             todel.append(i)
+        elif 'RNA' not in entry['type'] \
+            and entry['type'].lower() not in {'cds', 'exon', 'three_prime_utr',
+                                              'five_prime_utr'}:
+            par = re.search(gff3Comps()['par'], entry['attributes'])
+            if par is None:
+                alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+                new_id = entry['type'].lower() + '_' + alias
+                alias2geneid[alias] = new_id
+                geneid2alias[new_id] = alias
+                entry['attributes'] = re.sub(gff3Comps()['id'], f'ID={new_id}',
+                                             entry['attributes'])
+                scaf2gene2entries[seqid][new_id]['gene'] = [entry]
+                todel.append(i)
+            
+                
 
     for i in reversed(todel):
         del gff_list[i]
@@ -705,7 +754,7 @@ def rename_and_organize(gff_list):
             par_id = alias2geneid[alias]
             entry['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + par_id,
                                          entry['attributes'])
-            scaf2gene2entries[entry['seqid']][par_id]['gene'][alias].append(entry)
+            scaf2gene2entries[entry['seqid']][par_id]['gene'].append(entry)
         else:
             par_id = re.search(gff3Comps()['par'], entry['attributes'])[1]
             if par_id in rnaid2alias:
@@ -720,7 +769,7 @@ def rename_and_organize(gff_list):
                                          entry['attributes'])
             entry['attributes'] = re.sub(gff3Comps()['Alias'], 'Alias=' + new_alias,
                                          entry['attributes'])
-            scaf2gene2entries[entry['seqid']][gene_id]['gene'][new_alias].append(entry)
+            scaf2gene2entries[entry['seqid']][gene_id]['etc'][new_alias].append(entry)
 
     out_gff = []
     for seqid in sorted(scaf2gene2entries.keys()):
