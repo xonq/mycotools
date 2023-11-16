@@ -85,19 +85,19 @@ prefix, 'mtdb'. Pseudogenes, tRNAs, and rRNAs aliases will format as
 
 ### `gff3` gene coordinates file standard
 MTDB attempts to curate, assimilate, and modernize MycoCosm and NCBI
-legacy data. All proteins, associated transcripts, 
-exons, gene, UTRs, and CDSs will include `;Alias=<ome>_<acc>` in the attributes
-column. 
+legacy data. All entries will contain an MTDB alias in the attributes field.
 All attribute fields will contain `ID=[^;]+`, `Alias=[^;]+`; 
 Non-gene entries will have a parent field `Parent=[^;]+` that relates the entry
-to its parent RNA and each RNA to their parent gene.
+to its parent RNA and each RNA to their parent gene. For non-gene terminal entries
+(when the highest entry in a hierarchy is not a gene/pseudogene), these entries will
+be assigned an Alias that corresponds to their type field
 
 On the occassion GFF entries are not given an Alias, *assume that these are
 ignored by Mycotools*; while curation is fairly robust for JGI and NCBI GFFs,
 other GFFs may have cryptic formatting discrepancies. CDSs without an alias will 
 not be translated into the proteome `faa` fasta.
 
-#### - permitted `gff3` sequence type fields: 
+#### - RNA-related `gff3` sequence type fields: 
 - gene, pseudogene: contains the terminal ID of descendant entries and alias (Alias=.*;) that contains
   all MTDB aliases derived from the gene, separated by `|`. `ID=gene_<ACC>`
 - mRNA, tRNA, rRNA, RNA: `RNA` is synonymous with `transcript` and represents
