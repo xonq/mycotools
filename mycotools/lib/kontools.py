@@ -432,7 +432,7 @@ def format_path(path, force_dir = False):
 
         path = path.replace('/./', '/')
         while '/../' in path:
-            path = re.sub(r'[^/]+/\.\./', '', path)
+            path = re.sub(r'[^/]+/\.\./(.*)', r'\1', path)
     
     return path
 
