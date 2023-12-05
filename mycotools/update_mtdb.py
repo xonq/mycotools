@@ -39,7 +39,7 @@ from mycotools.jgiDwnld import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
 from mycotools.predb2mtdb import main as predb2mtdb
-from mycotools.predb2mtdb import predb_headers
+from mycotools.predb2mtdb import predb_headers, read_predb
 from mycotools.assemblyStats import main as assStats
 from mycotools.annotationStats import main as annStats
 
@@ -1146,6 +1146,8 @@ def main():
     init_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
     init_args.add_argument('-r', '--reference', 
         help = '[-i]: Initialize primary MTDB using a reference .mtdb')
+    init_args.add_argument('--predb', 
+        help = '[-i]: Initialize primary MTDB using a reference predb .tsv')
     init_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
 #    init_args.add_argument('--reinit', action = 'store_true', help = 'Redownload all web data')
 #    parser.add_argument('--rogue', action = 'store_true', 
@@ -1191,10 +1193,19 @@ def main():
     elif args.lineage and not args.init:
         eprint('\nERROR: --lineage requires --init')
         sys.exit(17)
+    elif args.predb and not args.init:
+        eprint('\nERROR: --predb requires --init')
+        sys.exit(18)
+    elif args.predb and args.lineage:
+        eprint('\nERROR: --predb and --lineage are incompatible')
+        sys.exit(20)
     elif args.reference:
         if args.add:
             eprint('\nERROR: --add and --reference are incompatible')
             sys.exit(13)
+        elif args.predb:
+            eprint('\nERROR: --reference and --predb are incompatible')
+            sys.exit(19)
         else:
             ref_db = mtdb(format_path(args.reference), add_paths = False)
 
@@ -1285,8 +1296,68 @@ def main():
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
-    if args.add: # add predb2mtdb 2 master database
-        addDB = mtdb(format_path(args.add))
+
+    if args.init:
+        if args.prokaryote:
+            dbtype = 'prokaryote'
+        else:
+            dbtype = 'fungi'
+        init_dir = format_path(args.init)
+        if os.path.isdir(init_dir):
+            init_dir += 'mycotoolsdb/'
+        if not init_dir.endswith( '/' ):
+             init_dir += '/'
+        envs = { 
+            'MYCOFNA': init_dir + 'data/fna', 
+            'MYCOFAA': init_dir + 'data/faa', 
+            'MYCOGFF3': init_dir + 'data/gff3', 
+            'MYCODB': init_dir + 'mtdb/'
+            }
+        os.environ['MYCODB'] = init_dir + 'mtdb/'
+        output, config = initDB( 
+            init_dir, dbtype, envs, dbtype, date = date, 
+            rogue = rogue_bool, nonpublished = nonpublished,
+            jgi = jgi, repo = format_path(args.reference),
+            rank2lineages = rank2lineages
+            )
+        for env in envs:
+            os.environ[env] = envs[env]
+        orig_db = db2df(mtdb()) # initialize a new database
+        update_path = output + 'log/' + date + '/'
+        if not os.path.isdir(update_path):
+            os.mkdir(update_path)
+        mtdb_initialize(init_dir, init = True) #init_dir + 'config/mtdb.json', init = True)
+    else:
+        output = format_path('$MYCODB/..')
+        update_path = output + 'log/' + date + '/'
+        if not os.path.isdir(update_path):
+            os.mkdir(update_path)
+        if not config['rogue']:            
+            old_db = db2df(db_path)
+            shutil.move(db_path, update_path + os.path.basename(db_path))
+            git_pull = subprocess.call([
+                'git', 'pull', '-C', output + 'mtdb', config['repository'], '-B', branch
+                 ], stdout = subprocess.PIPE, stderr = subprocess.PIPE 
+                )
+            new_db = db2df(primaryDB())
+            orig_db = pd.concat([old_db, new_db.loc[~new_db['ome'].isin(old_db.index)]])
+        else:
+            orig_db = db2df(primaryDB())
+
+    orig_db = orig_db.dropna(subset = ['ome'])
+
+
+    if args.add or args.predb: # add predb2mtdb 2 master database
+        if args.predb:
+            add_predb = read_predb(format_path(args.predb))
+            addDB, init_failed = predb2mtdb(add_predb, orig_db, update_path,
+                                           cpus = cpus, remove = remove, spacer = '\t\t')
+            if init_failed:
+                eprint('\nERROR: some genomes failed curation', flush = True)
+                sys.exit(23)
+ 
+        else:
+            addDB = mtdb(format_path(args.add))
         addDB['aquisition_date'] = [date for x in addDB['ome']] 
         # make date the acquisition time
         orig_mtdb = mtdb(primaryDB())
@@ -1329,54 +1400,7 @@ def main():
             os.remove(db_path)
         outro(start_time)
 
-    if args.init:
-        if args.prokaryote:
-            dbtype = 'prokaryote'
-        else:
-            dbtype = 'fungi'
-        init_dir = format_path(args.init)
-        if os.path.isdir(init_dir):
-            init_dir += 'mycotoolsdb/'
-        if not init_dir.endswith( '/' ):
-             init_dir += '/'
-        envs = { 
-            'MYCOFNA': init_dir + 'data/fna', 
-            'MYCOFAA': init_dir + 'data/faa', 
-            'MYCOGFF3': init_dir + 'data/gff3', 
-            'MYCODB': init_dir + 'mtdb/'
-            }
-        os.environ['MYCODB'] = init_dir + 'mtdb/'
-        output, config = initDB( 
-            init_dir, dbtype, envs, dbtype, date = date, 
-            rogue = rogue_bool, nonpublished = nonpublished,
-            jgi = jgi, repo = format_path(args.reference),
-            rank2lineages = rank2lineages
-            )
-        for env in envs:
-            os.environ[env] = envs[env]
-        orig_db = db2df(mtdb()) # initialize a new database
-        update_path = output + 'log/' + date + '/'
-        if not os.path.isdir(update_path):
-            os.mkdir(update_path)
-        mtdb_initialize(init_dir, init = True) #init_dir + 'config/mtdb.json', init = True)
-    else:
-        output = format_path('$MYCODB/..')
-        update_path = output + 'log/' + date + '/'
-        if not os.path.isdir( update_path ):
-            os.mkdir( update_path )
-        if not config['rogue']:            
-            old_db = db2df( db_path )
-            shutil.move( db_path, update_path + os.path.basename(db_path) )
-            git_pull = subprocess.call( [
-                'git', 'pull', '-C', output + 'mtdb', config['repository'], '-B', branch
-                    ], stdout = subprocess.PIPE, stderr = subprocess.PIPE 
-                )
-            new_db = db2df(primaryDB())
-            orig_db = pd.concat( [old_db, new_db.loc[~new_db['ome'].isin(old_db.index)]] )
-        else:
-            orig_db = db2df(primaryDB())
 
-    orig_db = orig_db.dropna(subset = ['ome'])
 
     if config['branch'] == 'prokaryote':
         jgi = False
