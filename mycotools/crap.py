@@ -611,7 +611,7 @@ def svg2node(node):
 
 def svgs2tree(input_gene, og, tree_data, db, tree_path,
               out_dir, root_key = None, midpoint = True,
-              ext = '.svg'):#svg_dir, out_dir):
+              ext = '.svg', circular = False):#svg_dir, out_dir):
     tree = Tree(tree_data)
     if root_key:
         tree.set_outgroup(root_key)
@@ -631,6 +631,9 @@ def svgs2tree(input_gene, og, tree_data, db, tree_path,
 
     tree = Tree(new_tree)
     ts = TreeStyle()
+    # make a circular tree
+    if circular:
+        ts.mode = "c"
     ts.layout_fn = svg2node
     ts.show_branch_support = True
     ts.branch_vertical_margin = 20
@@ -810,7 +813,8 @@ def crap_mngr(
     db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, 
     tree_suffix, genes2query, plusminus, query2color, 
     cpus = 1, verbose = False, hg = None, hgs = None, reoutput = True,
-    out_keys = [], labels = True, midpoint = True, ext = '.svg'
+    out_keys = [], labels = True, midpoint = True, ext = '.svg',
+    circular = False
     ):
 
     db = db.set_index('ome')
@@ -867,7 +871,7 @@ def crap_mngr(
             svgs2tree(
                 query, hg, raw_tree, db, tree_file,
                 out_dir, root_key, midpoint = midpoint,
-                ext = ext #svg_dir, out_dir
+                ext = ext, circular = circular #svg_dir, out_dir
                 )
         except NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
@@ -875,7 +879,8 @@ def crap_mngr(
         try:
             svgs2tree(
                 query, hg, raw_tree, db, tree_file,
-                out_dir, midpoint = midpoint, ext = ext #svg_dir, out_dir
+                out_dir, midpoint = midpoint, ext = ext,
+                circular = circular #svg_dir, out_dir
                 )
         except NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
@@ -887,7 +892,8 @@ def hg_main(
     clus_cons = 0.05, clus_var = 0.65, min_seq = 3, max_size = 250, cpus = 1,
     plusminus = 10000, verbose = False, reoutput = True, interval = 0.1,
     outgroups = True, labels = True, midpoint = True, faa_dir = None,
-    clus_meth = 'mmseqs easy-cluster', ext = '.svg', conversion_dict = {}
+    clus_meth = 'mmseqs easy-cluster', ext = '.svg', conversion_dict = {},
+    circular = False
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
@@ -998,7 +1004,7 @@ def hg_main(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, tree_suffix, 
             ome_gene2hg, plusminus, hg2color, cpus, verbose, HG, list(input_hgs.values()),
             reoutput = reoutput, out_keys = out_keys, labels = labels,
-            midpoint = midpoint, ext = ext
+            midpoint = midpoint, ext = ext, circular = circular
             )
 
     for query in fas4clus:
@@ -1038,7 +1044,8 @@ def hg_main(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, tree_suffix,
             ome_gene2hg, plusminus, hg2color, cpus, verbose, HG, 
             list(input_hgs.values()), reoutput = reoutput, labels = labels,
-            out_keys = out_keys, midpoint = midpoint, ext = ext
+            out_keys = out_keys, midpoint = midpoint, ext = ext, 
+            circular = circular
             )
 
 
@@ -1049,7 +1056,7 @@ def search_main(
     evalue = 1, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
     midpoint = True, clus_meth = 'mmseqs easy-linclust', ppos = 0,
-    max_hits = 1000, ext = '.svg'
+    max_hits = 1000, ext = '.svg', circular = False
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
@@ -1185,7 +1192,7 @@ def search_main(
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
             out_keys = out_keys, labels = labels, midpoint = midpoint,
-            ext = ext
+            ext = ext, circular = circular
             )
 
     if fas4clus:
@@ -1235,7 +1242,7 @@ def search_main(
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
             out_keys = out_keys, labels = labels, midpoint = midpoint,
-            ext = ext
+            ext = ext, circular = circular
             )
 
 
@@ -1350,6 +1357,11 @@ def cli():
     phy_opt.add_argument(
         '--no_label',
         help = 'Do not label synteny diagrams',
+        action = 'store_true'
+        )
+    phy_opt.add_argument(
+        '--circular',
+        help = 'Output circular phylogeny',
         action = 'store_true'
         )
 
@@ -1494,7 +1506,7 @@ def cli():
             interval = 0.1, labels = not args.no_label,
             outgroups = not args.no_outgroup, clus_meth = clus_meth,
             midpoint = not bool(args.no_midpoint), ext = out_ext,
-            conversion_dict = conversion_dict
+            conversion_dict = conversion_dict, circular = args.circular
             )
     else:
         new_log = init_log(
@@ -1506,14 +1518,20 @@ def cli():
         search_main(
             db, input_genes, input_fa, input_GFF, 
             binary = args.search, fast = fast, out_dir = out_dir,
-            clus_cons = args.min_cov, clus_var = 0.65, min_seq = args.min_seq, 
-            max_size = args.max_seq, cpus = 1, plusminus = args.plusminus, 
-            bitscore = args.bitscore, pident = args.identity, mem = None, 
-            verbose = args.verbose, interval = 0.1, ppos = args.positives,
+            clus_cons = args.min_cov, clus_var = 0.65, 
+            min_seq = args.min_seq, 
+            max_size = args.max_seq, cpus = 1, 
+            plusminus = args.plusminus, 
+            bitscore = args.bitscore, pident = args.identity, 
+            mem = None, 
+            verbose = args.verbose, interval = 0.1, 
+            ppos = args.positives,
             midpoint = not bool(args.no_midpoint),
-            outgroups = not args.no_outgroup, conversion_dict = conversion_dict, 
+            outgroups = not args.no_outgroup, 
+            conversion_dict = conversion_dict, 
             clus_meth = clus_meth, labels = not args.no_label,
-            max_hits = args.max_target_seq, ext = out_ext
+            max_hits = args.max_target_seq, ext = out_ext, 
+            circular = args.circular
             )
     outro(start_time)
 
