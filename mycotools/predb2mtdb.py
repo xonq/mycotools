@@ -48,17 +48,15 @@ def prep_output(base_dir):
             os.mkdir(dir_)
     return dirs[:2]
 
-def copy_file( old_path, new_path ):
-
+def copy_file(old_path, new_path):
     try:
-        shutil.copy( old_path, new_path )
+        shutil.copy(old_path, new_path)
         return True
     except:
         raise IOError
 
 
-def move_biofile(old_path, ome, typ, wrk_dir, suffix = '' ):
-
+def move_biofile(old_path, ome, typ, wrk_dir, suffix = ''):
     if old_path.endswith('.gz'):
         if not os.path.isfile(old_path[:-3]):
             temp_path = gunzip(old_path)
@@ -507,6 +505,10 @@ def main(
     verbose = False, spacer = '\t\t\t', forbidden = set(), 
     cpus = 1, exit = False, remove = False
     ):
+
+    for dir_ in [wrk_dir + 'fna/', wrk_dir + 'gff3/', wrk_dir + 'faa/']:
+        if not os.path.isdir(dir_):
+            os.mkdir(dir_)
 
     infdb = predb2mtdb(predb)
     vprint('\nGenerating omes', v = verbose, flush = True)
