@@ -36,9 +36,10 @@ def determine_version(toadd_gff, ome = None):
                 sys.exit(1)
             new_gff = curAnn(toadd_gff, ome)[0]
             return new_gff, gff3Comps()
-    else: # finished the for loop and no version detected
-        eprint('\nCould not determine gff version', flush = True)
-        sys.exit(4)
+    else: # finished the for loop and no version detected, assume gff3
+        return toadd_gff, gff3Comps()
+#        eprint('\nCould not determine gff version', flush = True)
+ #       sys.exit(4)
 
 
 def id_mtdb_accs(gff):
