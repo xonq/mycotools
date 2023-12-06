@@ -81,8 +81,8 @@ def cli():
     parser = argparse.ArgumentParser(description = 'Primary MycotoolsDB management utility')
     parser.add_argument('-c', '--clear_cache', action = 'store_true',
                         help = 'Clear MycotoolsDB legacy data')
-    parser.add_argument('-p', '--password', action = 'store_true',
-                        help = 'Encrypt NCBI/JGI passwords to expedite access')
+#    parser.add_argument('-p', '--password', action = 'store_true',
+ #                       help = '[NOT FUNCTIONAL] Encrypt NCBI/JGI passwords to expedite access')
     parser.add_argument('-r', '--restrict', 
                         help = 'Restrict assembly accessions file, formatted: ' \
                              + '<ACCESSION>\t<SOURCE>\t[REASON]')
