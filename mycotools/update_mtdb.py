@@ -1098,7 +1098,7 @@ def db2primary(addDB, refDB, save = False, combined = False):
     refOmes = set(refDB['ome'])
     addOmes = set(addDB['ome'])
     base_ome2update_ome = {re.search(r'^[^\d]+\d+', x)[0]: x \
-                           for x in refDB['ome']}
+                           for x in refDB['ome'] if x}
     updates = {}
     refDB = refDB.set_index()
     if refOmes.intersection(addOmes) and not combined:
@@ -1208,6 +1208,9 @@ def main():
             sys.exit(19)
         else:
             ref_db = mtdb(format_path(args.reference), add_paths = False)
+
+    if args.predb:
+        predb_path = format_path(args.predb)
 
 #    if args.rogue:
     rogue_bool = True
@@ -1349,9 +1352,10 @@ def main():
 
     if args.add or args.predb: # add predb2mtdb 2 master database
         if args.predb:
-            add_predb = read_predb(format_path(args.predb))
+            add_predb = read_predb(predb_path)
             addDB, init_failed = predb2mtdb(add_predb, orig_db, update_path,
-                                           cpus = cpus, remove = remove, spacer = '\t\t')
+                                           cpus = args.cpu, remove = False, 
+                                           spacer = '\t\t')
             if init_failed:
                 eprint('\nERROR: some genomes failed curation', flush = True)
                 sys.exit(23)
@@ -1397,7 +1401,8 @@ def main():
       #              if os.path.isfile(file_):
        #                 os.remove(file_)
         if new_db_path != db_path:
-            os.remove(db_path)
+            if db_path:
+                os.remove(db_path)
         outro(start_time)
 
 
