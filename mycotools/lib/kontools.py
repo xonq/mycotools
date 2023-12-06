@@ -188,11 +188,9 @@ def checkdir(dir_, unzip = False, to = None, rm = False):
     return False
 
 
-def eprint( *args, **kwargs ):
+def eprint(*args, **kwargs):
     '''Prints to stderr'''
-
     print(*args, file = sys.stderr, **kwargs)
-
 
 def fprint(out_str, log):
     with open(log, 'a') as out:
@@ -212,7 +210,7 @@ def vprint( toPrint, v = False, e = False , flush = True):
             print( toPrint, flush = True)
 
 
-def read_json( config_path, compress = False ):
+def read_json(config_path, compress = False):
 
     if compress or config_path.endswith('.gz'):
         with gzip.open( config_path, 'rt' ) as json_raw:
@@ -233,7 +231,7 @@ def write_json(obj, json_path, compress = False, indent = 1, **kwargs):
             json.dump(obj, json_out, indent = indent, **kwargs)
 
 
-def gunzip( gzip_file, remove = True, spacer = '\t' ):
+def gunzip(gzip_file, remove = True, spacer = '\t'):
     '''gunzips gzip_file and removes if successful'''
 
     new_file = re.sub( r'\.gz$', '', format_path(gzip_file) )
