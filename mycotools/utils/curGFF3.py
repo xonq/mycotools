@@ -53,7 +53,11 @@ def add_missing(gff_list, intron, comps, ome):
         # remove old alias if present
         entry['attributes'] = re.sub(r';?Alias=[^;]+', '', entry['attributes'])
         addEntry = None
-        id_ = re.search(comps['id'], entry['attributes'])[1]
+        # if there isn't an ID then the GFF is malformatted in the first place
+        try: 
+            id_ = re.search(comps['id'], entry['attributes'])[1]
+        except TypeError:
+            continue
         if 'gene' in entry['type']: # includes pseudogenes
             out_genes[id_] = {
                 'gene': [entry], 'tmrna': [], 'rna': [], 
