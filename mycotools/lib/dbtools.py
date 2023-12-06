@@ -86,7 +86,8 @@ class mtdb(dict):
         if os.stat(db_path).st_size == 0:
             return {x: [] for x in mtdb.columns}
         with open(format_path(db_path), 'r') as raw:
-            data = [x.rstrip().split('\t') for x in raw if not x.startswith('#')]
+            data = [x.rstrip().split('\t') for x in raw \
+                    if not x.startswith('#') and x.rstrip()]
         columns = self.columns
         for entry in data:
             [df[c].append('') for c in columns] # add a blank entry to each
