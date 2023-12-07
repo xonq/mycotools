@@ -2,6 +2,7 @@
 
 # NEED to implement fa2clus?
 # NEED to ignore non fasta inputs
+# NEED to work as a standalone script
 
 import os
 import re
@@ -517,8 +518,26 @@ def convert_seq_to_ome_name(trimmed_files, conv_dir):
     return new_trimmed_files
 
 
+def extract_supported(trimmed_files, min_mean_support, out_dir):
+    """Extract trees that meet the minimum summary support value"""
+    out_files = []
+    for f_ in trimmed_files:
+        t_path = f'{out_dir}{os.path.basename(f_)}.contree'
+        supports = check_tree_support(t_path)
+        mean_support = sum(supports)/len(supports)
+        if mean_support >= min_mean_support:
+            print(f'\t{os.path.basename(t_path)} {mean_support} passed', 
+                  flush = True)
+            out_files.append(f_)
+        else:
+            print(f'\t{os.path.basename(t_path)} {mean_support} failed', 
+                  flush = True)
+    return out_files
+
+
 def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
-                  ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep):
+                  ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep,
+                  min_mean_support):
     """Manage the execution of the multigene phylogeny execution from
     ModelFinding forward"""
 
@@ -542,6 +561,10 @@ def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
     print(spacer + 'Model finding', flush = True)
     models = run_mf(trimmed_files, wrk_dir, constraint,
                     verbose, cpus, spacer = spacer + '\t')
+    if min_mean_support:
+        print(spacer + 'Extracting passing trees', flush = True)
+        passing = extract_supported(trimmed_files, min_mean_support, out_dir)
+        models = {k: models[k] for k in passing}
 
     # build the concatenated NEXUS 
     print(spacer + 'Concatenating', flush = True)
@@ -565,12 +588,30 @@ def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
                        verbose, cpus, spacer = spacer)
 
 
+def check_tree_support(tree_file):
+    """Acquire the support values of a newick"""
+    t = Tree(tree_file)
+    supports = []
+    # parse the tree
+    for n in t.traverse():
+        # skip leaves and roots with null support
+        if not n.is_leaf():
+            if not n.is_root():
+                supports.append(n.support)
+
+    # adjust supports if they are 0 - 1
+    if any(x > 1 for x in supports): 
+        supports = [x/100 for x in supports]
+
+    return supports
+
+
 def main( 
     fasta_path, slurm = False, torque = False, fast = False, project = '', 
     output_dir = None, verbose = True, alignment = False, constraint = False,
     ome_conv = False, mem = '60GB', cpus = 1, spacer = '\t\t', align_stop = False, 
     tree_stop = False, flag_incomplete = True, start = 0, partition = False,
-    gappy = None
+    gappy = None, min_mean_support = 0
     ):
     """Python entry-point for fa2tree. Build a phylogeny from an inputted fasta
     of homologs. Align (mafft) -> trim (clipkit) -> ModelFinder (multigene
@@ -643,7 +684,8 @@ def main(
     # run multigene partition model phylogeny mode
     else:
         multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
-                      ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep)
+                      ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep,
+                      min_mean_support)
 
     if hpc:
         if slurm:
@@ -684,11 +726,11 @@ def cli():
 
     s_opt = parser.add_argument_group('Single tree options')
     s_opt.add_argument('-f', '--fast', action = 'store_true', \
-        help = 'Fasttree' )
-    s_opt.add_argument('-s', '--slurm', action = 'store_true', \
-        help = 'Submit ALL steps to Slurm' )
+        help = 'Fasttree')
+    s_opt.add_argument('--slurm', action = 'store_true', \
+        help = 'Submit ALL steps to Slurm')
     s_opt.add_argument('--torque', action = 'store_true', \
-        help = 'Submit ALL steps to Torque.' )
+        help = 'Submit ALL steps to Torque')
     s_opt.add_argument('-A', '--project', help = 'HPC project')
 
     m_opt = parser.add_argument_group('Partition tree options')
@@ -696,6 +738,8 @@ def cli():
         help = 'Multigene partition mode')
     m_opt.add_argument('-sa', '--stop_align', action = 'store_true',
         help = 'Stop after aligning and trimming, output tree scripts')
+    m_opt.add_argument('-s', '--support', default = 0, type = float,
+        help = 'Minimum mean node support to consider in final phylogeny')
     m_opt.add_argument('-sc', '--stop_cat', action = 'store_true',
         help = 'Stop after concatenating sequences')
     m_opt.add_argument('-m', '--missing', action = 'store_true',
@@ -718,6 +762,16 @@ def cli():
     else:
         findExecs(execs, execs)
 
+    if args.support:
+        if args.support > 1 or args.support < 0:
+            eprint('\nERROR: --support must be between 0 and 1')
+            sys.exit(3)
+        try:
+            from ete3 import Tree
+        except ImportError:
+            raise ImportError('Install ete3 into your ' \
+                + 'conda environment via `conda install ete3`')
+        
     output = format_path(args.output)
     if output:
         if not output.endswith('/'):
@@ -733,6 +787,7 @@ def cli():
         'Multigene partition': args.partition, 'Input alignments': bool(args.align),
         'Input trimmed': bool(args.trim), 'Constraint': args.constraint,
         'Ome conversion': args.ome, 'Gappy threshold': args.gappy,
+        'Minimum mean support': args.support,
         'Alignment stop': args.stop_align, 'Concatenation stop': args.stop_cat,
         'Ignore missing': args.missing, 'Torque': args.torque, 'Slurm': args.slurm, 
         'HPC project': args.project, 'Output': output, 'CPUs': args.cpus
@@ -760,7 +815,8 @@ def cli():
         ome_conv = args.ome, gappy = args.gappy,
         align_stop = args.stop_align, tree_stop = args.stop_cat,
         flag_incomplete = bool(not args.missing), start = start,
-        partition = bool(args.partition), cpus = args.cpus
+        partition = bool(args.partition), cpus = args.cpus,
+        min_mean_support = args.support
         )
 
     outro(start_time)
