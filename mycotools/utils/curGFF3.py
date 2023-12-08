@@ -30,7 +30,6 @@ class RNAError(Exception):
 class GeneError(Exception):
     pass
 
-
 def add_missing(gff_list, intron, comps, ome):
     accepted_types = {'pseudogene', 'pseudogenic_trna', 'trna',
                       'rrna', 'mrna', 'rna', 'transcript', 'gene',
