@@ -739,7 +739,8 @@ def cli():
     m_opt.add_argument('-sa', '--stop_align', action = 'store_true',
         help = 'Stop after aligning and trimming, output tree scripts')
     m_opt.add_argument('-s', '--support', default = 0, type = float,
-        help = 'Minimum mean node support to consider in final phylogeny')
+        help = 'Minimum mean node support to consider in final phylogeny' \
+             + '. Adopted from Gluck-Thaler et al. 2020 Scientific Advances')
     m_opt.add_argument('-sc', '--stop_cat', action = 'store_true',
         help = 'Stop after concatenating sequences')
     m_opt.add_argument('-m', '--missing', action = 'store_true',
