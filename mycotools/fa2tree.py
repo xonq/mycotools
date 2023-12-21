@@ -16,6 +16,12 @@ from mycotools.lib.kontools import eprint, vprint, collect_files, \
     format_path, intro, outro, findExecs, mkOutput, multisub
 from mycotools.lib.biotools import fa2dict, dict2fa
 from clipkit import clipkit
+try:
+    from ete3 import Tree
+except ImportError:
+    eprint('WARNING: ete3 not installed.\nInstall ete3 into your ' \
+                + 'conda environment via `conda install ete3`')
+
 
 # adopted from https://stackoverflow.com/a/2829036 for verbosity control
 class DummyFile(object):
@@ -218,7 +224,7 @@ def prepare_nexus(concat_fa, models, spacer = '\t'):
 
 
 def run_partition_tree(fa_file, nex_file, constraint,
-                       verbose, cpus, spacer = '\t'):
+                       tree_stop, verbose, cpus, spacer = '\t'):
     """Prepare and execute the command for multigene phylogeny
     reconstruction"""
     cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-nt', str(cpus),
@@ -227,6 +233,12 @@ def run_partition_tree(fa_file, nex_file, constraint,
     # add a topological constraint if necessary
     if constraint:
         cmd.extend(['-g', constraint])
+    if tree_stop:
+        print(spacer + 'Concatenated nexus and fasta outputted', 
+              flush = True)
+        print(' '.join(cmd), flush = True)
+        sys.exit(0)
+
     print(spacer + 'Tree building', flush = True)
     if verbose:
         run_tree = subprocess.call(cmd)
@@ -276,7 +288,7 @@ def run_tree_reconstruction(prefix, clipkit_file, out_dir, hpc, constraint,
     # previous scripts
     else: 
         vprint('\nOutputting bash script `tree.sh`.\n', v = verbose, flush = True)
-        with open(out_dir + prefix + '_tree.sh', 'w') as out:
+        with open(f'{out_dir}../{prefix}_tree.sh', 'w') as out:
             out.write(hpc + '\n\n' + ' '.join([str(x) for x in cmd]))
 
 
@@ -334,7 +346,7 @@ def prep_fasta_path_input(fasta_path, output_dir):
 
 def prep_fasta_list_input(fastas, output_dir):
     if not output_dir:
-        out_dir = mkOutput(output_dir_prep, 'fa2tree')
+        out_dir = mkOutput('./', 'fa2tree')
     else:
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
@@ -522,7 +534,7 @@ def extract_supported(trimmed_files, min_mean_support, out_dir):
     """Extract trees that meet the minimum summary support value"""
     out_files = []
     for f_ in trimmed_files:
-        t_path = f'{out_dir}{os.path.basename(f_)}.contree'
+        t_path = f'{out_dir}working/{os.path.basename(f_)}.contree'
         supports = check_tree_support(t_path)
         mean_support = sum(supports)/len(supports)
         if mean_support >= min_mean_support:
@@ -536,8 +548,8 @@ def extract_supported(trimmed_files, min_mean_support, out_dir):
 
 
 def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
-                  ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep,
-                  min_mean_support):
+                  ome2fa2gene, del_omes, verbose, cpus, spacer, hpc_prep,
+                  min_mean_support, tree_stop):
     """Manage the execution of the multigene phylogeny execution from
     ModelFinding forward"""
 
@@ -577,15 +589,11 @@ def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
         out.write(nex_data)
 
     # stop and allow the user to build the tree
-    if tree_stop:
-        print(spacer + 'Concatenated nexus and fasta outputted', 
-              flush = True)
-        sys.exit(0)
 
     # run the multigene phylogeny reconstruction
     run_partition_tree(out_dir + 'concatenated.fa', 
                        out_dir + 'concatenated.nex', constraint,
-                       verbose, cpus, spacer = spacer)
+                       tree_stop, verbose, cpus, spacer = spacer)
 
 
 def check_tree_support(tree_file):
@@ -684,8 +692,8 @@ def main(
     # run multigene partition model phylogeny mode
     else:
         multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
-                      ome2gfa2gene, del_omes, verbose, cpus, spacer, hpc_prep,
-                      min_mean_support)
+                      ome2fa2gene, del_omes, verbose, cpus, spacer, hpc_prep,
+                      min_mean_support, tree_stop)
 
     if hpc:
         if slurm:
@@ -739,7 +747,7 @@ def cli():
     m_opt.add_argument('-sa', '--stop_align', action = 'store_true',
         help = 'Stop after aligning and trimming, output tree scripts')
     m_opt.add_argument('-s', '--support', default = 0, type = float,
-        help = 'Minimum mean node support to consider in final phylogeny' \
+        help = '[0 < -s < 1] Minimum mean node support to consider in final phylogeny' \
              + '. Adopted from Gluck-Thaler et al. 2020 Scientific Advances')
     m_opt.add_argument('-sc', '--stop_cat', action = 'store_true',
         help = 'Stop after concatenating sequences')
@@ -767,11 +775,6 @@ def cli():
         if args.support > 1 or args.support < 0:
             eprint('\nERROR: --support must be between 0 and 1')
             sys.exit(3)
-        try:
-            from ete3 import Tree
-        except ImportError:
-            raise ImportError('Install ete3 into your ' \
-                + 'conda environment via `conda install ete3`')
         
     output = format_path(args.output)
     if output:
