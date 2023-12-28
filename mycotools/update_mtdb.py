@@ -1169,7 +1169,8 @@ def main():
     run_args = parser.add_argument_group('Runtime')
     run_args.add_argument('--save', action = 'store_true', 
         help = '[-u] Do not integrate/delete new data. -a to complete')
-    run_args.add_argument('--failed', action = 'store_true', help = 'Rerun failed')
+    run_args.add_argument('--failed', action = 'store_true', 
+        help = 'Rerun/ignore failed')
     run_args.add_argument('--forbidden', action = 'store_true', help = 'Rerun forbidden')
     run_args.add_argument('--no_md5', action = 'store_true', help = 'Skip NCBI MD5'
         + ' (expedite large reruns)')
@@ -1357,8 +1358,12 @@ def main():
                                            cpus = args.cpu, remove = False, 
                                            spacer = '\t\t')
             if init_failed:
-                eprint('\nERROR: some genomes failed curation', flush = True)
-                sys.exit(23)
+                if not args.failed:
+                    eprint('\nERROR: some genomes failed curation', flush = True)
+                    sys.exit(23)
+                else:
+                    eprint('\nWARNING: some genomes failed curation',
+                           flush = True)
  
         else:
             addDB = mtdb(format_path(args.add))
