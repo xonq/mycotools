@@ -34,21 +34,13 @@ def infer_rank(db, lineage):
     return rank
                             
 
-def extract_unique(db, allowed = 1, sp = True):
-    """Extract unique species (sp = True) or strains (sp = False) from an
-    MTDB"""
+def extract_unique(db, allowed = 1, rank = 'species'):
+    """Extract unique rank from an MTDB"""
     keys = copy.deepcopy(list(db.keys()))
     random.shuffle(keys)
     prep_db0 = {x: db[x] for x in keys}
     prep_db1 = mtdb().set_index('ome')
-    if sp:
-        found = defaultdict(int)
-        for ome, row in prep_db0.items():
-            name = row['taxonomy']['species']
-            found[name] += 1
-            if found[name] <= allowed:
-                prep_db1[ome] = row
-    else:
+    if rank == 'strain':
         found = set()
         for ome, row in prep_db0.items():
             name = row['taxonomy']['species'] + ' ' + row['strain']
@@ -57,6 +49,14 @@ def extract_unique(db, allowed = 1, sp = True):
             found_prep = list(found)
             found_prep.append(name)
             found = set(found_prep)
+    else:
+        found = defaultdict(int)
+        for ome, row in prep_db0.items():
+            name = row['taxonomy'][rank]
+            found[name] += 1
+            if found[name] <= allowed:
+                prep_db1[ome] = row
+            
     return prep_db1
 
 def extract_tax(db, lineages):
@@ -101,17 +101,15 @@ def extract_pub(db):
     return new_db
 
 def main( 
-    db, unique_strains = False, unique_species = 0, 
+    db, rank = None, x_number = 0, 
     lineage_list = [], omes_set = set(),
     source = None, nonpublished = False, inverse = False
     ):
     """Python entry point for extract_mtdb"""
 
     db = db.set_index('ome')
-    if unique_strains:
-        db = extract_unique(db, sp = False)
-    if unique_species > 0:
-        db = extract_unique(db, unique_species, sp = True)
+    if x_number > 0:
+        db = extract_unique(db, x_number, rank = rank)
 
     # extract each taxonomic entry based on the classification specified
     if lineage_list:
@@ -143,6 +141,8 @@ def main(
 
 
 def cli():
+    ranks = ['kingdom', 'phylum', 'subphylum', 'class', 'order',
+             'family', 'genus', 'species', 'strain']
     parser = argparse.ArgumentParser( description = \
        'Extracts a MycotoolsDB from arguments. E.g.\t`mtdb extract ' + \
        '-l Atheliaceae`' )
@@ -150,9 +150,10 @@ def cli():
     parser.add_argument('-s', '--source')
     parser.add_argument('-n', '--nonpublished', action = 'store_true', 
         help = 'Include restricted')
-    parser.add_argument('-u', '--unique_strain', action = 'store_true')
-    parser.add_argument('-a', '--allowed_sp', default = 0, type = int, 
-        help = 'Replicate species allowed' )
+    parser.add_argument('-r', '--rank', 
+        help = f'[-a] Taxonomic rank to pseudorandomly extract: {ranks}')
+    parser.add_argument('-a', '--allowed_rank', default = 0, type = int, 
+        help = '[-r] Number of replicate --rank allowed' )
     parser.add_argument('-i', '--inverse', action = 'store_true', 
         help = 'Inverse [source|lineage(s)|nonpublished]')
     parser.add_argument('-ol', '--ome', help = "File w/list of omes" )
@@ -166,12 +167,22 @@ def cli():
     db_path = format_path(args.mtdb)
 
 
-#    if (args.lineage or args.lineages) and not args.rank:
- #       eprint('\nERROR: need rank for lineage(s)', flush = True)
-  #      sys.exit(5)
     if args.lineage or args.lineages:
         eprint("\nWARNING: extracting taxonomy is subject to " \
              + "errors in NCBI's hierarchy\n")
+
+    # these arguments require one another
+    if args.rank and not args.allowed_rank:
+        eprint('\nERROR: --rank requires --allowed_rank', flush = True)
+        sys.exit(10)
+    elif args.allowed_rank and not args.rank:
+        eprint('\nERROR: --allowed_rank requres --rank', flush = True)
+        sys.exit(11)
+    elif args.rank:
+        args.rank = args.rank.lower()
+        if args.rank not in set(ranks):
+            eprint(f'\nERROR: --rank not in {ranks}', flush = True)
+            sys.exit(12)
 
     args.lineage = args.lineage.replace('"','').replace("'",'')
 
@@ -214,7 +225,8 @@ def cli():
 
     new_db = main( 
         db, lineage_list = lineage_list,
-        omes_set = omes, source = args.source, unique_species = args.allowed_sp, 
+        omes_set = omes, source = args.source, rank = args.rank, 
+        x_number = args.allowed_rank, 
         nonpublished = args.nonpublished, inverse = args.inverse
         )
     if args.new_mtdb:
