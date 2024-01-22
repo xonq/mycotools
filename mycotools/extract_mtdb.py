@@ -4,12 +4,14 @@
 # NEED stdin acceptance for most of these arguments
 
 import os
+import re
 import sys
 import copy
 import random
 import argparse
 from collections import defaultdict
-from mycotools.lib.kontools import file2list, intro, outro, format_path, eprint
+from mycotools.lib.kontools import file2list, intro, outro, format_path, \
+    eprint, mkOutput
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.db2files import mtdb_main as gen_full_mtdb
 
@@ -102,7 +104,7 @@ def extract_pub(db):
 
 def main( 
     db, rank = None, x_number = 0, 
-    lineage_list = [], omes_set = set(),
+    lineage_list = [], omes_set = set(), by_rank = False,
     source = None, nonpublished = False, inverse = False
     ):
     """Python entry point for extract_mtdb"""
@@ -135,7 +137,17 @@ def main(
         for ome, row in db.items():
             if ome not in new_omes:
                 inv_db[ome] = row
-        return inv_db.reset_index()
+        new_db = inv_db
+
+    if by_rank:
+        lineages = set(v['taxonomy'][rank] for k,v in new_db.items())
+        dbs = {}
+        for lineage in lineages:
+            if lineage:
+                dbs[lineage.lower()] = extract_tax(new_db, [lineage]).reset_index()
+            else:
+                dbs['unclassified'] = extract_tax(new_db, ['']).reset_index()
+        return dbs
     else:
         return new_db.reset_index()
 
@@ -151,9 +163,11 @@ def cli():
     parser.add_argument('-n', '--nonpublished', action = 'store_true', 
         help = 'Include restricted')
     parser.add_argument('-r', '--rank', 
-        help = f'[-a] Taxonomic rank to pseudorandomly extract: {ranks}')
+        help = f'[-a|-b] Taxonomic rank: {ranks}')
     parser.add_argument('-a', '--allowed_rank', default = 0, type = int, 
-        help = '[-r] Number of replicate --rank allowed' )
+        help = '[-r] Number of randomly sampled --rank allowed' )
+    parser.add_argument('-b', '--by_rank', action = 'store_true',
+        help = '[-r] Output MTDBs for each lineage in --rank')
     parser.add_argument('-i', '--inverse', action = 'store_true', 
         help = 'Inverse [source|lineage(s)|nonpublished]')
     parser.add_argument('-ol', '--ome', help = "File w/list of omes" )
@@ -172,12 +186,15 @@ def cli():
              + "errors in NCBI's hierarchy\n")
 
     # these arguments require one another
-    if args.rank and not args.allowed_rank:
-        eprint('\nERROR: --rank requires --allowed_rank', flush = True)
+    if args.by_rank and not args.rank:
+        eprint('\nERROR: --by_rank requires --rank', flush = True)
         sys.exit(10)
     elif args.allowed_rank and not args.rank:
         eprint('\nERROR: --allowed_rank requres --rank', flush = True)
         sys.exit(11)
+    elif args.rank and not args.allowed_rank and not args.by_rank:
+        eprint('\nERROR: --rank requires --allowed_rank or --by_rank', 
+               flush = True)
     elif args.rank:
         args.rank = args.rank.lower()
         if args.rank not in set(ranks):
@@ -226,14 +243,21 @@ def cli():
     new_db = main( 
         db, lineage_list = lineage_list,
         omes_set = omes, source = args.source, rank = args.rank, 
-        x_number = args.allowed_rank, 
+        x_number = args.allowed_rank, by_rank = args.by_rank,
         nonpublished = args.nonpublished, inverse = args.inverse
         )
     if args.new_mtdb:
         gen_full_mtdb(new_db, format_path(output),
             format_path(os.environ['MYCODB'] + '/../'))
-    elif args.output:
-        new_db.df2db(output)
+    elif args.output or args.by_rank:
+        if isinstance(new_db, mtdb):
+            new_db.df2db(output)
+        else:
+            out_dir = mkOutput(output, 'extract_mtdb')
+            prefix = re.sub(r'\.mtdb$', '', os.path.basename(db_path))
+            for lineage, db in new_db.items():
+                out_f = f'{out_dir}{prefix}.{lineage}.mtdb'
+                db.df2db(out_f)
     else:
         new_db.df2db(headers = bool(args.headers))
 
