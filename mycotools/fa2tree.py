@@ -228,7 +228,7 @@ def run_partition_tree(fa_file, nex_file, constraint,
     """Prepare and execute the command for multigene phylogeny
     reconstruction"""
     cmd = ['iqtree', '-s', fa_file, '-p', nex_file, '-nt', str(cpus),
-           '-B', '1000', '--sampling', 'GENESITE'] # this is not using the
+           '-B', '1000', '--sampling', 'GENESITE', '-safe'] # this is not using the
            # specified CPUs, but instead the most efficient
     # add a topological constraint if necessary
     if constraint:
@@ -544,6 +544,8 @@ def extract_supported(trimmed_files, min_mean_support, out_dir):
         else:
             print(f'\t{os.path.basename(t_path)} {mean_support} failed', 
                   flush = True)
+    print(f'\t{len(out_files)} ({len(out_files)/len(trimmed_files)*100}%)' \
+         + ' passed', flush = True)
     return out_files
 
 
