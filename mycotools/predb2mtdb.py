@@ -587,7 +587,7 @@ def cli():
 #    tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
  #   outdb, genus_dicts = assimilate_tax(omedb, tax_dicts)
   #  outdb.df2db(out_dir + 'predb2mtdb.mtdb')
-    ome2db.df2db(out_dir + 'predb2mtdb.mtdb')
+    omedb.df2db(out_dir + 'predb2mtdb.mtdb')
     sys.exit(0)
 
 
