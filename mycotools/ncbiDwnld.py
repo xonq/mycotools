@@ -632,23 +632,50 @@ def getSRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
         for record in records:
             srr = re.search(r'Run acc="(S\w+\d+)"', record['Runs'])[1]
             print('\t\t' + srr, flush = True)
+            cmd, count = 1, 0
             if pe:
-                subprocess.call([
-                    fastqdump, '--gzip', '--split-3', srr], 
-                    stdout = subprocess.PIPE)
-                if os.path.isfile(srr + '_1.fastq.gz'):
-                    shutil.move(srr + '_1.fastq.gz', assembly_acc + '_' + srr + '_1.fq.gz')
-                    shutil.move(srr + '_2.fastq.gz', assembly_acc + '_' + srr + '_2.fq.gz')
-                else:
-                    print('\t\t\tERROR: file failed', flush = True)
+                while cmd and count < 3:
+                    count += 1
+                    cmd = subprocess.call(['prefetch', srr, '--max-size', '10t'], 
+                                           stdout = subprocess.PIPE)
+                    if cmd:
+                        continue
+                    cmd = subprocess.call(['vdb-validate', srr], 
+                                          stdout = subprocess.PIPE)
+                    if cmd:
+                        continue
+                    cmd = subprocess.call([
+                        fastqdump, '--split-3', '--gzip', srr], 
+                        stdout = subprocess.PIPE)
+                    if os.path.isfile(srr + '_1.fastq'):
+  #                  if os.path.isfile(srr + '_1.fastq'):
+#                        cmd = subprocess.call(['gzip', f'{srr}_1.fastq'])
+ #                       cmd = subprocess.call(['gzip', f'{srr}_2.fastq'])
+                        shutil.move(srr + '_1.fastq.gz', assembly_acc + '_' + srr + '_1.fq.gz')
+                        shutil.move(srr + '_2.fastq.gz', assembly_acc + '_' + srr + '_2.fq.gz')
+                    else:
+#                        cmd = subprocess.call(['gzip', f'{srr}.fastq'])
+                        print('\t\t\tWARNING: file failed or not paired-end', flush = True)
             else:
-                subprocess.call([
-                    fastqdump, '--gzip', srr],
-                    stdout = subprocess.PIPE)
-                if os.path.isfile(srr + '.fastq.gz'):
-                    shutil.move(srr + '.fastq.gz', assembly_acc + '_' + srr + '.fq.gz')
-                else:
-                    print('\t\t\tERROR: file failed', flush = True)
+                while cmd and count < 3:
+                    count += 1
+                    cmd = subprocess.call(['prefetch', srr], stdout = subprocess.PIPE)
+                    if cmd:
+                        continue
+                    cmd = subprocess.call(['vdb-validate', srr], 
+                                          stdout = subprocess.PIPE)
+                    if cmd:
+                        continue
+                    cmd = subprocess.call([
+                        fastqdump, srr, '--gzip'], 
+                        stdout = subprocess.PIPE)
+                    if cmd:
+                        continue
+#                    cmd = subprocess.call(['gzip', f'{srr}.fastq'])
+                    if os.path.isfile(srr + '.fastq.gz'):
+                        shutil.move(srr + '.fastq.gz', assembly_acc + '_' + srr + '.fq.gz')
+                    else:
+                        print('\t\t\tERROR: file failed', flush = True)
 
 
 def goSRA(df, output = os.getcwd() + '/', pe = True):
@@ -693,14 +720,24 @@ def cli():
         help = 'NCBI database associated with column. ' \
             + '{"assembly", "biosample", "bioproject", "genome" ...}; ' \
             + 'DEFAULT: attempt to decipher')
-    parser.add_argument( '-o', '--output', help = 'Output directory' )
+    parser.add_argument('-o', '--output', help = 'Output directory' )
+    parser.add_argument('-e', '--email', help = 'NCBI email')
+    parser.add_argument('--api', help = 'NCBI API key for high query rate')
     args = parser.parse_args()
 
-    ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False) 
-
-    Entrez.email = ncbi_email
-    if ncbi_api:
-        Entrez.api_key = ncbi_api
+    if args.email:
+        ncbi_email = args.email
+        Entrez.email = ncbi_email
+        if args.api:
+            ncbi_api = args.api
+            Entrez.api_key = ncbi_api
+        else:
+            ncbi_api = None
+    else:
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False) 
+        Entrez.email = ncbi_email
+        if ncbi_api:
+            Entrez.api_key = ncbi_api
 
     if not args.output:
         output = os.getcwd() + '/'
