@@ -640,6 +640,8 @@ def prep_output(output, mkdir = True, require_newdir = False, cd = False):
 
 def mkOutput(base_dir, program, reuse = True, 
              suffix = datetime.now().strftime('%Y%m%d')):
+    if not base_dir:
+        base_dir = os.getcwd() + '/'
     if not os.path.isdir(format_path(base_dir)):
         raise FileNotFoundError(base_dir + ' does not exist')
     if suffix:
