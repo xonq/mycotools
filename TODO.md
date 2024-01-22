@@ -129,3 +129,4 @@
 - [ ] option to not dereplicate by genus and species alone
 - [ ] main MTDB files for prokaryotes and fungi uploaded and that can be parsed
 - [ ] add option to update taxonomy of existing entries
+- [ ] sp. will also not dereplicate
