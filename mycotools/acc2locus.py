@@ -159,6 +159,7 @@ def main(gff_list, accs, plusminus = 10, mycotools = False,
     out_indices = {k: v for k, v in out_indices.items() if v}
     if geneGff: # if a gff of the RNA entries is desired
         geneGffs_prep = {acc: {} for acc in out_indices}
+        alt_geneGffs_prep = {acc: {} for acc in out_indices}
         gene_sets = {acc: set(genes) for acc, genes in out_indices.items()}
         for entry in gff_list:
             if 'RNA' in entry['type']:
@@ -171,6 +172,15 @@ def main(gff_list, accs, plusminus = 10, mycotools = False,
 #                            break # if one gene is in multiple loci it needs to show up
                 except TypeError: # no alias
                     pass
+            elif 'gene' in entry['type']:
+                try:
+                    gene = re.search(gff3Comps()['Alias'],
+                                     entry['attributes'])[1]
+                    for acc, genes in gene_sets.items():
+                        if gene in genes:
+                            alt_geneGffs_prep[acc][gene] = entry
+                except TypeError: # no alias
+                    pass
 
         geneGffs, todel = {}, []
         for acc in out_indices:
@@ -179,7 +189,10 @@ def main(gff_list, accs, plusminus = 10, mycotools = False,
                 try:
                     geneGffs[acc].append(geneGffs_prep[acc][gene])
                 except KeyError: # gene without rna
-                    raise KeyError('gene without RNA: ' + gene)
+                    try:
+                        geneGffs[acc].append(alt_geneGffs_prep[acc][gene])
+                    except KeyError: # try to grab a gene
+                        raise KeyError('gene without RNA/gene entry: ' + gene)
 #                    todel.append((acc, gene))
         for acc, gene in todel:
             del out_indices[acc][gene]
