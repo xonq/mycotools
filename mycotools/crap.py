@@ -490,7 +490,7 @@ def extract_locus_hg(gff3, ome, genes_to_grab, hgs, ome_gene2hg,
         out_indices, rna_gff = acc2locus(gff_list, genes_to_grab, 
                                           plusminus, mycotools = True, 
                                           geneGff = True, nt = True)
-    except KeyError:
+    except ValueError: #KeyError:
         eprint(f'\t\t\tWARNING: {ome} could not parse GFF', flush = True)
         return
 
@@ -704,7 +704,7 @@ def make_color_palette(inputs, conversion_dict = {}):
         "#920000","#924900","#db6d00","#24ff24","#ffff6d"
         ]
     extColors = [
-        "F0A3FF", "#0075DC", "#993F00", "#4C005C", "#191919",
+        "#F0A3FF", "#0075DC", "#993F00", "#4C005C", "#191919",
         "#005C31", "#2BCE48", "#FFCC99", "#808080", "#94FFB5",
         "#8F7C00", "#9DCC00", "#C20088", "#003380", "#FFA405",
         "#FFA8BB", "#426600", "#FF0010", "#5EF1F2", "#00998F",
