@@ -311,11 +311,23 @@ def extract_nschg_pairs(nschgs, hgpair2i, m_arr):
     return valid_arr
 
 
+def rm_invariate_sites(arr):
+    """Remove invariate sites to not violate assumptions of ascertainment bias
+    correction model. Sum the array columns and find sums equal to the number
+    rows. There should be no 0 invariate columns."""
+    sum_arr = np.sum(arr, axis = 0)
+    inv_arr = np.where(sum_arr == arr.shape[0])[0]
+    new_arr = np.delete(arr, inv_arr, 1)
+    return new_arr
+
+
+
 def align_microsynt_np(m_arr, i2ome, hg2gene, hgpair2i, wrk_dir, nschgs = None):
     if not nschgs:
         nschgs = id_near_schgs(hg2gene, set(i2ome), max_hgs = 100,
                            max_median = 4, max_mean = 3)
-    trm_arr = extract_nschg_pairs(nschgs, hgpair2i, m_arr)
+    pre_arr = extract_nschg_pairs(nschgs, hgpair2i, m_arr)
+    trm_arr = rm_invariate_sites(pre_arr)
     with open(wrk_dir + 'microsynt.align.phy', 'w') as out:
         out.write(f'{trm_arr.shape[0]} {trm_arr.shape[1]}\n')
         [out.write(f'{i2ome[i]} {"".join([str(x) for x in trm_arr[i]])}\n') \
