@@ -6,7 +6,6 @@ import sys
 import argparse
 import multiprocessing as mp
 from collections import defaultdict
-from Bio.Seq import Seq
 from mycotools.lib.kontools import eprint, format_path, stdin2str
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps

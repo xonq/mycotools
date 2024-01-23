@@ -697,7 +697,8 @@ def cli():
         'bitscore is normalized 0-1 following -m and -x should be 0-1; DEFAULT: identity',
         default = 'identity'
         )
-
+    parser.add_argument('--interval', default = 0.1, type = float,
+        help = 'Cluster parameter adjustment interval; DEFAULT: 0.1')
     parser.add_argument('--linkage', default = 'single', 
         help = "[aggclus]: Linkage criterion: " \
         + "'complete' (maximum distance), 'average', 'weighted', " \
@@ -742,7 +743,9 @@ def cli():
 
     findExecs([args.alignment.split()[0]], 
                exit = set(args.alignment.split()[0]))
-    interval = 0.1
+    interval = args.interval
+    if args.interval < 0 or args.interval > 1:
+        eprint('\nERROR: --interval must be between 0 and 1', flush = True)
 
 #    if args.iterative and args.alignment in {'diamond', 'usearch'}:
  #       clus_var = 1 - args.cluster_constant
