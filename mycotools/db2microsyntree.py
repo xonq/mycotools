@@ -406,8 +406,7 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
 #    if return_post_compile:
  #       return ome2i, gene2hg, i2ome, hg2gene, None, None
 
-
-    
+    # remove genomes that are not in the db
     missing_from_db = set(ome2i.keys()).difference(set(db.keys()))
     print('\t\tOmes:', len(ome2i), flush = True)
     if missing_from_db:
@@ -429,13 +428,12 @@ def main(db, hg_file, out_dir, wrk_dir, algorithm,
         ome2i = {ome: i for i, ome in enumerate(i2ome)} 
         with open(wrk_dir + 'ome2i.tsv', 'w') as out:
             out.write(
-                '\n'.join([k + '\t' + str(v) for k, v in ome2i.items()])
+                '\n'.join([k + '\t' + str(v) \
+                for k, v in ome2i.items()])
                 )
 
     print('\t\tHGs:', len(hg2gene), flush = True)
     print('\t\tGenes:', len(gene2hg), flush = True)
-
-
 
      # compile cooccuring pairs of homogroups in each genome
     print('\tCompiling all loci', flush = True)
