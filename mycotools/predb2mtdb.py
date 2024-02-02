@@ -113,7 +113,8 @@ def read_predb(predb_path, spacer = '\t'):
     i2header = {}
     with open(predb_path, 'r') as raw:
         for i, line in enumerate(raw):
-            if line.startswith('#'):
+            # flexibly identify headers from the first column
+            if line.startswith('#') and not i2header and i == 0:
                 d = line.split('\t')
                 for i0, head_p in enumerate(d):
                     head = head_p.rstrip()
@@ -131,9 +132,9 @@ def read_predb(predb_path, spacer = '\t'):
  #               if not headers:
   #                  predb = {x: [] for x in line.rstrip()[1:].split('\t')}
    #                 headers = list(predb.keys())
-            if not line.startswith('#') and line.rstrip():
-#            if line.rstrip():
+            elif not line.startswith('#') and line.rstrip():
                 entry = line.split('\t')
+                # proceed with default header organization scheme
                 if not i2header:
                     if len(entry) != len(predb_headers):
                         eprint(spacer + 'ERROR: Incorrect columns, line ' + str(i),
@@ -142,6 +143,7 @@ def read_predb(predb_path, spacer = '\t'):
                         sys.exit(3)
                     for i1, v in enumerate(entry):
                         predb[predb_headers[i1]].append(v.rstrip())
+                # allow for flexible header identification
                 else:
                     used = []
                     for i1, v in enumerate(entry):
@@ -150,6 +152,7 @@ def read_predb(predb_path, spacer = '\t'):
                             predb[head].append(v.rstrip()) 
                             used.append(i1)
                     for mi in set(i2header.keys()).difference(set(used)):
+                        print(mi, flush = True)
                         predb[i2header[mi]].append('')
     
     try:
