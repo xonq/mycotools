@@ -28,6 +28,7 @@ predb_headers = [
     'useRestriction (yes/no)', 'published'
     ]
 
+
 def acq_forbid_omes(file_path):
     """Parse a file with forbidden ome accessions - ome codes that have been
     used before and are no longer valid"""
@@ -95,12 +96,31 @@ def gen_predb():
     return outputStr
 
 def read_predb(predb_path, spacer = '\t'):
+    """Read in a predatbase TSV and attempt to acquire the necessary columns
+    for converting into the predb dataframe"""
+
+    required_headers = {'assembly_accession', 'genus', 'assemblyPath',
+                    'gffPath', 'genomeSource (ncbi/jgi/new)'}
 
 #    predb, headers = {}, None
     predb = defaultdict(list)
+    i2header = {}
     with open(predb_path, 'r') as raw:
         for i, line in enumerate(raw):
-#            if line.startswith('#'):
+            if line.startswith('#'):
+                d = line.split('\t')
+                for i0, head in enumerate(d):
+                    if head in predb_headers:
+                        i2header[i0] = head
+                    elif head.replace('#', '') in predb_headers:
+                        i2header[i0] = head.replace('#','')
+
+                missing_headers = \
+                    required_headers.difference(set(i2header.values()))
+                if missing_headers:
+                    eprint(f'{spacer}ERROR: Required columns missing: ' \
+                         + f'{missing_headers}', flush = True)
+                    sys.exit(4)
  #               if not headers:
   #                  predb = {x: [] for x in line.rstrip()[1:].split('\t')}
    #                 headers = list(predb.keys())
@@ -108,14 +128,19 @@ def read_predb(predb_path, spacer = '\t'):
 #            if line.rstrip():
                 line = line.replace('\n','')
                 entry = line.split('\t')
-                if len(entry) != len(predb_headers):
-                    eprint(spacer + 'ERROR: Incorrect columns, line ' + str(i),
-                           flush = True)
-                    eprint(predb_headers, '\n', entry, flush = True)
-                    sys.exit(3)
-                for i, v in enumerate(entry):
-                    predb[predb_headers[i]].append(v.rstrip())
-
+                if not i2header:
+                    if len(entry) != len(predb_headers):
+                        eprint(spacer + 'ERROR: Incorrect columns, line ' + str(i),
+                               flush = True)
+                        eprint(predb_headers, '\n', entry, flush = True)
+                        sys.exit(3)
+                    for i1, v in enumerate(entry):
+                        predb[predb_headers[i1]].append(v.rstrip())
+                else:
+                    for i1, v in enumerate(entry):
+                        head = i2header[i1]
+                        predb[head].append(v.rstrip()) 
+    
     predb = dict(predb)
     try:
         predb['assembly_acc'] = predb['assembly_accession']
