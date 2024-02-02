@@ -178,6 +178,8 @@ def read_predb(predb_path, spacer = '\t'):
         for x in predb['source']):
         eprint(spacer + 'ERROR: genomeSource entries must be in {jgi, ncbi, new}', flush = True)
         sys.exit(5)
+
+    missing_from_predb = list(set(predb_headers).difference(set(predb.keys())))
     for i, path in enumerate(predb['assemblyPath']):
         predb['assemblyPath'][i] = format_path(predb['assemblyPath'][i])
         predb['gffPath'][i] = format_path(predb['gffPath'][i])
@@ -187,6 +189,8 @@ def read_predb(predb_path, spacer = '\t'):
             predb['restriction'][i] = ''
         if not predb['species'][i]:
             predb['species'][i] = 'sp.'
+        for missing_header in missing_from_predb:
+            predb[missing_header] = ''
     return predb
 
 def sub_disallowed(data, disallowed = r"""[^\w\d]"""):
