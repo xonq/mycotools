@@ -153,7 +153,7 @@ def read_predb(predb_path, spacer = '\t'):
                             used.append(i1)
                     for mi in set(i2header.keys()).difference(set(used)):
                         predb[i2header[mi]].append('')
-    
+
     try:
         predb['assembly_acc'] = predb['assembly_accession']
         del predb['assembly_accession']
@@ -167,8 +167,10 @@ def read_predb(predb_path, spacer = '\t'):
         if not 'genomeSource' in predb and not 'source' in predb:
             raise KeyError
     try:
-        predb['restriction'] = predb['useRestriction (yes/no)']
-        del predb['useRestriction (yes/no)']
+        if 'restriction' not in predb \
+            and predb['useRestriction (yes/no)'] in predb:
+            predb['restriction'] = predb['useRestriction (yes/no)']
+            del predb['useRestriction (yes/no)']
         if any(x.lower() not in {'y', 'n', 'yes', 'no', '', 'true', 'false'} for x in predb['restriction']):
             eprint(spacer + 'ERROR: useRestriction entries must be in {y, n, yes, no}', flush = True)
             sys.exit(4)
@@ -193,8 +195,9 @@ def read_predb(predb_path, spacer = '\t'):
             predb['restriction'][i] = ''
         if not predb['species'][i]:
             predb['species'][i] = 'sp.'
+        # add a blank entry for each missing column from the entire predb
         for missing_header in missing_from_predb:
-            predb[missing_header][i] = ''
+            predb[missing_header].append('')
 
     return dict(predb)
 
