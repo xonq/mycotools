@@ -133,7 +133,6 @@ def read_predb(predb_path, spacer = '\t'):
    #                 headers = list(predb.keys())
             if not line.startswith('#') and line.rstrip():
 #            if line.rstrip():
-                line = line.replace('\n','')
                 entry = line.split('\t')
                 if not i2header:
                     if len(entry) != len(predb_headers):
@@ -144,10 +143,14 @@ def read_predb(predb_path, spacer = '\t'):
                     for i1, v in enumerate(entry):
                         predb[predb_headers[i1]].append(v.rstrip())
                 else:
+                    used = []
                     for i1, v in enumerate(entry):
                         if i1 in i2header:
                             head = i2header[i1]
                             predb[head].append(v.rstrip()) 
+                            used.append(i1)
+                    for mi in set(i2header.keys()).difference(set(used)):
+                        predb[i2header[mi]] = ''
     
     try:
         predb['assembly_acc'] = predb['assembly_accession']
