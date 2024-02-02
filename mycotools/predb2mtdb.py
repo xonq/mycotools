@@ -101,12 +101,12 @@ def read_predb(predb_path, spacer = '\t'):
 
     required_headers = {'assembly_accession', 'genus', 'assemblyPath',
                     'gffPath', 'genomeSource (ncbi/jgi/new)'}
-    allowed_headers = [
+    allowed_headers = {
         'assembly_accession', 'previous_ome', 
         'genus', 'species', 'strain', 'version', 'biosample',
         'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
         'useRestriction (yes/no)', 'published', 'restriction',
-    ]
+    }
 
 #    predb, headers = {}, None
     predb = defaultdict(list)
@@ -116,9 +116,9 @@ def read_predb(predb_path, spacer = '\t'):
             if line.startswith('#'):
                 d = line.split('\t')
                 for i0, head in enumerate(d):
-                    if head in predb_headers:
+                    if head in allowed_headers:
                         i2header[i0] = head
-                    elif head.replace('#', '') in predb_headers:
+                    elif head.replace('#', '') in allowed_headers:
                         i2header[i0] = head.replace('#','')
 
                 missing_headers = \
