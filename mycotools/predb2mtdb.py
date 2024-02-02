@@ -101,6 +101,12 @@ def read_predb(predb_path, spacer = '\t'):
 
     required_headers = {'assembly_accession', 'genus', 'assemblyPath',
                     'gffPath', 'genomeSource (ncbi/jgi/new)'}
+    allowed_headers = [
+        'assembly_accession', 'previous_ome', 
+        'genus', 'species', 'strain', 'version', 'biosample',
+        'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
+        'useRestriction (yes/no)', 'published', 'restriction',
+    ]
 
 #    predb, headers = {}, None
     predb = defaultdict(list)
@@ -163,7 +169,7 @@ def read_predb(predb_path, spacer = '\t'):
             sys.exit(4)
     except KeyError:
         if not 'restriction' in predb and 'published' not in predb:
-            raise KeyError
+            raise KeyError('restriction/published columns required')
         elif 'published' in predb:
             predb['restriction'] = [bool(x) for x in predb['published']]
 
