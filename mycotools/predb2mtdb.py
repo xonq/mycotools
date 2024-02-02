@@ -150,7 +150,7 @@ def read_predb(predb_path, spacer = '\t'):
                             predb[head].append(v.rstrip()) 
                             used.append(i1)
                     for mi in set(i2header.keys()).difference(set(used)):
-                        predb[i2header[mi]] = ''
+                        predb[i2header[mi]].append('')
     
     try:
         predb['assembly_acc'] = predb['assembly_accession']
