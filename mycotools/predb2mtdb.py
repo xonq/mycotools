@@ -149,7 +149,6 @@ def read_predb(predb_path, spacer = '\t'):
                             head = i2header[i1]
                             predb[head].append(v.rstrip()) 
     
-    predb = dict(predb)
     try:
         predb['assembly_acc'] = predb['assembly_accession']
         del predb['assembly_accession']
@@ -190,8 +189,9 @@ def read_predb(predb_path, spacer = '\t'):
         if not predb['species'][i]:
             predb['species'][i] = 'sp.'
         for missing_header in missing_from_predb:
-            predb[missing_header] = ''
-    return predb
+            predb[missing_header][i] = ''
+
+    return dict(predb)
 
 def sub_disallowed(data, disallowed = r"""[^\w\d]"""):
     if data:
