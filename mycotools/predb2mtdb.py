@@ -138,8 +138,9 @@ def read_predb(predb_path, spacer = '\t'):
                         predb[predb_headers[i1]].append(v.rstrip())
                 else:
                     for i1, v in enumerate(entry):
-                        head = i2header[i1]
-                        predb[head].append(v.rstrip()) 
+                        if i1 in i2header:
+                            head = i2header[i1]
+                            predb[head].append(v.rstrip()) 
     
     predb = dict(predb)
     try:
