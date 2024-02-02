@@ -794,7 +794,7 @@ def checkSearchDB(binary = 'blast'):
             return search_db
 
 
-def dbBlast(
+def db_blast(
     db_path, blast_type, query, 
     evalue, hsps, cpus,
     report_dir, diamond = False
@@ -940,20 +940,21 @@ def blast_main(
     pident = 0, coverage = None,
     cpus = 1, force = False,
     skip = [], diamond = None, coordinate = False,
-    search_arg = [], ppos = 0
+    search_arg = [], ppos = 0, blastdb = False
     ):
 
        
     if blast in {'tblastn', 'blastp'}:
         seq_type = 'prot'
         biotype = 'faa'
-        search_db = checkSearchDB()
     elif blast in {'blastx', 'blastn'}:
         seq_type = 'nucl'
         biotype = 'fna'
-        search_db = None
     else:
         eprint('\nERROR: invalid search binary: ' + blast, flush = True)
+
+#    if blastdb:
+       # insert function to make blastdb
 
     report_dir = prepOutput(out_dir)
     if isinstance(query, str):
@@ -971,10 +972,10 @@ def blast_main(
         out.write(dict2fa(query_dict))
     query = out_dir + 'query.fa'
 
-    if search_db and not force:
+    if blastdb and not force:
         print('\nSearching using MycotoolsDB searchdb', flush = True)
-        search_exit, search_output = dbBlast(
-            search_db, blast, query, evalue, 
+        search_exit, search_output = db_blast(
+            blastdb, blast, query, evalue, 
             hsps, cpus, report_dir, diamond = diamond
             )
         if search_exit:
@@ -1044,6 +1045,9 @@ def cli():
         help = '[blast] Use diamond. Not recommended for ome-by-ome')
 
     p_arg = parser.add_argument_group('Search parameters')
+#    p_arg.add_argument('-bd', '--blastdb', action = 'store_true',
+ #                      help = 'Make a single BLASTdb of the genomes before ' \
+  #                          + 'BLAST; DEFAULT: genome by genome')
     p_arg.add_argument('-e', '--evalue', help = 'E value threshold, e.g. ' \
         + '10^(-x) where x is the input', type = int, default = 0)
     p_arg.add_argument('-bit', '--bitscore', default = 0,
@@ -1185,7 +1189,8 @@ def cli():
             bitscore = args.bitscore, pident = args.identity,
             max_hits = args.max_hits, cpus = cpu, force = True,
             search_arg = manual_cmd, coordinate = args.coordinate, 
-            coverage = args.query_thresh, ppos = args.positives
+            coverage = args.query_thresh, ppos = args.positives#,
+#            blastdb = args.blastdb
             )
     # run mmseqs
     else:
