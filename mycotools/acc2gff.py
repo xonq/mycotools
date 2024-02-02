@@ -24,16 +24,24 @@ def grab_gff_acc( gff_list, acc, term = 'Alias=' ):
 
 def grab_gff_accs(gff_list, acc_list, ome = None):
     """grab entries with any of a list of aliases"""
-    aliases, ends = set(), set()
-    for acc in acc_list:
-        aliases.add('Alias=' + acc)
-        ends.add('Alias=' + acc + ';')
+   # aliases, ends = set(), set()
+#    for acc in acc_list:
+ #       aliases.add('Alias=' + acc)
+  #      ends.add('Alias=' + acc + ';')
+    acc_set = set(acc_list)
     out_list = []
     for i in gff_list:
-        if any(i['attributes'].endswith(x) for x in aliases):
+        alia = re.search(r'Alias=([^;]+)', i['attributes'])
+        try:
+            aliases = set(alia[1].split('|'))
+        except TypeError:
+            continue
+        if acc_set.intersection(aliases):
             out_list.append(i)
-        elif any(x in i['attributes'] for x in ends):
-            out_list.append(i)
+#        if any(i['attributes'].endswith(x) for x in aliases):
+ #           out_list.append(i)
+  #      elif any(x in i['attributes'] for x in ends):
+   #         out_list.append(i)
 
     if ome:
         return out_list, ome

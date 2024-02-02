@@ -115,7 +115,8 @@ def read_predb(predb_path, spacer = '\t'):
         for i, line in enumerate(raw):
             if line.startswith('#'):
                 d = line.split('\t')
-                for i0, head in enumerate(d):
+                for i0, head_p in enumerate(d):
+                    head = head_p.rstrip()
                     if head in allowed_headers:
                         i2header[i0] = head
                     elif head.replace('#', '') in allowed_headers:
