@@ -152,7 +152,6 @@ def read_predb(predb_path, spacer = '\t'):
                             predb[head].append(v.rstrip()) 
                             used.append(i1)
                     for mi in set(i2header.keys()).difference(set(used)):
-                        print(mi, flush = True)
                         predb[i2header[mi]].append('')
     
     try:
@@ -176,7 +175,7 @@ def read_predb(predb_path, spacer = '\t'):
     except KeyError:
         if not 'restriction' in predb and 'published' not in predb:
             raise KeyError('restriction/published columns required')
-        elif 'published' in predb:
+        elif 'published' in predb and 'restriction' not in predb:
             predb['restriction'] = [bool(x) for x in predb['published']]
 
     if any(x.lower() not in {'jgi', 'ncbi', 'new'} \
