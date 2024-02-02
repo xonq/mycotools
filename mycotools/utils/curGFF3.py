@@ -129,10 +129,10 @@ def add_missing(gff_list, intron, comps, ome):
                 # is there a mycotools alias or associated alias?
                     if not entry['attributes'].endswith(';'):
                         entry['attributes'] += ';'
-                    alias = ome + '_' + prot # create an alias with the found
+                    alias = ome + '_' + prot.replace('|', '_') # create an alias with the found
                     # protein
-                    entry['attributes'] += 'Alias=' + ome + '_' + prot
-                    alt_alias[rna_par] = ome + '_' + prot
+                    entry['attributes'] += 'Alias=' + alias
+                    alt_alias[rna_par] = alias
             else: # doesnt have a protein id
                 if rna_par: # if there is an RNA
                     if rna_par not in alt_alias: # add it in
@@ -213,10 +213,10 @@ def add_missing(gff_list, intron, comps, ome):
                 # is there a mycotools alias or associated alias?
                     if not entry['attributes'].endswith(';'):
                         entry['attributes'] += ';'
-                    alias = ome + '_' + prot # create an alias with the found
+                    alias = ome + '_' + prot.replace('|', '_') # create an alias with the found
                     # protein
-                    entry['attributes'] += 'Alias=' + ome + '_' + prot
-                    alt_alias[id_] = ome + '_' + prot
+                    entry['attributes'] += 'Alias=' + alias
+                    alt_alias[id_] = alias
 
 
             rnas[id_] = par
@@ -329,7 +329,7 @@ def add_missing(gff_list, intron, comps, ome):
                     prot = search.groups()[0] # try the first search
                     if not prot:
                         prot = search.groups()[1] # try the second
-                    prots.append(prot)
+                    prots.append(prot.replace('|', '_'))
             prots = set(prots)
             if len(prots) > 1: # alternate splicing detected
                 prot_coords, prot_dir, prot2ali, prot2i = {}, {}, {}, {}
@@ -341,16 +341,17 @@ def add_missing(gff_list, intron, comps, ome):
                         if not prot:
                             prot = search.groups()[1] # try the second
                         alias = re.search(comps['Alias'], cds['attributes'])[1]
-                        prot_dir[prot] = cds['strand']
-                        prot2ali[prot] = alias
-                        if prot not in prot_coords:
-                            prot_coords[prot] = []
-                            prot2i[prot] = count
+                        new_prot = prot.replace('|', '_')
+                        prot_dir[new_prot] = cds['strand']
+                        prot2ali[new_prot] = alias
+                        if new_prot not in prot_coords:
+                            prot_coords[new_prot] = []
+                            prot2i[new_prot] = count
                             count += 1
                         parent = re.search(comps['par'], cds['attributes'])[1].replace('gene-', 'mrna=') + \
-                                 '-T' + str(prot2i[prot])
+                                 '-T' + str(prot2i[new_prot])
                         cds['attributes'] = re.sub(comps['par'], 'Parent=' + parent, cds['attributes'])
-                        prot_coords[prot].extend([cds['start'], cds['end']])
+                        prot_coords[new_prot].extend([cds['start'], cds['end']])
 
                 # reinitialize the trmnas
                 geneInfo['tmrna'] = []
@@ -705,13 +706,12 @@ def rename_and_organize(gff_list):
                 scaf2gene2entries[seqid][new_id]['gene'] = [entry]
                 todel.append(i)
             
-                
-
     for i in reversed(todel):
         del gff_list[i]
 
     todel = []
     alias2rnaid, rnaid2alias = {}, {}
+
     for i, entry in enumerate(gff_list):
         if 'RNA' in entry['type']:
             alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
