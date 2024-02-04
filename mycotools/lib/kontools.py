@@ -91,6 +91,11 @@ def stdin2str():
     return data
 
 def split_input(inp, ignore_white = False):
+    """Split a standard input by removing quotations, commas, etc. and
+    splitting a list from various bash inputs based on white space"""
+    if not inp:
+        return []
+
     if inp.startswith('"') and inp.endswith('"'):
         inp = inp[1:-1]
     elif inp.startswith("'") and inp.endswith("'"):
