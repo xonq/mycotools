@@ -87,9 +87,10 @@
 - [ ] move database feature
 - [ ] archive and unarchive genomes
 - [ ] remove logfiles as parting of clearing the cache
+- [ ] add combine DB option
 
 ### mtdb
-- [ ] add a log option of connected MTDBs
+- [x] add a log option of connected MTDBs
 - [ ] remove standalone scripts from PATH
 - [ ] look for old ome versions in query
 - [x] add a version querying option

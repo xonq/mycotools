@@ -30,7 +30,7 @@ def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
     if os.path.isfile(mtdb_config_file):
         config = read_json(mtdb_config_file)
     else:
-        config = {}
+        config = {'log': {}}
     return config
 
 def main(argv = sys.argv):
@@ -43,12 +43,14 @@ def main(argv = sys.argv):
         + '\n[m]anage\t\tMTDB management utility' \
         + '\n\nmtdb <OME>[.gff3|.fna|.faa]: [PATH] print ome/ome code path' \
         + '\n\nmtdb <ARG>:' \
-        + '\n[-i DBPATH]\t[--interface]\tInitialize MTDB connection' \
-        + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
-        + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
+        + '\n[-i DBPATH]\t[--interface]\tInitialize MTDB linkage' \
         + '\n[-u]\t\t[--unlink]\tUnlink from MTDB' \
+        + '\n[-l]\t\t[--list]\tList historically linked primary MTDBs' \
         + '\n[-d]\t\t[--dependency]\tInstall/update dependencies' \
         + '\n[-v]\t\t[--version]\tPrint Mycotools version and exit'
+#        + '\n[-f]\t\t[--fungi]     \tConnect to fungal MTDB' \
+ #       + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
+
 
     config = parse_config()
     if any([not x.startswith('-') for x in argv[1:]]):
@@ -92,7 +94,7 @@ def main(argv = sys.argv):
                         raise FileNotFoundError('invalid MTDB path')
         except IndexError:
             raise ValueError('--interface requires a path')
-        mtdb_initialize(mycodb_loc)
+        mtdb_initialize(mycodb_loc, config = config)
     elif {'-d', '--dependencies'}.intersection(set_argv):
         pip_deps = ['dna_features_viewer', 'mycotools']
         dep_cmds = [['conda', 'install', '-y', '-c', 'jlsteenwyk', 'clipkit'],
@@ -102,35 +104,44 @@ def main(argv = sys.argv):
             if cmd:
                 print('\nUPDATE failed. Exit ' + str(dep_cmd))
                 sys.exit(cmd)
-    elif {'-f', '--fungi'}.intersection(set_argv):
-        if len(set_argv) > 2:
-            eprint('\nERROR: -f does not accept additional arguments. Did you mean -i?')
-            sys.exit(14)
-        if '-f' in set_argv:
-            coord = '-f'
-        else:
-            coord = '--fungi'
-        if 'fungi' not in config:
-            raise ValueError('fungal MTDB not connected')
-        else:
-            mtdb_connect(config, 'fungi')
-            if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
-                loginCheck()
-    elif {'-p', '--prokaryote'}.intersection(set_argv):
-        if len(set_argv) > 2:
-            eprint('\nERROR: -p does not accept additional arguments. Did you mean -i?')
-            sys.exit(15)
+    elif {'-l', '--list'}.intersection(set_argv):
+        if 'log' in config:
+            for dbtype in config['log']:
+                print(dbtype, flush = True)
+                for mtdb_loc, login_time in config['log'][dbtype].items():
+                    print(f'\t{mtdb_loc} {login_time}', flush = True)
+                print()
+        sys.exit(0)
 
-        if '-p' in set_argv:
-            coord = '-p'
-        else:
-            coord = '--prokaryote'
-        if 'prokaryote' not in config:
-            raise ValueError('prokaryote MTDB not connected')
-        else:
-            mtdb_connect(config, 'prokaryote')
-            if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
-                loginCheck()
+#    elif {'-f', '--fungi'}.intersection(set_argv):
+ #       if len(set_argv) > 2:
+  #          eprint('\nERROR: -f does not accept additional arguments. Did you mean -i?')
+   #         sys.exit(14)
+    #    if '-f' in set_argv:
+     #       coord = '-f'
+      #  else:
+       #     coord = '--fungi'
+        #if 'fungi' not in config:
+         #   raise ValueError('fungal MTDB not connected')
+     #   else:
+      #      mtdb_connect(config, 'fungi')
+       #     if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
+        #        loginCheck()
+#    elif {'-p', '--prokaryote'}.intersection(set_argv):
+ #       if len(set_argv) > 2:
+  #          eprint('\nERROR: -p does not accept additional arguments. Did you mean -i?')
+   #         sys.exit(15)
+#
+ #       if '-p' in set_argv:
+  #          coord = '-p'
+   #     else:
+    #        coord = '--prokaryote'
+     #   if 'prokaryote' not in config:
+      #      raise ValueError('prokaryote MTDB not connected')
+       # else:
+        #    mtdb_connect(config, 'prokaryote')
+         #   if not os.path.isfile(format_path('~/.mycotools/mtdb_key')):
+          #      loginCheck()
     elif {'-u', '--unlink'}.intersection(set_argv):
         if '-u' in set_argv:
             coord = '-u'
@@ -173,10 +184,9 @@ def main(argv = sys.argv):
                     raise KeyError('Invalid ome ' + ome)
         sys.exit(0)
 
-
     path = primaryDB()
     if path:
-        print(path)
+        print(path, flush = True)
         sys.exit(0)
     else:
         eprint('Link a MycotoolsDB via `mtdb -i <MTDB_DIR>`')
