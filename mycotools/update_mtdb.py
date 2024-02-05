@@ -1351,6 +1351,18 @@ def main():
     orig_db = orig_db.dropna(subset = ['ome'])
 
 
+    if config['branch'] == 'prokaryote':
+        jgi = False
+        group = 'prokaryotes'
+        king = 'bacteria' # NEED to make DB tools pull from this
+        rank = 'superkingdom'
+    else:
+        jgi = not args.ncbi_only
+        group = 'eukaryotes'
+        king = 'fungi'
+        rank = 'kingdom'
+
+
     if args.add or args.predb: # add predb2mtdb 2 master database
         if args.predb:
             add_predb = read_predb(predb_path)
@@ -1375,17 +1387,6 @@ def main():
             os.mkdir(update_path)
         shutil.copy(primaryDB(), update_path)
 
-        if config['branch'] == 'prokaryote':
-            jgi = False
-            group = 'prokaryotes'
-            king = 'bacteria' # NEED to make DB tools pull from this
-            rank = 'superkingdom'
-        else:
-            jgi = not args.ncbi_only
-            group = 'eukaryotes'
-            king = 'fungi'
-            rank = 'kingdom'
-     
         tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
                                     king=king, rank = rank)
         addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
@@ -1409,17 +1410,6 @@ def main():
             if db_path:
                 os.remove(db_path)
         outro(start_time)
-
-
-
-    if config['branch'] == 'prokaryote':
-        jgi = False
-        group = 'prokaryotes'
-        king = 'bacteria' # NEED to make DB tools pull from this
-    else:
-        jgi = not args.ncbi_only
-        group = 'eukaryotes'
-        king = 'fungi'
         
     # THIS IS WHERE WE INTEGRATE GIT LINKING
 #    if not config['rogue']:
