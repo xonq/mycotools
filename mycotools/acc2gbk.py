@@ -271,7 +271,8 @@ def contig2gbk(ome, row, contig, contig_dict,
                 gbk += '                     ' + lines[-1] + '"\n'
             else:
                 gbk += '"\n'
-
+            if gbk.endswith('\n"\n'):
+                gbk = gbk[:-2] + '                     "\n'
     total_coords = []
     for coord in seq_coords:
         total_coords.extend(coord)
