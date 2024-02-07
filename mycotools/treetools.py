@@ -69,7 +69,7 @@ def cli():
     parser.add_argument('-d', '--mtdb', help = 'MTDB to reference')
     parser.add_argument('-p', '--prune', action = 'store_true',
                         help = 'Remove omes absent from input')
-    parser.add_argument('-r', '--root', action = 'store_true',
+    parser.add_argument('-r', '--root',
                         help = 'Root on tip(s)')
     args = parser.parse_args()
 
