@@ -28,7 +28,7 @@ import pandas as pd
 from Bio import Entrez
 from collections import defaultdict
 from mycotools.lib.dbtools import db2df, df2db, gather_taxonomy, assimilate_tax, \
-    primaryDB, loginCheck, log_editor, mtdb, mtdb_connect, \
+    primaryDB, loginCheck, log_editor, mtdb, \
     mtdb_initialize
 from mycotools.lib.kontools import intro, outro, format_path, eprint, \
                                    prep_output, collect_files, read_json, \
