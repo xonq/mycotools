@@ -24,7 +24,8 @@ import hashlib
 import random
 import multiprocessing as mp
 import shutil
-from collections import Counter
+from itertools import chain
+from collections import Counter, defaultdict
 try:
     from ete3 import Tree, faces, TreeStyle, NodeStyle, AttrFace
     from ete3.parser.newick import NewickError
@@ -412,6 +413,10 @@ def make_output(base_dir, new_log):
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
 
+    loc_dir = output_dir + 'loci/'
+    if not os.path.isdir(loc_dir):
+        os.mkdir(loc_dir)
+
     wrk_dir = output_dir + 'working/'
     global svg_dir # needs to be global for etetree
 
@@ -496,7 +501,7 @@ def extract_locus_hg(gff3, ome, genes_to_grab, hgs, ome_gene2hg,
 
     # parse the loci and the genes associated with each locus, with the
     # locus_id set to the query accession used above
-    extracted_genes, new_hgs = {}, []
+    extracted_genes, new_hgs, final_loci = {}, [], set()
     for locus_id, genes in out_indices.items():
         start_i, end_i = None, None
         # for each gene in the locus, append its HG number (if it exists) to
@@ -523,12 +528,13 @@ def extract_locus_hg(gff3, ome, genes_to_grab, hgs, ome_gene2hg,
         if not end_i:
             end_i = start_i
         extracted_genes[locus_id] = rna_gff[locus_id][start_i:end_i+1]
+        final_loci = final_loci.union(set(genes[start_i:end_i+1]))
 
     for locus_id, rna_gff in extracted_genes.items():
         with open(wrk_dir + 'genes/' + locus_id + '.locus.genes', 'w') as out:
             out.write(list2gff(rna_gff))
 
-    return ome, extracted_genes, new_hgs
+    return ome, extracted_genes, new_hgs, final_loci
 
 def extract_locus_svg_hg(extracted_genes, wrk_dir, hg2color, labels):
     for locus_id, rna_gff in extracted_genes.items():
@@ -555,7 +561,7 @@ def extract_locus_gene(gff3, ome, accs, gene2query,
         eprint('\t\t\tWARNING: ' + ome + ' could not parse gff', flush = True)
         return
 
-    extracted_genes = {}
+    extracted_genes, final_loci = {}, set()
     for locus_id, genes in out_indices.items():
         if os.path.isfile(wrk_dir + 'svg/' + locus_id + '.locus.svg'):
             # NEED to rerun if there's a change in output parameters
@@ -573,6 +579,7 @@ def extract_locus_gene(gff3, ome, accs, gene2query,
                 continue
         if not end_i:
             end_i = start_i
+        final_loci = final_loci.union(set(genes[start_i:end_i+1]))
         extracted_genes[locus_id] = rna_gff[locus_id][start_i:end_i+1]
 
     for locus_id, rna_gff in extracted_genes.items():
@@ -586,7 +593,7 @@ def extract_locus_gene(gff3, ome, accs, gene2query,
             prod_comp = r';SearchQuery=([^;]+$)', width = 8, null = 'na'
             )
    
-    return extracted_genes
+    return extracted_genes, ome, final_loci
 
 
 def svg2node(node):
@@ -838,7 +845,7 @@ def crap_mngr(
             ex_locs_res = pool.starmap(extract_locus_hg, extract_loci_cmds)
         ex_locs_res = [x for x in ex_locs_res if x]
         etc_hgs, ex_locs = [], []
-        for ome, ex_loc, new_hgs in ex_locs_res:
+        for ome, ex_loc, new_hgs, tot_genes in ex_locs_res:
             etc_hgs.extend(new_hgs)
             ex_locs.append(ex_loc)
         new_hgs = [k for k,v in Counter(etc_hgs).items() if v > 1]
@@ -854,7 +861,7 @@ def crap_mngr(
                 extract_loci_cmds.append([db[ome]['gff3'], ome, ome_hits, ome_genes2query, 
                                           plusminus, query2color, wrk_dir, labels])
         with mp.Pool(processes = cpus) as pool:
-            pool.starmap(extract_locus_gene, extract_loci_cmds)
+            gene_res = pool.starmap(extract_locus_gene, extract_loci_cmds)
     
     print('\t\tMapping synteny diagrams on phylogeny', flush = True)
     tree_file = tre_dir + query + tree_suffix
@@ -885,19 +892,87 @@ def crap_mngr(
         except NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
 
-    return query2color
-    
+    return query2color 
+   
+def write_loci(ome2genes, loc_dir):
+    for ome, genes in ome2genes.items():
+        with open(f'{loc_dir}/{ome}.txt', 'w') as out:
+            out.write('\n'.join(genes))
+
+def calc_sorensen(interlen, len0, len1):
+    return 2*interlen/(len0 + len1)
+def calc_jaccard(interlen, len0, len1):
+    return interlen/(len0 + len1 - interlen)
+def calc_overlap(interlen, len0, len1):
+    return interlen/min([len0, len1])
+
+
+def parse_collected_loci(ome, files, queries, calc_index = calc_jaccard,
+                         re_comp = re.compile(r'HG=([^;]+)')):
+    """Extract the most similar locus based on similarity index of overlapping
+    genes with the queries"""
+    loc2sim = {}
+    for f in files:
+        hgs = set()
+        gff = gff2list(f)
+        alia = []
+        for entry in gff:
+            alias = re.search(r'Alias=([^;]+)', entry['attributes'])[1]
+            alia.append(alias)
+            hit = re_comp.search(entry['attributes'])
+            if hit is not None:
+                hgs = hgs.union(set(hit[1].split('|')))
+        intersection = hgs.intersection(queries)
+        locus_sim = calc_index(len(intersection), len(hgs), len(queries))
+        loc2sim[f] = [alia, locus_sim]
+
+    # sort the loci by similarity
+    loc2sim = {k: v for k, v in sorted(loc2sim.items(), key = lambda x: x[1][1],
+                                       reverse = True)}
+    max_sim = loc2sim[list(loc2sim.keys())[0]][1]
+    # merge the top loci and report as one
+    top_loc = set(chain(*[v[0] for k, v in loc2sim.items() \
+        if v[1] == max_sim]))
+
+    return ome, sorted(top_loc)
+
+def locus_output_mngr(gff_dir, loc_dir, queries,
+                      re_comp = re.compile(r'HG=([^;]+)'),
+                      calc_index = calc_jaccard, cpus = 1):
+    """Identify and report the most similar loci to the inputted query 
+    for each genome via overlapping homology group similarity"""
+    files = collect_files(gff_dir, 'genes')
+    ome2files = defaultdict(list)
+    ome2locs = defaultdict(list)
+    for f in files:
+        ome = os.path.basename(f)[:os.path.basename(f).find('_')]
+        ome2files[ome].append(f)
+
+    parse_cmds = [(ome, files, queries, calc_index, re_comp) \
+                  for ome, files in ome2files.items()]
+    with mp.Pool(processes = cpus) as pool:
+        top_locs = pool.starmap(parse_collected_loci, parse_cmds)
+
+    ome2genes = {}
+    for ome, loc in top_locs:
+        ome2genes[ome] = loc
+
+    write_loci(ome2genes, loc_dir)
+    return ome2genes
+        
+
+ 
 def hg_main(
     db, input_genes, hg_file, fast = True, out_dir = None,
     clus_cons = 0.05, clus_var = 0.65, min_seq = 3, max_size = 250, cpus = 1,
     plusminus = 10000, verbose = False, reoutput = True, interval = 0.1,
     outgroups = True, labels = True, midpoint = True, faa_dir = None,
     clus_meth = 'mmseqs easy-cluster', ext = '.svg', conversion_dict = {},
-    circular = False
+    circular = False, output_loci = False
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
-    wrk_dir = out_dir + 'working/'
+    wrk_dir, loc_dir = out_dir + 'working/', out_dir + 'loci/'
     gff_dir, tre_dir = wrk_dir + 'genes/', wrk_dir + 'trees/'
     clus_dir = wrk_dir + 'clus/'
     db = db.set_index()
@@ -1048,6 +1123,13 @@ def hg_main(
             circular = circular
             )
 
+    if output_loci:
+        print('\nOutputting most similar loci to query',
+              flush = True)
+        locus_output_mngr(gff_dir, loc_dir, set(input_hgs),
+                      re_comp = re.compile(r'HG=([^;]+)'),
+                      calc_index = calc_jaccard, cpus = cpus)
+
 
 def search_main(
     db, input_genes, query_fa, query_gff, binary = 'mmseqs', fast = True, 
@@ -1056,12 +1138,12 @@ def search_main(
     evalue = 1, bitscore = 40, pident = 0, mem = None, verbose = False,
     interval = 0.01, outgroups = False, conversion_dict = {}, labels = True,
     midpoint = True, clus_meth = 'mmseqs easy-linclust', ppos = 0,
-    max_hits = 1000, ext = '.svg', circular = False
+    max_hits = 1000, ext = '.svg', circular = False, output_loci = False
     ):
     """input_genes is a list of genes within an inputted cluster"""
 
     print('\nPreparing run', flush = True)
-    wrk_dir = out_dir + 'working/'
+    wrk_dir, loc_dir = out_dir + 'working/', out_dir + 'loci/'
     gff_dir, tre_dir = wrk_dir + 'genes/', wrk_dir + 'trees/'
     clus_dir = wrk_dir + 'clus/'
 
@@ -1156,6 +1238,7 @@ def search_main(
         print('\tRunning clustering on ' + str(len(fas4clus)) + ' fastas', flush = True)
 
     print('\nCRAP', flush = True)
+    ome2genes = {}
     if fast:
         tree_suffix = '.fa.mafft.clipkit.treefile'
     else:
@@ -1187,13 +1270,14 @@ def search_main(
                     '\t\t\tWARNING: could not detect outgroup for root', 
                     flush = True
                     )
-        crap_mngr(
+        null = crap_mngr(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, 
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
             out_keys = out_keys, labels = labels, midpoint = midpoint,
             ext = ext, circular = circular
             )
+
 
     if fas4clus:
         if cpus > 5:
@@ -1237,13 +1321,20 @@ def search_main(
                           flush = True)
         else:
             query_fa = fa2dict(wrk_dir + query + '.fa')
-        crap_mngr(
+        null = crap_mngr(
             db, query, query_hits, out_dir, wrk_dir, tre_dir, 
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
             out_keys = out_keys, labels = labels, midpoint = midpoint,
             ext = ext, circular = circular
             )
+
+    if output_loci:
+        print('\nOutputting most similar loci to query',
+              flush = True)
+        locus_output_mngr(gff_dir, loc_dir, set(search_fas.keys()),
+                      re_comp = re.compile(r'SearchQuery=([^;]+)'),
+                      calc_index = calc_jaccard, cpus = cpus)
 
 
 def cli():
@@ -1313,7 +1404,7 @@ def cli():
         default = 0.3, type = float
         )
     clus_opt.add_argument(
-        '-l', '--linclust',
+        '--linclust',
         help = 'Cluster large gene sets via mmseqs linclust; DEFAULT: \
                 easy-cluster',
         action = 'store_true'
@@ -1370,6 +1461,9 @@ def cli():
         '-o', '--output', 
         help = 'Output base dir - will rerun if previous directory exists'
         )
+    run_opt.add_argument('-l', '--loci', action = 'store_true',
+                         help = 'Report best retrieved locus for each genome' \
+                              + ' determined by Jaccard similarity to query')
     run_opt.add_argument('-c', '--cpu', default = 1, type = int)
     run_opt.add_argument('-v', '--verbose', default = False, action = 'store_true')
     run_opt.add_argument('-of', '--out_format', default = 'svg',
@@ -1474,6 +1568,7 @@ def cli():
         'Minimum identity': args.identity,
         'Minimum positives': args.positives,
         'Minimum Bitscore': args.bitscore,
+        'Output best loci': args.loci,
         'GFF': args.gff,
         'Conversion file': args.conversion,
         'Labels': not args.no_label,
@@ -1506,7 +1601,8 @@ def cli():
             interval = 0.1, labels = not args.no_label,
             outgroups = not args.no_outgroup, clus_meth = clus_meth,
             midpoint = not bool(args.no_midpoint), ext = out_ext,
-            conversion_dict = conversion_dict, circular = args.circular
+            conversion_dict = conversion_dict, circular = args.circular,
+            output_loci = args.loci
             )
     else:
         new_log = init_log(
@@ -1531,7 +1627,7 @@ def cli():
             conversion_dict = conversion_dict, 
             clus_meth = clus_meth, labels = not args.no_label,
             max_hits = args.max_target_seq, ext = out_ext, 
-            circular = args.circular
+            circular = args.circular, output_loci = args.loci
             )
     outro(start_time)
 
