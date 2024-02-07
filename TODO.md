@@ -21,6 +21,7 @@
 - [ ] *Better root inference*
 - [ ] Assembly query method, i.e. through tblastn
 - [ ] Allow changing the clustering variable
+- [ ] locus output using percent similarity
 
 ### curGFF3
 - [ ] pseudogenes can have RNAs, and CDSs from NCBI may reference those
