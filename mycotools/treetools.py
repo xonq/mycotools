@@ -10,9 +10,7 @@ from mycotools.lib.dbtools import mtdb
 
 def compile_tree(tree_path, root = [], verbose = False):
     """Compile a phylogeny from a path and conver the tip names to an index"""
-    with open(tree_path, 'r') as raw:
-        nwk = raw.read()
-
+    print(root)
     phylo = load_tree(tree_path)
     tips = set(phylo.get_tip_names())
     vprint(f'{len(tips)} tips on input', v = verbose, e = True)
@@ -26,7 +24,7 @@ def compile_tree(tree_path, root = [], verbose = False):
                  if set(root).issubset(set(v.get_tip_names()))}
         mrca_tip_len = min([v[1] for v in list(nodes.values())])
         mrca_edge = [k for k, v in nodes.items() if v[1] == mrca_tip_len]
-        phylo = phylo.rooted_at(mrca_edge)
+        phylo = phylo.rooted_at(mrca_edge[0])
 
     return phylo
 
@@ -50,7 +48,6 @@ def main(phylo_path, db = None,
          tips = [], root = [], trim = False,
          phylo = None, verbose = True):
 
-    db = db.set_index()
     if phylo_path:
         phylo = compile_tree(phylo_path, root, verbose = verbose)
 
@@ -93,7 +90,8 @@ def cli():
     else:
         db = None
 
-    phylo = main(format_path(args.input), db, tips, trim = args.prune)
+    phylo = main(format_path(args.input), db, tips, 
+                 trim = args.prune, root = root)
     eprint(f'{len(phylo.get_tip_names())} tips on output', flush = True)
     print(phylo.get_newick(with_distances = True), flush = True)
 
