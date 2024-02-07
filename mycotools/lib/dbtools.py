@@ -751,31 +751,42 @@ def mtdb_disconnect(config, mtdb_config_file = format_path('~/.mycotools/config.
     config['active'] = False
     write_json(config, mtdb_config_file)
 
-def mtdb_connect(config, dbtype, 
+def mtdb_connect(config, mycodb_loc, 
                  mtdb_config_file= format_path('~/.mycotools/config.json')):
-    config['active'] = dbtype
+    config['active'] = mycodb_loc
     write_json(config, mtdb_config_file)
     for var, env in config[config['active']].items():
         os.environ[var] = env
 
 def mtdb_initialize(mycodb_loc, 
                     mtdb_config_file= format_path('~/.mycotools/config.json'),
-                    init = False):
+                    init = False, config = {'log': {}}):
     mtdb_config = read_json(mycodb_loc + 'config/mtdb.json')
     dbtype = mtdb_config['branch']
     eprint('Establishing ' + dbtype + ' connection', flush = True)
-    config = {}
 
-    if not os.path.isdir(mycodb_loc + 'mtdb') and not init:
+    # to maintain legacy installs
+    if 'log' not in config:
+        config['log'] = {}
+
+    if not os.path.isdir(mycodb_loc + 'mtdb/') and not init:
         raise FileNotFoundError('invalid MycotoolsDB path')
     dPath = mycodb_loc + 'data/'
-    config[dbtype] = {
+    config[mycodb_loc] = {
         'MYCODB': mycodb_loc + 'mtdb/',
         'MYCOFNA': dPath + 'fna/',
         'MYCOFAA': dPath + 'faa/',
         'MYCOGFF3': dPath + 'gff3/'
         }
-    mtdb_connect(config, dbtype, mtdb_config_file)
+
+    login_time = datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')
+#    login_time = datetime.datetime.now().strftime('%Y%m%d')
+    if dbtype in config['log']:
+        config['log'][dbtype][mycodb_loc] = login_time
+    else:
+        config['log'][dbtype] = {mycodb_loc: login_time}
+
+    mtdb_connect(config, mycodb_loc, mtdb_config_file)
 
 
 interface = format_path('~/.mycotools/config.json')
