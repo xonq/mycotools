@@ -5,6 +5,7 @@ import re
 import sys
 import argparse
 import multiprocessing as mp
+from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, format_path, stdin2str
 from mycotools.lib.dbtools import mtdb, primaryDB
@@ -25,7 +26,7 @@ def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
             try:
                 alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
             except TypeError:
-                eprint( '\n\tERROR: could not extract Alias ID from ' + gff , flush = True)
+                eprint('\n\tERROR: could not extract Alias ID from ' + gff , flush = True)
                 continue
             aliases = alias.split('|') # to address alternate splicing in gene
             # aliases
@@ -35,7 +36,7 @@ def col_CDS(gff_list, types = {'gene', 'CDS', 'exon', 'mRNA',
                 if contig not in cds_dict[ome]:
                     cds_dict[ome][contig] = defaultdict(list)
                 cds_dict[ome][contig][alias].append(entry)
-            
+
     return cds_dict
 
 def contig2gbk(ome, row, contig, contig_dict, 
@@ -295,17 +296,71 @@ def contig2gbk(ome, row, contig, contig_dict,
     gbk += '//'
     return gbk
 
-def gen_gbk(ome_dict, row, fna, faa, ome, product_searches, full = False):
+def gen_gbk(ome_dict, row, fna, faa, ome, product_searches, 
+            full = False, break_contigs = False):
     """manage generating the GBK for each contiguous sequence"""
     gbk = {}
-    for contig, contig_dict in ome_dict.items():
-        gbk[contig] = contig2gbk(ome, row, contig, contig_dict, 
-                   fna[contig]['sequence'], faa, full = full,
-                   product_searches = product_searches)
+    if break_contigs:
+        for contig, contig_dict in ome_dict.items():
+            seq_coords = {} # a dict of all the coordinates from the contig
+            for prot, prot_list in contig_dict.items():
+                coords = []
+                for entry in prot_list:
+                    t_start, t_end = int(entry['start']), int(entry['end'])
+                    coords.append([t_start, t_end])
+                new_coords = [min(chain(*coords)), max(chain(*coords))]
+                seq_coords[prot] = new_coords
+
+            seq_coords = {k: v for k, v in sorted(seq_coords.items(),
+                              key = lambda x: x[1][0])}
+            contig_dict = {k: contig_dict[k] for k in seq_coords}
+
+            breaks, count0 = set(), 0
+            for k1, v1 in seq_coords.items():
+                if count0:
+                    if v1[0] - v0[1] > break_contigs:
+                        breaks.add(k0)
+                k0 = k1
+                v0 = v1
+                count0 += 1
+
+            count1 = 0
+            if breaks:
+                new_contigs = {}
+                for k, v in contig_dict.items():
+                    new_contigs[k] = v
+                    if k in breaks: 
+                        nc_name = f'{contig}_{count1}'
+                        count1 += 1
+                        gbk[nc_name] = contig2gbk(ome, row, nc_name,
+                                                  new_contigs,
+                                                  fna[contig]['sequence'],
+                                                  faa, full = full,
+                                                  product_searches = \
+                                                  product_searches)
+                        new_contigs = {}
+                nc_name = f'{contig}_{count1}'
+                gbk[nc_name] = contig2gbk(ome, row, nc_name, new_contigs,
+                                          fna[contig]['sequence'],
+                                          faa, full = full,
+                                          product_searches = \
+                                          product_searches)
+
+            else:
+                gbk[contig] = contig2gbk(ome, row, contig, contig_dict, 
+                           fna[contig]['sequence'], faa, full = full,
+                           product_searches = product_searches)
+    else:
+        for contig, contig_dict in ome_dict.items():
+            gbk[contig] = contig2gbk(ome, row, contig, contig_dict, 
+                       fna[contig]['sequence'], faa, full = full,
+                       product_searches = product_searches)
 
     return gbk
 
-def ome_main(ome, gff_lists, row, product_searches = {'product': r'product=([^;]+)'}):
+def ome_main(ome, gff_lists, row, 
+             product_searches = {'product': r'product=([^;]+)'},
+             break_contigs = False):
     """Create a genbank for the whole genome"""
     gbks = defaultdict(list)
     faa, fna = fa2dict(row['faa']), fa2dict(row['fna'])
@@ -315,13 +370,13 @@ def ome_main(ome, gff_lists, row, product_searches = {'product': r'product=([^;]
                                                   'mRNA', 'tRNA', 'rRNA',
                                                   'RNA', 'pseudogene'})
             gbks[key].append(gen_gbk(cds_dict[ome], row, fna, faa, 
-                                     ome, product_searches))
+                                     ome, product_searches, break_contigs))
     return gbks
 
 
 
 def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'}, 
-         full = False):
+         full = False, break_contigs = False):
     """Generate a genbank for each inputed gff, its associated fna, and ome"""
     cds_dict = col_CDS(gff_list, 
             types = {'gene', 'CDS', 'exon', 'mRNA', 
@@ -331,7 +386,7 @@ def main(gff_list, db, product_searches = {'product': r'product=([^;]+)'},
         fna = fa2dict(db[ome]['fna'])
         faa = fa2dict(db[ome]['faa'])
         ome_gbks[ome] = gen_gbk(ome_dict, db[ome], fna, faa, ome, product_searches,
-                                full = full)
+                                full = full, break_contigs = break_contigs)
 
     return ome_gbks
 
@@ -350,6 +405,8 @@ def cli():
     parser.add_argument('-s', '--seqid', action = 'store_true',
         help = 'Output files by sequence ID (contig/scaffold/chromosome)'
         )
+    parser.add_argument('-b', '--split', default = 0, type = int,
+        help = 'Base pairs to split long breaks between genes')
     parser.add_argument('-d', '--mtdb',
         help = "DEFAULT: master", default = primaryDB())
     parser.add_argument('-c', '--cpu', type = int, default = 1)
@@ -409,25 +466,27 @@ def cli():
     gbk_dict = {}
     if args.gff: # use an inputted gff
         gbk_dict = main(gff2list(format_path(args.gff)), db, {'product': regex},
-                        full = args.full)
+                        full = args.full, break_contigs = args.split)
     elif not args.full: # acquire an inputted gff from the accessions
         gffs = acc2gff(db, accs, args.cpu)
         for ome, gff in gffs.items():
-            gbk_dict[ome] = main(gff, db, {'product': regex})[ome]
+            gbk_dict[ome] = main(gff, db, {'product': regex},
+                                 break_contigs = args.split)[ome]
     else: # acquire a gff for each inputted ome
         gffs = {ome: db[ome]['gff3'] for ome in accs}
         for ome, gff_p in gffs.items():
-            gbk_dict[ome] = main(gff2list(gff_p), db, {'product': regex}, args.full)[ome]
+            gbk_dict[ome] = main(gff2list(gff_p), db, {'product': regex}, 
+                                 args.full, break_contigs = args.split)[ome]
     
     if args.ome: # output a file for each genome inputted
         for ome, gbks in gbk_dict.items():
             with open(ome + '.acc2gbk.gbk', 'w') as out:
                 out.write('\n'.join([gbk for gbk in gbks]))
-    elif args.seqid: # output a file for each contig inputted
-        for ome, gbks in gbk_dict.items():
-            for contig, gbk in gbks.items():
-                with open(contig + '.gbk', 'w') as out:
-                    out.write(gbk)
+#    elif args.accession: # output a file for each contig inputted
+ #       for ome, gbks in gbk_dict.items():
+  #          for contig, gbk in gbks.items():
+   #             with open(contig + '.gbk', 'w') as out:
+    #                out.write(gbk)
     else: # otherwise just print to stdout
         for ome, gbks in gbk_dict.items():
             for contig, gbk in gbks.items():
