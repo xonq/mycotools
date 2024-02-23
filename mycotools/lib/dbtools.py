@@ -747,32 +747,48 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome',
 
     return db, tax_dicts
 
-def mtdb_disconnect(config, mtdb_config_file = format_path('~/.mycotools/config.json')):
-    config['active'] = False
-    write_json(config, mtdb_config_file)
+def parse_user_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
+    config_dir = format_path('~/.mycotools/')
+    if not os.path.isdir(config_dir):
+        os.mkdir(config_dir)
+        config_dir += '/'
 
-def mtdb_connect(config, mycodb_loc, 
+    if os.path.isfile(mtdb_config_file):
+        config = read_json(mtdb_config_file)
+    else:
+        config = {'log': {}}
+    return config
+
+def mtdb_disconnect(mtdb_config_file = format_path('~/.mycotools/config.json')):
+    user_config = parse_user_config()
+    user_config['active'] = False
+    write_json(user_config, mtdb_config_file)
+
+def mtdb_connect(user_config, mycodb_loc, 
                  mtdb_config_file= format_path('~/.mycotools/config.json')):
-    config['active'] = mycodb_loc
-    write_json(config, mtdb_config_file)
-    for var, env in config[config['active']].items():
+    user_config['active'] = mycodb_loc
+    write_json(user_config, mtdb_config_file)
+    for var, env in user_config[user_config['active']].items():
         os.environ[var] = env
 
 def mtdb_initialize(mycodb_loc, 
                     mtdb_config_file= format_path('~/.mycotools/config.json'),
-                    init = False, config = {'log': {}}):
+                    init = False):
+
+    user_config = parse_user_config()
+    # to maintain legacy installs
+    if 'log' not in user_config:
+        user_config['log'] = {}
+
     mtdb_config = read_json(mycodb_loc + 'config/mtdb.json')
     dbtype = mtdb_config['branch']
     eprint('Establishing ' + dbtype + ' connection', flush = True)
 
-    # to maintain legacy installs
-    if 'log' not in config:
-        config['log'] = {}
 
     if not os.path.isdir(mycodb_loc + 'mtdb/') and not init:
         raise FileNotFoundError('invalid MycotoolsDB path')
     dPath = mycodb_loc + 'data/'
-    config[mycodb_loc] = {
+    user_config[mycodb_loc] = {
         'MYCODB': mycodb_loc + 'mtdb/',
         'MYCOFNA': dPath + 'fna/',
         'MYCOFAA': dPath + 'faa/',
@@ -781,12 +797,12 @@ def mtdb_initialize(mycodb_loc,
 
     login_time = datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')
 #    login_time = datetime.datetime.now().strftime('%Y%m%d')
-    if dbtype in config['log']:
-        config['log'][dbtype][mycodb_loc] = login_time
+    if dbtype in user_config['log']:
+        user_config['log'][dbtype][mycodb_loc] = login_time
     else:
-        config['log'][dbtype] = {mycodb_loc: login_time}
+        user_config['log'][dbtype] = {mycodb_loc: login_time}
 
-    mtdb_connect(config, mycodb_loc, mtdb_config_file)
+    mtdb_connect(user_config, mycodb_loc, mtdb_config_file)
 
 
 interface = format_path('~/.mycotools/config.json')
