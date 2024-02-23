@@ -621,8 +621,13 @@ def svgs2tree(input_gene, og, tree_data, db, tree_path,
               ext = '.svg', circular = False):#svg_dir, out_dir):
     tree = Tree(tree_data)
     if root_key:
-        tree.set_outgroup(root_key)
-        adj = 'outgroup'
+        try:
+            tree.set_outgroup(root_key)
+            adj = 'outgroup'
+        except ValueError:
+            mid = tree.get_midpoint_outgroup()
+            tree.set_outgroup(mid)
+            adj = 'midpoint'
     elif midpoint:
         mid = tree.get_midpoint_outgroup()
         tree.set_outgroup(mid)
@@ -906,8 +911,60 @@ def calc_jaccard(interlen, len0, len1):
 def calc_overlap(interlen, len0, len1):
     return interlen/min([len0, len1])
 
+def parse_search_col_loci(ome, files, queries, rep_dir, 
+                         calc_index = calc_jaccard,
+                         re_comp = re.compile(r'HG=([^;]+)')):
+    """Extract the most similar locus based on similarity index of overlapping
+    genes with the queries"""
+    loc2sim = {}
+    for f in files:
+        hgs = set()
+        gff = gff2list(f)
+        alia = []
+        alia_set = set()
+        for entry in gff:
+            alias = re.search(r'Alias=([^;]+)', entry['attributes'])[1]
+            alia.append(alias)
+            hit = re_comp.search(entry['attributes'])
+            if hit is not None:
+                hgs = hgs.union(set(hit[1].split('|')))
+                alia_set.add(alias)
+                        
+        intersection = hgs.intersection(queries)
+        locus_sim = calc_index(len(intersection), len(hgs), len(queries))
+        # only extract those with > 1 gene overlap
+        if len(intersection) > 1:
+            try:
+                with open(f'{rep_dir}{ome}.tsv', 'r') as raw:
+                    id_dict = defaultdict(list)
+                    for line in raw:
+                        d = line.rstrip().split()
+                        if d[0] in queries:
+                            if d[1] in alia_set:
+                               id_dict[d[0]].append(float(d[2]))
+                identities = [sorted(v, reverse = True)[0] \
+                              for v in id_dict.values()]
+                id_mean = sum(identities)/len(identities)
+                loc2sim[f] = [alia, locus_sim * id_mean]
+            except FileNotFoundError:
+                eprint(f'\tWARNING: {ome} locus not weighted by %ID', 
+                       flush = True)
+                loc2sim[f] = [alia, locus_sim]
 
-def parse_collected_loci(ome, files, queries, calc_index = calc_jaccard,
+                   
+    # sort the loci by similarity
+    loc2sim = {k: v for k, v in sorted(loc2sim.items(), key = lambda x: x[1][1],
+                                       reverse = True)}
+    max_sim = loc2sim[list(loc2sim.keys())[0]][1]
+    # merge the top loci and report as one
+    top_loc = set(chain(*[v[0] for k, v in loc2sim.items() \
+        if v[1] == max_sim]))
+
+    return ome, sorted(top_loc)
+
+
+
+def parse_collected_loci(ome, files, queries, report_dir, calc_index = calc_jaccard,
                          re_comp = re.compile(r'HG=([^;]+)')):
     """Extract the most similar locus based on similarity index of overlapping
     genes with the queries"""
@@ -924,7 +981,9 @@ def parse_collected_loci(ome, files, queries, calc_index = calc_jaccard,
                 hgs = hgs.union(set(hit[1].split('|')))
         intersection = hgs.intersection(queries)
         locus_sim = calc_index(len(intersection), len(hgs), len(queries))
-        loc2sim[f] = [alia, locus_sim]
+        # only extract those with > 1 gene overlap
+        if len(intersection) > 1:
+            loc2sim[f] = [alia, locus_sim]
 
     # sort the loci by similarity
     loc2sim = {k: v for k, v in sorted(loc2sim.items(), key = lambda x: x[1][1],
@@ -936,7 +995,7 @@ def parse_collected_loci(ome, files, queries, calc_index = calc_jaccard,
 
     return ome, sorted(top_loc)
 
-def locus_output_mngr(gff_dir, loc_dir, queries,
+def locus_output_mngr(gff_dir, loc_dir, queries, report_dir = None,
                       re_comp = re.compile(r'HG=([^;]+)'),
                       calc_index = calc_jaccard, cpus = 1):
     """Identify and report the most similar loci to the inputted query 
@@ -948,10 +1007,16 @@ def locus_output_mngr(gff_dir, loc_dir, queries,
         ome = os.path.basename(f)[:os.path.basename(f).find('_')]
         ome2files[ome].append(f)
 
-    parse_cmds = [(ome, files, queries, calc_index, re_comp) \
-                  for ome, files in ome2files.items()]
-    with mp.Pool(processes = cpus) as pool:
-        top_locs = pool.starmap(parse_collected_loci, parse_cmds)
+    if not report_dir:
+        parse_cmds = [(ome, files, queries, calc_index, re_comp) \
+                      for ome, files in ome2files.items()]
+        with mp.Pool(processes = cpus) as pool:
+            top_locs = pool.starmap(parse_collected_loci, parse_cmds)
+    else:
+        parse_cmds = [(ome, files, queries, report_dir, calc_index, re_comp,)
+                      for ome, files in ome2files.items()]
+        with mp.Pool(processes = cpus) as pool:
+            top_locs = pool.starmap(parse_search_col_loci, parse_cmds)
 
     ome2genes = {}
     for ome, loc in top_locs:
@@ -1127,6 +1192,7 @@ def hg_main(
         print('\nOutputting most similar loci to query',
               flush = True)
         locus_output_mngr(gff_dir, loc_dir, set(input_hgs),
+                      None, 
                       re_comp = re.compile(r'HG=([^;]+)'),
                       calc_index = calc_jaccard, cpus = cpus)
 
@@ -1333,6 +1399,7 @@ def search_main(
         print('\nOutputting most similar loci to query',
               flush = True)
         locus_output_mngr(gff_dir, loc_dir, set(search_fas.keys()),
+                      report_dir = wrk_dir + 'reports/',
                       re_comp = re.compile(r'SearchQuery=([^;]+)'),
                       calc_index = calc_jaccard, cpus = cpus)
 
