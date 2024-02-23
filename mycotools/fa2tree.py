@@ -536,6 +536,8 @@ def extract_supported(trimmed_files, min_mean_support, out_dir):
     for f_ in trimmed_files:
         t_path = f'{out_dir}working/{os.path.basename(f_)}.contree'
         supports = check_tree_support(t_path)
+        if supports is None:
+            continue
         mean_support = sum(supports)/len(supports)
         if mean_support >= min_mean_support:
             print(f'\t{os.path.basename(t_path)} {mean_support} passed', 
@@ -600,7 +602,10 @@ def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
 
 def check_tree_support(tree_file):
     """Acquire the support values of a newick"""
-    t = Tree(tree_file)
+    try:
+        t = Tree(tree_file)
+    except:
+        return None
     supports = []
     # parse the tree
     for n in t.traverse():
