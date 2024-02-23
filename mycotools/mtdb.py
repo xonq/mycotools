@@ -15,23 +15,11 @@ import sys
 import subprocess
 from mycotools.lib.kontools import format_path, read_json, write_json, eprint
 from mycotools.lib.dbtools import primaryDB, mtdb_connect, mtdb_disconnect, \
-    mtdb_initialize, mtdb, loginCheck
+    mtdb_initialize, mtdb, loginCheck, parse_user_config
 
 def get_version():
     from importlib.metadata import version
     print(f'Mycotools version {version("mycotools")}')
-
-def parse_config(mtdb_config_file = format_path('~/.mycotools/config.json')):
-    config_dir = format_path('~/.mycotools/')
-    if not os.path.isdir(config_dir):
-        os.mkdir(config_dir)
-        config_dir += '/'
-
-    if os.path.isfile(mtdb_config_file):
-        config = read_json(mtdb_config_file)
-    else:
-        config = {'log': {}}
-    return config
 
 def main(argv = sys.argv):
     description = 'MycotoolsDB (MTDB) utility usage' \
@@ -52,7 +40,7 @@ def main(argv = sys.argv):
  #       + '\n[-p]\t\t[--prokaryote]\tConnect to prokaryote MTDB' \
 
 
-    config = parse_config()
+    config = parse_user_config()
     if any([not x.startswith('-') for x in argv[1:]]):
         script = [x for x in argv[1:] if not x.startswith('-')]
         script = script[0]
@@ -94,7 +82,7 @@ def main(argv = sys.argv):
                         raise FileNotFoundError('invalid MTDB path')
         except IndexError:
             raise ValueError('--interface requires a path')
-        mtdb_initialize(mycodb_loc, config = config)
+        mtdb_initialize(mycodb_loc)
     elif {'-d', '--dependencies'}.intersection(set_argv):
         pip_deps = ['dna_features_viewer', 'mycotools']
         dep_cmds = [['conda', 'install', '-y', '-c', 'jlsteenwyk', 'clipkit'],
@@ -147,7 +135,7 @@ def main(argv = sys.argv):
             coord = '-u'
         else:
             coord = '--unlink'
-        mtdb_disconnect(config)
+        mtdb_disconnect()
         sys.exit(0)
     elif len(argv) > 1:
         omes = argv[1].replace('"','').replace("'",'').split()
