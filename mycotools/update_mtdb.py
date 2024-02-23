@@ -1451,6 +1451,9 @@ def main():
         new_db, update_mtdb = taxonomy_update(orig_db, update_path, date, 
                                               config, ncbi_email, ncbi_api,
                                               rank = rank, group = king)
+        new_path = format_path('$MYCODB/' + date + '.mtdb')
+        update_mtdb.df2db(new_path)
+        sys.exit(0)
     elif args.reference:
         new_db, update_mtdb = rogue_update(
             orig_db, update_path, date, args.failed, jgi_email, jgi_pwd,
