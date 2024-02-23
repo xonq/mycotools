@@ -168,7 +168,7 @@ def read_predb(predb_path, spacer = '\t'):
             raise KeyError
     try:
         if 'restriction' not in predb \
-            and predb['useRestriction (yes/no)'] in predb:
+            and 'useRestriction (yes/no)' in predb:
             predb['restriction'] = predb['useRestriction (yes/no)']
             del predb['useRestriction (yes/no)']
         if any(x.lower() not in {'y', 'n', 'yes', 'no', '', 'true', 'false'} for x in predb['restriction']):
