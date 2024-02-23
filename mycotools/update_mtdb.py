@@ -744,10 +744,11 @@ def ref_update(
     else:
         rank = 'superkingdom'
 
-    tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
+    if not args.taxonomy: #already completed
+        tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
-    new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
-    dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
+        new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
+        dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
@@ -811,6 +812,22 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
 
     df = df[df['genus'].isin(passing_tax)]
     return tax_dicts, df
+
+
+def taxonomy_update(orig_db, update_path, date, 
+                    config, ncbi_email, ncbi_api,
+                    rank = 'kingdom', group = 'fungi'):
+
+    taxless_db = orig_db.reset_index()
+    taxless_db['taxonomy'] = [{} for x in taxless_db['taxonomy']]
+    tax_dicts = gather_taxonomy(taxless_db, api_key = ncbi_api,
+                                    king=group, rank = rank)
+    tax_db, genus_dicts = assimilate_tax(taxless_db, tax_dicts)
+    if not isinstance(tax_db, mtdb):
+        return tax_db, mtdb.pd2mtdb(tax_db)
+    else:
+        return tax_db.mtdb2pd(), tax_db
+
 
 
 def rogue_update(
@@ -1141,18 +1158,22 @@ def main():
     parser = argparse.ArgumentParser(description = "Initializes or updates " \
         + "MycotoolsDB (MTDB)")
 
-    init_args = parser.add_argument_group('Initializiation')
-    init_args.add_argument('-p', '--prokaryote', action = 'store_true',
-        help = '[PROKARY, -i]: Initialize prokaryote MTDB')
-    init_args.add_argument('-u', '--update', action = 'store_true')
+    init_args = parser.add_argument_group('MTDB Initializiation')
     init_args.add_argument('-i', '--init', 
                            help = 'Initialize MTDB in dir')
-    init_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
     init_args.add_argument('-r', '--reference', 
         help = '[-i]: Initialize primary MTDB using a reference .mtdb')
     init_args.add_argument('--predb', 
         help = '[-i]: Initialize primary MTDB using a reference predb .tsv')
-    init_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
+
+    upd_args = parser.add_argument_group("MTDB Updating")
+    upd_args.add_argument('-u', '--update', action = 'store_true')
+    upd_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
+    upd_args.add_argument('-t', '--taxonomy', action = 'store_true',
+        help = 'Update taxonomy and exit')
+    upd_args.add_argument('--save', action = 'store_true', 
+        help = '[-u] Do not integrate/delete new data; -a to complete')
+
 #    init_args.add_argument('--reinit', action = 'store_true', help = 'Redownload all web data')
 #    parser.add_argument('--rogue', action = 'store_true', 
  #       help = 'De novo MTDB') # currently required
@@ -1167,15 +1188,17 @@ def main():
     conf_args.add_argument('-rk', '--rank',
                            help = '[-i, -l]: Rank(s) that positionally ' \
                                 + 'correspond to -l')
+    conf_args.add_argument('-p', '--prokaryote', action = 'store_true',
+        help = '[PROKARY, -i]: Initialize prokaryote MTDB')
+    conf_args.add_argument('--failed', action = 'store_true', 
+        help = 'Rerun/ignore failed')
+    conf_args.add_argument('--forbidden', action = 'store_true', help = 'Rerun forbidden')
+
 #    conf_args.add_argument('--deviate', action = 'store_true', help = 'Deviate' \
  #       + ' from existing config without prompting')
 
     run_args = parser.add_argument_group('Runtime')
-    run_args.add_argument('--save', action = 'store_true', 
-        help = '[-u] Do not integrate/delete new data. -a to complete')
-    run_args.add_argument('--failed', action = 'store_true', 
-        help = 'Rerun/ignore failed')
-    run_args.add_argument('--forbidden', action = 'store_true', help = 'Rerun forbidden')
+    run_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
     run_args.add_argument('--no_md5', action = 'store_true', help = 'Skip NCBI MD5'
         + ' (expedite large reruns)')
 #    run_args.add_argument('--overwrite', action = 'store_true',
@@ -1186,7 +1209,8 @@ def main():
     if not args.init \
         and not args.update \
         and not args.reference \
-        and not args.add:
+        and not args.add \
+        and not args.taxonomy:
         eprint('\nERROR: --update/--init/--reference/--add must be specified', flush = True)
         sys.exit(15)
     elif args.reference and not args.init:
@@ -1340,7 +1364,7 @@ def main():
         update_path = output + 'log/' + date + '/'
         if not os.path.isdir(update_path):
             os.mkdir(update_path)
-        if not config['rogue']:            
+        if not True: #config['rogue']: # NEED TO MAKE THIS wget a particular URL
             old_db = db2df(db_path)
             shutil.move(db_path, update_path + os.path.basename(db_path))
             git_pull = subprocess.call([
@@ -1353,7 +1377,6 @@ def main():
             orig_db = db2df(primaryDB())
 
     orig_db = orig_db.dropna(subset = ['ome'])
-
 
     if config['branch'] == 'prokaryote':
         jgi = False
@@ -1424,7 +1447,11 @@ def main():
      #       ) # NEED massive overhaul and git generation
 #    else:
 
-    if not args.reference:
+    if args.taxonomy:
+        new_db, update_mtdb = taxonomy_update(orig_db, update_path, date, 
+                                              config, ncbi_email, ncbi_api,
+                                              rank = rank, group = king)
+    elif args.reference:
         new_db, update_mtdb = rogue_update(
             orig_db, update_path, date, args.failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = args.cpu, 
@@ -1467,14 +1494,6 @@ def main():
         shutil.move(new_path + '.tmp', new_path)
         rm_raw_data(update_path)
         eprint('\nMTDB update complete', flush = True)
-
-        eprint('\nGathering assembly statistics', flush = True)
-        assStats(primaryDB(), format_path('$MYCODB/../data/assemblyStats.tsv'),
-                 args.cpu)
-    
-        eprint('\nGathering annotation statistics', flush = True)
-        annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'),
-                 args.cpu)
 #        gen_algn_db(
  #           update_path, set(full_mtdb['ome'])
   #          )
@@ -1485,6 +1504,13 @@ def main():
             +  f'{format_path(update_path + date + ".mtdb")}')
         # output new database and new list of omes
 
+    if args.init or args.update or args.add:
+        eprint('\nGathering assembly statistics', flush = True)
+        assStats(primaryDB(), format_path('$MYCODB/../data/assemblyStats.tsv'),
+                 args.cpu)
+        eprint('\nGathering annotation statistics', flush = True)
+        annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'),
+                 args.cpu)
 
     outro(start_time)
 
