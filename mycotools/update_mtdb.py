@@ -940,11 +940,15 @@ def rogue_update(
         if not os.path.isfile(jgi_predb_path):
             print('\tCurating MycoCosm data', flush = True)
             jgi_premtdb = jgi_predb.fillna('').to_dict(orient='list')
-            jgi_mtdb, jgi_failed1 = predb2mtdb(jgi_premtdb, refdbjgi, update_path,
-                                            forbidden = forbid_omes, cpus = cpus, 
-                                            remove = remove, spacer = '\t\t')
-            jgi_failed.extend(jgi_failed1)
+            if 'assemblyPath' in jgi_premtdb:
+                jgi_mtdb, jgi_failed1 = predb2mtdb(jgi_premtdb, refdbjgi, update_path,
+                                                forbidden = forbid_omes, cpus = cpus, 
+                                                remove = remove, spacer = '\t\t')
+                jgi_failed.extend(jgi_failed1)
+            else:
+                jgi_mtdb = mtdb()
             jgi_mtdb.df2db(jgi_predb_path)
+
             for failure in jgi_failed:
                 add_failed(failure[0], 'jgi', str(failure[1]), date,
                           format_path('$MYCODB/../log/failed.tsv'))
