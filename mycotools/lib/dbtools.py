@@ -654,7 +654,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
     if king:
         for lineage in lineages:
             if lineage['Rank'].lower() == rank.lower():
-                if lineage['ScientificName'].lower() == king:
+                if lineage['ScientificName'].lower() == king.lower():
                     taxid = tax
                     if len(ids) > 1:
                         print('\t\tMultiple Tax IDs: ' + str(ids), flush = True)
@@ -703,7 +703,7 @@ def gather_taxonomy(df, api_key = None, king='fungi',
 
 def read_tax(taxonomy_string):
     """Read taxonomy from an MTDB by converting the string into a dictionary"""
-    tax_strs = ['kingdom', 'phylum', 'subphylum', 'class', 
+    tax_strs = ['superkingdom', 'kingdom', 'phylum', 'subphylum', 'class', 
                 'order', 'family', 'subfamily']
     if taxonomy_string: 
         if isinstance(taxonomy_string, str):
@@ -725,7 +725,7 @@ def read_tax(taxonomy_string):
 # assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database
 # forbid a list of taxonomic classifications you are not interested in and return a new database
 def assimilate_tax(db, tax_dicts, ome_index = 'ome', 
-                   forbid={'no rank', 'superkingdom', 'subkingdom', 'genus', 
+                   forbid={'no rank', 'subkingdom', 'genus', 
                            'species', 'species group', 'varietas', 'forma'}):
 
     genera = set(db['genus'])
