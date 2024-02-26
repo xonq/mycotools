@@ -1455,14 +1455,6 @@ def main():
         update_mtdb.df2db(new_path)
         sys.exit(0)
     elif args.reference:
-        new_db, update_mtdb = rogue_update(
-            orig_db, update_path, date, args.failed, jgi_email, jgi_pwd,
-            config, ncbi_email, ncbi_api, cpus = args.cpu, 
-            check_MD5 = not bool(args.no_md5), jgi = jgi, group = group,
-            kingdom = king, remove = not args.save, 
-            lineage_constraints = config['lineage_constraints']
-            )
-    else:
         if any(not x for x in ref_db['published']) and not args.nonpublished:
             eprint('\nWARNING: nonpublished data detected in reference and will be ignored', 
                    flush = True)
@@ -1472,6 +1464,16 @@ def main():
             jgi = jgi, group = group, kingdom = king,
             remove = not args.save
             )
+    else:
+        new_db, update_mtdb = rogue_update(
+            orig_db, update_path, date, args.failed, jgi_email, jgi_pwd,
+            config, ncbi_email, ncbi_api, cpus = args.cpu, 
+            check_MD5 = not bool(args.no_md5), jgi = jgi, group = group,
+            kingdom = king, remove = not args.save, 
+            lineage_constraints = config['lineage_constraints']
+            )
+
+
     if not update_mtdb:
         eprint('\nNo new data acquired', flush = True)
 
