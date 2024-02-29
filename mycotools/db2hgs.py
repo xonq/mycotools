@@ -36,6 +36,7 @@ def mk_db2hg_output(out_dir, nscg = False):
 def run_mmseqs(db, wrk_dir, algorithm = 'mmseqs easy-cluster',
                min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
                cpus = 1):
+    """Run MMseqs clustering by sym linking MTDB proteomes"""
     symlink_files(['faa'], db, wrk_dir, verbose = False) # symlink proteomes
     cluster_res_file = wrk_dir + 'raw_hgs.tsv'
     if not os.path.isfile(cluster_res_file): # NEED to add to log removal
@@ -74,6 +75,7 @@ def run_mmseqs(db, wrk_dir, algorithm = 'mmseqs easy-cluster',
     return cluster_res_file
 
 def parse_1to1(hg_file, useableOmes = set()):
+    """Parse MMseqs style homology group output"""
     derivations = defaultdict(list)
     with open(hg_file, 'r') as raw:
         for line in raw:
@@ -109,6 +111,7 @@ def parse_1to1(hg_file, useableOmes = set()):
 
 def compile_homolog_groups(raw_hg_file, out_hg_file, 
                            useableOmes = set()):
+    """Compile OrthoFinder-style homology group tabular output"""
     hg_info = parse_1to1(raw_hg_file)
     hg2genes = hg_info[-1]
     with open(out_hg_file, 'w') as out:
@@ -119,9 +122,7 @@ def compile_homolog_groups(raw_hg_file, out_hg_file,
 
 def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 100, 
                   max_mean = 2, max_stdev = 1, min_genomes = 1):
-    """Identify near single copy homology groups. Criteria:
-       1) has all omes; 2) minimal overall size of homology group;
-       3) lowest median"""
+    """Identify near single copy homology groups"""
     schgs, near_schgs = [], []
     hg2stats, all_omes_hgs, hg2d_omes = {}, set(), {}
     min_hg2gene = {k: v for k, v in sorted(hg2gene.items(),
@@ -184,6 +185,7 @@ def write_hg_stats(hg2stats, out_file, sort = False):
                     + f'\t{stats[3]}\n')
 
 def write_hgs(hg, genes, wrk_dir, write_dir):
+    """Write homology group fastas"""
 #    fa_dict = acc2fa(db, genes)
     ome2gene = defaultdict(list)
     for gene in genes:
@@ -200,13 +202,15 @@ def write_hgs(hg, genes, wrk_dir, write_dir):
     os.rename(f'{write_dir}{hg}.faa.tmp', f'{write_dir}{hg}.faa')
 
 def align_hg(hg_fa, out_fa, cpus = 1):
+    """Run homology group alignment"""
     with open(out_fa + '.tmp', 'w') as out:
         cmd = subprocess.call(['mafft', '--auto', '--thread', f'-{cpus}', hg_fa],
-                              stdout = out, stderr = subprocess.PIPE)
+                              stdout = out)#, stderr = subprocess.PIPE)
     os.rename(out_fa + '.tmp', out_fa)
     return cmd
 
 def hmmbuild_hg(msa_fa, out_hmm, cpus = 1):
+    """Build HMMs of homology groups"""
     cmd = subprocess.call(['hmmbuild', '--amino', out_hmm + '.tmp', msa_fa],
                           stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     os.rename(out_hmm + '.tmp', out_hmm)
@@ -267,30 +271,36 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
         hg2d_omes = {k: v for k, v in sorted(hg2d_omes.items(),
                          key = lambda x: len(x[1]))}
         for k, v in hg2d_omes.items():
-            out.write(f'{k}\t{sorted(v)}\n')
+            out.write(f'{k}\t{",".join(sorted(v))}\n')
     write_hg_stats(hg2stats, hg_stats_file, sort = True)
     write_hg_stats({k: hg2stats[k] for k in list(full_hgs)},
                    full_hg_stats_file, sort = True)
     if nscg:
         print(f'\t{len(nschgs)} near single-copy HGs', flush = True)
         with mp.Pool(processes = cpus) as pool:
-            pool.starmap(write_hgs, ((hg, hg2gene[hg], wrk_dir, nscg_dir) \
-                                     for hg in nschgs))
+            pool.starmap(write_hgs, 
+                         ((hg, hg2gene[hg], wrk_dir, nscg_dir) \
+                           for hg in nschgs \
+                           if not os.path.isfile(f'{nscg_dir}{hg}.faa')))
 #        for hg in nschgs:
  #           if not os.path.isfile(f'{nscg_dir}{hg}.faa'):
   #              write_hgs(db, hg, hg2gene[hg], wrk_dir, nscg_dir)
     if schgs:
         print(f'\t{len(schgs)} single-copy HGs', flush = True)
         with mp.Pool(processes = cpus) as pool:
-            pool.starmap(write_hgs, ((hg, hg2gene[hg], wrk_dir, scg_dir) \
-                                     for hg in schgs))
+            pool.starmap(write_hgs, 
+                        ((hg, hg2gene[hg], wrk_dir, scg_dir) \
+                         for hg in schgs \
+                         if not os.path.isfile(f'{scg_dir}{hg}.faa')))
 #        for hg in schgs:
  #           if not os.path.isfile(f'{scg_dir}{hg}.faa'):
   #              write_hgs(db, hg, hg2gene[hg], wrk_dir, scg_dir)
     if all_hgs:
         with mp.Pool(processes = cpus) as pool:
-            pool.starmap(write_hgs, ((hg, genes, wrk_dir, hg_seq_dir) \
-                                     for hg, genes in hg2genes.items()))
+            pool.starmap(write_hgs, 
+                         ((hg, genes, wrk_dir, hg_seq_dir) \
+                         for hg, genes in hg2genes.items() \
+                         if not os.path.isfile(f'{hg_seq_dir}{hg}.faa')))
 
 #        for hg, genes in hg2gene.items():
  #           if not os.path.isfile(f'{hg_seq_dir}{hg}.faa'):
