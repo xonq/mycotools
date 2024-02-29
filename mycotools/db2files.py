@@ -24,12 +24,16 @@ def soft_main(filetypes, db, output_path, print_link = False, verbose = False):
         for ome, row in db.items():
             for ftype in filetypes:
                 if os.path.isfile(row[ftype]):
+                    sym_path = f'{output_path}{ftype}/{ome}.{ftype}'
                     try:
-                        os.symlink(row[ftype], output_path + ftype \
-                                 + '/' + ome + '.' + ftype)
+                        os.symlink(row[ftype], sym_path)
                     except FileExistsError:
-                        vprint('\t' + ome + ' ' + ftype + ' exists',
-                               v = verbose, flush = True)
+                        if os.path.islink(sym_path):
+                            os.remove(sym_path)
+                            os.symlink(row[ftype], sym_path)
+                        else:
+                            vprint('\t' + ome + ' ' + ftype + ' exists',
+                                   v = verbose, flush = True)
                 else:
                     vprint('\tERROR: ' + ome + ' ' + ftype, flush = True,
                            v = verbose)
