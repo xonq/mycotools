@@ -148,7 +148,7 @@ def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 100,
         hg2d_omes[hg] = diff_omes
 
         if omes_perc >= min_genomes: # all omes are present
-            all_ome_hgs.add(hg)
+            all_omes_hgs.add(hg)
 #            print(median, max_median, len(genes), max_len)
             if max(count_omes) == 1:
                 schgs.append(hg)
