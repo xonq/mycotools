@@ -69,50 +69,83 @@ def reverse_complement(seq):
     return new_seq
 
 
-def fa2dict(fasta_input, file_ = True):
+def fa2dict(fasta_input): #file_ = True):
     fasta_dict = {}
-    if file_:
-        with open(fasta_input, 'r') as fasta:
-            str_fasta = ''
-            for line in fasta:
-                data = line.rstrip()
-                if data.startswith('>'):
-                    str_fasta += '\n' + data.rstrip() + '\n'
-                elif data:
-                    str_fasta += data
+    with open(fasta_input, 'r') as raw:
+        for line in raw:
+            data = line.rstrip()
+            if data.startswith('>'):
+                header = data[1:].split(' ')
+                seq_name = header[0]
+                fasta_dict[seq_name] = {'sequence': '', 
+                                         'description': ' '.join(header[1:])}
+            elif not data.startswith('#'):
+                fasta_dict[seq_name]['sequence'] += data
+    return fasta_dict
+
+def fa2dict_accs(fasta_input, accs = set()): #file_ = True):
+    fasta_dict = {}
+    with open(fasta_input, 'r') as raw:
+        for line in raw:
+            data = line.rstrip()
+            if data.startswith('>'):
+                header = data[1:].split(' ')
+                seq_name = header[0]
+                if seq_name in accs:
+                    fasta_dict[seq_name] = {'sequence': '', 
+                                         'description': ' '.join(header[1:])}
+                    accs.remove(seq_name)
+                elif not accs:
+                    break
+                else:
+                    seq_name = False
+            elif seq_name:
+                if not data.startswith('#'):
+                    fasta_dict[seq_name]['sequence'] += data
+    return fasta_dict
+
+
+    #if file_:
+   #     with open(fasta_input, 'r') as fasta:
+#            str_fasta = ''
+ #           for line in fasta:
+  #              data = line.rstrip()
+   #             if data.startswith('>'):
+    #                str_fasta += '\n' + data.rstrip() + '\n'
+     #           elif data:
+      #              str_fasta += data
                 # concatenates the prep string with the prepped line from the fasta file
-        str_fasta = str_fasta.lstrip()
-    else:
-        str_fasta = fasta_input
+       # str_fasta = str_fasta.lstrip()
+ #   else:
+  #      str_fasta = fasta_input
 
     # extracts 0) seq ID and description and 1) sequence
-    extracted = re.findall( r'(^>[^\n]*)\n([^>]*)', str_fasta, re.M)
+   # extracted = re.findall( r'(^>[^\n]*)\n([^>]*)', str_fasta, re.M)
 
     # adds a new dictionary for each gene
-    for val in extracted:
-        step1 = val[0]
-        step2 = re.search(r'^>([^ ]*)', step1)
-        gene = step2[1]
-        step3 = re.search(r' (.*)', step1)
-        if step3:
-            descrip = step3[1]
-        else:
-            descrip = ''
+#    for val in extracted:
+ #       step1 = val[0]
+  #      step2 = re.search(r'^>([^ ]*)', step1)
+   #     gene = step2[1]
+    #    step3 = re.search(r' (.*)', step1)
+     #   if step3:
+      #      descrip = step3[1]
+       # else:
+        #    descrip = ''
 
-        seq = val[1]
-        if seq:
-            if seq[-1] == '\n' or seq[-1] == '\r':
-                seq = seq.rstrip()
-        else:
-            continue
+#        seq = val[1]
+ #       if seq:
+  #          if seq[-1] == '\n' or seq[-1] == '\r':
+   #             seq = seq.rstrip()
+    #    else:
+     #       continue
 
         # prepares dictionaries for each gene with description, seq, rvcmpl_seq, and codons
-        fasta_dict[gene] = {}
-        if descrip != '\n':
-            fasta_dict[gene]['description'] = descrip
-        fasta_dict[gene]['sequence'] = seq
+#        fasta_dict[gene] = {}
+ #       if descrip != '\n':
+  #          fasta_dict[gene]['description'] = descrip
+   #     fasta_dict[gene]['sequence'] = seq
 
-    return fasta_dict
 
 
 # truncates sequences based on inputted lenght
