@@ -5,12 +5,13 @@ import sys
 import shutil
 import argparse
 import subprocess
+import multiprocessing as mp
 from statistics import stdev
 from collections import defaultdict, Counter
 from mycotools.acc2fa import dbmain as acc2fa
 from mycotools.db2files import soft_main as symlink_files
 from mycotools.lib.dbtools import mtdb, primaryDB
-from mycotools.lib.biotools import fa2dict, dict2fa
+from mycotools.lib.biotools import fa2dict, dict2fa, fa2dict_accs
 from mycotools.lib.kontools import format_path, eprint, mkOutput, findExecs
 
 
@@ -148,7 +149,8 @@ def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 100,
         hg2d_omes[hg] = diff_omes
 
         if omes_perc >= min_genomes: # all omes are present
-            all_omes_hgs.add(hg)
+            if omes_perc == 1:
+                all_omes_hgs.add(hg)
 #            print(median, max_median, len(genes), max_len)
             if max(count_omes) == 1:
                 schgs.append(hg)
@@ -166,7 +168,6 @@ def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 100,
                near_schgs.append(hg)
 #            if len(near_schgs) == max_hgs:
  #               break
-
     return schgs, near_schgs, hg2stats, all_omes_hgs, hg2d_omes
 
 def write_hg_stats(hg2stats, out_file, sort = False):
@@ -182,7 +183,7 @@ def write_hg_stats(hg2stats, out_file, sort = False):
             out.write(f'{hg}\t{stats[0]}\t{stats[1]}\t{stats[2]}' \
                     + f'\t{stats[3]}\n')
 
-def write_hgs(db, hg, genes, wrk_dir, write_dir):
+def write_hgs(hg, genes, wrk_dir, write_dir):
 #    fa_dict = acc2fa(db, genes)
     ome2gene = defaultdict(list)
     for gene in genes:
@@ -191,9 +192,8 @@ def write_hgs(db, hg, genes, wrk_dir, write_dir):
         
     fa_dict = {}
     for ome, genes in ome2gene.items():
-         faa = fa2dict(f'{wrk_dir}faa/{ome}.faa')
-         for gene in genes:
-             fa_dict[gene] = faa[gene]
+         fa_dict = {**fa_dict, 
+                    **fa2dict_accs(f'{wrk_dir}faa/{ome}.faa', set(genes))}
 
     with open(f'{write_dir}{hg}.faa.tmp', 'w') as out:
         out.write(dict2fa(fa_dict))
@@ -213,7 +213,7 @@ def hmmbuild_hg(msa_fa, out_hmm, cpus = 1):
     return cmd
     
 
-def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5, nscg = False,
+def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
          max_mean = 1, max_stdev = 1, all_hgs = False, min_genomes = 1,
          max_median = 1, algorithm = 'mmseqs easy-cluster', hmm = False, cpus = 1):
     """Acquire the proteome files for an inputted MycotoolsDB, use MMseqs to
@@ -221,6 +221,20 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5, nscg = Fal
     single-copy gene groups"""
 
     db = db.set_index()
+
+    nscg = False
+    if max_mean:
+        if max_mean > 1:
+            nscg = True
+    if max_median and not nscg:
+        if max_median > 1:
+            nscg = True
+    if max_stdev and not nscg:
+        if max_stdev > 0:
+            nscg = True
+    if min_genomes and not nscg:
+        if min_genomes < 1:
+            nscg = True
 
     hg_output = out_dir + 'homology_groups.tsv'
     hg_stats_file = out_dir + 'hg_stats.tsv'
@@ -259,18 +273,28 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5, nscg = Fal
                    full_hg_stats_file, sort = True)
     if nscg:
         print(f'\t{len(nschgs)} near single-copy HGs', flush = True)
-        for hg in nschgs:
-            if not os.path.isfile(f'{nscg_dir}{hg}.faa'):
-                write_hgs(db, hg, hg2gene[hg], nscg_dir)
+        with mp.Pool(processes = cpus) as pool:
+            pool.starmap(write_hgs, ((hg, hg2gene[hg], wrk_dir, nscg_dir) \
+                                     for hg in nschgs))
+#        for hg in nschgs:
+ #           if not os.path.isfile(f'{nscg_dir}{hg}.faa'):
+  #              write_hgs(db, hg, hg2gene[hg], wrk_dir, nscg_dir)
     if schgs:
         print(f'\t{len(schgs)} single-copy HGs', flush = True)
-        for hg in schgs:
-            if not os.path.isfile(f'{scg_dir}{hg}.faa'):
-                write_hgs(db, hg, hg2gene[hg], scg_dir)
+        with mp.Pool(processes = cpus) as pool:
+            pool.starmap(write_hgs, ((hg, hg2gene[hg], wrk_dir, scg_dir) \
+                                     for hg in schgs))
+#        for hg in schgs:
+ #           if not os.path.isfile(f'{scg_dir}{hg}.faa'):
+  #              write_hgs(db, hg, hg2gene[hg], wrk_dir, scg_dir)
     if all_hgs:
-        for hg, genes in hg2gene.items():
-            if not os.path.isfile(f'{hg_seq_dir}{hg}.faa'):
-                write_hgs(db, hg, genes, hg_seq_dir)
+        with mp.Pool(processes = cpus) as pool:
+            pool.starmap(write_hgs, ((hg, genes, wrk_dir, hg_seq_dir) \
+                                     for hg, genes in hg2genes.items()))
+
+#        for hg, genes in hg2gene.items():
+ #           if not os.path.isfile(f'{hg_seq_dir}{hg}.faa'):
+  #              write_hgs(db, hg, genes, wrk_dir, hg_seq_dir)
 
     if hmm:
         print('\nAligning and building HMMs', flush = True)
@@ -336,7 +360,7 @@ def cli():
         execs.extend(['hmmbuild', 'mafft'])
     findExecs(execs, set(execs))
 
-    main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5, nscg = args.mean,
+    main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
          max_mean = args.mean, max_stdev = args.stdev, all_hgs = args.all,
          algorithm = 'mmseqs easy-cluster', min_genomes = args.min_genomes,
          hmm = args.hmm, max_median = args.median, cpus = args.cpus)
