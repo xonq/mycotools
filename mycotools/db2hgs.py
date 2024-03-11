@@ -6,7 +6,7 @@ import shutil
 import argparse
 import subprocess
 import multiprocessing as mp
-from statistics import stdev
+from statistics import stdev, StatisticsError
 from collections import defaultdict, Counter
 from mycotools.acc2fa import dbmain as acc2fa
 from mycotools.db2files import soft_main as symlink_files
@@ -137,7 +137,10 @@ def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 100,
     for hg, genes in min_hg2gene.items():
         hg_omes = [x[:x.find('_')] for x in genes]
         count_omes = list(Counter(hg_omes).values()) # prepare for median
-        sd = stdev(count_omes)
+        try:
+            sd = stdev(count_omes)
+        except StatisticsError:
+            sd = None
         #calculation
         count_omes.sort()
         median_i = round((len(count_omes) / 2) - 0.5)
@@ -164,7 +167,9 @@ def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 100,
                    if len(genes) > max_len:
                        break # it is sorted so nothing will be lower
                if max_stdev:
-                   if sd > max_stdev:
+                   if sd is None:
+                       continue
+                   elif sd > max_stdev:
                        continue
                near_schgs.append(hg)
 #            if len(near_schgs) == max_hgs:
@@ -176,7 +181,7 @@ def write_hg_stats(hg2stats, out_file, sort = False):
     if sort:
         # sort by median, then standard dev
         hg2stats = {k: v for k, v in sorted(hg2stats.items(), 
-                    key = lambda x: (x[1][1], x[1][2]))}
+                    key = lambda x: (x[1][1], (x[1][2] is None, x[1][2])))}
 
     with open(out_file, 'w') as out:
         out.write('#hg\tmean\tmedian\tstdev\t%_genomes\n')
@@ -242,7 +247,7 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
 
     hg_output = out_dir + 'homology_groups.tsv'
     hg_stats_file = out_dir + 'hg_stats.tsv'
-    full_hg_stats_file = out_dir + 'pervasive_hg_stats.tsv'
+    full_hg_stats_file = out_dir + 'core_hg_stats.tsv'
     hg2missing_genome_file = out_dir + 'hg2missing.tsv'
     wrk_dir, scg_dir, nscg_dir, hg_seq_dir = mk_db2hg_output(out_dir, nscg)
 
