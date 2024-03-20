@@ -93,8 +93,6 @@ def jgi_redundancy_check(db, jgi_df, duplicates = {}, ome_col = 'portal',
             low_ome = ome.lower()
             ncbi_acc = jgi2ncbi[low_ome]
             if ncbi_acc in set(db['assembly_acc']):
-                print(low_ome, ncbi_acc)
-                sys.exit(1)
                 check_db = db[db['assembly_acc'] == ncbi_acc]
                 checkOme = list(check_db['ome'])[0]
                 index = list(check_db.index)[0]
