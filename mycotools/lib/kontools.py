@@ -8,6 +8,7 @@ import gzip
 import json
 import shutil
 import tarfile
+import argparse
 import subprocess
 from tqdm import tqdm
 from datetime import datetime
@@ -61,8 +62,6 @@ class kon_log():
         self._base = 0
 
 
-
-
 def checksum(path, cmd = 'sha256', ref = ''):
     if not isinstance(path, list):
         hash_res = subprocess.run([cmd + 'sum', path],
@@ -109,6 +108,38 @@ def split_input(inp, ignore_white = False):
     elif not ignore_white:
         out_list = inp.split()
     return out_list
+
+def namespace_to_dict(namespace):
+    return {
+        k: namespace_to_dict(v) if isinstance(v, argparse.Namespace) else v
+        for k, v in vars(namespace).items()
+    }
+
+def parse_run_log(log_path, args_dict, fail = set()):
+    """Parse a log of the previous run, or create one if it doesn't exist.
+    Raise a KeyError if there are deviations that should fail the existing
+    run"""
+    if isinstance(args_dict, argparse.Namespace):
+        args_dict = namespace_to_dict(args_dict)
+
+    if not os.path.isfile(log_path):
+        write_json(args_dict, log_path)
+        return {}
+    else:
+        prev_args = read_json(log_path)
+        deviations = {}
+        for arg, val in args_dict.items():
+            if arg in prev_args:
+                if val != prev_args[arg]:
+                    deviations[arg] = prev_args[arg]
+            else:
+                deviations[arg] = None
+        failure_args = sorted(x for x in deviations if x in fail)
+        if failure_args:
+            raise KeyError(f'arguments discrepant from previous run: ' \
+                         + f'{failure_args}')
+        return deviations
+
 
 def hex2rgb(hexCode):
     return tuple(int(hexCode.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
@@ -339,8 +370,6 @@ def fmt_float(val, sig_dig = None):
                 
 
     return val_str
-
-
 
 
 def findExecs( deps, exit = set(), verbose = True ):
