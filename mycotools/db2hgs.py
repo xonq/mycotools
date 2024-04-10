@@ -220,6 +220,30 @@ def hmmbuild_hg(msa_fa, out_hmm, cpus = 1):
                           stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     os.rename(out_hmm + '.tmp', out_hmm)
     return cmd
+
+
+def pangenome_output(pan_file, hg2gene, hg2d_omes, max_mis_ome = 0):
+    """Circumscribe and output the pangenome based on a maximum missing genome
+    to determine the accessory and core HGs"""
+    ome2pan = defaultdict(lambda: [[], []])
+    core_hgs = set(k for k, v in hg2d_omes.items() if len(v) <= max_mis_ome)
+    for hg, genes in hg2gene.items():
+        if hg in core_hgs:
+            for gene in genes:
+                ome = gene[:gene.find('_')]
+                ome2pan[ome][0].append(gene)
+        else:
+            for gene in genes:
+                ome = gene[:gene.find('_')]
+                ome2pan[ome][1].append(gene)
+
+    with open(pan_file, 'w') as out:
+        out.write('#ome\tcore_%\tacc_%\n')
+        for ome, pan in ome2pan.items():
+            tot = len(pan[0]) + len(pan[1])
+            out.write(f'{ome}\t{len(pan[0])/tot}\t{len(pan[1])/tot}\n')
+    return ome2pan
+    
     
 
 def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
@@ -249,6 +273,7 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
     hg_stats_file = out_dir + 'hg_stats.tsv'
     full_hg_stats_file = out_dir + 'core_hg_stats.tsv'
     hg2missing_genome_file = out_dir + 'hg2missing.tsv'
+    pan_file = out_dir + 'pangenome.tsv'
     wrk_dir, scg_dir, nscg_dir, hg_seq_dir = mk_db2hg_output(out_dir, nscg)
 
     print('\nClustering protein sequences', flush = True)
@@ -262,6 +287,7 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
                                                               hg_output,
                                                               useable_omes)
 
+
     print('\nIdentifying single-copy HGs', flush = True)
     schgs, nschgs, hg2stats, full_hgs, hg2d_omes = id_near_schgs(hg2gene, 
                                    set(i2ome), max_hgs = 100,
@@ -271,6 +297,8 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
                                    min_genomes = min_genomes)
 
     print('\nWriting output', flush = True)
+    ome2pan = pangenome_output(pan_file, hg2gene, hg2d_omes, max_mis_ome = 0)
+
     with open(hg2missing_genome_file, 'w') as out:
         out.write('#hg\tmissing\n')
         hg2d_omes = {k: v for k, v in sorted(hg2d_omes.items(),
