@@ -75,6 +75,8 @@ def gff2svg(
 
     for seq in seqs:
         # sort each contig length set, start becomes the smallest
+        if not lens[seq]:
+            continue
         lens[seq].sort()
         start, features = lens[seq][0], []
         for i in seqs[seq]:
@@ -95,7 +97,7 @@ def gff2svg(
             sequence_length=length, features = features, first_index = start
             )
         ax, _ = record.plot(figure_width=width, strand_in_label_threshold=7)
-        ax.figure.savefig( svg_path, bbox_inches = 'tight'  )
+        ax.figure.savefig(svg_path, bbox_inches = 'tight')
 
 #    CLOSE(ax)
 
