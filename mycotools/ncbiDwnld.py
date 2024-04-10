@@ -101,7 +101,7 @@ def compile_log(output_path, remove = False):
     if not os.path.isfile( output_path + 'ncbiDwnld.log' ):
         with open( output_path + 'ncbiDwnld.log', 'w' ) as out:
             out.write('#ome\tassembly_acc\tassembly\tproteome\tgff3\ttranscript\t' + \
-            'fna_md5\tfaa_md5\tgff3_md5\ttrans_md5\tgenome_id(s)')
+            'fna_md5\tfaa_md5\tgff3_md5\ttrans_md5\tgenome_id(s)\tgenus\tspecies\tstrain')
 
         # too risky, too many things can go wrong and then users would be in a
         # loop, but necessary for huge downloads
@@ -110,14 +110,16 @@ def compile_log(output_path, remove = False):
             for line in raw:
                 if not line.startswith('#'):
                     data = [x.rstrip() for x in line.split('\t')]
-                    while len(data) < 10:
+                    while len(data) < 13:
                         data.append('')
                     ass_prots[data[0]] = { 
                         'assembly_acc': str(data[1]), 'fna': str(data[2]), 
                         'faa': str(data[3]), 'gff3': str(data[4]), 
                         'transcript': str(data[5]), 'fna_md5': str(data[6]),
                         'faa_md5': str(data[7]), 'gff3_md5': str(data[8]),
-                        'transcript_md5': str(data[9]), 'genome_id': data[10]
+                        'transcript_md5': str(data[9]), 'genome_id': data[10],
+                        'genus': str(data[11]), 'species': str(data[12]),
+                        'strain': str(data[13])
                         }
 
     return ass_prots
@@ -205,7 +207,8 @@ def collect_ftps(
                 'assembly_acc': accession, 'fna': '',
                 'faa': '', 'gff3': '', 'transcript': '',
                 'fna_md5': '', 'faa_md5': '',
-                'gff3_md5': '', 'transcript_md5': '', 'genome_id': ''
+                'gff3_md5': '', 'transcript_md5': '', 'genome_id': '',
+                'genus': '', 'species': '', 'strain': ''
                 }
             failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
             continue
@@ -241,12 +244,26 @@ def collect_ftps(
                 'assembly_acc': accession, 'fna': '', 'faa': '', 
                 'gff3': '', 'transcript': '', 'fna_md5': '',
                 'faa_md5': '', 'gff3_md5': '', 
-                'transcript_md5': '', 'genome_id': ID
+                'transcript_md5': '', 'genome_id': ID,
+                'genus': '', 'species': '', 'strain': ''
                 }
 
             record = esummary_ncbi(ID, database)
-            assemblyID = record['DocumentSummarySet']['DocumentSummary'][0]['AssemblyAccession']
-            ftp_path = str(record['DocumentSummarySet']['DocumentSummary'][0]['FtpPath_GenBank'])
+            record_info = record['DocumentSummarySet']['DocumentSummary'][0]
+            assemblyID = record_info['AssemblyAccession']
+            org = record_info['Organism'].split()
+            genus = org[0]
+            if len(org) > 2:
+                species = org[1]
+                strain = ''.join(org[2:])
+            elif len(org) == 2:
+                species = org[1]
+                strain = ''
+            else:
+                species = 'sp.'
+                strain = ''
+            
+            ftp_path = str(record_info['FtpPath_GenBank'])
 
             if not ftp_path:
                 eprint(spacer + '\t' + new_acc + ' failed to return any FTP path', flush = True)
@@ -320,14 +337,16 @@ def collect_ftps(
                 str(accession) + '\t' + accession + '\t' +  assembly + '\t' + \
                 proteome + '\t' + gff3 + '\t' + transcript + '\t' + \
                 ass_md5 + '\t' + prot_md5 + '\t' + gff_md5 + '\t' + trans_md5 + \
-                '\t' + ID
+                '\t' + ID + f'\t{genus}\t{species}\t{strain}'
                 )
             ass_prots[str(new_acc)] = {
                 'assembly_acc': accession, 'fna': assembly, 'fna_md5': ass_md5,
                 'faa': proteome, 'faa_md5': prot_md5,
                 'gff3': gff3, 'gff3_md5': gff_md5,
                 'transcript': transcript, 'transcript_md5': trans_md5,
-                'genome_id': ID
+                'genome_id': ID,
+                'genus': genus, 'species': species, 'strain': strain
+
                 }
             row['dwnld_id'] = ID
             if icount:
@@ -429,7 +448,8 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                 str(acc_prots['faa_md5']) + '\t' + \
                 str(acc_prots['gff3_md5']) + '\t' + \
                 str(acc_prots['transcript_md5']) + '\t' + \
-                str(acc_prots['genome_id']))
+                f"{acc_prots['genome_id']}\t{acc_prots['genus']}\t" + \
+                f"{acc_prots['species']}\t{acc_prots['strain']}")
             if remove and file_type in {'fna', 'gff3'}:
                 break
             continue
@@ -592,6 +612,9 @@ def main(
                         os.path.basename(ass_prots[acc]['faa'])
                     ncbi_df.at[acc, 'gffPath'] = output_path + 'gff3/' + \
                         os.path.basename(ass_prots[acc]['gff3'])
+                    ncbi_df.at[acc, 'genus'] = ass_prots[acc]['genus']
+                    ncbi_df.at[acc, 'species'] = ass_prots[acc]['species']
+                    ncbi_df.at[acc, 'strain'] = ass_prots[acc]['strain']
                     new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
             else:
                 check = ncbi_df[ncbi_df[column] == acc[:acc.find('$')]]
@@ -604,7 +627,8 @@ def main(
         for acc, data in ass_prots.items():
             eprint(spacer + '\t' + str(acc), flush = True)
             fail, count = dwnld_mngr_no_MD5(
-                ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
+                ncbi_df, data, acc, file_types, output_path, 
+                count, remove, api, spacer
                 )
             if fail:
                 failed.append(fail)
@@ -808,7 +832,15 @@ def cli():
             gff3 = args.gff3, transcript = args.transcript, ncbi_df = ncbi_df,
             output_path = output, verbose = True, spacer = ''
             )
-        new_df.to_csv( args.input + '_dwnld', sep = '\t' )
+        new_df = new_df.rename(columns = {'index': '#assembly_accession'})
+        new_df['source'] = 'ncbi'
+        new_df['useRestriction (yes/no)'] = 'no'
+#        if 'index' in new_df.columns:
+ #           del new_df['index']
+        if 0 in new_df.columns:
+            del new_df[0]
+
+        new_df.to_csv(args.input + '.predb', sep = '\t', index = None)
 
     outro(start_time)
 
