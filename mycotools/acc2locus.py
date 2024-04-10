@@ -55,12 +55,18 @@ def compile_alias_coords(gff_list, accs_list = []):
         seqid = entry['seqid']
         if 'gene' in entry['type']:
             # account for alternately spliced aliases
-            alias = alias_comp.search(entry['attributes'])[1]
+            try:
+                alias = alias_comp.search(entry['attributes'])[1]
+            except TypeError:
+                continue
             for al in alias.split('|'):
                 gene2alia[seqid][al].extend([entry['start'], entry['end']])
                 alia2seqid[al] = seqid
         elif 'RNA' in entry['type']:
-            alias = alias_comp.search(entry['attributes'])[1]
+            try:
+                alias = alias_comp.search(entry['attributes'])[1]
+            except TypeError:
+                continue
             coord_dict[seqid][alias].extend([entry['start'], entry['end']])
            
     # are there genes without RNA?
