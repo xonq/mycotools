@@ -13,7 +13,7 @@ import subprocess
 import contextlib
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
-    format_path, intro, outro, findExecs, mkOutput, multisub
+    format_path, intro, outro, findExecs, mkOutput, multisub, parse_run_log
 from mycotools.lib.biotools import fa2dict, dict2fa
 from clipkit import clipkit
 try:
@@ -40,7 +40,7 @@ class PhyloError(Exception):
 
 
 def run_mafft(name, fasta, out_dir, hpc, verbose = True, 
-              cpus = 1, spacer = '\t'):
+              cpus = 1, spacer = '\t', pass_fail = False):
     """Call Mafft to align an inputted fasta and either output commands for
     sequential execution on an HPC, or run directly through subprocess"""
 
@@ -60,6 +60,8 @@ def run_mafft(name, fasta, out_dir, hpc, verbose = True,
             eprint(spacer + '\tERROR: mafft failed: ' + str(run_mafft), flush = True)
             if os.path.isfile(out_dir + name + '.mafft'):
                 os.remove(out_dir + name + '.mafft')	
+            if pass_fail:
+                return None
             raise PhyloError
     # prepare an execution script for the HPC submission
     else:
@@ -77,7 +79,7 @@ def run_mafft(name, fasta, out_dir, hpc, verbose = True,
 
 
 def run_clipkit(name, mafft_name, out_dir, hpc, gappy, 
-            verbose, cpus = 1, spacer = '\t'):
+            verbose, cpus = 1, spacer = '\t', pass_fail = False):
     """Execute ClipKIT from a complete Mafft run"""
 
     clipkit_out_name = out_dir + os.path.basename(mafft_name) + '.clipkit'
@@ -95,9 +97,9 @@ def run_clipkit(name, mafft_name, out_dir, hpc, gappy,
     if not hpc:
         print(spacer + 'Trimming', flush = True)
         if not verbose:
-            run_clipkit = subprocess.call(cmd, stdout = subprocess.PIPE)
+            clipkit_code = subprocess.call(cmd, stdout = subprocess.PIPE)
         else:
-            run_clipkit = subprocess.call( 
+            clipkit_code = subprocess.call( 
                 cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL
                 )
 #            clipkit_out = clipkit.execute(
@@ -123,8 +125,10 @@ def run_clipkit(name, mafft_name, out_dir, hpc, gappy,
 
         # no output file, the run failed
         if not os.path.isfile(clipkit_out_name):
-            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(run_clipkit), 
-                   flush = True)  
+            eprint(spacer + '\tERROR: `clipkit` failed: ' + str(clipkit_code), 
+                   flush = True)
+            if pass_fail:
+                return None
             raise PhyloError
     # prepare a command for HPC execution
     else:
@@ -462,7 +466,7 @@ def identify_incomplete_files(files, flag_incomplete, wrk_dir):
 
 
 def algn_mngr(start, files, wrk_dir, hpc, gappy, alignment,
-              verbose, cpus, spacer):
+              verbose, cpus, spacer, pass_fail):
     """Manage the alignment and trimming executor for inputted fasta files"""
 
     trimmed_files = []
@@ -485,7 +489,10 @@ def algn_mngr(start, files, wrk_dir, hpc, gappy, alignment,
                 # otherwise run the alignment
                 if not alignment:
                     mafft = run_mafft(name, os.path.abspath(fasta), wrk_dir, hpc, 
-                                     verbose, cpus, spacer = spacer)
+                                     verbose, cpus, spacer = spacer,
+                                     pass_fail = pass_fail)
+                    if not mafft:
+                        continue
                 else:
                     mafft = fasta
         # else the starting point is an alignment or trimmed alignment
@@ -504,7 +511,10 @@ def algn_mngr(start, files, wrk_dir, hpc, gappy, alignment,
                     raise ValueError
             except (FileNotFoundError, ValueError) as e:
                 clipkit_out = run_clipkit(name, mafft, wrk_dir, hpc, gappy,
-                                          verbose, spacer = spacer)
+                                          verbose, spacer = spacer,
+                                          pass_fail = pass_fail)
+                if not clipkit_out:
+                    continue
             trimmed_files.append(clipkit_out)
         else:
             trimmed_files.append(fasta)
@@ -626,7 +636,7 @@ def main(
     output_dir = None, verbose = True, alignment = False, constraint = False,
     ome_conv = False, mem = '60GB', cpus = 1, spacer = '\t\t', align_stop = False, 
     tree_stop = False, flag_incomplete = True, start = 0, partition = False,
-    gappy = None, min_mean_support = 0
+    gappy = None, min_mean_support = 0, pass_fail = False
     ):
     """Python entry-point for fa2tree. Build a phylogeny from an inputted fasta
     of homologs. Align (mafft) -> trim (clipkit) -> ModelFinder (multigene
@@ -683,7 +693,8 @@ def main(
 
     # manage the alignment and trimming
     trimmed_files = algn_mngr(start, files, wrk_dir, hpc, gappy, 
-                              alignment, verbose, cpus, spacer)
+                              alignment, verbose, cpus, spacer,
+                              pass_fail)
 
     # convert the sequences to genome codenames    
     if ome_conv:
@@ -760,6 +771,8 @@ def cli():
         help = 'Stop after concatenating sequences')
     m_opt.add_argument('-m', '--missing', action = 'store_true',
         help = 'Remove omes with missing sequences')
+    m_opt.add_argument('--skip', action = 'store_true',
+        help = 'Skip failed alignments')
 
     r_opt = parser.add_argument_group('Runtime options')
     r_opt.add_argument('-v', '--verbose', action = 'store_true')
@@ -812,12 +825,21 @@ def cli():
     else:
         args.input = args.input.replace('"','').replace("'",'').split()
 
-
     start = 0
     if args.trim:
         start = 2
     elif args.align:
         start = 1
+
+#    deviations = parse_run_log(f'{output}.{os.path.basename(output)}.json',
+ #                              args)
+  #  if any(x in deviations for x in ['input', 'constraint', 'support']):
+   #     if not os.path.isdir(output + 'archive/'):
+    #        os.mkdir(args.archive)
+     #   final_files = collect_files(output, '*')
+      #  for f_ in final_files:
+       #     os.rename(f_, f'{output}archive/{os.path.basename(f_)}')
+
     main( 
         args.input, slurm = args.slurm, fast = args.fast,
         torque = args.torque, project = args.project,
@@ -827,7 +849,7 @@ def cli():
         align_stop = args.stop_align, tree_stop = args.stop_cat,
         flag_incomplete = bool(not args.missing), start = start,
         partition = bool(args.partition), cpus = args.cpus,
-        min_mean_support = args.support
+        min_mean_support = args.support, pass_fail = args.skip
         )
 
     outro(start_time)
