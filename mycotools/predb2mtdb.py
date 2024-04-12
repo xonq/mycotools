@@ -613,11 +613,11 @@ def cli():
     else:
         exit = True
 
-    from Bio import Entrez
-    ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False)
-    Entrez.email = ncbi_email
-    if ncbi_api:
-        Entrez.api_key = ncbi_api
+ #   from Bio import Entrez
+#    ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False)
+  #  Entrez.email = ncbi_email
+   # if ncbi_api:
+    #    Entrez.api_key = ncbi_api
 
     eprint('\nPreparing run', flush = True)
     predb = read_predb(format_path(sys.argv[1]), spacer = '\t')
