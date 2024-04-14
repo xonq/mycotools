@@ -11,6 +11,7 @@ from tqdm import tqdm
 from itertools import combinations
 from collections import defaultdict, Counter
 from mycotools.db2files import soft_main as symlink_files
+from mycotools.db2hgs import id_near_schgs
 from mycotools.lib.kontools import format_path, mkOutput, \
                                    findExecs, intro, outro, \
                                    eprint
@@ -272,36 +273,6 @@ def form_cooccur_structures(pairs, min_omes, ome2i, cc_arr_path = None):
     return cooccur_array, dict(cooccur_dict), hgpair2i, i2hgpair
 
 
-def id_near_schgs(hg2gene, omes, max_hgs = 10000, max_median = 2, max_mean = 2):
-    """Identify near single copy homology groups. Criteria:
-       1) has all omes; 2) minimal overall size of homology group;
-       3) lowest median"""
-    near_schgs = []
-    min_hg2gene = {k: v for k, v in sorted(hg2gene.items(),
-                    key = lambda x: len(x[1])) \
-                   if len(v) >= len(omes)}
-
-    max_len = max_mean * len(omes) # dont need to compute means iteratively
-    median_i = round((len(omes) / 2) - 0.5)
-
-    for hg, genes in min_hg2gene.items():
-        hg_omes = [x[:x.find('_')] for x in genes]
-        if not omes.difference(hg_omes): # all omes are present
-            count_omes = list(Counter(hg_omes).values()) # prepare for median calculation
-            count_omes.sort()
-            median = count_omes[median_i]
-#            print(median, max_median, len(genes), max_len)
-            if median <= max_median and len(genes) <= max_len:
- #               print('\t', median, len(genes))
-                near_schgs.append(hg)
-            elif len(genes) >= max_len: # everything else will be higher
-                break
-            if len(near_schgs) == max_hgs:
-                break
-
-    return near_schgs
-
-
 def extract_nschg_pairs(nschgs, hgpair2i, m_arr):
     nschg_set = set(nschgs)
     nschg_pairs = [i for hgpair, i in hgpair2i.items() \
@@ -323,9 +294,33 @@ def rm_invariate_sites(arr):
 
 
 def align_microsynt_np(m_arr, i2ome, hg2gene, hgpair2i, wrk_dir, nschgs = None):
+    max_median = 1
+    max_stdev = 0.2
+    while not nschgs and max_median < 3:
+        schgs, nschgs, n, n, n = id_near_schgs(hg2gene, set(i2ome), max_hgs = 100,
+                           max_median = max_median, max_stdev = max_stdev,
+                           min_genomes = len(i2ome))
+        if len(schgs) > 9:
+            nschgs = schgs
+            print(f'\t\t{len(schgs)} HGs in single copy extracted', 
+                  flush = True)
+        elif len(nschgs) < 10:
+            nschgs = []
+        if nschgs:
+            print(f'\t\t{len(nschgs)} HGs with <= {max_median} median copy ' \
+                + f'number and <= {max_stdev} standard deviation extracted',
+                  flush = True)
+        max_stdev += 0.2
+        if max_stdev > 2:
+            max_stdev = 0.1
+            max_median += 1
     if not nschgs:
-        nschgs = id_near_schgs(hg2gene, set(i2ome), max_hgs = 100,
-                           max_median = 4, max_mean = 3)
+        eprint('\nERROR: could not detect 10 genes present in all genomes ' \
+             + 'with median 2 copy number and less than 2 copy number ' \
+             + 'standard deviation. Manually input focal homology groups.',
+               flush = True)
+        sys.exit(35)
+        
     pre_arr = extract_nschg_pairs(nschgs, hgpair2i, m_arr)
     trm_arr = rm_invariate_sites(pre_arr)
     with open(wrk_dir + 'microsynt.align.phy', 'w') as out:
