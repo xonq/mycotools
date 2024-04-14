@@ -433,7 +433,8 @@ def identify_incomplete_files(files, flag_incomplete, wrk_dir):
         # it is an error if genomes are missing and it isn't explicitly
         # permitted
         if flag_incomplete:
-            eprint('\nERROR: omes without sequences in all fastas: ', flush = True)
+            eprint('\nERROR: omes without sequences in all fastas\n', 
+                 + 'Run with -m to remove failed omes', flush = True)
         else:
             eprint('\nWARNING: omes removed without sequences in all \
                     fastas: ', flush = True)
