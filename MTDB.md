@@ -90,7 +90,7 @@ All attribute fields will contain `ID=[^;]+`, `Alias=[^;]+`;
 Non-gene entries will have a parent field `Parent=[^;]+` that relates the entry
 to its parent RNA and each RNA to their parent gene. For non-gene terminal entries
 (when the highest entry in a hierarchy is not a gene/pseudogene), these entries will
-be assigned an Alias that corresponds to their type field
+be assigned an Alias that corresponds to their type field. 
 
 On the occassion GFF entries are not given an Alias, *assume that these are
 ignored by Mycotools*; while curation is fairly robust for JGI and NCBI GFFs,
@@ -124,7 +124,10 @@ fields.
 #### - alternate splicing
 Alternately spliced genes are accounted for in curation. Genes with alternately
 spliced descendants will have multiple aliases, separated by '|'. mRNAs and
-their children will all have unique aliases.
+their children will all have unique aliases. Groups of CDS coordinates tied to
+the same mRNA and that are exactly
+the same as another will be removed because it is commonly an annotation error
+and/or the resulting protein sequence will not be different.
 
 #### - proteome `faa`
 Proteomes will be generated on the fly when updating the database by
