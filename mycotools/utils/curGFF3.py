@@ -21,6 +21,7 @@ import re
 import sys
 import copy
 from collections import defaultdict
+from itertools import combinations, chain
 from mycotools.lib.kontools import format_path, sys_start, eprint
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
 
@@ -60,7 +61,7 @@ def add_missing(gff_list, intron, comps, ome):
         if 'gene' in entry['type']: # includes pseudogenes
             out_genes[id_] = {
                 'gene': [entry], 'tmrna': [], 'rna': [], 
-                'cds': [], 'exon': [], 'texon': [], 
+                'cds': defaultdict(list), 'exon': [], 'texon': [], 
                 'etc': [], 'pseudo': entry['type'] == 'pseudogene'
                 } # create an entry for the genes
             if 'gene_biotype=protein_coding' in entry['attributes']: # if it is
@@ -100,7 +101,7 @@ def add_missing(gff_list, intron, comps, ome):
                 rnas[rna_par] = par
                 out_genes[par] = {
                     'gene': [], 'tmrna': [], 'rna': [], 
-                    'cds': [], 'exon': [], 'texon': [], 
+                    'cds': defautdict(list), 'exon': [], 'texon': [], 
                     'etc': [], 'pseudo': pseudo
                     } # create an entry for the genes
     
@@ -158,7 +159,7 @@ def add_missing(gff_list, intron, comps, ome):
 
             if not out_genes[par]['pseudo']: # if it isnt a defined pesudogene
                 entry['attributes'] = entry['attributes'].replace('Parent=gene-', 'Parent=mrna-')
-                out_genes[par]['cds'].append(entry)
+                out_genes[par]['cds'][alias].append(entry)
                 if not intron:
                     addEntry = copy.deepcopy(entry)
                     addEntry['type'] = 'exon'
@@ -166,7 +167,7 @@ def add_missing(gff_list, intron, comps, ome):
                     addEntry['attributes'] = addEntry['attributes'].replace('gbkey=CDS', 'gbkey=mRNA')
                     out_genes[par]['texon'].append(addEntry)
             else: # else just add the unmodified CDS
-                out_genes[par]['cds'].append(entry)
+                out_genes[par]['cds'][alias].append(entry)
         elif 'RNA' in entry['type'] or entry['type'] == 'transcript':
             entry['type'] = entry['type'].replace('transcript','RNA')
             if id_.startswith('rna'): # make RNA ID explicit
@@ -197,7 +198,8 @@ def add_missing(gff_list, intron, comps, ome):
                 entry['attributes'] = re.sub(comps['par'] + ';', '',
                                              entry['attributes'])
                 out_genes[geneID] = {
-                    'gene': [addEntry], 'tmrna': [], 'rna': [], 'cds': [], 
+                    'gene': [addEntry], 'tmrna': [], 'rna': [], 
+                    'cds': defaultdict(list), 
                     'exon': [], 'texon': [], 'etc': [], 'pseudo': False 
                     }
 #                out_genes[geneID]['gene'].append(addEntry)
@@ -234,7 +236,8 @@ def add_missing(gff_list, intron, comps, ome):
                 par = re.search(comps['par'], entry['attributes'])[1]
             except TypeError: # skip no parents, should be a flag
                 out_genes[id_] = {
-                    'gene': [entry], 'tmrna': [], 'rna': [], 'cds': [], 
+                    'gene': [entry], 'tmrna': [], 'rna': [], 
+                    'cds': defaultdict(list), 
                     'exon': [], 'texon': [], 'etc': [], 'pseudo': False 
                     }
                 continue
@@ -265,7 +268,8 @@ def add_missing(gff_list, intron, comps, ome):
         for gene, intronList in introns.items():
             if out_genes[gene]['exon']:
                 continue
-            geneCoords = sorted([int(out_genes[gene]['gene'][0]['start']), int(out_genes[gene]['gene'][0]['end'])])
+            geneCoords = sorted([int(out_genes[gene]['gene'][0]['start']), 
+                                 int(out_genes[gene]['gene'][0]['end'])])
             intronList = sorted(intronList, key = lambda x: int(x['start']))
             intronCoords = [sorted([int(x['start']), int(x['end'])]) for x in intronList]
             if len(intronCoords) == 1:
@@ -295,6 +299,22 @@ def add_missing(gff_list, intron, comps, ome):
                     addEntry['start'], addEntry['end'] = str(exonCoords[0]), str(exonCoords[1])
                     out_genes[gene]['exon'].append(addEntry)
 
+    for geneID, geneInfo in out_genes.items():
+        if len(geneInfo['cds'])  > 1:
+            cds_info = defaultdict(set)
+            for cds, cds_e in geneInfo['cds'].items():
+                for cds_d in cds_e:
+                    coords = sorted([cds_d['start'], cds_d['end']])
+                    par = re.search(gff3Comps()['par'], cds_d['attributes'])[1]
+                    cds_info[cds].add((tuple(coords), par,))
+            todel = []
+            for cds0, cds1 in combinations(list(cds_info.keys()), 2):
+                if cds_info[cds0] == cds_info[cds1]:
+                    todel.append(cds1)
+            for cds in todel:
+                del geneInfo['cds'][cds]
+            geneInfo['cds'] = list(chain(*geneInfo['cds'].values()))
+
     out_list = []
     for geneID, geneInfo in out_genes.items():
         multiRNA = False
@@ -303,21 +323,24 @@ def add_missing(gff_list, intron, comps, ome):
             # assume there is an mrna involved - I don't like having to do this
             # but I don't like having to do most all of this because  the files
             # are so inconsistently formatted
-            geneInfo['tmrna'] = copy.deepcopy(geneInfo['gene'])
+            tmrna_base = copy.deepcopy(geneInfo['gene'])
             id_ = re.search(gff3Comps()['id'], geneInfo['tmrna'][0]['attributes'])[1]
-            new_id = 'mrna' + id_[4:]
-            geneInfo['tmrna'][0]['attributes'] = f'ID={new_id};Parent={geneID};gbkey=mRNA'
             geneInfo['tmrna'][0]['type'] = 'mRNA'
             for cds in geneInfo['cds']:
-                cds['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' + new_id, cds['attributes'])
+                cds['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' +
+new_id, cds['attributes'])
             
         if geneInfo['rna']:
 #            if geneInfo['rna'][0]['type'] != 'mRNA' and not geneInfo['cds']:
  #               del geneInfo['tmrna']
+                
             if len(geneInfo['rna']) > 1:
                 multiRNA = True
             if any(x['type'] == 'mRNA' for x in geneInfo['rna']):
                 del geneInfo['tmrna']
+            # post-translational/transcriptional modification and not multiple
+            # mRNAs detected
+
         elif geneInfo['tmrna'] and not geneInfo['cds']:
             del geneInfo['tmrna']
         elif geneInfo['tmrna']:
