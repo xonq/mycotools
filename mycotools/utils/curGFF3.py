@@ -101,7 +101,7 @@ def add_missing(gff_list, intron, comps, ome):
                 rnas[rna_par] = par
                 out_genes[par] = {
                     'gene': [], 'tmrna': [], 'rna': [], 
-                    'cds': defautdict(list), 'exon': [], 'texon': [], 
+                    'cds': defaultdict(list), 'exon': [], 'texon': [], 
                     'etc': [], 'pseudo': pseudo
                     } # create an entry for the genes
     
@@ -313,7 +313,7 @@ def add_missing(gff_list, intron, comps, ome):
                     todel.append(cds1)
             for cds in todel:
                 del geneInfo['cds'][cds]
-            geneInfo['cds'] = list(chain(*geneInfo['cds'].values()))
+        geneInfo['cds'] = list(chain(*geneInfo['cds'].values()))
 
     out_list = []
     for geneID, geneInfo in out_genes.items():
@@ -323,12 +323,14 @@ def add_missing(gff_list, intron, comps, ome):
             # assume there is an mrna involved - I don't like having to do this
             # but I don't like having to do most all of this because  the files
             # are so inconsistently formatted
-            tmrna_base = copy.deepcopy(geneInfo['gene'])
+            geneInfo['tmrna'] = copy.deepcopy(geneInfo['gene'])
             id_ = re.search(gff3Comps()['id'], geneInfo['tmrna'][0]['attributes'])[1]
+            new_id = 'mrna' + id_[4:]
+            geneInfo['tmrna'][0]['attributes'] = f'ID={new_id};Parent={geneID};gbkey=mRNA'
             geneInfo['tmrna'][0]['type'] = 'mRNA'
             for cds in geneInfo['cds']:
-                cds['attributes'] = re.sub(gff3Comps()['par'], 'Parent=' +
-new_id, cds['attributes'])
+                cds['attributes'] = re.sub(gff3Comps()['par'], 
+                                           'Parent=' + new_id, cds['attributes'])
             
         if geneInfo['rna']:
 #            if geneInfo['rna'][0]['type'] != 'mRNA' and not geneInfo['cds']:
