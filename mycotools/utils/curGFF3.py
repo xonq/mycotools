@@ -38,6 +38,7 @@ def add_missing(gff_list, intron, comps, ome):
                       'five_prime_utr', '5_prime_utr', '3_prime_utr'}
     out_genes, t_list, rnas, introns = {}, [], {}, {}
     mtdb_count, pseudocount, alt_alias = 1, 1, {}
+    cds2par = {}
     rna_changes = {} # a dictionary for changing ambigious rna id names for
     # explicit RNA type references
     for entry in gff_list:
@@ -119,7 +120,7 @@ def add_missing(gff_list, intron, comps, ome):
                 out_genes[par]['gene'].append(gene_scaf)
                 entry['attributes'] = entry['attributes'].replace(f'ID={id_}', 
                                                                   f'ID=cds-{id_};Parent={rna_par}')
-                id_ = 'cds-' + id_
+                new_id = 'cds-' + id_
 
             search = re.search(comps['prot'], entry['attributes'])
             if search: # search for protein
@@ -160,6 +161,7 @@ def add_missing(gff_list, intron, comps, ome):
             if not out_genes[par]['pseudo']: # if it isnt a defined pesudogene
                 entry['attributes'] = entry['attributes'].replace('Parent=gene-', 'Parent=mrna-')
                 out_genes[par]['cds'][alias].append(entry)
+                cds2par[id_] = par.replace('gene-', 'mrna-')
                 if not intron:
                     addEntry = copy.deepcopy(entry)
                     addEntry['type'] = 'exon'
@@ -168,6 +170,7 @@ def add_missing(gff_list, intron, comps, ome):
                     out_genes[par]['texon'].append(addEntry)
             else: # else just add the unmodified CDS
                 out_genes[par]['cds'][alias].append(entry)
+                cds2par[id_] = par
         elif 'RNA' in entry['type'] or entry['type'] == 'transcript':
             entry['type'] = entry['type'].replace('transcript','RNA')
             if id_.startswith('rna'): # make RNA ID explicit
@@ -258,10 +261,23 @@ def add_missing(gff_list, intron, comps, ome):
                     entry['type'] = 'three_prime_UTR'
                 elif entry['type'].lower() in {'5_prime_utr', 'five_prime_utr'}:
                     entry['type'] = 'five_prime_UTR'
-                try:
+                if par in out_genes: # derived from a gene entry
                     out_genes[par]['etc'].append(entry)
-                except KeyError: # derived from an RNA
+                elif par in rnas: # derived from an RNA
                     out_genes[rnas[par]]['etc'].append(entry)
+                elif par in cds2par: # derived from a CDS
+                    cds_par = cds2par[par]
+                    entry['attributes'] = re.sub(comps['par'], 
+                           f'Parent={cds2par[par]}',
+                           entry['attributes'])
+                    if cds_par in out_genes: # CDS from gene
+                        out_genes[cds_par]['etc'].append(entry)
+                    elif cds_par in rnas: # CDS from RNA
+                        out_genes[rnas[cds_par]]['etc'].append(entry)
+                    else:
+                        continue
+                else: # no accepted parent
+                    continue
 
     if introns:
         exons = {}
