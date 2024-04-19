@@ -130,15 +130,13 @@ class mtdb(dict):
     
         return df
 
-    def df2db(self, db_path = None, headers = False):
+    def df2db(self, db_path = None, headers = False, paths = False):
         df = copy.copy(self)
         df = df.reset_index()
-        output = mtdb(
-            {k: v for k,v in sorted(self.set_index('ome').items(), key = lambda x: x[0])},
-            index = 'ome'
-            ) 
+        output = mtdb({k: v for k,v in sorted(self.set_index('ome').items(), 
+                                    key = lambda x: x[0])}, index = 'ome') 
         # does this work if its not an inplace change
-        paths = {
+        abb_paths = {
             'faa': [os.environ['MYCOFAA'], '.faa'],
             'fna': [os.environ['MYCOFNA'], '.fna'],
             'gff3': [os.environ['MYCOGFF3'], '.gff3']
@@ -148,10 +146,11 @@ class mtdb(dict):
                 if headers:
                     out.write('#' + '\t'.join(self.columns)+ '\n')
                 for ome in output:
-                    for file_type in ['fna', 'faa', 'gff3']:
-                        output[ome][file_type] = output[ome][file_type].replace(
-                            paths[file_type][0] + ome + paths[file_type][1], ''
-                            ) # abbreviate when possible
+                    if not paths:
+                        for file_type in ['fna', 'faa', 'gff3']:
+                            output[ome][file_type] = output[ome][file_type].replace(
+                                abb_paths[file_type][0] + ome + abb_paths[file_type][1], ''
+                                ) # abbreviate when possible
                     if output[ome]['taxonomy']:
                         output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                     else:
@@ -169,10 +168,11 @@ class mtdb(dict):
                     )
 
             for ome in output:
-                for file_type in ['fna', 'faa', 'gff3']:
-                    output[ome][file_type] = output[ome][file_type].replace(
-                        paths[file_type][0] + ome + paths[file_type][1], ''
-                        ) # abbreviate when possible
+                if not paths:
+                    for file_type in ['fna', 'faa', 'gff3']:
+                        output[ome][file_type] = output[ome][file_type].replace(
+                            abb_paths[file_type][0] + ome + abb_paths[file_type][1], ''
+                            ) # abbreviate when possible
                 for rank in ['species', 'genus', 'strain']:
                     try:
                         del output[ome]['taxonomy'][rank]
