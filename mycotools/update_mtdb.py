@@ -33,13 +33,13 @@ from mycotools.lib.dbtools import db2df, df2db, gather_taxonomy, assimilate_tax,
 from mycotools.lib.kontools import intro, outro, format_path, eprint, \
                                    prep_output, collect_files, read_json, \
                                    write_json, split_input
-from mycotools.lib.biotools import fa2dict, gff2list
+from mycotools.lib.biotools import fa2dict, gff2list, dict2fa, list2gff
 from mycotools.ncbiDwnld import esearch_ncbi, esummary_ncbi, main as ncbiDwnld
 from mycotools.jgiDwnld import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
 from mycotools.predb2mtdb import main as predb2mtdb
-from mycotools.predb2mtdb import predb_headers, read_predb
+from mycotools.predb2mtdb import predb_headers, read_predb, gen_omes
 from mycotools.assemblyStats import main as assStats
 from mycotools.annotationStats import main as annStats
 
@@ -1103,7 +1103,95 @@ def gen_algn_db(update_path, omes):
         '\nbash ' + update_path + date + '_makeblastdb.sh')
      #bash ' + update_path \
      #   + date + '_mmseqsdb.sh')
-   
+  
+
+def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
+    """Check the original MTDB for overlapping omes and curate if necessary"""
+    orig_mtdb = orig_mtdb.set_index()
+    add_mtdb = add_mtdb.set_index()
+
+    orig_omes = set(orig_mtdb.keys())
+    new_omes = set(add_mtdb.keys())
+    orig_aas = set(v['assembly_acc'] for k, v in orig_mtdb.items())
+    inter_omes = orig_omes.intersection(new_omes)
+
+    failed_aas = []
+    for assembly_acc in add_mtdb.reset_index()['assembly_acc']:
+        if assembly_acc in orig_aas:
+            failed_aas.append(assembly_acc)
+    if failed_aas:
+        eprint('\nERROR: assembly accessions ("assembly_acc") must be ' \
+               'unique between databases: ', flush = True)
+        eprint(', '.join(failed_aas), flush = True)
+        sys.exit(123)
+
+    # if there are overlapping omes between the addition MTDB and existing
+    if inter_omes:
+        # prepare to create new omes for the overlapping names
+        need_ome_mtdb = mtdb({k: add_mtdb[k] for k in sorted(inter_omes)},
+                             index = 'ome')
+        fine_ome_mtdb = mtdb({k: v for k, v in add_mtdb.items() \
+                         if k not in inter_omes}, index = 'ome')
+        need_ome_mtdb = need_ome_mtdb.reset_index()
+        need_ome_mtdb['ome'] = ['' for x in need_ome_mtdb['assembly_acc']]
+        ref_ome_mtdb = mtdb({**fine_ome_mtdb, **orig_mtdb}, index = 'ome')
+        part_ome_mtdb, failed = gen_omes(need_ome_mtdb, ref_ome_mtdb.reset_index())
+        overlap_mtdb = add_mtdb.set_index('assembly_acc')
+
+        new_ome_mtdb = mtdb({**part_ome_mtdb.set_index('ome'), **fine_ome_mtdb}, 
+                            index = 'ome')
+        new_ome_mtdb = new_ome_mtdb.set_index('assembly_acc')
+        old_ome2new_ome = {v['ome']: new_ome_mtdb[k]['ome'] \
+                           for k, v in overlap_mtdb.items() \
+                           if v['ome'] in inter_omes}
+        new_ome2old_ome = {v: k for k, v in old_ome2new_ome.items()}
+        new_ome_mtdb = new_ome_mtdb.set_index('ome')
+        for k, v in old_ome2new_ome.items():
+            print(f'\t{k} converted to {v}',  flush = True)
+
+        # create directories for new files
+        fna_dir, gff_dir, faa_dir = f'{update_path}/fna/', \
+                                    f'{update_path}/gff3', \
+                                    f'{update_path}/faa/'
+        for path_ in [fna_dir, gff_dir, faa_dir]:
+            if not os.path.isdir(path_):
+                os.mkdir(path_)
+
+        # convert the file header names to the new omes
+        for ome, old_ome in new_ome2old_ome.items():
+            row = new_ome_mtdb[ome]
+            if row['assembly_acc'] == old_ome:
+                new_ome_mtdb[ome]['assembly_acc'] = ome
+
+            old_ome = new_ome2old_ome[ome]
+            fna = fa2dict(row['fna'])
+            new_fna = {k.replace(old_ome + '_', ome + '_'): v \
+                       for k, v in fna.items()}
+            with open(f'{fna_dir}{ome}.fna', 'w') as out:
+                out.write(dict2fa(new_fna))
+            gff = gff2list(row['gff3'])
+            for entry in gff:
+                entry['seqid'] = entry['seqid'].replace(f'{old_ome}_',
+                                                        f'{ome}_')
+            with open(f'{gff_dir}{ome}.gff3', 'w') as out:
+                out.write(list2gff(gff))
+            faa = fa2dict(row['faa'])
+            new_faa = {k.replace(old_ome + '_', ome + '_'): v \
+                       for k, v in faa.items()}
+            with open(f'{faa_dir}{ome}.fna', 'w') as out:
+                out.write(dict2fa(new_faa))
+            row['fna'] = f'{fna_dir}{ome}.fna'
+            row['faa'] = f'{faa_dir}{ome}.faa'
+            row['gff3'] = f'{gff_dir}{ome}.gff3'
+
+        # assembly accessions must be unique
+        new_ome_mtdb = new_ome_mtdb.reset_index()
+
+        return new_ome_mtdb
+    else:
+        return add_mtdb
+
+ 
 
 def db2primary(addDB, refDB, save = False, combined = False):
     """Finalize an update by converting the updated MTDB into the primary
@@ -1168,7 +1256,7 @@ def main():
 
     upd_args = parser.add_argument_group("MTDB Updating")
     upd_args.add_argument('-u', '--update', action = 'store_true')
-    upd_args.add_argument('-a', '--add', help = 'Curated .mtdb to add to database')
+    upd_args.add_argument('-a', '--add', help = '.mtdb with full paths to add to database')
     upd_args.add_argument('-t', '--taxonomy', action = 'store_true',
         help = 'Update taxonomy and exit')
     upd_args.add_argument('--save', action = 'store_true', 
@@ -1406,6 +1494,24 @@ def main():
  
         else:
             addDB = mtdb(format_path(args.add))
+        # we need full Paths for an addDB
+        gff_fail, fna_fail, faa_fail = False, False, False
+        if not all(os.path.isfile(format_path(x)) \
+                   for x in addDB.reset_index()['gff3']):
+            gff_fail = True
+        if not all(os.path.isfile(format_path(x)) \
+                   for x in addDB.reset_index()['fna']):
+            fna_fail = True
+        if not all(os.path.isfile(format_path(x)) \
+                   for x in addDB.reset_index()['faa']):
+            faa_fail = True
+        if gff_fail or fna_fail or faa_fail:
+            eprint('\nERROR: some paths in addition MTDB do not exist: ',
+                   flush = True)
+            eprint(f'\tFNA: {fna_fail}; GFF3: {gff_fail}; FAA: {faa_fail}',
+                   flush = True)
+            sys.exit(124)
+
         addDB['aquisition_date'] = [date for x in addDB['ome']] 
         # make date the acquisition time
         orig_mtdb = mtdb(primaryDB())
@@ -1417,10 +1523,11 @@ def main():
         tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
                                     king=king, rank = rank)
         addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
+        addDB = check_add_mtdb(orig_mtdb, addDB, update_path)
 
         write_forbid_omes(set(addDB['ome']), format_path('$MYCODB/../log/relics.txt'))
 
-        new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save = args.save)
+        new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save = True)
         new_db_path = format_path('$MYCODB/' + date + '.mtdb')
 
         new_mtdb.df2db(new_db_path)
