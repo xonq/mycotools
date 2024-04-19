@@ -80,13 +80,14 @@ def extract_tax(db, lineages):
 
     return new_db
 
-def extract_ome(db, omes):
+def extract_ome(db, omes, column = 'ome'):
     """Extract a list of genome codes (omes) of interest"""
-    new_db = mtdb().set_index()
+    new_db = mtdb().set_index(column)
+    db = db.set_index(column)
     for i in db:
         if i in list(omes):
             new_db[i] = db[i]
-    return new_db
+    return new_db.set_index()
 
 def extract_source(db, source):
     """Extract an MTDB with genomes from a particular source"""
@@ -105,8 +106,8 @@ def extract_pub(db):
 def main( 
     db, rank = None, x_number = 0, 
     lineage_list = [], omes_set = set(), by_rank = False,
-    source = None, nonpublished = False, inverse = False
-    ):
+    source = None, nonpublished = False, inverse = False,
+    aa_set = set()):
     """Python entry point for extract_mtdb"""
 
     db = db.set_index('ome')
@@ -119,6 +120,8 @@ def main(
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif omes_set:
         new_db = extract_ome(db, omes_set)
+    elif aa_set:
+        new_db = extract_ome(db, aa_set, 'assembly_acc')
     # if none of these are specified then create a `new_db` variable to work for later
     else:
         new_db = db
@@ -155,28 +158,37 @@ def main(
 def cli():
     ranks = ['kingdom', 'phylum', 'subphylum', 'class', 'order',
              'family', 'genus', 'species', 'strain']
-    parser = argparse.ArgumentParser( description = \
+    parser = argparse.ArgumentParser(description = \
        'Extracts a MycotoolsDB from arguments. E.g.\t`mtdb extract ' + \
-       '-l Atheliaceae`' )
-    parser.add_argument('-l', '--lineage', default = '')
-    parser.add_argument('-s', '--source')
-    parser.add_argument('-n', '--nonpublished', action = 'store_true', 
+       '-l Atheliaceae`')
+
+    ex_opt = parser.add_argument_group('Extraction parameters')
+    ex_opt.add_argument('-l', '--lineage', default = '')
+    ex_opt.add_argument('-s', '--source')
+    ex_opt.add_argument('-n', '--nonpublished', action = 'store_true', 
         help = 'Include restricted')
-    parser.add_argument('-r', '--rank', 
+    ex_opt.add_argument('-r', '--rank', 
         help = f'[-a|-b] Taxonomic rank: {ranks}')
-    parser.add_argument('-a', '--allowed_rank', default = 0, type = int, 
+    ex_opt.add_argument('-a', '--allowed_rank', default = 0, type = int, 
         help = '[-r] Number of randomly sampled --rank allowed' )
-    parser.add_argument('-b', '--by_rank', action = 'store_true',
+    ex_opt.add_argument('-b', '--by_rank', action = 'store_true',
         help = '[-r] Output MTDBs for each lineage in --rank')
-    parser.add_argument('-i', '--inverse', action = 'store_true', 
+    ex_opt.add_argument('-i', '--inverse', action = 'store_true', 
         help = 'Inverse [source|lineage(s)|nonpublished]')
-    parser.add_argument('-ol', '--ome', help = "File w/list of omes" )
-    parser.add_argument('-ll', '--lineages', help = 'File w/list of lineages' )
-    parser.add_argument('-m', '--new_mtdb', action = 'store_true',
+    ex_opt.add_argument('-ol', '--ome', help = "File w/list of omes")
+    ex_opt.add_argument('-al', '--assembly_list',
+                        help = 'File w/list of assembly accessions')
+    ex_opt.add_argument('-ll', '--lineages', help = 'File w/list of lineages' )
+
+    out_opt = parser.add_argument_group('Output parameters')
+    out_opt.add_argument('-m', '--new_mtdb', action = 'store_true',
                         help = 'Create MTDB directory hierarchy')
-    parser.add_argument('--headers', action = 'store_true')
-    parser.add_argument('-d', '--mtdb', help = '- for stdin', default = primaryDB())
-    parser.add_argument('-o', '--output')
+    out_opt.add_argument('-p', '--paths', help = 'Output with paths',
+                        action = 'store_true')
+    out_opt.add_argument('--headers', action = 'store_true')
+    out_opt.add_argument('-d', '--mtdb', help = '- for stdin', default = primaryDB())
+    out_opt.add_argument('-o', '--output')
+
     args = parser.parse_args()
     db_path = format_path(args.mtdb)
 
@@ -233,6 +245,11 @@ def cli():
     else:
         omes = set()
 
+    if args.assembly_list:
+        aa_set = set(file2list(format_path(args.assembly_list)))
+    else:
+        aa_set = set()
+
     if args.lineages:
         lineage_list = file2list(format_path(args.lineages))
     elif args.lineage:
@@ -244,14 +261,15 @@ def cli():
         db, lineage_list = lineage_list,
         omes_set = omes, source = args.source, rank = args.rank, 
         x_number = args.allowed_rank, by_rank = args.by_rank,
-        nonpublished = args.nonpublished, inverse = args.inverse
+        nonpublished = args.nonpublished, inverse = args.inverse,
+        aa_set = aa_set
         )
     if args.new_mtdb:
         gen_full_mtdb(new_db, format_path(output),
             format_path(os.environ['MYCODB'] + '/../'))
     elif args.output or args.by_rank:
         if isinstance(new_db, mtdb):
-            new_db.df2db(output)
+            new_db.df2db(output, paths = args.paths)
         else:
             out_dir = mkOutput(output, 'extract_mtdb')
             prefix = re.sub(r'\.mtdb$', '', os.path.basename(db_path))
@@ -259,7 +277,7 @@ def cli():
                 out_f = f'{out_dir}{prefix}.{lineage}.mtdb'
                 db.df2db(out_f)
     else:
-        new_db.df2db(headers = bool(args.headers))
+        new_db.df2db(headers = bool(args.headers), paths = args.paths)
 
     sys.exit(0)
 
