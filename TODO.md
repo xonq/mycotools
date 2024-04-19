@@ -9,6 +9,10 @@
 - [ ] kon_log class output to local configuration directory
 - [ ] support compressed databases
 - [ ] register mycotools with NCBI
+- [ ] configuration to output mtdb name + date in output directory
+- [ ] discuss OrthoFinder
+- [ ] discuss multigene phylo pipeline
+- [ ] discuss db2hgs
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
@@ -28,6 +32,7 @@
   pseudogene parents or their RNAs (GCA_900074715.1_LAME0)
 - [ ] some pseudogenes fail because they are given an "Alias" without being
   completed (GCA_004920355.1)
+- [ ] make universal interface to remove need for source column
 
 ### db2microsyntree
 - [ ] Allow log removal
@@ -105,6 +110,7 @@
 - [ ] source to reference the annotation source
 - [ ] *integrate prokka/bakta*
 - [ ] error check FAA
+- [ ] allow for just assembly accession in known sources
 
 ### update_mtdb
 - [x] optimize dereplication, currently too slow
@@ -130,5 +136,7 @@
 - [ ] option to remove entries that have been removed from genbank
 - [ ] option to not dereplicate by genus and species alone
 - [ ] main MTDB files for prokaryotes and fungi uploaded and that can be parsed
-- [ ] add option to update taxonomy of existing entries
+- [x] add option to update taxonomy of existing entries
 - [ ] sp. will also not dereplicate
+- [ ] make add option check for overwriting entries (indicating incorrect PREDB
+  linkage)
