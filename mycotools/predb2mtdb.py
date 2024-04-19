@@ -106,6 +106,7 @@ def read_predb(predb_path, spacer = '\t'):
         'genus', 'species', 'strain', 'version', 'biosample',
         'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
         'useRestriction (yes/no)', 'published', 'restriction',
+        'source'
     }
 
 #    predb, headers = {}, None
