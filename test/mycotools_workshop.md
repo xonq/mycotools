@@ -1,0 +1,301 @@
+- determine the throughput of these analyses
+
+## Prerequisites
+
+- A UNIX/Linux command-line environment. Mycotools is deveoped for Linux,
+  though most functions should be compatible with UNIX, including Apple, and
+  BASH should be used as the command-line shell software
+- [Install Mycotools](https://github.com/xonq/mycotools/blob/master/README.md#install) using miniconda3 as an environment manager
+- [Install FigTree](https://github.com/rambaut/figtree/releases) for
+  phylogenetic tree viewing
+- Basic bash shell navigation knowledge
+- [Setup an NCBI account](https://account.ncbi.nlm.nih.gov/)
+- [Setup a JGI account](https://signon.jgi.doe.gov/signon) and review the
+  use-restricted data [terms and conditions](https://jgi.doe.gov/user-programs/pmo-overview/policies/legacy-data-policies/)
+
+
+### Optional
+
+- Install Clinker in your activated Mycotools environment (`conda activate
+  mycotools`) via `conda install clinker-py -c conda-forge -c bioconda`
+- Install OrthoFinder in your activated Mycotools environment via `conda
+  install orthofinder -c bioconda`
+
+
+## Make a directory for our analyses
+One of the best habits you can start while programming is to make clean,
+organized directory hierarchies for projects. I personally recommend starting
+an overarching `projects` directory, and any subdirectories titled
+`<PROJECT_NAME>_YYYYmm` where `YYYYmm` is the year and month. 
+
+```bash
+conda activate mycotools
+mkdir <PROJECT_DIR>/mycotools_202405
+cd <PROJECT_DIR>/mycotoos_202405
+```
+
+
+## Download the reference database
+```bash
+wget https://raw.githubusercontent.com/xonq/mycotools/master/test/reference.mtdb
+```
+
+
+## Initializing a MycotoolsDB (MTDB) from a reference dataset (.mtdb file)
+There are multiple ways to initialize a Mycotools database (MTDB): from a de
+novo assimilation of publicly available data (`mtdb update -i <INIT_DIR>`);
+from a spreadsheet of metadata referencing local genomes (`mtdb update -i
+<INIT_DIR> --predb <PREDB.tsv>`); or from a reference MTDB file that contains
+publicly available assembly accessions. We will implement the last option.
+
+```bash
+mtdb update -i <PROJECT_DIR>/mycotools_202405/ -r reference.mtdb
+```
+
+
+## Add a local genome to this database
+If you have your own genomes, we can add those to the database by filling out a
+spreadsheet of metadata that references those genomes. In this example, we will
+add a local genome that we've acquired from JGI - note that Mycotools can
+automatically assimilate JGI genomes by initializing the database with `mtdb
+update -i <INIT_DIR>`, but that will take quite some time because JGI limits
+how frequently you can download data. So we will only take one genome for this
+example. We will need both an assembly and a `gff3` annotation file to add a
+genome to the database.
+
+```bash
+jgiDwnld -i Ustbr1 -a -g
+```
+
+This script will output a `predb` file that is ready for assimilating into the
+database. If you wanted to add your own genomes, you would fill out one of
+these files manually by generating it via `mtdb predb2mtdb > predb.tsv`,
+then running the following commands as we will here:
+
+```bash
+# curate the data via predb2mtdb
+mtdb p Ustbr1.predb.tsv
+
+# add the curated data to the primary MTDB
+mtdb u -a predb2mtdb_<YYYYmmdd>/predb2mtdb.mtdb
+```
+
+Now we can check if the file was added by querying the genome code from the
+database:
+
+```bash
+mtdb ustbro1
+```
+
+
+## A note on the `mtdb` database command
+`mtdb` is a command that controls your interface to generated MTDBs. You can have
+different *primary* MTDBs for different projects, and can interact with subsets
+of those databases, which we will go over later.
+
+To print the path of the primary database you are linked to, simply run:
+
+```bash
+mtdb
+```
+
+That's it! Now, we can interface with that primary data using some basic shell
+wizardy, e.g. to preview the contents of the primary MTDB:
+
+```bash
+cat $(mtdb)
+```
+
+
+## Obtain basic statistics about the annotations
+Let's get into some computational biology! We will start by obtaining some
+basic annotation statistics regarding what is in the database. 
+
+```bash
+annotationStats $(mtdb) > annotation_stats.tsv
+```
+
+Now you can open that `.tsv` file in whatever spreadsheet software/command-line
+text editor you prefer. We can also run a similar analysis for the assemblies:
+
+```bash
+assemblyStats $(mtdb) > assembly_stats.tsv
+```
+
+Both `annotationStats` and `assemblyStats` can be ran referencing a single
+genome `.gff3` or `.fna` respectively IF they have been curated into an MTDB.
+
+
+## Circumscribe genes into homology groups and identify single-copy orthologs
+Homology groups are groups of homologous genes, which is a useful method of
+classification for downstream analyses. Single-copy orthologs (SCOs) are tractable 
+genes for phylogenetic reconstruction because they are assumed to reliably
+evolve in step with the species. The most robust automated method of single-copy ortholog
+determination is currently OrthoFinder (which I show how to implement at the
+bottom of this guide), but we can more swiftly circumscribe homology groups
+using a faster algorithm, `MMseqs cluster`, implemented in `db2hgs` of the
+Mycotools suite:
+
+```bash
+db2hgs
+```
+
+Once this command completes, you should have an output folder labeled
+`db2hgs_<YYYYmmd>`, which contains multiple files regarding the output. We are
+interested in the `single_copy_genes/` subdirectory to use for reconstructing a
+phylogenomic tree of our database. Let's look at how many SCOs we identified:
+
+```bash
+ls db2hgs_<YYYYmmdd>/single_copy_genes/*faa | wc -l
+```
+
+
+## Reconstructing a multigene species phylogeny
+A phylogenomic tree is a phylogenetic analysis of a group of genomes that
+incorporates an arbitrary minimum number of genes. There are multiple methods
+for reconstructing a phylogenomic tree, and Mycotools implements the multigene
+partition method. This method essentially determines the best-fit evolutionary
+model for each SCO, concatenates an alignment of all SCOs in the dataset, and
+then reconstructs a maximum-likelihood phylogenomic tree by applying the best-fit evolutionary
+model to each individual gene partion. A general rule-of-thumb is
+the more tractable genes we have to construct a phylogenomic tree, the better.
+We have quite a few, so let's go ahead and use them:
+
+```bash
+fa2tree -i db2hgs_<YYYYmm>/single_copy_genes/ --partition
+```
+
+When complete, we will open the `concatenated.nex.contree` file in the
+resulting `fa2tree_<YYYYmmdd>` directory in FigTree, which is the consensus
+tree with 1000 ultrafast bootstrap replicates. 
+
+What you will note is that the tips are labeled with the ome code - but we
+probably want to see the actual genus, species, and strain names, right?! Let's
+convert the phylogenomic tree from genome code tips to full names:
+
+```bash
+ome2name fa2tree_<YYYYmmdd>/concatenated.nex.contree -o \
+  > fa2tree_<YYYYmmdd>/full_name.newick
+```
+
+Go ahead and open this one in FigTree, and let's glance at how well supported
+this phylogeny is.
+
+
+## Reconstructing the evolution of a gene of interest
+While multigene/SCO phylogenies are useful for studying the evolution of
+genomes, genes can undergo evolutionary events that are independent of what is
+happening to the genome at large: horizontal transfer, gene duplication,
+convergence, and gene loss can all lead to discordance between the species and
+gene evolution. Let's study the evolution a gene associated with nitrate
+assimilation in our dataset.
+
+First, we need to identify homologs of this gene across our database. We will
+do this by implementing a BLAST search of the protein sequence. We obtain the
+protein sequence using a handy command, `acc2fa`.
+
+```bash
+acc2fa -a <ACC> | db2search -a blastp -q - -e 2
+```
+
+With the BLAST results in hand, we can now build a phylogeny of the outputted
+`.fasta` file of homologs.
+
+```bash
+fa2tree -i db2search_<YYYYmmdd>/fastas/<ACC>.fasta
+```
+
+Now, we can view this tree in FigTree similar to before.
+
+
+## Visualizing the evolution of a gene cluster/syntenic locus
+Oftentimes, phenotypes are derived from multiple genes that are proximal to one
+another. Therefore, studying the evolution of a locus from both a gene-by-gene
+and locus-wide (shared synteny) perspective enables inferring information about the evolution of
+a phenotype.
+
+For this example, we will look at the nitrate assimilation gene cluster, which
+encodes three genes that allow diverse fungi to import extracellular nitrate, reduce it
+to nitrite, and further reduce it to intracellular ammonium as a nitrogen
+source.
+
+Professor Jason Slot (The Ohio State University) conceptualized a the Cluster
+Reconstruction and phylogenetic Analysis Pipeline (CRAP) under advisor
+Professor Antonis Rokas (Vanderbilt University) to swiftly accomplish this
+task. We can implement the Mycotools version of this pipeline by first
+extracting a representative nitrate assimilation locus, then feeding it into
+the CRAP pipeline:
+
+```bash
+acc2locus -a <ACC> -p 1 > nitrate_cluster.txt
+crap -q nitrate_cluster.txt -s blastp
+```
+
+Once complete, we will see `.svg` files in the output directory,
+`crap_<YYYYmmdd>` that contain phylogenies of the nitrate assimilation genes,
+with synteny diagrams of the individual genes extracted applied to each tip.
+
+
+## Clinker
+We can also make more visually appealing synteny diagrams that depict percent
+identity through Clinker. I built the CRAP pipeline to output the most similar
+loci to the query sequence, and we can invoke this option by having CRAP rerun
+off the initial results referencing the initial output directory. This is the
+general way for resuming Mycotools scripts.
+
+```bash
+crap -q nitrate_cluster.txt -s blastp --loci -o crap_<YYYYmmdd>
+```
+
+There should now be a subdirectory, `loci/`, that contains the most similar
+loci, and we want to generate GenBanks of these loci to run Clinker. So let's
+make a directory in our main project folder:
+
+```bash
+mkdir clinker_<YYYYmmdd>
+```
+
+Then generate GenBanks of each locus file using some basic BASH scripting:
+
+```bash
+for i in crap_<YYYYmmdd>/loci/*txt
+  do o=$(basename ${i} .txt)
+  acc2gbk -i ${i} > clinker_<YYYYmmdd>/${o}.gbk
+done
+```
+
+We can now run Clinker on this dataset:
+
+```bash
+cd clinker_<YYYYmmdd>
+clinker ./ -p nitrate_assimilation.html
+```
+
+
+## OrthoFinder
+We previously circumscribed homologous gene groups using a script that
+implements `MMseqs2 cluster`, which is a fairly crude method. OrthoFinder is a
+much more robust, albeit slow, method for circumscribing genes into orthologous
+gene groups (orthogroups) that are approximately set with respect to the most
+recent common ancestor of the dataset. OrthoFinder is not built into Mycotools
+yet, though we can implement it - and other external scripts - by acquiring the
+necessary files.
+
+```bash
+mkdir orthofinder_<YYYYmmdd>/
+cd orthofinder_<YYYYmmdd>/
+db2files -p
+```
+
+This will generate a folder of proteome fastas, `faa/`, that we can now
+reference. Note this folder contains "symlinked" files, which are essentially
+empty links to the original file. Therefore, editing these files will edit the
+initial files in the database. If you want to make hard copies of the files,
+append the `--hard` flag to the `db2files` command.
+
+```bash
+orthofinder -f faa/
+```
+
+If your dataset is small enough then I recommend implementing because OrthoFinder 
+outputs a more robust set of single-copy orthologs.
