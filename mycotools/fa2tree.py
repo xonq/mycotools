@@ -778,7 +778,7 @@ def cli():
     r_opt = parser.add_argument_group('Runtime options')
     r_opt.add_argument('-v', '--verbose', action = 'store_true')
     r_opt.add_argument('-o', '--output')
-    r_opt.add_argument('-c', '--cpus', default = 1, type = int)
+    r_opt.add_argument('-c', '--cpus', default = mp.cpu_count(), type = int)
 
     args = parser.parse_args()
 
