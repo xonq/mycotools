@@ -1,4 +1,5 @@
 - determine the throughput of these analyses
+- add extract_mtdb examples
 
 ## Prerequisites
 
@@ -13,6 +14,7 @@
 - [Setup a JGI account](https://signon.jgi.doe.gov/signon) and review the
   use-restricted data [terms and conditions](https://jgi.doe.gov/user-programs/pmo-overview/policies/legacy-data-policies/)
 
+<br />
 
 ### Optional
 
@@ -21,6 +23,7 @@
 - Install OrthoFinder in your activated Mycotools environment via `conda
   install orthofinder -c bioconda`
 
+<br /><br />
 
 ## Make a directory for our analyses
 One of the best habits you can start while programming is to make clean,
@@ -34,12 +37,14 @@ mkdir <PROJECT_DIR>/mycotools_202405
 cd <PROJECT_DIR>/mycotoos_202405
 ```
 
+<br />
 
 ## Download the reference database
 ```bash
 wget https://raw.githubusercontent.com/xonq/mycotools/master/test/reference.mtdb
 ```
 
+<br />
 
 ## Initializing a MycotoolsDB (MTDB) from a reference dataset (.mtdb file)
 There are multiple ways to initialize a Mycotools database (MTDB): from a de
@@ -52,6 +57,7 @@ publicly available assembly accessions. We will implement the last option.
 mtdb update -i <PROJECT_DIR>/mycotools_202405/ -r reference.mtdb
 ```
 
+<br />
 
 ## Add a local genome to this database
 If you have your own genomes, we can add those to the database by filling out a
@@ -87,6 +93,7 @@ database:
 mtdb ustbro1
 ```
 
+<br />
 
 ## A note on the `mtdb` database command
 `mtdb` is a command that controls your interface to generated MTDBs. You can have
@@ -106,6 +113,7 @@ wizardy, e.g. to preview the contents of the primary MTDB:
 cat $(mtdb)
 ```
 
+<br />
 
 ## Obtain basic statistics about the annotations
 Let's get into some computational biology! We will start by obtaining some
@@ -125,6 +133,7 @@ assemblyStats $(mtdb) > assembly_stats.tsv
 Both `annotationStats` and `assemblyStats` can be ran referencing a single
 genome `.gff3` or `.fna` respectively IF they have been curated into an MTDB.
 
+<br />
 
 ## Circumscribe genes into homology groups and identify single-copy orthologs
 Homology groups are groups of homologous genes, which is a useful method of
@@ -149,6 +158,7 @@ phylogenomic tree of our database. Let's look at how many SCOs we identified:
 ls db2hgs_<YYYYmmdd>/single_copy_genes/*faa | wc -l
 ```
 
+<br />
 
 ## Reconstructing a multigene species phylogeny
 A phylogenomic tree is a phylogenetic analysis of a group of genomes that
@@ -181,6 +191,7 @@ ome2name fa2tree_<YYYYmmdd>/concatenated.nex.contree -o \
 Go ahead and open this one in FigTree, and let's glance at how well supported
 this phylogeny is.
 
+<br />
 
 ## Reconstructing the evolution of a gene of interest
 While multigene/SCO phylogenies are useful for studying the evolution of
@@ -207,6 +218,7 @@ fa2tree -i db2search_<YYYYmmdd>/fastas/<ACC>.fasta
 
 Now, we can view this tree in FigTree similar to before.
 
+<br />
 
 ## Visualizing the evolution of a gene cluster/syntenic locus
 Oftentimes, phenotypes are derived from multiple genes that are proximal to one
@@ -235,6 +247,7 @@ Once complete, we will see `.svg` files in the output directory,
 `crap_<YYYYmmdd>` that contain phylogenies of the nitrate assimilation genes,
 with synteny diagrams of the individual genes extracted applied to each tip.
 
+<br />
 
 ## Clinker
 We can also make more visually appealing synteny diagrams that depict percent
@@ -271,6 +284,7 @@ cd clinker_<YYYYmmdd>
 clinker ./ -p nitrate_assimilation.html
 ```
 
+<br />
 
 ## OrthoFinder
 We previously circumscribed homologous gene groups using a script that
