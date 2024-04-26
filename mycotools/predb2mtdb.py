@@ -102,12 +102,15 @@ def read_predb(predb_path, spacer = '\t'):
     required_headers = {'assembly_accession', 'genus', 'assemblyPath',
                     'gffPath', 'genomeSource (ncbi/jgi/new)'}
     allowed_headers = {
-        'assembly_accession', 'previous_ome', 
+        'previous_ome', 'assembly_acc',
         'genus', 'species', 'strain', 'version', 'biosample',
         'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
         'useRestriction (yes/no)', 'published', 'restriction',
-        'source'
+        'source', 'fna_path', 'gff3_path'
     }
+    allowed2required = {'assembly_acc': 'assembly_accession',
+                        'gff3_path': 'gffPath', 'fna_path': 'assemblyPath',
+                        'source': 'genomeSource (ncbi/jgi/new)'}
 
 #    predb, headers = {}, None
     predb = defaultdict(list)
@@ -124,6 +127,9 @@ def read_predb(predb_path, spacer = '\t'):
                     elif head.replace('#', '') in allowed_headers:
                         i2header[i0] = head.replace('#','')
 
+                for head in i2header.values():
+                    if head in allowed2required:
+                        required_headers.remove(allowed2required[head])
                 missing_headers = \
                     required_headers.difference(set(i2header.values()))
                 if missing_headers:
@@ -155,24 +161,39 @@ def read_predb(predb_path, spacer = '\t'):
                     for mi in set(i2header.keys()).difference(set(used)):
                         predb[i2header[mi]].append('')
 
-    try:
+    if not 'assembly_acc' in predb and not 'assembly_accession' in predb:
+        predb['assembly_acc'] = ['' for x in predb['genus']]
+    elif 'assembly_accession' in predb:
         predb['assembly_acc'] = predb['assembly_accession']
         del predb['assembly_accession']
-    except KeyError:
-        if not 'assembly_acc' in predb and not 'assembly_accession' in predb:
-            predb['assembly_acc'] = ['' for x in predb['genus']]
-    try:
-        predb['source'] = predb['genomeSource (ncbi/jgi/new)']
-        del predb['genomeSource (ncbi/jgi/new)']
-    except KeyError:
-        if not 'genomeSource' in predb and not 'source' in predb:
+    if not 'source' in predb:
+        if 'genomeSource (ncbi/jgi/new)' in predb:
+            predb['source'] = predb['genomeSource (ncbi/jgi/new)']
+            del predb['genomeSource (ncbi/jgi/new)']
+        elif 'genomeSource' in predb:
+            predb['source'] = predb['genomeSource']
+            del predb['genomeSource']
+        else:
+            raise KeyError
+    if not 'assemblyPath' in predb:
+        if 'fna_path' in predb:
+            predb['assemblyPath'] = predb['fna_path']
+            del predb['fna_path']
+        else:
+            raise KeyError
+    if not 'gffPath' in predb:
+        if 'gff3_path' in predb:
+            predb['gffPath'] = predb['gff3_path']
+            del predb['gff3_path']
+        else:
             raise KeyError
     try:
         if 'restriction' not in predb \
             and 'useRestriction (yes/no)' in predb:
             predb['restriction'] = predb['useRestriction (yes/no)']
             del predb['useRestriction (yes/no)']
-        if any(x.lower() not in {'y', 'n', 'yes', 'no', '', 'true', 'false'} for x in predb['restriction']):
+        if any(x.lower() not in {'y', 'n', 'yes', 'no', '', 'true', 'false'} \
+               for x in predb['restriction']):
             eprint(spacer + 'ERROR: useRestriction entries must be in {y, n, yes, no}', flush = True)
             sys.exit(4)
     except KeyError:
