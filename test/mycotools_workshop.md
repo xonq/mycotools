@@ -2,9 +2,10 @@
 
 - A UNIX/Linux command-line environment. Mycotools is deveoped for Linux,
   though most functions should be compatible with UNIX, including Apple, and
-  BASH should be used as the command-line shell software. If you are using a
-  Mac, you will need to switch to BASH as your default shell by opening a terminal 
-  and running: `chsh -s /bin/bash`
+  BASH should be used as the command-line shell software. UNFORTUNATELY, MACS
+  THAT USE THE NEW M* SERIES CPUS DO NOT HAVE PACKAGE SUPPORT FOR MANY OF THE
+  DEPENDENCIES. If you are using a Mac that has an Intel CPU, you will need to 
+  switch to BASH as your default shell by opening a terminal and running: `chsh -s /bin/bash`
 - [Install Mycotools](https://github.com/xonq/mycotools/blob/master/README.md#install) using miniconda3 as an environment manager
 - [Install FigTree](https://github.com/rambaut/figtree/releases) for
   phylogenetic tree viewing
