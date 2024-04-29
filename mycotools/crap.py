@@ -955,7 +955,11 @@ def parse_search_col_loci(ome, files, queries, rep_dir,
     # sort the loci by similarity
     loc2sim = {k: v for k, v in sorted(loc2sim.items(), key = lambda x: x[1][1],
                                        reverse = True)}
-    max_sim = loc2sim[list(loc2sim.keys())[0]][1]
+    if loc2sim:
+        max_sim = loc2sim[list(loc2sim.keys())[0]][1]
+    else:
+        return ome, []
+
     # merge the top loci and report as one
     top_loc = set(chain(*[v[0] for k, v in loc2sim.items() \
         if v[1] == max_sim]))
