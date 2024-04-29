@@ -381,7 +381,7 @@ def cli():
     parser.add_argument('--hmm', action = 'store_true',
         help = 'Align & build HMMER models of near single-copy HGs')
     parser.add_argument('-o', '--out_dir', help = 'WARNING: will not overwrite')
-    parser.add_argument('-c', '--cpus', type = int, default = 1)
+    parser.add_argument('-c', '--cpus', type = int, default = mp.cpu_count())
     args = parser.parse_args()
 
     if args.min_genomes > 1 or args.min_genomes < 0:
