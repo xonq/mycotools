@@ -242,10 +242,17 @@ db2search -a blastp -q ustbro1_1795.faa -e 2
 ```
 
 With the BLAST results in hand, we can now build a phylogeny of the outputted
-`.fasta` file of homologs.
+`.fasta` file of homologs. First, we will move the phylogenomic analysis to a
+different directory so `fa2tree` doesn't output to the same place because the
+date is the same. This time we will use FastTree to expedite tree
+building at the cost of some quality:
 
 ```bash
-fa2tree -i db2search_<YYYYmmdd>/fastas/ustbro1_1795.fasta
+# move the phylogenomic directory
+mv fa2tree_<YYYYmmdd> phylogenomic_<YYYYmmdd>/
+
+# run the single gene phylo
+fa2tree -i db2search_<YYYYmmdd>/fastas/ustbro1_1795.search.fa -f
 ```
 
 Now, we can view this tree in FigTree.
@@ -304,10 +311,8 @@ mkdir clinker_<YYYYmmdd>
 Then generate GenBanks of each locus file using some basic BASH scripting:
 
 ```bash
-for i in crap_<YYYYmmdd>/loci/*txt
-  do o=$(basename ${i} .txt)
-  acc2gbk -i ${i} > clinker_<YYYYmmdd>/${o}.gbk
-done
+for i in crap_<YYYYmmdd>/loci/*txt; do o=$(basename ${i} .txt); acc2gbk -i ${i}
+> clinker_<YYYYmmdd>/${o}.gbk; done
 ```
 
 We can now run Clinker on this dataset:
