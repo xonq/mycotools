@@ -1,7 +1,3 @@
-- determine the throughput of these analyses
-- add extract_mtdb examples
-- cite software implemented in each step
-
 ## Prerequisites
 
 - A UNIX/Linux command-line environment. Mycotools is deveoped for Linux,
