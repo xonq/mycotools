@@ -125,7 +125,7 @@ mtdb extract -l Ustilago > ust.mtdb
 
 <br />
 
-## Obtain basic statistics about the annotations
+## Obtain basic genome and annotation measurements
 Let's get into some computational biology! We will start by obtaining some
 basic annotation statistics regarding what is in the database. 
 
@@ -167,7 +167,7 @@ db2hgs -d tree.mtdb
 
 <br />
 
-## Reconstructing a multigene species phylogeny
+## Reconstruct a multigene species phylogeny
 A phylogenomic tree is a phylogenetic analysis of a group of genomes that
 incorporates an arbitrary minimum number of genes. There are multiple methods
 for reconstructing a phylogenomic tree, and Mycotools implements the multigene
@@ -210,11 +210,11 @@ this phylogeny is.
 
 <br />
 
-## Reconstructing the evolution of a gene of interest
-Genes can undergo evolutionary events that are independent of what is
-happening to the genome at large: horizontal transfer, gene duplication,
-convergence, and gene loss can all lead to discordance between the species and
-gene evolution. Let's study the evolution a gene associated with nitrate
+## Reconstruct the evolution of a gene of interest
+Horizontal transfer, gene duplication,
+convergence, and gene loss all lead to discordance between the species and
+gene evolution. So to study a gene's evolution, we have to reconstruct a
+phylogeny of it - let's study the evolution a gene associated with nitrate
 assimilation in our dataset.
 
 First, we need to identify homologs of this gene across our database. We will
@@ -222,21 +222,25 @@ do this by implementing a BLAST search of the protein sequence. We obtain the
 protein sequence using a handy command, `acc2fa`.
 
 ```bash
-acc2fa -a ustbro1_1795 | db2search -a blastp -q - -e 2
+# extract the protein accession of interest
+acc2fa -a ustbro1_1795 > ustbro1_1795.faa
+
+# run a blast search on this gene against the primary MTDB
+db2search -a blastp -q ustbro1_1795.faa -e 2
 ```
 
 With the BLAST results in hand, we can now build a phylogeny of the outputted
 `.fasta` file of homologs.
 
 ```bash
-fa2tree -i db2search_<YYYYmmdd>/fastas/<ACC>.fasta
+fa2tree -i db2search_<YYYYmmdd>/fastas/ustbro1_1795.fasta
 ```
 
 Now, we can view this tree in FigTree.
 
 <br />
 
-## Visualizing the evolution of a gene cluster/syntenic locus
+## Visualize the evolution of a gene cluster/syntenic locus
 Oftentimes, phenotypes are derived from multiple genes that are proximal to one
 another in the linear genome. Therefore, studying the evolution of a locus from 
 both a gene-by-gene and locus-wide (shared synteny) perspective can be
@@ -265,7 +269,7 @@ with synteny diagrams of the individual genes extracted applied to each tip.
 
 <br />
 
-## Clinker
+## Create GenBanks of loci for a visually appealing synteny analysis
 We can also make more visually appealing synteny diagrams that depict percent
 identity through Clinker. I built the CRAP pipeline to output the most similar
 loci to the query sequence, and we can invoke this option by having CRAP rerun
@@ -303,7 +307,7 @@ clinker ./ -p nitrate_assimilation.html
 
 <br />
 
-## OrthoFinder
+## Integrate external software using Mycotools data extraction
 We previously circumscribed homologous gene groups using a script that
 implements `MMseqs2 cluster`, which is a fairly crude method. OrthoFinder is a
 much more robust method for circumscribing genes into orthologous
