@@ -34,7 +34,7 @@ the hierarchy:
 
 ```bash
 mkdir <PROJECT_DIR>/mycotools_202405
-cd <PROJECT_DIR>/mycotoos_202405
+cd <PROJECT_DIR>/mycotools_202405
 ```
 
 <br />
@@ -73,6 +73,11 @@ example. We will need both an assembly and a `gff3` annotation file to add a
 genome to the database.
 
 ```bash
+# make a directory to run these commands
+mkdir jgi_dwnld_202405
+cd jgi_dwnld_202405
+
+# download the assembly and gff of a MycoCosm accession
 jgiDwnld -i Ustbr1 -a -g
 ```
 
@@ -132,6 +137,10 @@ Let's get into some computational biology! We will start by obtaining some
 basic annotation statistics regarding what is in the database. 
 
 ```bash
+# return to the main project directory if you have not
+cd <PROJECT_DIR>/mycotools_202405
+
+# obtain annotation statistics from the primary MTDB
 annotationStats $(mtdb) > annotation_stats.tsv
 ```
 
@@ -373,11 +382,11 @@ Price, M. N., Dehal, P. S. & Arkin, A. P. FastTree 2 – Approximately Maximum-L
 
 Minh, B. Q. et al. IQ-TREE 2: New Models and Efficient Methods for Phylogenetic Inference in the Genomic Era. Molecular Biology and Evolution 37, 1530–1534 (2020).
 
-#### Mafft:
+#### MAFFT:
 
 Katoh, K., Misawa, K., Kuma, K. & Miyata, T. MAFFT: a novel method for rapid multiple sequence alignment based on fast Fourier transform. Nucleic Acids Res 30, 3059–3066 (2002).
 
-#### MMseqs:
+#### MMseqs2:
 
 Steinegger, M. & Söding, J. MMseqs2 enables sensitive protein sequence searching for the analysis of massive data sets. Nat Biotechnol 35, 1026–1028 (2017).
 
