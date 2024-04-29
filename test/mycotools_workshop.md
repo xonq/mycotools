@@ -179,10 +179,20 @@ model for each SCO, concatenates an alignment of all SCOs in the dataset, and
 then reconstructs a maximum-likelihood phylogenomic tree by applying the best-fit evolutionary
 model to each individual gene partion. A general rule-of-thumb is
 the more tractable genes we have to construct a phylogenomic tree, the better.
-We have quite a few, so let's go ahead and use them:
+We have quite a few, and it would be ideal to use them all!... but we don't
+have time, so let's work with a subset by copying them to a new folder:
 
 ```bash
-fa2tree -i db2hgs_<YYYYmm>/single_copy_genes/ --partition
+# make a folder for single copy genes
+mkdir sco_202405
+
+# copy the top ten SCOs
+for i in $(ls db2hgs_<YYYYmmdd>/single_copy_genes/ | head -10)
+  do cp $i sco_202405/
+done
+
+# run the tree building pipeline
+fa2tree -i sco_202405/ --partition
 ```
 
 When complete, we will open the `concatenated.nex.contree` file in the
