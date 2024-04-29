@@ -188,7 +188,7 @@ mkdir sco_202405
 
 # copy the top ten SCOs
 for i in $(ls db2hgs_<YYYYmmdd>/single_copy_genes/ | head -10)
-  do cp $i db2hgs_<YYYYmmdd>/single_copy_genes/sco_202405/
+  do cp db2hgs_<YYYYmmdd>/single_copy_genes/$i sco_202405/
 done
 
 # run the tree building pipeline
