@@ -27,13 +27,14 @@
 <br /><br />
 
 ## Make a directory for our analyses
-One of the best habits you can start while programming is to make clean,
+One of the best habits while programming is to make clean,
 organized directory hierarchies for projects. I personally recommend starting
 an overarching `projects` directory, and any subdirectories titled
-`<PROJECT_NAME>_YYYYmm` where `YYYYmm` is the year and month. 
+`<PROJECT_NAME>_YYYYmm` where `YYYYmm` is the year and month. Navigate
+somewhere you want to start your directories (Desktop or Home) and initialize
+the hierarchy:
 
 ```bash
-conda activate mycotools
 mkdir <PROJECT_DIR>/mycotools_202405
 cd <PROJECT_DIR>/mycotoos_202405
 ```
@@ -52,9 +53,13 @@ There are multiple ways to initialize a Mycotools database (MTDB): from a de
 novo assimilation of publicly available data (`mtdb update -i <INIT_DIR>`);
 from a spreadsheet of metadata referencing local genomes (`mtdb update -i
 <INIT_DIR> --predb <PREDB.tsv>`); or from a reference MTDB file that contains
-publicly available assembly accessions. We will implement the last option.
+publicly available assembly accessions. We will implement a reference.
 
 ```bash
+# access mycotools by making sure your environment is activated
+conda activate mycotools
+
+# initialize the mycotoolsdb according to a reference file
 mtdb update -i <PROJECT_DIR>/mycotools_202405/ -r reference.mtdb
 ```
 
@@ -65,8 +70,7 @@ If you have your own genomes, we can add those to the database by filling out a
 spreadsheet of metadata that references those genomes. In this example, we will
 add a local genome that we've acquired from JGI - note that Mycotools can
 automatically assimilate JGI genomes by initializing the database with `mtdb
-update -i <INIT_DIR>`, but that will take quite some time because JGI limits
-how frequently you can download data. So we will only take one genome for this
+update -i <INIT_DIR>`, but that will take quite some time. So we will take one genome for this
 example. We will need both an assembly and a `gff3` annotation file to add a
 genome to the database.
 
@@ -76,7 +80,7 @@ jgiDwnld -i Ustbr1 -a -g
 
 This script will output a `predb` file that is ready for assimilating into the
 database. If you wanted to add your own genomes, you would fill out one of
-these files manually by generating it via `mtdb predb2mtdb > predb.tsv`,
+these files manually by generating a blank copy via `mtdb predb2mtdb > predb.tsv`,
 then running the following commands as we will here:
 
 ```bash
@@ -98,8 +102,9 @@ mtdb ustbro1
 
 ## A note on the `mtdb` database command
 `mtdb` is a command that controls your interface to generated MTDBs. You can have
-different *primary* MTDBs for different projects, and can interact with subsets
-of those databases, which we will go over later.
+different *primary* MTDBs for different projects by initializing different
+databases, and/or you can have a large primary database and interact with subsets
+of it/
 
 To print the path of the primary database you are linked to, simply run:
 
@@ -112,6 +117,14 @@ wizardy, e.g. to preview the contents of the primary MTDB:
 
 ```bash
 cat $(mtdb)
+```
+
+Now, if you want to interface with a subset of your primary MTDB we can
+*extract* the particular genomes of interest:
+
+```bash
+# extract a database of Ustilago genomes
+mtdb extract -l Ustilago > ust.mtdb
 ```
 
 <br />
@@ -139,10 +152,10 @@ genome `.gff3` or `.fna` respectively IF they have been curated into an MTDB.
 ## Circumscribe genes into homology groups and identify single-copy orthologs
 Homology groups are groups of homologous genes, which is a useful method of
 classification for downstream analyses. Single-copy orthologs (SCOs) are tractable 
-genes for phylogenetic reconstruction because they are assumed to reliably
-evolve in step with the species. The most robust automated method of single-copy ortholog
-determination is currently OrthoFinder (which I show how to implement at the
-bottom of this guide), but we can more swiftly circumscribe homology groups
+genes for phylogenetic reconstruction because their evolution is assumed to be
+congruent with the evolution of the species. A robust automated method of 
+single-copy ortholog determination is OrthoFinder,
+but we can more swiftly circumscribe homology groups and identify SCOs
 using a faster algorithm, `MMseqs cluster`, implemented in `db2hgs` of the
 Mycotools suite:
 
@@ -195,8 +208,7 @@ this phylogeny is.
 <br />
 
 ## Reconstructing the evolution of a gene of interest
-While multigene/SCO phylogenies are useful for studying the evolution of
-genomes, genes can undergo evolutionary events that are independent of what is
+Genes can undergo evolutionary events that are independent of what is
 happening to the genome at large: horizontal transfer, gene duplication,
 convergence, and gene loss can all lead to discordance between the species and
 gene evolution. Let's study the evolution a gene associated with nitrate
@@ -207,7 +219,7 @@ do this by implementing a BLAST search of the protein sequence. We obtain the
 protein sequence using a handy command, `acc2fa`.
 
 ```bash
-acc2fa -a <ACC> | db2search -a blastp -q - -e 2
+acc2fa -a ustbro1_1796 | db2search -a blastp -q - -e 2
 ```
 
 With the BLAST results in hand, we can now build a phylogeny of the outputted
@@ -217,30 +229,30 @@ With the BLAST results in hand, we can now build a phylogeny of the outputted
 fa2tree -i db2search_<YYYYmmdd>/fastas/<ACC>.fasta
 ```
 
-Now, we can view this tree in FigTree similar to before.
+Now, we can view this tree in FigTree.
 
 <br />
 
 ## Visualizing the evolution of a gene cluster/syntenic locus
 Oftentimes, phenotypes are derived from multiple genes that are proximal to one
-another. Therefore, studying the evolution of a locus from both a gene-by-gene
-and locus-wide (shared synteny) perspective enables inferring information about the evolution of
-a phenotype.
+another in the linear genome. Therefore, studying the evolution of a locus from 
+both a gene-by-gene and locus-wide (shared synteny) perspective can be
+important for understanding the evolution a phenotype.
 
 For this example, we will look at the nitrate assimilation gene cluster, which
-encodes three genes that allow diverse fungi to import extracellular nitrate, reduce it
-to nitrite, and further reduce it to intracellular ammonium as a nitrogen
-source.
+encodes three genes that import extracellular nitrate and reduce it
+to intracellular ammonium as a nitrogen source.
 
-Professor Jason Slot (The Ohio State University) conceptualized a the Cluster
-Reconstruction and phylogenetic Analysis Pipeline (CRAP) under advisor
-Professor Antonis Rokas (Vanderbilt University) to swiftly accomplish this
-task. We can implement the Mycotools version of this pipeline by first
-extracting a representative nitrate assimilation locus, then feeding it into
-the CRAP pipeline:
+The Cluster Reconstruction and phylogenetic Analysis Pipeline (CRAP)
+facilitates swiftly analyzing the evolution of a gene cluster. We can 
+implement this pipeline by first extracting a representative nitrate assimilation 
+locus, then inputting it into the CRAP pipeline:
 
 ```bash
+# extract a locus of interest, and store in a file
 acc2locus -a <ACC> -p 1 > nitrate_cluster.txt
+
+# run the CRAP analysis
 crap -q nitrate_cluster.txt -s blastp
 ```
 
@@ -258,6 +270,7 @@ off the initial results referencing the initial output directory. This is the
 general way for resuming Mycotools scripts.
 
 ```bash
+# rerun a Mycotools command referencing a previous output directory
 crap -q nitrate_cluster.txt -s blastp --loci -o crap_<YYYYmmdd>
 ```
 
@@ -290,16 +303,20 @@ clinker ./ -p nitrate_assimilation.html
 ## OrthoFinder
 We previously circumscribed homologous gene groups using a script that
 implements `MMseqs2 cluster`, which is a fairly crude method. OrthoFinder is a
-much more robust, albeit slow, method for circumscribing genes into orthologous
+much more robust method for circumscribing genes into orthologous
 gene groups (orthogroups) that are approximately set with respect to the most
-recent common ancestor of the dataset. OrthoFinder is not built into Mycotools
+recent common ancestral genome of the dataset. OrthoFinder is not built into Mycotools
 yet, though we can implement it - and other external scripts - by acquiring the
 necessary files.
 
 ```bash
+# make your OrthoFinder analysis directory
 mkdir orthofinder_<YYYYmmdd>/
 cd orthofinder_<YYYYmmdd>/
-db2files -p
+
+# extract the proteomes you need for an analysis, referencing a MycotoolsDB we
+# extracted previously
+db2files -p -d ../ust.mtdb
 ```
 
 This will generate a folder of proteome fastas, `faa/`, that we can now
@@ -312,5 +329,5 @@ append the `--hard` flag to the `db2files` command.
 orthofinder -f faa/
 ```
 
-If your dataset is small enough then I recommend implementing because OrthoFinder 
-outputs a more robust set of single-copy orthologs.
+If your dataset is small enough then I recommend implementing
+OrthoFinder over `db2hgs`
