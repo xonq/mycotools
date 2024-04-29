@@ -331,3 +331,48 @@ orthofinder -f faa/
 
 If your dataset is small enough then I recommend implementing
 OrthoFinder over `db2hgs`
+
+<br /><br /><br />
+
+## REFERENCE SOFTWARE
+
+BioPython:
+
+Chapman, B. & Chang, J. Biopython: Python Tools for Computational Biology. SIGBIO Newsl. 20, 15–19 (2000).
+
+
+BLAST+:
+
+Ye, J., McGinnis, S. & Madden, T. L. BLAST: improvements for better sequence analysis. Nucleic Acids Research 34, W6–W9 (2006).
+
+Clinker:
+
+clinker & clustermap.js: automatic generation of gene cluster comparison figures | Bioinformatics | Oxford Academic. https://academic.oup.com/bioinformatics/article/37/16/2473/6103786.
+
+ClipKIT:
+
+Steenwyk, J. L., Iii, T. J. B., Li, Y., Shen, X.-X. & Rokas, A. ClipKIT: A multiple sequence alignment trimming software for accurate phylogenomic inference. PLOS Biology 18, e3001007 (2020).
+
+CRAP:
+
+
+
+FastTree:
+
+Price, M. N., Dehal, P. S. & Arkin, A. P. FastTree 2 – Approximately Maximum-Likelihood Trees for Large Alignments. PLoS ONE 5, e9490 (2010).
+
+IQ-TREE:
+
+Minh, B. Q. et al. IQ-TREE 2: New Models and Efficient Methods for Phylogenetic Inference in the Genomic Era. Molecular Biology and Evolution 37, 1530–1534 (2020).
+
+Mafft:
+
+Katoh, K., Misawa, K., Kuma, K. & Miyata, T. MAFFT: a novel method for rapid multiple sequence alignment based on fast Fourier transform. Nucleic Acids Res 30, 3059–3066 (2002).
+
+MMseqs:
+
+Steinegger, M. & Söding, J. MMseqs2 enables sensitive protein sequence searching for the analysis of massive data sets. Nat Biotechnol 35, 1026–1028 (2017).
+
+OrthoFinder:
+
+Emms, D. M. & Kelly, S. OrthoFinder: phylogenetic orthology inference for comparative genomics. Genome Biology 20, 238 (2019).
