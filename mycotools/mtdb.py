@@ -87,7 +87,7 @@ def main(argv = sys.argv):
         pip_deps = ['dna_features_viewer', 'mycotools']
         dep_cmds = [['conda', 'install', '-y', '-c', 'jlsteenwyk', 'clipkit'],
                     ['conda', 'install', '-y', '-c', 'bioconda', 'iqtree', 
-                    'mafft', 'blast', 'hmmer', 'mmseqs2'],
+                    'mafft', 'blast', 'hmmer', 'mmseqs2', 'fasttree'],
                     ['python3', '-m', 'pip', 'install'] + pip_deps + ['--upgrade']]
         for dep_cmd in dep_cmds:
             cmd = subprocess.call(dep_cmd)
