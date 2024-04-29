@@ -11,6 +11,7 @@ import shutil
 import argparse
 import subprocess
 import contextlib
+import multiprocessing as mp
 from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
     format_path, intro, outro, findExecs, mkOutput, multisub, parse_run_log
