@@ -1192,7 +1192,7 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
 
         return new_ome_mtdb
     else:
-        return add_mtdb
+        return add_mtdb.reset_index()
 
  
 
