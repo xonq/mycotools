@@ -153,19 +153,16 @@ congruent with the evolution of the species. A robust automated method of
 single-copy ortholog determination is OrthoFinder,
 but we can more swiftly circumscribe homology groups and identify SCOs
 using a faster algorithm, `MMseqs cluster`, implemented in `db2hgs` of the
-Mycotools suite:
+Mycotools suite. Let's run a phylogenetic analysis on a subset of our genomes.
 
 ```bash
-db2hgs
-```
+# extract the lineages we want
+mtdb e -l Ustilago >> tree.mtdb
+mtdb e -l Puccinia >> tree.mtdb
+mtdb e -l Trichoderma >> tree.mtdb
+mtdb e -l Psilocybe >> tree.mtdb
 
-Once this command completes, you should have an output folder labeled
-`db2hgs_<YYYYmmdd>`, which contains multiple files regarding the output. We are
-interested in the `single_copy_genes/` subdirectory to use for reconstructing a
-phylogenomic tree of our database. Let's look at how many SCOs we identified:
-
-```bash
-ls db2hgs_<YYYYmmdd>/single_copy_genes/*faa | wc -l
+db2hgs -d tree.mtdb
 ```
 
 <br />
