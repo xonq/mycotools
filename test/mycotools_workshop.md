@@ -1,8 +1,8 @@
 ## Prerequisites
 
 - A UNIX/Linux command-line environment. Mycotools is deveoped for Linux,
-  though most functions should be compatible with UNIX, including Apple, and
-  BASH should be used as the command-line shell software. UNFORTUNATELY, MACS
+  though it should be compatible with UNIX-based BASH environments, Linux
+  virtual machines, and potentially Windows Subsystem for Linux. UNFORTUNATELY, MACS
   THAT USE THE NEW M* SERIES CPUS DO NOT HAVE PACKAGE SUPPORT FOR MANY OF THE
   DEPENDENCIES. If you are using a Mac that has an Intel CPU, you will need to 
   switch to BASH as your default shell by opening a terminal and running: `chsh -s /bin/bash`
