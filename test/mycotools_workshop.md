@@ -160,7 +160,7 @@ db2hgs
 ```
 
 Once this command completes, you should have an output folder labeled
-`db2hgs_<YYYYmmd>`, which contains multiple files regarding the output. We are
+`db2hgs_<YYYYmmdd>`, which contains multiple files regarding the output. We are
 interested in the `single_copy_genes/` subdirectory to use for reconstructing a
 phylogenomic tree of our database. Let's look at how many SCOs we identified:
 
@@ -186,8 +186,8 @@ have time, so let's work with a subset by copying them to a new folder:
 # make a folder for single copy genes
 mkdir sco_202405
 
-# copy the top ten SCOs
-for i in $(ls db2hgs_<YYYYmmdd>/single_copy_genes/ | head -10)
+# copy the top three SCOs
+for i in $(ls db2hgs_<YYYYmmdd>/single_copy_genes/ | head -3)
   do cp db2hgs_<YYYYmmdd>/single_copy_genes/$i sco_202405/
 done
 
@@ -225,7 +225,7 @@ do this by implementing a BLAST search of the protein sequence. We obtain the
 protein sequence using a handy command, `acc2fa`.
 
 ```bash
-acc2fa -a ustbro1_1796 | db2search -a blastp -q - -e 2
+acc2fa -a ustbro1_1795 | db2search -a blastp -q - -e 2
 ```
 
 With the BLAST results in hand, we can now build a phylogeny of the outputted
@@ -256,7 +256,7 @@ locus, then inputting it into the CRAP pipeline:
 
 ```bash
 # extract a locus of interest, and store in a file
-acc2locus -a <ACC> -p 1 > nitrate_cluster.txt
+acc2locus -a ustbro1_1795 -p 1 > nitrate_cluster.txt
 
 # run the CRAP analysis
 crap -q nitrate_cluster.txt -s blastp
