@@ -39,7 +39,7 @@ cd <PROJECT_DIR>/mycotoos_202405
 
 ## Download the reference database
 ```bash
-wget https://raw.githubusercontent.com/xonq/mycotools/master/test/reference.mtdb
+curl -o reference.mtdb https://raw.githubusercontent.com/xonq/mycotools/master/test/reference.mtdb
 ```
 
 <br />
@@ -201,7 +201,7 @@ probably want to see the actual genus, species, and strain names, right?! Let's
 convert the phylogenomic tree from genome code tips to full names:
 
 ```bash
-ome2name fa2tree_<YYYYmmdd>/concatenated.nex.contree -o \
+ome2name fa2tree_<YYYYmmdd>/concatenated.nex.contree o \
   > fa2tree_<YYYYmmdd>/full_name.newick
 ```
 
