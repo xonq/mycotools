@@ -3,7 +3,7 @@
 - A UNIX/Linux command-line environment. Mycotools is deveoped for Linux,
   though it should be compatible with UNIX-based BASH environments, Linux
   virtual machines, and potentially Windows Subsystem for Linux. UNFORTUNATELY, MACS
-  THAT USE THE NEW M* SERIES CPUS DO NOT HAVE PACKAGE SUPPORT FOR MANY OF THE
+  THAT USE THE NEW M* SERIES CPUS DO NOT HAVE NATIVE PACKAGE SUPPORT FOR MANY OF THE
   DEPENDENCIES. If you are using a Mac that has an Intel CPU, you will need to 
   switch to BASH as your default shell by opening a terminal and running: `chsh -s /bin/bash`
 - [Install Mycotools](https://github.com/xonq/mycotools/blob/master/README.md#install) using miniconda3 as an environment manager
@@ -158,12 +158,12 @@ genome `.gff3` or `.fna` respectively IF they have been curated into an MTDB.
 <br />
 
 ## Circumscribe genes into homology groups and identify single-copy orthologs
-Homology groups are groups of homologous genes, which is a useful method of
-classification for downstream analyses. Single-copy orthologs (SCOs) are tractable 
-genes for phylogenetic reconstruction because their evolution is assumed to be
+It is often useful to group genes into homology groups for downstream analyses.
+Single-copy orthologs (SCOs) are a particular type of homology group that is
+useful for phylogenetic reconstruction because SCO evolution is assumed to be
 congruent with the evolution of the species. A robust automated method of 
-single-copy ortholog determination is OrthoFinder,
-but we can more swiftly circumscribe homology groups and identify SCOs
+SCO determination is OrthoFinder,
+but we can more swiftly circumscribe homology groups and identify putative SCOs
 using a faster algorithm, `MMseqs cluster`, implemented in `db2hgs` of the
 Mycotools suite. Let's run a phylogenetic analysis on a subset of our genomes.
 
@@ -340,7 +340,7 @@ cd orthofinder_<YYYYmmdd>/
 
 # extract the proteomes you need for an analysis, referencing a MycotoolsDB we
 # extracted previously
-db2files -p -d ../ust.mtdb
+db2files -p -d ../tree.mtdb
 ```
 
 This will generate a folder of proteome fastas, `faa/`, that we can now
