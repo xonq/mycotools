@@ -46,7 +46,7 @@ def main(argv = sys.argv):
         script = script[0]
         ab2mt = {'extract': 'extract_mtdb', 'update': 'update_mtdb', 'predb2mtdb': 'predb2mtdb',
                  'e': 'extract_mtdb', 'u': 'update_mtdb', 'p': 'predb2mtdb', 'm': 'manage_mtdb',
-                 'manage': 'mange_mtdb'}
+                 'manage': 'manage_mtdb'}
         if script in ab2mt:
             exit_code = subprocess.call([ab2mt[script]] + [x for x in argv[1:] \
                                          if x != script])
