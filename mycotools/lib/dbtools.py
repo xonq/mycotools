@@ -270,6 +270,7 @@ def getLogin( ncbi, jgi ):
 
 def encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd,
                info_path = format_path('~/.mycotools/mtdb_key')):
+    salt = b'D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118'
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.backends import default_backend
@@ -291,7 +292,7 @@ def encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd,
     key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
     fernet = Fernet(key)
     out_data = ncbi_email + '\t' + ncbi_api + '\t' + jgi_email + '\t' + jgi_pwd
-    encrypt_data = fernet.encrypt(out_data)
+    encrypt_data = fernet.encrypt(out_data.encode('utf-8'))
     with open(format_path(info_path), 'wb') as out:
         out.write(encrypt_data)
 
@@ -323,7 +324,7 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True,
         with open(format_path(info_path), 'rb') as raw_file:
             data = raw_file.read()
         decrypted = fernet.decrypt(data)
-        data = decrypted.decode('UTF-8').split('\n')
+        data = decrypted.decode('UTF-8').split()
         if len(data) != 4:
             eprint('BAD PASSWORD FILE. Delete ~/.mycotools/mtdb_key to reset.', flush = True)
             sys.exit(8)
