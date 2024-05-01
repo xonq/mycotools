@@ -10,9 +10,8 @@
 - [ ] support compressed databases
 - [ ] register mycotools with NCBI
 - [ ] configuration to output mtdb name + date in output directory
-- [ ] discuss OrthoFinder
 - [ ] discuss multigene phylo pipeline
-- [ ] discuss db2hgs
+- [x] discuss db2hgs
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
