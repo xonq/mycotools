@@ -1151,7 +1151,7 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
 
         # create directories for new files
         fna_dir, gff_dir, faa_dir = f'{update_path}/fna/', \
-                                    f'{update_path}/gff3', \
+                                    f'{update_path}/gff3/', \
                                     f'{update_path}/faa/'
         for path_ in [fna_dir, gff_dir, faa_dir]:
             if not os.path.isdir(path_):
@@ -1178,7 +1178,7 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
             faa = fa2dict(row['faa'])
             new_faa = {k.replace(old_ome + '_', ome + '_'): v \
                        for k, v in faa.items()}
-            with open(f'{faa_dir}{ome}.fna', 'w') as out:
+            with open(f'{faa_dir}{ome}.faa', 'w') as out:
                 out.write(dict2fa(new_faa))
             row['fna'] = f'{fna_dir}{ome}.fna'
             row['faa'] = f'{faa_dir}{ome}.faa'
