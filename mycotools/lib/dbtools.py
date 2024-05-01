@@ -8,7 +8,6 @@ import sys
 import copy
 import json
 import time
-import hashes
 import base64
 import urllib
 import getpass
@@ -272,10 +271,11 @@ def encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd,
                info_path = format_path('~/.mycotools/mtdb_key')):
     salt = b'D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118'
     from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.backends import default_backend
     kdf = PBKDF2HMAC(
-        algorithm=hashes.sha256(),
+        algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
         iterations=480000,
@@ -304,8 +304,9 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True,
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import hashes
         kdf = PBKDF2HMAC(
-            algorithm=hashes.sha256(),
+            algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
             iterations=480000,
