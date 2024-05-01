@@ -626,7 +626,7 @@ def ref_update(
     ref_db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
     jgi = True, group = 'eukaryotes', kingdom = 'Fungi',
-    remove = True
+    remove = True, taxonomy = True
     ):
     """Initialize/Update the primary MTDB based on a reference database
     acquired external from any existing primary MTDB"""
@@ -729,6 +729,8 @@ def ref_update(
             add_failed(failure[0], 'ncbi', str(failure[1]), date,
                       format_path('$MYCODB/../log/failed.tsv'))
         ncbi_mtdb.df2db(update_path + date + '.ncbi.predb2.mtdb')
+    else:
+        ncbi_mtdb = mtdb(f'{update_path}{date}.ncbi.predb2.mtdb')
 
     try:
         ncbi_db = db2df(update_path + date + '.ncbi.predb2.mtdb')
@@ -744,11 +746,6 @@ def ref_update(
     else:
         rank = 'superkingdom'
 
-    if not args.taxonomy: #already completed
-        tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
-                                king=kingdom, rank = rank)
-        new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
-        dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
@@ -761,11 +758,17 @@ def ref_update(
         eprint('\nNo updates', flush = True)
         sys.exit(0)
 
-    for ome, row in update_mtdb.items():
-        if row['genus'] in genus_dicts:
-            print(genus_dicts[row['genus']])
-            row['taxonomy'] = genus_dicts[row['genus']]
-
+    if not taxonomy: #already completed
+        tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
+                                king=kingdom, rank = rank)
+        new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
+        dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
+    
+        for ome, row in update_mtdb.items():
+            if row['genus'] in genus_dicts:
+                print(genus_dicts[row['genus']])
+                row['taxonomy'] = genus_dicts[row['genus']]
+    
     return new_db, update_mtdb 
 
 
@@ -1189,7 +1192,7 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
 
         return new_ome_mtdb
     else:
-        return add_mtdb
+        return add_mtdb.reset_index()
 
  
 
@@ -1569,7 +1572,7 @@ def main():
             ref_db, update_path, date, args.failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = args.cpu, check_MD5 = not bool(args.no_md5),
             jgi = jgi, group = group, kingdom = king,
-            remove = not args.save
+            remove = not args.save, taxonomy = not args.taxonomy
             )
     else:
         new_db, update_mtdb = rogue_update(
@@ -1616,13 +1619,13 @@ def main():
             +  f'{format_path(update_path + date + ".mtdb")}')
         # output new database and new list of omes
 
-    if args.init or args.update or args.add:
-        eprint('\nGathering assembly statistics', flush = True)
-        assStats(primaryDB(), format_path('$MYCODB/../data/assemblyStats.tsv'),
-                 args.cpu)
-        eprint('\nGathering annotation statistics', flush = True)
-        annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'),
-                 args.cpu)
+#    if args.init or args.update or args.add:
+ #       eprint('\nGathering assembly statistics', flush = True)
+  #      assStats(primaryDB(), format_path('$MYCODB/../data/assemblyStats.tsv'),
+   #              args.cpu)
+    #    eprint('\nGathering annotation statistics', flush = True)
+     #   annStats(primaryDB(), format_path('$MYCODB/../data/annotationStats.tsv'),
+      #           args.cpu)
 
     outro(start_time)
 

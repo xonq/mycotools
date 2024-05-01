@@ -119,6 +119,7 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
     tree = ET.parse(xml_file)
     root = tree.getroot()
     flip = True
+    org_name = None
 
     # flip is a way to rerun the loop if the file type changes (e.g. from
     # masked to unmasked); parse through the XML hiearchy in accord with the
@@ -143,6 +144,10 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
                                     for x in ft2fh[ft]):
                                 for chil3 in chil2:
                                     t_url = chil3.attrib['url']
+                                    try:
+                                        org_name = chil3.attrib['label']
+                                    except KeyError:
+                                        pass
                                     # we want to avoid tape files as we cannot
                                     # download them readily
                                     if 'get_tape_file' not in t_url \
@@ -188,7 +193,7 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
         else:
             break
 
-    return filename, url, md5
+    return filename, url, md5, org_name
 
 
 def handle_redirect_307(dwnld_data, dwnld, dwnld_url, file_type, xml_file,
@@ -197,7 +202,7 @@ def handle_redirect_307(dwnld_data, dwnld, dwnld_url, file_type, xml_file,
     from, or return the original if none exist"""
     print(spacer +'\t' + dwnld + ' link has moved. ' \
         + 'Trying a different link.', flush = True)
-    filename, n_url, dwnld_md5 = parse_xml(file_type, xml_file, 
+    filename, n_url, dwnld_md5, t_org_name = parse_xml(file_type, xml_file, 
                                          masked = masked,
                                          forbidden = {url}.union(urls))
 
@@ -205,7 +210,7 @@ def handle_redirect_307(dwnld_data, dwnld, dwnld_url, file_type, xml_file,
         url = n_url
         dwnld_url = prefix + url.replace('&amp;', '&')
         dwnld = f'{output}{file_type}/{os.path.basename(dwnld_url)}'
-    return url, dwnld_url, dwnld, {url}.union(urls)
+    return url, dwnld_url, dwnld, {url}.union(urls), t_org_name
 
 
 def no_md5_checks(dwnld, md5, spacer):
@@ -258,11 +263,14 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
         file_type += '3'
 
     ran_dwnld = False
+    org_name = None
 
     # acquire the filename, URL, and MD5 from the xml for the file type of
     # interest
-    filename, url, dwnld_md5 = parse_xml(file_type, xml_file, 
+    filename, url, dwnld_md5, t_org_name = parse_xml(file_type, xml_file, 
                                          masked = masked)
+    if t_org_name:
+        org_name = t_org_name
     if not dwnld_md5:
         dwnld_md5 = None
 
@@ -298,10 +306,13 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                             as dwnld_data_raw:
                             dwnld_data = dwnld_data_raw.read()
                         if re.search('307 Temporary Redirect', dwnld_data):    
-                            url, dwnld_url, dwnld, f_urls = handle_redirect_307(dwnld_data, 
-                                                                       dwnld, dwnld_url,
-                                                                       file_type, xml_file,
-                                                                       masked, url, f_urls, spacer)
+                            url, dwnld_url, dwnld, f_urls, t_org_name \
+                                = handle_redirect_307(dwnld_data, 
+                                                      dwnld, dwnld_url,
+                                                      file_type, xml_file,
+                                                      masked, url, f_urls, spacer)
+                            if t_org_name:
+                                org_name = t_org_name
                         break
                     except FileNotFoundError:
                         md5 = False
@@ -352,13 +363,15 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                             as dwnld_data_raw:
                             dwnld_data = dwnld_data_raw.read()
                         if re.search('307 Temporary Redirect', dwnld_data):
-                            t_url, dwnld_url, dwnld, f_urls = \
+                            t_url, dwnld_url, dwnld, f_urls, t_org_name = \
                                 handle_redirect_307(dwnld_data, 
                                                     dwnld, 
                                                     dwnld_url,
                                                     file_type, xml_file,
                                                     masked, url, f_urls,
                                                     spacer)
+                            if t_org_name:
+                                org_name = t_org_name
                             
                             if t_url == url:
                                 print(spacer + '\t\tNo valid alternative', flush = True)
@@ -389,12 +402,14 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                                 as dwnld_data_raw:
                                 dwnld_data = dwnld_data_raw.read()
                             if re.search('307 Temporary Redirect', dwnld_data ):
-                                t_url, dwnld_url, dwnld, f_urls = \
+                                t_url, dwnld_url, dwnld, f_urls, t_org_name = \
                                     handle_redirect_307(dwnld_data, dwnld, 
                                                         dwnld_url,
                                                         file_type, xml_file,
                                                         masked, url, f_urls,
                                                         spacer)
+                                if t_org_name:
+                                    org_name = t_org_name
                                 if t_url == url:
                                     print(spacer + '\t\tNo valid alternative', flush = True)
                                     attempt = 4
@@ -412,9 +427,12 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
                     print(f'{spacer}\tERROR: md5 does not match JGI. Attempt {attempt}', 
                           flush = True)
                     curl_cmd = -1
-                    filename, n_url, dwnld_md5 = parse_xml(file_type, xml_file,
-                                                         masked = masked,
-                                                         forbidden = f_urls)
+                    filename, n_url, dwnld_md5, t_org_name \
+                        = parse_xml(file_type, xml_file,
+                                    masked = masked,
+                                    forbidden = f_urls)
+                    if t_org_name:
+                        org_name = t_org_name
                 
                     if n_url:
                         url = n_url
@@ -440,15 +458,13 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
             if curl_cmd != 0:
                 print(spacer + '\tFile failed to download', flush = True)
 
-    return check, preexisting, file_type, ran_dwnld
+    return check, preexisting, file_type, ran_dwnld, org_name
 
 
 def main( 
     df, output, user, pwd, assembly = True, proteome = False, gff3 = True, 
     transcript = False, est = False, masked = True, spacer = '\t'
     ):
-
-    
 #    pd.options.mode.chained_assignment = None  # default='warn'
     if not 'assembly_acc' in df.columns:
         if len(df.columns) != 1:
@@ -521,13 +537,29 @@ def main(
             else:
                 eprint(spacer + ome , flush = True)     
             for typ in dwnlds:
-                check, preexisting, new_typ, ran_dwnld = jgi_dwnld(
+                check, preexisting, new_typ, ran_dwnld, org_name = jgi_dwnld(
                     ome, typ, output, masked = masked, spacer = spacer
                 )
                 if type(check) != int:
                     df.at[i, new_typ + '_path'] = output + '/' + new_typ + \
                         '/' + os.path.basename(check)
-                    check = os.path.basename( os.path.abspath(check))
+                    check = os.path.basename(os.path.abspath(check))
+                    if org_name:
+                        org_d = org_name.split()
+                        genus = org_d[0]
+                        if len(org_d) > 1:
+                            sp = org_d[1]
+                        else:
+                            sp = 'sp.'
+                        if len(org_d) > 2:
+                            strain = ''.join(org_d[2:])
+                        else:
+                            strain = ''
+                    else:
+                        genus, sp, strain = '', '', ''
+                    df.at[i, 'genus'] = genus
+                    df.at[i, 'species'] = sp
+                    df.at[i, 'strain'] = strain
                 elif type(check) == int:
                     ome_set.add(row[ome_col])
                 eprint(spacer + '\t' + new_typ + ': exit status ' + str(check), flush = True)
@@ -596,6 +628,12 @@ def cli():
             }
 
     start_time = intro('Download JGI files', args_dict)
+    eprint('\nWARNING: This script does NOT account for use-restricted data. ' \
+         + 'It is user responsibility to determine use restriction status ' \
+         + 'in accord with the MycoCosm terms and conditions: ' \
+         + 'https://jgi.doe.gov/user-programs/pmo-overview/policies/legacy-data-policies/',
+         flush = True)
+    eprint(flush = True)
    
     if os.path.isfile(args.input): 
         with open(args.input, 'r') as raw:
@@ -611,12 +649,15 @@ def cli():
 
     output = format_path(args.output)
 
-    jgi_df = main( 
+    jgi_df, ome_set = main( 
         df, output, user, pwd, args.assembly, args.proteome, 
         args.gff, args.transcript, args.est, not args.nonmasked,
         spacer = ''
         )
-    df.to_csv(os.path.normpath(args.input) + '_jgiDwnld', sep = '\t', index = False)
+    jgi_df = jgi_df.rename(columns = {'assembly_acc': '#assembly_acc'})
+    jgi_df['source'] = 'jgi'
+    jgi_df['restriction'] = 'no'
+    jgi_df.to_csv(os.path.normpath(args.input) + '.predb.tsv', sep = '\t', index = False)
 
     outro(start_time)
 

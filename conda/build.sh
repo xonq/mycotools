@@ -1,4 +1,5 @@
+set -e
 conda activate mycotools
-python3 -m pip install dna_features_viewer
 conda install -c jlsteenwyk -y clipkit
+conda install -c xonq -y dna_features_viewer
 conda deactivate

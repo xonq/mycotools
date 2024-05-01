@@ -34,6 +34,10 @@
   completed (GCA_004920355.1)
 - [ ] make universal interface to remove need for source column
 
+### db2hgs
+- [ ] implement db2search to identify NSCHGs best-hits 
+- [ ] implement an automated NSCHG extraction based on minimum gene #
+
 ### db2microsyntree
 - [ ] Allow log removal
 
