@@ -50,7 +50,7 @@ uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/mas
 
 - **EVOLUTIONARY ANALYSES**
 	- [MycotoolsDB BLAST/HMM](https://github.com/xonq/mycotools/blob/master/USAGE.md#homolog-search-mycotoolsdb)
-    - [Homology Group, Single-copy ortholog, and pangenome circumscription](https://github.com/xonq/mycotools/blob/master/USAGE.md#homology-group,-single-copy-ortholog,-and-near-single-copy-homology-group-circumscription)
+    - [Homology Group, Single-copy ortholog, and pangenome circumscription](https://github.com/xonq/mycotools/blob/master/USAGE.md#homology-group-single-copy-ortholog-and-near-single-copy-homology-group-circumscription)
 	- [Fasta to tree](https://github.com/xonq/mycotools/blob/master/USAGE.md#tree-building)
 	- [Sequence clustering](https://github.com/xonq/mycotools/blob/master/USAGE.md#sequence-clustering)
 	- [Gene cluster phylogenetic analysis](https://github.com/xonq/mycotools/blob/master/USAGE.md#crappy)
