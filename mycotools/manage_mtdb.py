@@ -3,7 +3,7 @@
 import os
 import sys
 import argparse
-from mycotools.lib.dbtools import loginCheck, primaryDB, mtdb
+from mycotools.lib.dbtools import loginCheck, primaryDB, mtdb, encrypt_pw
 from mycotools.lib.kontools import format_path, read_json, collect_files
 
 def rm_outdated(omes, yes = False):
@@ -81,8 +81,8 @@ def cli():
     parser = argparse.ArgumentParser(description = 'Primary MycotoolsDB management utility')
     parser.add_argument('-c', '--clear_cache', action = 'store_true',
                         help = 'Clear MycotoolsDB legacy data')
-#    parser.add_argument('-p', '--password', action = 'store_true',
- #                       help = '[NOT FUNCTIONAL] Encrypt NCBI/JGI passwords to expedite access')
+    parser.add_argument('-p', '--password', action = 'store_true',
+                        help = 'Encrypt NCBI/JGI passwords to expedite access')
     parser.add_argument('-r', '--restrict', 
                         help = 'Restrict assembly accessions file, formatted: ' \
                              + '<ACCESSION>\t<SOURCE>\t[REASON]')
@@ -92,7 +92,8 @@ def cli():
     db = mtdb(primaryDB()).set_index('assembly_acc')
 
     if args.password:
-        loginCheck()
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck()
+        encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd)
     if args.restrict:
         restrict_path = format_path(args.restrict)
         with open(restrict_path, 'r') as raw:
@@ -103,6 +104,8 @@ def cli():
         restrictions(db, restricted, yes = args.yes)
     if args.clear_cache:
         rm_outdated(mtdb(primaryDB())['ome'], args.yes)
+
+        
 
     sys.exit(0)
 
