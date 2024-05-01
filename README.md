@@ -92,14 +92,14 @@ the administrator of a new one:
 To link with an existing database, fill in `<PATH>` with the database path
 
 ```bash
-mtdb --init <DB_PATH>
+mtdb -i <DB_PATH>
 ```
 
 <br />
 
 ## 3b. ADMINISTRATOR: Initialize a local MycotoolsDB
 ```bash
-mtdb update --init <DB_PATH>
+mtdb update -i <DB_PATH>
 ```
 
 <br /><br />
