@@ -21,6 +21,7 @@ uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/mas
 - **MYCOTOOLSDB TOOLS**
 	- [Initializing *de novo* MycotoolsDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#de-novo-initialization)
         - [Initializing reference MycotoolsDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#reference-initialization)
+        - [Initializing from local genomes](https://github.com/xonq/mycotools/blob/master/USAGE.md#local-initialization)
 	- [Updating MycotoolsDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#updating)
 	- [Connecting to the database](https://github.com/xonq/mycotools/blob/master/USAGE.md#interfacing)
 	- [Managing the database](https://github.com/xonq/mycotools/blob/master/USAGE.md#managing)
@@ -102,6 +103,21 @@ this is in alpha-testing and needs to improve vectorization to scale more effici
 mtdb update -i <INIT_DIRECTORY> -p
 ```
 
+#### HPC USAGE
+If you are using a job submission protocol, such as SLURM, you can encrypt you
+NCBI and JGI login information and pass the encryption password when submitting
+a job:
+
+```bash
+mtdb manage --password # encrypt your password
+echo "<PASSWORD>" | mtdb update -i <INIT_DIRECTORY>
+```
+
+Please note, echo'ing a password is not secure and there are more secure
+methods for passing this password without it being traceable in your command
+history, but that is beyond the scope of this guide.
+
+
 #### SPECIFIC LINEAGES
 To initialize a curated database of specific lineages of Fungi append
 `--lineage` and `--rank` to your intialization command. Add `-p` for
@@ -128,6 +144,23 @@ mtdb update -i <INIT_DIR> -r <REF.mtdb>
 ```
 
 If successful, a new MycotoolsDB will be initialized in `<INIT_DIR>`; to link back to any previously established MycotoolsDBs see how to [interface](https://github.com/xonq/mycotools/blob/master/USAGE.md#interfacing). 
+
+<br />
+
+### Local initialization
+A MycotoolsDB can be initialized referencing a `predb.tsv` file by filling it
+out with the metadata of your local genomes.
+
+```bash
+mtdb predb2mtdb > predb.tsv # generate a blank spreadsheet
+```
+
+Once filled, you can initialize your primary MTDB referencing your metadata
+spreadsheet:
+
+```bash
+mtdb udpate -i <INIT_DIR> --predb predb.tsv
+```
 
 <br /><br />
 
@@ -325,7 +358,10 @@ If you want to route the output to a file, simply redirect output by appending `
 
 ## Downloading files
 ### jgiDwnld / ncbiDwnld
-These scripts input a MycotoolsDB or can be manually made as shown at the bottom of this section. 
+These scripts input a MycotoolsDB or can be manually made as shown at the
+bottom of this section. Upon completion, they will output `predb.tsv` files
+that can be used to as a standard local genome metadata spreadsheet for 
+[adding local genomes to the primary MTDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#adding-local-genomes).
 
 Say you want to grab transcript information from a genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```bash
