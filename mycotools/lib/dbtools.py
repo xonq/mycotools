@@ -8,10 +8,10 @@ import sys
 import copy
 import json
 import time
+import hashes
 import base64
 import urllib
 import getpass
-import hashlib
 import datetime
 from Bio import Entrez
 from io import StringIO
@@ -275,11 +275,10 @@ def encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd,
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.backends import default_backend
     kdf = PBKDF2HMAC(
-        algorithm=hashlib.sha256(),
+        algorithm=hashes.sha256(),
         length=32,
         salt=salt,
-        iterations=100000,
-        backend=default_backend()
+        iterations=480000,
     )
     print(flush = True)
     hash_pwd, hash_check = True, False
@@ -306,11 +305,10 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True,
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.backends import default_backend
         kdf = PBKDF2HMAC(
-            algorithm=hashlib.sha256(),
+            algorithm=hashes.sha256(),
             length=32,
             salt=salt,
-            iterations=100000,
-            backend=default_backend()
+            iterations=480000,
         )
         print(flush = True)
         if sys.stdin.isatty():
