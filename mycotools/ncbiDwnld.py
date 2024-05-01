@@ -330,7 +330,10 @@ def collect_ftps(
                 trans_md5 = md5s[transcript]
     
             if (not assembly or not gff3) and remove:
-                failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+                try:
+                    failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+                except TypeError:
+                    failed.append([accession, datetime.strftime(datetime.now(), '%Y%m%d')])
     
             log_editor( 
                 output_path + 'ncbiDwnld.log', str(new_acc), 
