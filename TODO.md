@@ -32,6 +32,9 @@
 - [ ] some pseudogenes fail because they are given an "Alias" without being
   completed (GCA_004920355.1)
 - [ ] make universal interface to remove need for source column
+- [ ] allow including entries that cannot be hiearchically assimilated into
+  genes or transcripts
+- [ ] build to universally include genes and transcript-assimilated types
 
 ### db2hgs
 - [ ] implement db2search to identify NSCHGs best-hits 
