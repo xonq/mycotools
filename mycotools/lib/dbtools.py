@@ -268,10 +268,39 @@ def getLogin( ncbi, jgi ):
 
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
-def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
+def encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd,
+               info_path = format_path('~/.mycotools/mtdb_key')):
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.backends import default_backend
+    kdf = PBKDF2HMAC(
+        algorithm=hashlib.sha256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    print(flush = True)
+    hash_pwd, hash_check = True, False
+    while hash_pwd != hash_check:
+        if hash_pwd != True:
+            eprint('ERROR: passwords do not match', flush = True)
+        hash_pwd = getpass.getpass(prompt = 'New MycotoolsDB login password: ')
+        hash_check = getpass.getpass(prompt = 'Confirm password: ')
+
+    key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
+    fernet = Fernet(key)
+    out_data = ncbi_email + '\t' + ncbi_api + '\t' + jgi_email + '\t' + jgi_pwd
+    encrypt_data = fernet.encrypt(out_data)
+    with open(format_path(info_path), 'wb') as out:
+        out.write(encrypt_data)
+
+
+def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True,
+               encrypt = False):
     salt = b'D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118'
     #NEED to make this store a password
-    if os.path.isfile( format_path(info_path) ):
+    if os.path.isfile(format_path(info_path)):
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.backends import default_backend
@@ -306,36 +335,6 @@ def loginCheck(info_path = '~/.mycotools/mtdb_key', ncbi = True, jgi = True):
         ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi, jgi)
         # CURRENTLY THE REST DOESNT WORK, SO SKIP FOR NOW
         return ncbi_email, ncbi_api, jgi_email, jgi_pwd
-        if ncbi and jgi:
-            hash_check = input('Would you like to encrypt your login ' + \
-                'information to ' + info_path + ' [Y/n]: ')
-        else:
-            hash_check = 'n'
-        if hash_check not in {'n', 'N'}:
-            from cryptography.fernet import Fernet
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-            from cryptography.hazmat.backends import default_backend
-            kdf = PBKDF2HMAC(
-                algorithm=hashlib.sha256(),
-                length=32,
-                salt=salt,
-                iterations=100000,
-                backend=default_backend()
-            )
-            print(flush = True)
-            hash_pwd, hash_check = True, False
-            while hash_pwd != hash_check:
-                if hash_pwd != True:
-                    eprint('ERROR: passwords do not match', flush = True)
-                hash_pwd = getpass.getpass( prompt = 'New MycoDB login password: ' )
-                hash_check = getpass.getpass( prompt = 'Confirm password: ' )
-
-            key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode('utf-8')))
-            fernet = Fernet( key )
-            out_data = ncbi_email + '\t' + ncbi_api + '\t' + jgi_email + '\t' + jgi_pwd
-            encrypt_data = fernet.encrypt(out_data)
-            with open( format_path(info_path), 'wb' ) as out:
-                out.write(encrypt_data)
 #
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
