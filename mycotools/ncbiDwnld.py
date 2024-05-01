@@ -779,9 +779,9 @@ def cli():
     }
 
     start_time = intro('Download NCBI files',args_dict)
-    if not args.assembly and not args.proteome and not args.gff3 and not args.sra and not args.transcript:
-        eprint('\nERROR: You must choose at least one download option\nExit code 37', flush = True)
-        sys.exit( 37 )
+#    if not args.assembly and not args.proteome and not args.gff3 and not args.sra and not args.transcript:
+ #       eprint('\nERROR: You must choose at least one download option\nExit code 37', flush = True)
+  #      sys.exit( 37 )
 
     if args.sra:
         if os.path.isfile(format_path(args.input)):
