@@ -34,6 +34,22 @@ def jgi_login(user, pwd):
 
     return login_cmd
 
+def dwnld_xml(output, ome, max_tempts = 2):
+    attempts = 0
+    while not os.path.isfile(f'{output}/{ome}.xml') and attempts < max_tempts:
+        attempts += 1
+        xml_cmd = subprocess.call([
+            'curl', 
+            "https://genome.jgi.doe.gov/portal/ext-api/downloads/get-directory?organism=" \
+             + str(ome), '-b', 'cookies', '-o', f'{output}/{ome}.xml'],
+            stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        if xml_cmd != 0:
+            print(f'\tERROR: {ome} xml curl error: {xml_cmd}', flush = True)
+    if not os.path.isfile(f'{output}/{ome}.xml'):
+        return -1
+    else:
+        return xml_cmd
+
 
 def retrieve_xml(ome, output):
     '''Retrieve JGI xml file tree. First check if it already exists, if not then 
@@ -54,13 +70,7 @@ def retrieve_xml(ome, output):
             xml_cmd = -1
 
     else:
-        xml_cmd = subprocess.call([
-            'curl', 
-            "https://genome.jgi.doe.gov/portal/ext-api/downloads/get-directory?organism=" \
-             + str(ome), '-b', 'cookies', '-o', f'{output}/{ome}.xml'],
-            stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        if xml_cmd != 0:
-            print(f'\tERROR: {ome} xml curl error: {xml_cmd}', flush = True)
+        xml_cmd = dwnld_xml(output, ome)
 
     if xml_cmd == 0:
         with open(output + '/' + ome + '.xml', 'r') as xml_raw:
