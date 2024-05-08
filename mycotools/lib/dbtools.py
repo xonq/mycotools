@@ -186,6 +186,10 @@ class mtdb(dict):
         data, retry, error, df, columns = {}, bool(column), False, copy.copy(self), copy.copy(self.columns)
         if not column:
             return df.reset_index()
+        elif column not in {'assembly_acc', 'ome'}:
+            raise KeyError(f'MTDB index must be "assembly_acc"/"ome"')
+        elif column not in df: # empty df
+            return mtdb({}, index = column)
         while retry:
             oldCol = set()
             try:
