@@ -143,11 +143,10 @@ def runjgi_dwnld(
                 ome, typ, output, masked = masked
             )
             if not isinstance(check, int):
-                jgi_df.at[i, new_typ + '_path'] = output + '/' + new_typ + \
-                    '/' + check
-                check = os.path.basename( os.path.abspath( check ) )
-                print(spacer + '\t\t' + new_typ + ': ' + str(check), flush = True)
-                log[ome][typ] = check
+                jgi_df.at[i, new_typ + '_path'] = check
+                base_check = os.path.basename(os.path.abspath(check))
+                print(spacer + '\t\t' + new_typ + ': ' + str(base_check), flush = True)
+                log[ome][typ] = base_check
             else:
                 print(spacer + '\t\t' + new_typ + ': ERROR', flush = True)
                 log[ome][typ] = 'error'
