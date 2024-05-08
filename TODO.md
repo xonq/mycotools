@@ -10,9 +10,8 @@
 - [ ] support compressed databases
 - [ ] register mycotools with NCBI
 - [ ] configuration to output mtdb name + date in output directory
-- [ ] discuss OrthoFinder
 - [ ] discuss multigene phylo pipeline
-- [ ] discuss db2hgs
+- [x] discuss db2hgs
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
@@ -25,7 +24,7 @@
 - [ ] *Better root inference*
 - [ ] Assembly query method, i.e. through tblastn
 - [ ] Allow changing the clustering variable
-- [ ] locus output using percent similarity
+- [x] locus output using percent similarity
 
 ### curGFF3
 - [ ] pseudogenes can have RNAs, and CDSs from NCBI may reference those
@@ -33,6 +32,9 @@
 - [ ] some pseudogenes fail because they are given an "Alias" without being
   completed (GCA_004920355.1)
 - [ ] make universal interface to remove need for source column
+- [ ] allow including entries that cannot be hiearchically assimilated into
+  genes or transcripts
+- [ ] build to universally include genes and transcript-assimilated types
 
 ### db2hgs
 - [ ] implement db2search to identify NSCHGs best-hits 
@@ -81,6 +83,7 @@
 ### fa2tree
 - [ ] Implement fa2clus
 - [ ] ignore non-fasta inputs
+- [ ] take to phylogenomic tree from db2hgs
 
 ### gff2svg
 - [ ] find a prettier way to create SVGs
@@ -88,16 +91,16 @@
 - [ ] create a single file output option for multiple inputs
 
 ### jgiDwnld
-- [ ] remove gff v gff3 option
+- [x] remove gff v gff3 option
 
 ### manage_mtdb
 - [ ] delete database feature
-- [ ] *fix local password encryption*
-- [ ] overwrite old password
-- [ ] move database feature
+- [x] *fix local password encryption*
+- [x] overwrite old password
+- [x] move database feature
 - [ ] archive and unarchive genomes
 - [ ] remove logfiles as parting of clearing the cache
-- [ ] add combine DB option
+- [x] add combine DB option
 
 ### mtdb
 - [x] add a log option of connected MTDBs
@@ -111,7 +114,7 @@
 - [ ] convert downloading to NCBI datasets
 
 ### predb2mtdb
-- [ ] source to reference the annotation source
+- [ ] source to reference the annotation source/project name
 - [ ] *integrate prokka/bakta*
 - [ ] error check FAA
 - [ ] allow for just assembly accession in known sources
@@ -136,7 +139,7 @@
   function)
 - [ ] Need a manually curated file to correct errors in naming, e.g. Vararia v
   Vavraia, Fibularhizoctonia v Fibulorhizoctonia
-- [ ] initialize from a predb
+- [x] initialize from a predb
 - [ ] option to remove entries that have been removed from genbank
 - [ ] option to not dereplicate by genus and species alone
 - [ ] main MTDB files for prokaryotes and fungi uploaded and that can be parsed
@@ -144,3 +147,6 @@
 - [ ] sp. will also not dereplicate
 - [ ] make add option check for overwriting entries (indicating incorrect PREDB
   linkage)
+- [ ] ensure `-t` overlloks non-JGI/NCBI sources
+- [ ] ensure assembly accessions from non-JGI/NCBI sources are not included in
+  download

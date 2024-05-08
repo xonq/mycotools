@@ -21,6 +21,7 @@ uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/mas
 - **MYCOTOOLSDB TOOLS**
 	- [Initializing *de novo* MycotoolsDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#de-novo-initialization)
         - [Initializing reference MycotoolsDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#reference-initialization)
+        - [Initializing from local genomes](https://github.com/xonq/mycotools/blob/master/USAGE.md#local-initialization)
 	- [Updating MycotoolsDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#updating)
 	- [Connecting to the database](https://github.com/xonq/mycotools/blob/master/USAGE.md#interfacing)
 	- [Managing the database](https://github.com/xonq/mycotools/blob/master/USAGE.md#managing)
@@ -49,6 +50,7 @@ uniform curation. [See here for more](https://github.com/xonq/mycotools/blob/mas
 
 - **EVOLUTIONARY ANALYSES**
 	- [MycotoolsDB BLAST/HMM](https://github.com/xonq/mycotools/blob/master/USAGE.md#homolog-search-mycotoolsdb)
+    - [Homology Group, Single-copy ortholog, and pangenome circumscription](https://github.com/xonq/mycotools/blob/master/USAGE.md#homology-group-single-copy-ortholog-and-near-single-copy-homology-group-circumscription)
 	- [Fasta to tree](https://github.com/xonq/mycotools/blob/master/USAGE.md#tree-building)
 	- [Sequence clustering](https://github.com/xonq/mycotools/blob/master/USAGE.md#sequence-clustering)
 	- [Gene cluster phylogenetic analysis](https://github.com/xonq/mycotools/blob/master/USAGE.md#crappy)
@@ -102,6 +104,12 @@ this is in alpha-testing and needs to improve vectorization to scale more effici
 mtdb update -i <INIT_DIRECTORY> -p
 ```
 
+#### HPC USAGE
+If you are using a job submission protocol, such as SLURM, you can encrypt you
+NCBI and JGI login information and pass the encryption password when submitting
+a job as [noted below](https://github.com/xonq/mycotools/blob/master/USAGE.md#managing).
+
+
 #### SPECIFIC LINEAGES
 To initialize a curated database of specific lineages of Fungi append
 `--lineage` and `--rank` to your intialization command. Add `-p` for
@@ -129,6 +137,23 @@ mtdb update -i <INIT_DIR> -r <REF.mtdb>
 
 If successful, a new MycotoolsDB will be initialized in `<INIT_DIR>`; to link back to any previously established MycotoolsDBs see how to [interface](https://github.com/xonq/mycotools/blob/master/USAGE.md#interfacing). 
 
+<br />
+
+### Local initialization
+A MycotoolsDB can be initialized referencing a `predb.tsv` file by filling it
+out with the metadata of your local genomes.
+
+```bash
+mtdb predb2mtdb > predb.tsv # generate a blank spreadsheet
+```
+
+Once filled, you can initialize your primary MTDB referencing your metadata
+spreadsheet:
+
+```bash
+mtdb udpate -i <INIT_DIR> --predb predb.tsv
+```
+
 <br /><br />
 
 ## Updating
@@ -136,6 +161,12 @@ To update MycotoolsDB:
 
 ```bash
 mtdb update -u
+```
+
+To update the taxonomy of the primary MTDB:
+
+```bash
+mtdb update -t
 ```
 
 <br /><br />
@@ -153,14 +184,6 @@ To add interfacing with a fungal/prokaryote primary MTDB:
 ```bash
 mtdb -i <DATABASE_BASE_DIRECTORY>
 ```
-
-To switch between established interfaces:
-```bash
-mtdb -f
-mtdb -p
-```
-
-NOTE: only one MycotoolsDB of each type will be stored. Multiple databases of the same type require reiniterfacing via `mtdb -i <PATH>`.
 
 <br /><br />
 
@@ -325,7 +348,10 @@ If you want to route the output to a file, simply redirect output by appending `
 
 ## Downloading files
 ### jgiDwnld / ncbiDwnld
-These scripts input a MycotoolsDB or can be manually made as shown at the bottom of this section. 
+These scripts input a MycotoolsDB or can be manually made as shown at the
+bottom of this section. Upon completion, they will output `predb.tsv` files
+that can be used to as a standard local genome metadata spreadsheet for 
+[adding local genomes to the primary MTDB](https://github.com/xonq/mycotools/blob/master/USAGE.md#adding-local-genomes).
 
 Say you want to grab transcript information from a genus, *Aspergillus*. First, extract entries in the database that are within *Aspergillus*:
 ```bash
@@ -503,37 +529,6 @@ gff2seq -g <.GFF3> -a <.FNA> -nc -pm 1000 -n
 
 <br /><br />
 
-## Curate annotation
-Please note that MTDB curates annotations and assemblies prior to adding to the database via
-`mtdb predb2mtdb`. If your intention is to add your data to the database, please see `mtdb predb2mtdb`.
-If your data can be curated, it will be submitted to one of the following scripts during 
-`mtdb predb2mtdb`. These scripts are not in your PATH by default and are useful for testing 
-compatibility with MTDB. Only complete genome annotations are acceptable. 
-MTDB strives to incorporate the most common annotation software -
-please raise an issue if your complete genome annotation - from a common software - is not compatible.
-
-### gtf2gff3
-This script will convert OrthoFiller `.gtf` to `.gff3`, rename headers sequentially, and 
-optionally adds Alias
-
-```bash
-gtf2gff3 -g <ORTHOFILLER>/results/results.gtf -f <ASSEMBLY> -p <OME>
-```
-
-### gff2gff3
-Designed for JGI gff2 legacy formatted gffs
-```bash
-gff2gff3 -o <OME> -j <JGI_ome> -i <GFF2>
-```
-
-### curGFF3 
-`curGFF3` is tested with, Funannotate, JGI, and GenBank `gff3` files
-```bash
-curGFF3 <GFF3> <OME>
-```
-
-<br /><br />
-
 ## Adding corrected gene models
 ### add2gff
 This script will add new and corrected gene models to a full genome gff.
@@ -578,6 +573,17 @@ gff2svg -i <LISTOFGFF3.nsv> -o <OUTPUT_DIR> -w 20
 
 <br /><br />
 
+## Homology group, single-copy ortholog, and near single-copy homology group circumscription
+`db2hgs` can circumscribe homology groups using `mmseqs cluster` to cluster
+protein sequences via amino acid similarity. This algorithm will output a crude
+pangenome circumscription, homology groups that contain gene families in
+single-copy abundance across the dataset, and optionally near single-copy
+homology groups that meet criteria for median genes/HG in each genome (`-e`)
+and standard deviation (`-s`). This script is useful for large-scale homology
+group circumscription, and a crude single-copy ortholog
+inference module.
+
+<br /><br />
 
 ## Tree Building
 ### fa2tree
