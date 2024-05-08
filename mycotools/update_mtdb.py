@@ -1614,7 +1614,8 @@ def main():
   #          )
     else:
         # NEED to: insert note aboutrunning updatedb on predb
-        df2db(db, format_path(update_path + date + '.mtdb'))
+        new_mtdb = mtdb.pd2mtdb(new_db)
+        new_mtdb.df2db(format_path(update_path + date + '.mtdb'))
         eprint(f'\nUpdate ready for `mtdb u -a` at ' \
             +  f'{format_path(update_path + date + ".mtdb")}')
         # output new database and new list of omes
