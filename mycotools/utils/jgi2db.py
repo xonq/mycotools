@@ -139,7 +139,7 @@ def runjgi_dwnld(
                 if not rerun:
                     print(spacer + '\t\t' + typ + ': ERROR', flush = True)
                     continue
-            check, preexisting, new_typ, ran_dwnld = jgi_dwnld( 
+            check, preexisting, new_typ, ran_dwnld, org_name = jgi_dwnld( 
                 ome, typ, output, masked = masked
             )
             if not isinstance(check, int):
