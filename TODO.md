@@ -3,7 +3,7 @@
 - [ ] Annotate code (all)
     - [ ] add type constraints to functions
 - [ ] Conform old scripts to PEP8 (all)
-- [ ] Build all-in-one stable conda package
+- [o] Build all-in-one stable conda package
 - [ ] Transition code-base to Rust
 - [ ] implement kon_log class, paying attention to verbosity control
 - [ ] kon_log class output to local configuration directory
