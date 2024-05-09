@@ -616,7 +616,7 @@ def cli():
 
     if any(x in {'-h', '--help', '-help'} for x in sys.argv):
         eprint('\n' + usage + '\n', flush = True)
-        sys.exit(1)
+        sys.exit(0)
     elif len(sys.argv) == 1:
         print(gen_predb())
         sys.exit(0)
