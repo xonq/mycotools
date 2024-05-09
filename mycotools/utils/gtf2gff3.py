@@ -711,7 +711,7 @@ def sortMain(gff, prefix):
 
     id_comp = re.compile(gff3Comps()['id'])
     crude_sort = sorted(gff, key = lambda x: \
-        int(re.search(r'ID=' + prefix + '_(\d+)', x['attributes'])[1]))
+        int(re.search(r'ID=' + prefix + r'_(\d+)', x['attributes'])[1]))
     gff = preSortGFF(crude_sort, id_comp)
 
     return gff
