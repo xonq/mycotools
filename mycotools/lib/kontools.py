@@ -548,10 +548,10 @@ def sys_start(args, usage, min_len, dirs = [], files = []):
 
     if '-h' in args or '--help' in args:
         print('\n' + usage + '\n' , flush = True)
-        sys.exit(1)
+        sys.exit(0)
     elif len(args) < min_len:
         print('\n' + usage + '\n' , flush = True)
-        sys.exit(2)
+        sys.exit(1)
     elif not all(os.path.isfile(format_path(x)) for x in files):
         print('\n' + usage , flush = True)
         eprint('ERROR: input file(s) do not exist\n', flush = True)
