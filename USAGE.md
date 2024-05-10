@@ -141,7 +141,8 @@ If successful, a new MycotoolsDB will be initialized in `<INIT_DIR>`; to link ba
 
 ### Local initialization
 A MycotoolsDB can be initialized referencing a `predb.tsv` file by filling it
-out with the metadata of your local genomes.
+out with the metadata of your local genomes. Mycotools requires an assembly
+*and* annotation for all genomes in the database.
 
 ```bash
 mtdb predb2mtdb > predb.tsv # generate a blank spreadsheet
@@ -277,7 +278,7 @@ db2files -d atheliaceae.mtdb -p --print
 
 ## Adding local genomes
 ### mtdb predb2mtdb
-To add in-house annotations `mtdb predb2mtdb` will input your genome and
+To add in-house genomes *and* annotations (required) `mtdb predb2mtdb` will input your genome and
 metadata, curate, and prepare a database file to add to the database. The
 administrator will then take your database and add it to the primary MTDB.
 
