@@ -16,7 +16,10 @@ from collections import defaultdict
 from mycotools.lib.kontools import eprint, vprint, collect_files, \
     format_path, intro, outro, findExecs, mkOutput, multisub, parse_run_log
 from mycotools.lib.biotools import fa2dict, dict2fa
-from clipkit import clipkit
+try:
+    from clipkit import clipkit
+except ImportError:
+    eprint('ERROR: clipkit is not installed. Install via `conda` or `pip`')
 try:
     from ete3 import Tree
 except ImportError:
