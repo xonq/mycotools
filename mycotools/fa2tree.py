@@ -165,7 +165,8 @@ def run_mf(clipkit_files, out_dir, constraint = False,
     cmds = [['iqtree', '-m', 'MFP+MERGE', '-nt', 'AUTO',
              '-B', '1000', '-s', f_, '--prefix', 
              out_dir + os.path.basename(f_)] \
-            for f_ in clipkit_files]
+            for f_ in clipkit_files \
+            if not os.path.isfile(f'{out_dir}{os.path.basename(f_)}.contree')]
     # append the topological constraint to each command if it is present
     if constraint:
         [x.extend(['-g', constraint]) for x in cmds]
