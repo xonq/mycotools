@@ -188,7 +188,7 @@ class mtdb(dict):
             return df.reset_index()
         elif column not in {'assembly_acc', 'ome'}:
             raise KeyError(f'MTDB index must be "assembly_acc"/"ome"')
-        elif column not in df: # empty df
+        elif column not in set(df.keys()).union({df.index}): # empty df
             return mtdb({}, index = column)
         while retry:
             oldCol = set()
