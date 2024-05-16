@@ -1133,16 +1133,24 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
         # prepare to create new omes for the overlapping names
         need_ome_mtdb = mtdb({k: add_mtdb[k] for k in sorted(inter_omes)},
                              index = 'ome')
+        # these genomes have unique codenames and can be submitted as-is
         fine_ome_mtdb = mtdb({k: v for k, v in add_mtdb.items() \
                          if k not in inter_omes}, index = 'ome')
         need_ome_mtdb = need_ome_mtdb.reset_index()
+        # delete the previous ome codes of those that need new ones
         need_ome_mtdb['ome'] = ['' for x in need_ome_mtdb['assembly_acc']]
+        # the reference database should now contain the original and fine
+        # codenames
         ref_ome_mtdb = mtdb({**fine_ome_mtdb, **orig_mtdb}, index = 'ome')
+        # generate new codenames
+
         part_ome_mtdb, failed = gen_omes(need_ome_mtdb, ref_ome_mtdb.reset_index())
         overlap_mtdb = add_mtdb.set_index('assembly_acc')
 
+        # prepare a database of new genome codes and previously fine ones
         new_ome_mtdb = mtdb({**part_ome_mtdb.set_index('ome'), **fine_ome_mtdb}, 
                             index = 'ome')
+        # choose the assembly accession column to reference for old names
         new_ome_mtdb = new_ome_mtdb.set_index('assembly_acc')
         old_ome2new_ome = {v['ome']: new_ome_mtdb[k]['ome'] \
                            for k, v in overlap_mtdb.items() \
@@ -1153,9 +1161,9 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
             print(f'\t{k} converted to {v}',  flush = True)
 
         # create directories for new files
-        fna_dir, gff_dir, faa_dir = f'{update_path}/fna/', \
-                                    f'{update_path}/gff3/', \
-                                    f'{update_path}/faa/'
+        fna_dir, gff_dir, faa_dir = f'{update_path}fna/', \
+                                    f'{update_path}gff3/', \
+                                    f'{update_path}faa/'
         for path_ in [fna_dir, gff_dir, faa_dir]:
             if not os.path.isdir(path_):
                 os.mkdir(path_)
