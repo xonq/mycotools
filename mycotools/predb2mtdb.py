@@ -162,10 +162,14 @@ def read_predb(predb_path, spacer = '\t'):
                         predb[i2header[mi]].append('')
 
     if not 'assembly_acc' in predb and not 'assembly_accession' in predb:
-        predb['assembly_acc'] = ['' for x in predb['genus']]
+        raise KeyError('unique assembly accessions are required')
     elif 'assembly_accession' in predb:
         predb['assembly_acc'] = predb['assembly_accession']
         del predb['assembly_accession']
+
+    if len(predb['assembly_acc']) != len(set(predb['assembly_acc'])):
+        raise KeyError('unique assembly accessions are required')
+
     if not 'source' in predb:
         if 'genomeSource (ncbi/jgi/new)' in predb:
             predb['source'] = predb['genomeSource (ncbi/jgi/new)']
@@ -366,7 +370,7 @@ def gen_omes(
                     new_ome = ome + '.' + str(v)
                 else:
                     raise TypeError('unknown error ' + ome)
-                eprint(spacer + ome + ' update -> ' + new_ome, flush = True)
+                eprint(spacer + ome + ' version added -> ' + new_ome, flush = True)
                 newdb['ome'][i] = new_ome
                     
 
