@@ -387,7 +387,7 @@ def readLog( log, columns = '', sep = '\t' ):
     return log_dict
 
 def primaryDB(path = '$MYCODB'):
-    """Acquire the path of the master database by searching $MYCODB for a file
+    """Acquire the path of the primary database by searching $MYCODB for a file
     with a basename that starts with a date string %Y%m%d."""
 
     path = path.replace('$', '')
@@ -401,19 +401,19 @@ def primaryDB(path = '$MYCODB'):
     dates = [x.replace('.mtdb','') \
             for x in basenames \
             if re.search(r'^\d+\.mtdb$', x)]
-    master = '19991231' # arbitrary master for sorting
+    primary = '19991231' # arbitrary primary for sorting
     for date in dates:
         dtDate = datetime.datetime.strptime(date, "%Y%m%d")
-        dtMast = datetime.datetime.strptime(master, "%Y%m%d")
+        dtMast = datetime.datetime.strptime(primary, "%Y%m%d")
         if dtDate > dtMast:
-            master = date
-    if master == '19991231': # if it is the arbitrary start
-        eprint('\nERROR: master db not found in ' + path \
-              + '. Have you initialized MycoDB?', flush = True)
+            primary = date
+    if primary == '19991231': # if it is the arbitrary start
+        eprint('\nWARNIGN: Primary MTDB not found in ' + full_path,
+               flush = True)
         return None
-    master_path = format_path( '$' + path + '/' + master + '.mtdb')
+    primary_path = format_path('$' + path + '/' + primary + '.mtdb')
 
-    return master_path
+    return primary_path
  
 # imports database, converts into df
 # returns database dataframe
