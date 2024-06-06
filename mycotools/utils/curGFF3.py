@@ -43,7 +43,7 @@ def add_missing(gff_list, intron, comps, ome):
     # explicit RNA type references
     for entry in gff_list:
         if entry['type'].lower() not in accepted_types:
-            if 'RNA' in entry['type']: # converts snRNAs
+            if 'RNA' in entry['type'] or 'ribozyme' in entry['type'].lower(): # converts snRNAs
                 entry['type'] = 'RNA'
 #            else:
  #               continue
