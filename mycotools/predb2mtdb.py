@@ -102,7 +102,7 @@ def read_predb(predb_path, spacer = '\t'):
     required_headers = {'assembly_accession', 'genus', 'assemblyPath',
                     'gffPath', 'genomeSource (ncbi/jgi/new)'}
     allowed_headers = {
-        'previous_ome', 'assembly_acc',
+        'previous_ome', 'assembly_acc', 'assembly_accession',
         'genus', 'species', 'strain', 'version', 'biosample',
         'assemblyPath', 'gffPath', 'genomeSource (ncbi/jgi/new)', 
         'useRestriction (yes/no)', 'published', 'restriction',
@@ -130,6 +130,8 @@ def read_predb(predb_path, spacer = '\t'):
                 for head in i2header.values():
                     if head in allowed2required:
                         required_headers.remove(allowed2required[head])
+#                    elif head in required_headers:
+ #                       required_headers.remove(head)
                 missing_headers = \
                     required_headers.difference(set(i2header.values()))
                 if missing_headers:
@@ -208,6 +210,8 @@ def read_predb(predb_path, spacer = '\t'):
 
     if any(x.lower() not in {'jgi', 'ncbi', 'new'} \
         for x in predb['source']):
+        eprint([predb['assembly_acc'][i] for i, v in enumerate(predb['source']) \
+                if v not in {'jgi', 'ncbi', 'new'}])
         eprint(spacer + 'ERROR: genomeSource entries must be in {jgi, ncbi, new}', flush = True)
         sys.exit(5)
 
