@@ -83,6 +83,21 @@ def fa2dict(fasta_input): #file_ = True):
                 fasta_dict[seq_name]['sequence'] += data
     return fasta_dict
 
+def fa2dict_str(fasta_input):
+    fasta_dict = {}
+    for line in fasta_input.split('\n'):
+        data = line.rstrip()
+        if data.startswith('>'):
+            header = data[1:].split(' ')
+            seq_name = header[0]
+            fasta_dict[seq_name] = {'sequence': '', 
+                                     'description': ' '.join(header[1:])}
+        elif not data.startswith('#'):
+            fasta_dict[seq_name]['sequence'] += data
+    return fasta_dict
+
+
+
 def fa2dict_accs(fasta_input, accs = set()): #file_ = True):
     fasta_dict = {}
     with open(fasta_input, 'r') as raw:
