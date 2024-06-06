@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 
 # NEED a db check to ensure the log is relevant to the input
+# NEED to convert to datasets
+# NEED to consider refseq genomes with annotations when genbank doesn't have them
 
 import os
 import re
@@ -267,7 +269,10 @@ def collect_ftps(
 
             if not ftp_path:
                 eprint(spacer + '\t' + new_acc + ' failed to return any FTP path', flush = True)
-                failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+                try:
+                    failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+                except TypeError:
+                    failed.append([accession, str(row['version'])])
                 continue
 
             esc_count = 0
@@ -305,6 +310,7 @@ def collect_ftps(
                 md5s = {}
 
             tranname = os.path.basename(ftp_path.replace('/GCA','/GCF'))
+  #          tranname = os.path.basename(ftp_path)
             assembly = ftp_path + '/' + basename + '_genomic.fna.gz'
             if assembly in md5s:
                 ass_md5 = md5s[assembly]
@@ -326,6 +332,7 @@ def collect_ftps(
                 gff3 = ''
     
             transcript = ftp_path.replace('/GCA', '/GCF') + '/' + tranname + '_rna.fna.gz'
+ #           transcript = f'{ftp_path}/{tranname}_rna.fna.gz'
             if transcript in md5s:
                 trans_md5 = md5s[transcript]
     
