@@ -593,10 +593,12 @@ def multigene_mngr(align_stop, trimmed_files, wrk_dir, constraint, out_dir,
     print(spacer + 'Model finding', flush = True)
     models = run_mf(trimmed_files, wrk_dir, constraint,
                     verbose, cpus, spacer = spacer + '\t')
+    print(f'{spacer}\t{len(models)} individual trees completed', flush = True)
     if min_mean_support:
         print(spacer + 'Extracting passing trees', flush = True)
         passing = extract_supported(trimmed_files, min_mean_support, out_dir)
         models = {k: models[k] for k in passing}
+
 
     # build the concatenated NEXUS 
     print(spacer + 'Concatenating', flush = True)

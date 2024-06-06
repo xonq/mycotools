@@ -26,7 +26,7 @@ from mycotools.db2files import soft_main as db2files
 from mycotools.lib.kontools import intro, outro, collect_files, multisub, \
     findExecs, untardir, eprint, format_path, mkOutput, tardir, inject_args, stdin2str
 from mycotools.lib.dbtools import primaryDB, mtdb
-from mycotools.lib.biotools import dict2fa, fa2dict
+from mycotools.lib.biotools import dict2fa, fa2dict, fa2dict_str
 #from mycotools.extractHmmsearch import main as exHmm
 from mycotools.acc2fa import dbmain as acc2fa_db, famain as acc2fa_fa
 from mycotools.utils.extractHmmsearch import main as exHmm
@@ -1094,7 +1094,7 @@ def cli():
     else:
         if args.query:
             if args.query == '-':
-                queries = fa2dict(stdin2str(), file_ = False)
+                queries = fa2dict_str(stdin2str())
             else:
                 queries = [format_path(args.query)]
         elif args.query_dir:
