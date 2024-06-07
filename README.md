@@ -7,10 +7,7 @@
 <br /><br />
 
 # NOTE
-This software is a beta release (prokaryote is alpha state) - errors are
-expected. Kindly raise an issue if the error has not been mentioned.
-If you can find the bug, even better! The goal is to reach a longterm stable
-release - please join me in this aspiration.
+This software is a beta release - kindly raise an issue for errors.
 
 # PURPOSE
 Bring broadscale comparative genomics to the masses. 
@@ -18,15 +15,14 @@ Bring broadscale comparative genomics to the masses.
 Mycotools is a compilation of computational biology tools and database
 ([MycotoolsDB/MTDB](https://github.com/xonq/mycotools/blob/master/MTDB.md)) software
 that facilitate large-scale comparative genomics. MycotoolsDB dereplicates and locally
-assimilates all NCBI and MycoCosm (Joint Genome Institute) genomes into a database schema with uniform file curation, scalability, and automation as guiding principles. 
+assimilates NCBI and MycoCosm (Joint Genome Institute) genomes into a database schema with uniform file curation, scalability, and automation as guiding principles. 
 
-- Database initialization is as simple as `mtdb u --init <DIR>`
-- `mtdb u --update` brings the database to the current date
-- The MycotoolsDB (MTDB) uniformly curates the numerous iterations of
-  the `gff` into a consistent standard
-- The `.mtdb` database format enables swift transitions from analyses with datasets of 100,000s genomes to as few as a lineage of interest
+- Database initialization: `mtdb u --init <DIR>`
+- Database updating: `mtdb u --update`
+- The MycotoolsDB (MTDB) uniformly curates GenBank/MycoCosm and local `gff` formats into a consistent standard
+- The `.mtdb` database format is a uniform input for analyses with 100,000s to as few as a single genome
 - Mycotools [software suite](https://github.com/xonq/mycotools/blob/master/USAGE.md) includes modules to automate routine-complex
-  comparative genomics
+  comparative genomics, such as phylogenetic analysis
 
 <p align="center">
     <img
@@ -74,6 +70,7 @@ If not, try `conda activate base` or `source activate base`.
 
 ```bash
 conda create -n mycotools mycotools
+conda activate mycotools
 mtdb -d
 ```
 
@@ -114,13 +111,8 @@ recommended to run the following in your conda environment if you are having
 trouble with analyses:
 
 ```bash
-python3 -m pip install mycotools --upgrade
+conda update mycotools
 ```
-
-NOTE: Make sure the conda environment is active when updating.
-I recommend updating with `pip` because the `conda` distribution 
-is currently prone to dependency issues and will not update reliably.
-
 
 <br /><br /><br />
 
