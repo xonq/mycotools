@@ -73,15 +73,11 @@ Make sure `conda` is active, usually by seeing `(base)` in in your shell.
 If not, try `conda activate base` or `source activate base`. 
 
 ```bash
-conda create -n mycotools python pip
-conda activate mycotools
-python3 -m pip install mycotools --upgrade
+conda create -n mycotools mycotools
 mtdb -d
 ```
 
-NOTE: The conda package is broken on its own, so please 
-explicitly run `pip install` as noted above to update the
-mycotools package inside the conda environment.
+IF the above installation does not work, you can create a conda environment manually, activate it, then install mycotools via `python3 -m pip install mycotools`. 
 
 <br />
 

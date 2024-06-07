@@ -85,10 +85,7 @@ def main(argv = sys.argv):
         mtdb_initialize(mycodb_loc)
     elif {'-d', '--dependencies'}.intersection(set_argv):
         pip_deps = ['dna_features_viewer', 'mycotools']
-        dep_cmds = [['conda', 'install', '-y', '-c', 'jlsteenwyk', 'clipkit'],
-                    ['conda', 'install', '-y', '-c', 'bioconda', 'iqtree', 
-                    'mafft', 'blast', 'hmmer', 'mmseqs2', 'fasttree',
-                    'diamond'],
+        dep_cmds = [['conda', 'install', '-y', 'clipkit'],
                     ['python3', '-m', 'pip', 'install'] + pip_deps + ['--upgrade']]
         for dep_cmd in dep_cmds:
             cmd = subprocess.call(dep_cmd)
