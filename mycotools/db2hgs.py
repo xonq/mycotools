@@ -227,18 +227,28 @@ def pangenome_output(pan_file, aln_file, hg2gene, hg2d_omes, max_mis_ome = 0):
     to determine the accessory and core HGs"""
     ome2pan = defaultdict(lambda: [[], []])
     core_hgs = set(k for k, v in hg2d_omes.items() if len(v) <= max_mis_ome)
-    acc_hgs = sorted(set(hg2d_omes.keys()).difference(core_hgs))
-    ome2acc_aln = defaultdict(lambda: {k: 0 for k in acc_hgs})
+#    acc_hgs = sorted(set(hg2d_omes.keys()).difference(core_hgs))
+    acc_hgs = set()
+    ome2acc_aln = defaultdict(set)
     for hg, genes in hg2gene.items():
         if hg in core_hgs:
             for gene in genes:
                 ome = gene[:gene.find('_')]
                 ome2pan[ome][0].append(gene)
         else:
+            acc_hgs.add(hg)
             for gene in genes:
                 ome = gene[:gene.find('_')]
                 ome2pan[ome][1].append(gene)
-                ome2acc_aln[ome][hg] = 1
+                ome2acc_aln[ome].add(hg)
+
+    acc_hgs = sorted(acc_hgs)
+    ome2aln = {}
+    for ome, hg_set in ome2acc_aln.items():
+        ome2aln[ome] = {k: 0 for k in acc_hgs}
+        for hg in list(hg_set):
+            ome2aln[ome][hg] = 1
+        
 
     with open(pan_file, 'w') as out:
         out.write('#ome\tcore_%\tacc_%\n')
@@ -247,10 +257,11 @@ def pangenome_output(pan_file, aln_file, hg2gene, hg2d_omes, max_mis_ome = 0):
             out.write(f'{ome}\t{len(pan[0])/tot}\t{len(pan[1])/tot}\n')
 
     with open(aln_file, 'w') as out:
-        out.write('#ome ' + ' '.join([str(x) for x in acc_hgs]) + '\n')
-        for ome, aln in {k: v for k, v in sorted(ome2acc_aln.items(), 
+#        out.write('#ome ' + ' '.join([str(x) for x in acc_hgs]) + '\n')
+        out.write(f'{len(ome2aln)} {len(acc_hgs)}\n')
+        for ome, aln in {k: v for k, v in sorted(ome2aln.items(), 
                                            key = lambda x: x[0])}.items():
-            out.write(f'{ome} ' + ' '.join([str(x) for x in aln.values()]) + '\n') 
+            out.write(f'{ome} ' + ''.join([str(x) for x in aln.values()]) + '\n') 
 
     return ome2pan
     
@@ -284,7 +295,7 @@ def main(db, out_dir, min_id = 0.3, min_cov = 0.3, sensitivity = 7.5,
     full_hg_stats_file = out_dir + 'core_hg_stats.tsv'
     hg2missing_genome_file = out_dir + 'hg2missing.tsv'
     pan_file = out_dir + 'pangenome.tsv'
-    aln_file = out_dir + 'accessory_alignment.txt'
+    aln_file = out_dir + 'accessory_alignment.phy'
     wrk_dir, scg_dir, nscg_dir, hg_seq_dir = mk_db2hg_output(out_dir, nscg)
 
     print('\nClustering protein sequences', flush = True)
