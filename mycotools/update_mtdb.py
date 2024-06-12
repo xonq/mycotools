@@ -1184,6 +1184,8 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
             for entry in gff:
                 entry['seqid'] = entry['seqid'].replace(f'{old_ome}_',
                                                         f'{ome}_')
+                entry['attributes'] = entry['attributes'].replace(f'{old_ome}_',
+                                                        f'{ome}_')
             with open(f'{gff_dir}{ome}.gff3', 'w') as out:
                 out.write(list2gff(gff))
             faa = fa2dict(row['faa'])
