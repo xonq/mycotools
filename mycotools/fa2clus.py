@@ -52,7 +52,7 @@ def run_mmseqs(fa_path, res_base, wrk_dir, algorithm = 'mmseqs easy-linclust',
                                   stderr = stderr)
     if mmseqs_exit:
         raise ClusteringError('Clustering failed: ' + str(mmseqs_exit) \
-                            + ' ' + str(mmseqs_cmd))
+                            + ' ' + ' '.join(mmseqs_cmd))
     if os.path.isfile(res_base + '_all_seqs.fasta'):
         os.remove(res_base + '_all_seqs.fasta')
     if os.path.isfile(res_base + '_rep_seq.fasta'):
