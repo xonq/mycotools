@@ -45,8 +45,8 @@ def add_missing(gff_list, intron, comps, ome):
         if entry['type'].lower() not in accepted_types:
             if 'RNA' in entry['type'] or 'ribozyme' in entry['type'].lower(): # converts snRNAs
                 entry['type'] = 'RNA'
-#            else:
- #               continue
+            else:
+                continue
         entry['attributes'] = \
             entry['attributes'].replace('proteinId', 'protein_id')
         entry['attributes'] = \
