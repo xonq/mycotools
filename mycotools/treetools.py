@@ -10,7 +10,6 @@ from mycotools.lib.dbtools import mtdb
 
 def compile_tree(tree_path, root = [], verbose = False):
     """Compile a phylogeny from a path and conver the tip names to an index"""
-    print(root)
     phylo = load_tree(tree_path)
     tips = set(phylo.get_tip_names())
     vprint(f'{len(tips)} tips on input', v = verbose, e = True)
@@ -24,6 +23,9 @@ def compile_tree(tree_path, root = [], verbose = False):
                  if set(root).issubset(set(v.get_tip_names()))}
         mrca_tip_len = min([v[1] for v in list(nodes.values())])
         mrca_edge = [k for k, v in nodes.items() if v[1] == mrca_tip_len]
+        if mrca_edge[0] == 'root':
+            eprint(f'WARNING: rooting with {root} does not change current tree',
+                   flush = True)
         phylo = phylo.rooted_at(mrca_edge[0])
 
     return phylo
@@ -46,13 +48,16 @@ def prune_to_new(phylo, tips = [], spacer = ''):
 
 def main(phylo_path, db = None, 
          tips = [], root = [], trim = False,
-         phylo = None, verbose = True):
+         phylo = None, verbose = True, convert = {}):
 
     if phylo_path:
         phylo = compile_tree(phylo_path, root, verbose = verbose)
 
     if trim:
         phylo = prune_to_new(phylo, tips)
+
+    if convert:
+        phylo.reassign_names(convert)
 
     return phylo
 
@@ -66,6 +71,7 @@ def cli():
     parser.add_argument('-d', '--mtdb', help = 'MTDB to reference')
     parser.add_argument('-p', '--prune', action = 'store_true',
                         help = 'Remove omes absent from input')
+    parser.add_argument('-c', '--convert', help = 'File of tips to new names')
     parser.add_argument('-r', '--root',
                         help = 'Root on tip(s)')
     args = parser.parse_args()
@@ -83,15 +89,29 @@ def cli():
     else:
         tips = []
 
+    convert = {}
+    if args.convert:
+        convert_path = format_path(args.convert)
+        if os.path.isfile(convert_path):
+            eprint('\nDetecting path input', flush = True)
+            with open(convert_path, 'r') as raw:
+                for line in raw:
+                    data = line.rstrip()
+                    if not data.startswith('#') and data:
+                        k2v = data.split()
+                        convert[k2v[0]] = k2v[1]
+        else:
+            eprint('\nERROR: --convert must be a valid reference file', flush = True)
+
+
     if args.mtdb:
         db = mtdb(format_path(args.mtdb))
         if not tips:
             tips = sorted(db['ome'])
     else:
         db = None
-
     phylo = main(format_path(args.input), db, tips, 
-                 trim = args.prune, root = root)
+                 trim = args.prune, root = root, convert = convert)
     eprint(f'{len(phylo.get_tip_names())} tips on output', flush = True)
     print(phylo.get_newick(with_distances = True), flush = True)
 
