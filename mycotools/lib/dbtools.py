@@ -386,7 +386,7 @@ def readLog( log, columns = '', sep = '\t' ):
 
     return log_dict
 
-def primaryDB(path = '$MYCODB'):
+def primaryDB(path = '$MYCODB', verbose = True):
     """Acquire the path of the primary database by searching $MYCODB for a file
     with a basename that starts with a date string %Y%m%d."""
 
@@ -408,8 +408,9 @@ def primaryDB(path = '$MYCODB'):
         if dtDate > dtMast:
             primary = date
     if primary == '19991231': # if it is the arbitrary start
-        eprint('\nWARNIGN: Primary MTDB not found in ' + full_path,
-               flush = True)
+        if verbose:
+            eprint('\nWARNING: Primary MTDB not found in ' + full_path,
+                   flush = True)
         return None
     primary_path = format_path('$' + path + '/' + primary + '.mtdb')
 
