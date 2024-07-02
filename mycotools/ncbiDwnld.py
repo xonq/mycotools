@@ -835,7 +835,9 @@ def cli():
             ncbi_df = pd.DataFrame({'assembly_acc': args.input.replace('"','').replace("'",'').split()})
             column = 'assembly_acc'
             ncbi_column = 'assembly'
-    
+
+        ncbi_df = ncbi_df.drop_duplicates(column)
+
         new_df, failed = main( 
             assembly = args.assembly, column = column, 
             ncbi_column = ncbi_column, proteome = args.proteome, 
