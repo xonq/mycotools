@@ -26,6 +26,7 @@ import subprocess
 import numpy as np
 import pandas as pd
 from Bio import Entrez
+from datetime import datetime
 from collections import defaultdict
 from mycotools.lib.dbtools import db2df, df2db, gather_taxonomy, assimilate_tax, \
     primaryDB, loginCheck, log_editor, mtdb, \
@@ -1255,9 +1256,10 @@ def db2primary(addDB, refDB, save = False, combined = False):
 
 
 def control_flow(init, update, reference, add, taxonomy,
-                 predb, lineage, save, nonpublished,
+                 predb, save, nonpublished,
                  ncbi_only, lineage, rank, prokaryote, failed,
-                 forbidden, resume, no_md5, cpu, ncbi_email = False):
+                 forbidden, resume, no_md5, cpu, ncbi_email = False,
+                 ncbi_api = None):
 
     if not init \
         and not update \
@@ -1363,7 +1365,7 @@ def control_flow(init, update, reference, add, taxonomy,
 #    branch = 'stable'
     db_path = primaryDB()
     if not resume or add:
-        date = start_time.strftime('%Y%m%d')
+        date = datetime.now().strftime('%Y%m%d')
     else:
         date = str(resume)
 
@@ -1625,7 +1627,7 @@ def main():
     start_time = intro('Update MycotoolsDB', args_dict)
 
     control_flow(args.init, args.update, args.reference, args.add, args.taxonomy,
-                 args.predb, args.lineage, args.save, args.nonpublished,
+                 args.predb, args.save, args.nonpublished,
                  args.ncbi_only, args.lineage, args.rank, args.prokaryote, args.failed,
                  args.forbidden, args.resume, args.no_md5, args.cpu, 
                  ncbi_email = None)
