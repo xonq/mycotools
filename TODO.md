@@ -124,6 +124,7 @@
 - [x] optimize dereplication, currently too slow
 - [x] initial JGI predb2mtdb fails because assemblyPath doesn't exist as a
   column, but restarts are fine
+- [ ] allow updating from Predb.tsv immediately
 - [ ] update introduction output
 - [ ] need a verbose option
 - [ ] reversion option
