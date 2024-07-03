@@ -5,9 +5,6 @@
 </p>
 <br /><br />
 
-# NOTE
-This software is a beta release - kindly raise an issue for errors.
-
 # PURPOSE
 Bring broadscale comparative genomics to the masses. 
 
