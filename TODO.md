@@ -118,6 +118,7 @@
 - [ ] *integrate prokka/bakta*
 - [ ] error check FAA
 - [ ] allow for just assembly accession in known sources
+- [ ] allow inputting GBK
 
 ### update_mtdb
 - [x] optimize dereplication, currently too slow
