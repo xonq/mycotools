@@ -6,7 +6,9 @@
 <br /><br />
 
 # PURPOSE
-Bring broadscale comparative genomics to the masses. 
+Bring broadscale comparative genomics to the masses. Operational with
+prokaryote and fungal genome data - generalized taxonomy-agnostic integration
+on the way.
 
 Mycotools is a compilation of computational biology tools and database
 ([MycotoolsDB/MTDB](https://github.com/xonq/mycotools/wiki/MycotoolsDB)) software
