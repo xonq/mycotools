@@ -147,6 +147,6 @@
 - [ ] sp. will also not dereplicate
 - [ ] make add option check for overwriting entries (indicating incorrect PREDB
   linkage)
-- [ ] ensure `-t` overlloks non-JGI/NCBI sources
+- [ ] ensure `-t` overlooks non-JGI/NCBI sources
 - [ ] ensure assembly accessions from non-JGI/NCBI sources are not included in
   download
