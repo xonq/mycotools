@@ -25,7 +25,7 @@ assimilates NCBI and MycoCosm (Joint Genome Institute) genomes into a database s
 
 <p align="center">
     <img
-        src="https://github.com/xonq/mycotools/blob/raw/master/misc/mtdb.png"
+        src="https://github.com/xonq/mycotools/blob/master/misc/mtdb.png"
     >
 </p>
 
