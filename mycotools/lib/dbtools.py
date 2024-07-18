@@ -749,7 +749,7 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome',
         return mtdb(db), tax_dicts
     else:
         for i, row in db.iterrows():
-            db.at[i, 'taxonomy'] = tax_dicts[genus]
+            db.at[i, 'taxonomy'] = tax_dicts[row['genus']]
 
     return db, tax_dicts
 
