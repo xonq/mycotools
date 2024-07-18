@@ -742,11 +742,12 @@ def ref_update(
         new_db = pd.concat([new_db, ncbi_db])
 
     print('\nAssimilating NCBI taxonomy data', flush = True)
+    new_mtdb = mtdb.pd2mtdb(new_db)
+
     if kingdom.lower() == 'fungi':
         rank = 'kingdom'
     else:
         rank = 'superkingdom'
-
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
@@ -760,16 +761,16 @@ def ref_update(
         sys.exit(0)
 
     if taxonomy: #already completed
-        tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
+        tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
-        new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
+        new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
         dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
     
         for ome, row in update_mtdb.items():
             if row['genus'] in genus_dicts:
                 row['taxonomy'] = genus_dicts[row['genus']]
     
-    return new_db, update_mtdb 
+    return new_mtdb, update_mtdb 
 
 
 def extract_constraint_lineages(df, ncbi_api, kingdom,
@@ -1053,14 +1054,16 @@ def rogue_update(
         df2db(ncbi_db, ncbi_db_path)
         new_db = pd.concat([new_db, ncbi_db])
 
+    new_mtdb = mtdb.pd2mtdb(new_db)
+
     print('\nAssimilating NCBI taxonomy data', flush = True)
     if kingdom.lower() == 'fungi':
         rank = 'kingdom'
     else:
         rank = 'superkingdom'
-    tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
+    tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
-    new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
+    new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
     dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
     if jgi_mtdb and ncbi_mtdb:
@@ -1074,7 +1077,7 @@ def rogue_update(
         eprint('\nNo updates', flush = True)
         sys.exit(0)
 
-    return new_db, update_mtdb 
+    return new_mtdb, update_mtdb 
 
 
 def rm_raw_data(out_dir):
@@ -1508,14 +1511,14 @@ def control_flow(init, update, reference, add, taxonomy,
             eprint('\nWARNING: nonpublished data detected in reference and will be ignored', 
                    flush = True)
         
-        new_db, update_mtdb = ref_update(
+        new_mtdb, update_mtdb = ref_update(
             ref_db, update_path, date, failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = cpu, check_MD5 = not bool(no_md5),
             jgi = jgi, group = group, kingdom = king,
             remove = not save, taxonomy = True
             )
     else:
-        new_db, update_mtdb = rogue_update(
+        new_mtdb, update_mtdb = rogue_update(
             orig_db, update_path, date, failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = cpu, 
             check_MD5 = not bool(no_md5), jgi = jgi, group = group,
@@ -1532,9 +1535,8 @@ def control_flow(init, update, reference, add, taxonomy,
         # output new database and new list of omes
 
         eprint('\nMoving data into database', flush = True)
-        write_forbid_omes(set(new_db['ome']), format_path('$MYCODB/../log/relics.txt'))
+        write_forbid_omes(set(new_mtdb['ome']), format_path('$MYCODB/../log/relics.txt'))
 
-        new_mtdb = mtdb.pd2mtdb(new_db)
         new_path = format_path('$MYCODB/' + date + '.mtdb')
         if format_path(db_path) == new_path:
             shutil.copy(db_path, db_path + '.tmp')
@@ -1554,7 +1556,6 @@ def control_flow(init, update, reference, add, taxonomy,
   #          )
     else:
         # NEED to: insert note aboutrunning updatedb on predb
-        new_mtdb = mtdb.pd2mtdb(new_db)
         new_mtdb.df2db(format_path(update_path + date + '.mtdb'))
         eprint(f'\nUpdate ready for `mtdb u -a` at ' \
             +  f'{format_path(update_path + date + ".mtdb")}')
