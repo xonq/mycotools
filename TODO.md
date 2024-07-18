@@ -112,6 +112,8 @@
 ### ncbiDwnld
 - [ ] db check to ensure log is relevant to input
 - [ ] convert downloading to NCBI datasets
+- [ ] add strain parsing from within GenBank records for entries that don't
+  have an obvious strain entry
 
 ### predb2mtdb
 - [ ] source to reference the annotation source/project name
