@@ -759,7 +759,7 @@ def ref_update(
         eprint('\nNo updates', flush = True)
         sys.exit(0)
 
-    if not taxonomy: #already completed
+    if taxonomy: #already completed
         tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
         new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
@@ -767,7 +767,6 @@ def ref_update(
     
         for ome, row in update_mtdb.items():
             if row['genus'] in genus_dicts:
-                print(genus_dicts[row['genus']])
                 row['taxonomy'] = genus_dicts[row['genus']]
     
     return new_db, update_mtdb 
@@ -999,7 +998,7 @@ def rogue_update(
         new_db = db
         new_dups = duplicates
 
-    print('\nAssimilating NCBI (10 download/minute w/API key, 3 w/o)', flush = True)
+    print('\nAssimilating NCBI (10 download/second w/API key, 3 w/o)', flush = True)
     new_db['version'] = new_db['version'].astype(str)
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
 #    if not os.path.isfile(update_path + date + '.ncbi.predb'):
@@ -1062,7 +1061,7 @@ def rogue_update(
     tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
     new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
-    dupFiles = { 'fna': {}, 'faa': {}, 'gff3': {} }
+    dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
@@ -1508,11 +1507,12 @@ def control_flow(init, update, reference, add, taxonomy,
         if any(not x for x in ref_db['published']) and not nonpublished:
             eprint('\nWARNING: nonpublished data detected in reference and will be ignored', 
                    flush = True)
+        
         new_db, update_mtdb = ref_update(
             ref_db, update_path, date, failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = cpu, check_MD5 = not bool(no_md5),
             jgi = jgi, group = group, kingdom = king,
-            remove = not save, taxonomy = not taxonomy
+            remove = not save, taxonomy = True
             )
     else:
         new_db, update_mtdb = rogue_update(
