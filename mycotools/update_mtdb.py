@@ -1111,25 +1111,37 @@ def gen_algn_db(update_path, omes):
      #   + date + '_mmseqsdb.sh')
   
 
-def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
+def check_add_mtdb(orig_mtdb, add_mtdb, update_path, overwrite = True):
     """Check the original MTDB for overlapping omes and curate if necessary"""
     orig_mtdb = orig_mtdb.set_index()
     add_mtdb = add_mtdb.set_index()
+    orig_aa2ome = {v['assembly_acc']: k for k, v in orig_mtdb.items()}
 
+#    failed_aas = []
+    overwrite_omes = []
+    for assembly_acc, row in add_mtdb.items():
+        if assembly_acc in orig_aa2ome:
+ #           failed_aas.append(assembly_acc)
+            if overwrite:
+                overwrite_omes.append(orig_aa2ome[assembly_acc])
+            else:
+                overwrite_omes.append(row['ome'])
+
+#    if failed_aas:
+    if overwrite:
+        for ome in overwrite_omes:
+            del orig_mtdb[ome]
+    else:
+        for ome in overwrite_omes:
+            del add_mtdb[ome]
+#        eprint('\nERROR: assembly accessions ("assembly_acc") must be ' \
+ #              'unique between databases: ', flush = True)
+  #      eprint(', '.join(failed_aas), flush = True)
+   #     sys.exit(123)
+        
     orig_omes = set(orig_mtdb.keys())
     new_omes = set(add_mtdb.keys())
-    orig_aas = set(v['assembly_acc'] for k, v in orig_mtdb.items())
     inter_omes = orig_omes.intersection(new_omes)
-
-    failed_aas = []
-    for assembly_acc in add_mtdb.reset_index()['assembly_acc']:
-        if assembly_acc in orig_aas:
-            failed_aas.append(assembly_acc)
-    if failed_aas:
-        eprint('\nERROR: assembly accessions ("assembly_acc") must be ' \
-               'unique between databases: ', flush = True)
-        eprint(', '.join(failed_aas), flush = True)
-        sys.exit(123)
 
     # if there are overlapping omes between the addition MTDB and existing
     if inter_omes:
@@ -1261,7 +1273,7 @@ def control_flow(init, update, reference, add, taxonomy,
                  predb, save, nonpublished,
                  ncbi_only, lineage, rank, prokaryote, failed,
                  forbidden, resume, no_md5, cpu, ncbi_email = False,
-                 ncbi_api = None):
+                 ncbi_api = None, overwrite = True):
 
     if not init \
         and not update \
@@ -1484,7 +1496,7 @@ def control_flow(init, update, reference, add, taxonomy,
         tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
                                     king=king, rank = rank)
         addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
-        addDB = check_add_mtdb(orig_mtdb, addDB, update_path)
+        addDB = check_add_mtdb(orig_mtdb, addDB, update_path, overwrite)
 
         write_forbid_omes(set(addDB['ome']), format_path('$MYCODB/../log/relics.txt'))
 
@@ -1582,6 +1594,8 @@ def main():
     upd_args.add_argument('-a', '--add', help = '.mtdb with full paths to add to database')
     upd_args.add_argument('-t', '--taxonomy', action = 'store_true',
         help = 'Update taxonomy and exit')
+    upd_args.add_argument('-k', '--keep', action = 'store_true',
+        help = '[-a] Keep original MTDB data when adding overlapping accessions')
     upd_args.add_argument('--save', action = 'store_true', 
         help = '[-u] Do not integrate/delete new data; -a to complete')
 
@@ -1612,8 +1626,6 @@ def main():
     run_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
     run_args.add_argument('--no_md5', action = 'store_true', help = 'Skip NCBI MD5'
         + ' (expedite large reruns)')
-#    run_args.add_argument('--overwrite', action = 'store_true',
-#        help = 'Remove entries that violate new MTDB parameters')
     run_args.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 
@@ -1631,7 +1643,7 @@ def main():
                  args.predb, args.save, args.nonpublished,
                  args.ncbi_only, args.lineage, args.rank, args.prokaryote, args.failed,
                  args.forbidden, args.resume, args.no_md5, args.cpu, 
-                 ncbi_email = None)
+                 ncbi_email = None, overwrite = not args.keep)
 
     outro(start_time)
 
