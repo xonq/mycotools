@@ -150,6 +150,12 @@ class mtdb(dict):
                             output[ome][file_type] = output[ome][file_type].replace(
                                 abb_paths[file_type][0] + ome + abb_paths[file_type][1], ''
                                 ) # abbreviate when possible
+                    for rank in ['species', 'genus', 'strain']:
+                        try:
+                            del output[ome]['taxonomy'][rank]
+                        except KeyError:
+                            pass
+
                     if output[ome]['taxonomy']:
                         output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                     else:
