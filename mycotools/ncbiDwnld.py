@@ -23,7 +23,7 @@ from datetime import datetime
 from mycotools.lib.kontools import intro, outro, format_path, prep_output, eprint, vprint, findExecs
 from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
 
-def db2df(data, stdin = False):
+def ncbidb2df(data, stdin = False):
     import pandas as pd, pandas
     columns = mtdb.columns
     if isinstance(data, mtdb):
@@ -40,59 +40,28 @@ def db2df(data, stdin = False):
 
     db_df = db_df.fillna('')
 
-    if len(db_df.keys()) == 16: # legacy conversion TO BE DEPRECATED
-        eprint('\tWARNING: Legacy MycotoolsDB format will be removed in the future.', flush = True)
-        db_df.columns = [
-            'ome', 'genus', 'species', 'strain', 'version',
-            'biosample', 'fna', 'faa', 'gff3', 'taxonomy', 'ecology',
-            'eco_conf',
-            'source', 'published', 'assembly_acc', 'acquisition_date'
-            ]
-    else:
-        db_df.columns = columns
-    for i, row in db_df.iterrows():
-        db_df.at[i, 'taxonomy'] = read_tax(
-            row['taxonomy']
-            )
-        db_df.at[i, 'taxonomy']['genus'] = row['genus']
-        db_df.at[i, 'taxonomy']['species'] = \
-            row['genus'] + ' ' + row['species']
-        # if malformatted due to decreased entries in some lines, this will raise an IndexError
-        if row['fna'] or row['fna'] == row['ome'] + '.fna': # abbreviated line w/o file coordinates
-           db_df.at[i, 'fna'] = os.environ['MYCOFNA'] + row['ome'] + '.fna'
-           db_df.at[i, 'faa'] = os.environ['MYCOFAA'] + row['ome'] + '.faa'
-           db_df.at[i, 'gff3'] = os.environ['MYCOGFF3'] + row['ome'] + '.gff3'
-        else: # has file coordinates
-           db_df.at[i, 'fna'] = format_path(row['fna'])
-           db_df.at[i, 'faa'] = format_path(row['faa'])
-           db_df.at[i, 'gff3'] = format_path(row['gff3'])
-
-    if len(db_df) == 16: # LEGACY conversion to be deprecated
-        del db_df['ecology']
-        del db_df['eco_conf']
-
     return db_df
 
 
-def prepare_folders( output_path, gff, prot, assem, transcript ):
+def prepare_folders(output_path, gff, prot, assem, transcript):
 
     file_types = []
     if assem:
         if not os.path.exists(output_path + 'fna'):
             os.mkdir(output_path + 'fna')
-        file_types.append( 'fna' )
+        file_types.append('fna')
     if gff:
         if not os.path.exists(output_path + 'gff3'):
             os.mkdir(output_path + 'gff3')
-        file_types.append( 'gff3' )
+        file_types.append('gff3')
     if prot:
         if not os.path.exists(output_path + 'faa'):
             os.mkdir(output_path + 'faa')
-        file_types.append( 'faa' ) 
+        file_types.append('faa') 
     if transcript:
         if not os.path.exists(output_path + 'transcript'):
             os.mkdir(output_path + 'transcript')
-        file_types.append( 'transcript' )
+        file_types.append('transcript')
 
     return file_types  
 
@@ -174,6 +143,201 @@ def esummary_ncbi(ID, database):
             raise urllib.error.HTTPError('\tERROR: FTP request failed')
 
     return record
+
+def collect_ftps_no_md5(
+    ncbi_df, ass_prots, api_key=0, column = 'assembly_acc',
+    ncbi_column='Assembly Accession', database="assembly", output_path = '',
+    verbose=True, remove = False, spacer = '\t\t'
+    ):
+
+    count, failed = 0, []
+
+# for each row in the assembly, grab the accession number, form the search term for Entrez, use Entrez,
+    if ncbi_column in {'assembly', 'genome', 'uid'}:
+        out_df = ncbi_df[ncbi_df.index.isin(set(ass_prots.keys()))]
+        ncbi_df = ncbi_df[~ncbi_df.index.isin(set(ass_prots.keys()))]
+    for accession, row in ncbi_df.iterrows():
+        if accession in ass_prots: # add all rows that have indices associated with this
+            # query type
+            out_df = pd.concat([out_df, row.to_frame().T])
+            icount = 1
+            test = str(accession) + '_' + str(icount)
+            while test in ass_prots:
+                count += 1
+    #                row['assembly_acc'] = ass_prots[test]['genome_id']
+                if 'ome' in row.keys():
+                    row['ome'] = None # haven't assigned a mycotools ID yet
+                out_df = pd.concat([out_df, row.to_frame().T])
+                sys.exit()
+                test = str(accession) + '_' + str(icount)
+            continue
+
+        elif pd.isnull(row[column]) or not row[column]: # ignore blank entries
+            ass_prots[str(accession)] = {
+                'assembly_acc': accession, 'fna': '',
+                'faa': '', 'gff3': '', 'transcript': '',
+                'fna_md5': '', 'faa_md5': '',
+                'gff3_md5': '', 'transcript_md5': '', 'genome_id': '',
+                'genus': '', 'species': '', 'strain': ''
+                }
+            failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+            continue
+
+        if ncbi_column not in {'uid'}: # we already have the uid, no worries
+            genome_id = esearch_ncbi(accession, ncbi_column, database = 'assembly')
+        else:
+            genome_id = [accession]
+
+        if not genome_id: # No IDs retrieved
+            if 'ome' in row.keys():
+                accession = row['ome']
+            eprint(spacer + '\t' + accession + ' failed to find genome ID', flush = True)
+            try:
+                failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+            except TypeError: # if the row can't be formatted as a date
+                failed.append([accession, row['version']])
+            continue
+
+        if ncbi_column in {'Assembly Accession', 'assembly', 
+                           'genome', 'uid'}: # be confident it is the most
+        # recent assembly UID
+            genome_id = [str(max([int(i) for i in genome_id]))]
+
+        icount = 0
+        for ID in genome_id:
+            if icount:
+                new_acc = str(accession) + '$' + str(icount)
+            else:
+                new_acc = accession
+# obtain the path from a summary of the ftp directory and create the standard paths for proteomes and assemblies
+            ass_prots[str(new_acc)] = {
+                'assembly_acc': accession, 'fna': '', 'faa': '', 
+                'gff3': '', 'transcript': '', 'fna_md5': '',
+                'faa_md5': '', 'gff3_md5': '', 
+                'transcript_md5': '', 'genome_id': ID,
+                'genus': '', 'species': '', 'strain': ''
+                }
+
+            record = esummary_ncbi(ID, database)
+            record_info = record['DocumentSummarySet']['DocumentSummary'][0]
+            assemblyID = record_info['AssemblyAccession']
+            org = record_info['Organism'].split()
+            genus = org[0]
+            if len(org) > 2:
+                species = org[1]
+                strain = ''.join(org[2:])
+            elif len(org) == 2:
+                species = org[1]
+                strain = ''
+            else:
+                species = 'sp.'
+                strain = ''
+            
+            ftp_path = str(record_info['FtpPath_GenBank'])
+
+            if not ftp_path:
+                eprint(spacer + '\t' + new_acc + ' failed to return any FTP path', flush = True)
+                try:
+                    failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+                except TypeError:
+                    failed.append([accession, str(row['version'])])
+                continue
+
+            esc_count = 0
+            ass_md5, gff_md5, trans_md5, prot_md5, md5s = '', '', '', '', {}
+            basename = os.path.basename(ftp_path)
+
+            dwnld = 0
+            for attempt in range(3):
+                try:
+                    r = requests.head(ftp_path.replace('ftp://', 'https://'),
+                                      allow_redirects = True)
+                    break
+                except:
+                    time.sleep(1)
+            
+            if r.status_code != 200:
+                dwnld = -1
+            else:
+                md5_path = ftp_path.replace('ftp://', 'https://') + '/md5checksums.txt'
+    
+                dwnld = subprocess.call(['curl', md5_path, '-o', 
+                                        output_path + '.tmpmd5',
+                                        '--connect-timeout', '5'],
+                                        stdout = subprocess.PIPE, 
+                                        stderr = subprocess.PIPE)
+    
+                count += 1
+            if dwnld == 0:
+                with open(output_path + '.tmpmd5', 'r') as raw:
+                    for line in raw:
+                        data = line.rstrip().split('  ')
+                        if data:
+                            md5s[ftp_path + '/' + os.path.basename(data[1])] = data[0]
+            else:
+                md5s = {}
+
+            tranname = os.path.basename(ftp_path.replace('/GCA','/GCF'))
+  #          tranname = os.path.basename(ftp_path)
+            assembly = ftp_path + '/' + basename + '_genomic.fna.gz'
+            if assembly in md5s:
+                ass_md5 = md5s[assembly]
+            else:
+                assembly = ''
+            proteome = ftp_path + '/' + basename + '_protein.faa.gz'
+            if proteome in md5s:
+                prot_md5 = md5s[proteome]
+            else:
+                proteome = ''
+            gff3 = ftp_path + '/' + basename + '_genomic.gff3.gz'
+            test_gff3 = re.sub( r'\.gff3\.gz$', '.gff.gz', gff3 )
+            if gff3 in md5s:
+                gff_md5 = md5s[gff3]
+            elif test_gff3 in md5s:
+                gff3 = test_gff3
+                gff_md5 = md5s[gff3]
+            else:
+                gff3 = ''
+    
+            transcript = ftp_path.replace('/GCA', '/GCF') + '/' + tranname + '_rna.fna.gz'
+ #           transcript = f'{ftp_path}/{tranname}_rna.fna.gz'
+            if transcript in md5s:
+                trans_md5 = md5s[transcript]
+    
+            if (not assembly or not gff3) and remove:
+                try:
+                    failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
+                except TypeError:
+                    failed.append([accession, datetime.strftime(datetime.now(), '%Y%m%d')])
+    
+            log_editor( 
+                output_path + 'ncbiDwnld.log', str(new_acc), 
+                str(accession) + '\t' + accession + '\t' +  assembly + '\t' + \
+                proteome + '\t' + gff3 + '\t' + transcript + '\t' + \
+                ass_md5 + '\t' + prot_md5 + '\t' + gff_md5 + '\t' + trans_md5 + \
+                '\t' + ID + f'\t{genus}\t{species}\t{strain}'
+                )
+            ass_prots[str(new_acc)] = {
+                'assembly_acc': accession, 'fna': assembly, 'fna_md5': ass_md5,
+                'faa': proteome, 'faa_md5': prot_md5,
+                'gff3': gff3, 'gff3_md5': gff_md5,
+                'transcript': transcript, 'transcript_md5': trans_md5,
+                'genome_id': ID,
+                'genus': genus, 'species': species, 'strain': strain
+                }
+            row['dwnld_id'] = ID
+            if icount:
+                if 'ome' in row:
+                    row['ome'] = None
+            out_df = pd.concat([out_df, row.to_frame().T])
+            icount += 1
+    
+    # if no API key is used, we can only generate 3 queries per second, otherwise we can use 10
+            count = wait_for_ncbi(count, api_key)
+    
+    return ass_prots, failed, out_df
+
+
 
 # collects paths to download proteomes and assemblies
 def collect_ftps(
@@ -356,7 +520,6 @@ def collect_ftps(
                 'transcript': transcript, 'transcript_md5': trans_md5,
                 'genome_id': ID,
                 'genus': genus, 'species': species, 'strain': strain
-
                 }
             row['dwnld_id'] = ID
             if icount:
@@ -401,11 +564,13 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
             md5 = md5_find[0]
 
             if md5 == acc_prots[file_type + '_md5']:
-                eprint(spacer + '\t' + file_type + ': ' + os.path.basename(file_path), flush = True)
+                eprint(f'{spacer}\t{file_type}: {os.path.basename(file_path)}', 
+                       flush = True)
                 dwnlds[file_type] = 0
                 continue
         elif os.path.isfile(file_path[:-3]):
-            eprint(spacer + '\t' + file_type + ': ' + os.path.basename(file_path), flush = True)
+            eprint(f'{spacer}\t{file_type}: {os.path.basename(file_path)}', 
+                   flush = True)
             dwnlds[file_type] = 0
             continue
 
@@ -427,27 +592,8 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
                 time.sleep(1)
                 count = 0
                 
-#            try:
-#            esc_count += 1
-#                with closing(urllib.request.urlopen(ftp_link, None, 20)) as r:
- #                   with open(file_path, 'wb') as f:
-  #                      shutil.copyfileobj(r, f)
-#                status_code = 200
-                #    break
-#            except (requests.exceptions.ConnectionError, urllib.error.URLError,
- #                   TimeoutError,
-  #                  requests.exceptions.ChunkedEncodingError) as e:
-#                if esc_count == 3:
- #                   eprint(spacer + '\tERROR: Connection/link failure', flush = True)
-#                    sys.exit(71)
-#                    status_code = 1
-#                    break
- #               time.sleep(1)
-  #              count = 0
-  #      count += 1
-
         if dwnld:
-            eprint(spacer + '\t\tERROR: ' + file_type + ' failed', flush = True)
+            eprint(f'{spacer}\t\tERROR: {file_type} failed', flush = True)
             dwnlds[file_type] = 69
             acc_prots[file_type] = ''
             log_editor(output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
@@ -466,18 +612,18 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
 
         if not os.path.isfile(file_path):
             dwnlds[file_type] = 1
-            eprint(spacer + '\t\tERROR: ' + file_type + ' missing', flush = True)
+            eprint(f'{spacer}\t\tERROR: {file_type} missing', flush = True)
             if remove and file_type in {'fna', 'gff3'}:
                 break
         else:
             dwnlds[file_type] = 0
             if os.stat(file_path).st_size < 150:
-                eprint(spacer + '\t' + file_type + ': ERROR, file too small', flush = True)
-#                       print('\t' + acc + '\t' + file_type + ' empty', flush = True)
+                eprint(f'{spacer}\t{file_type}: ERROR, file too small', flush = True)
                 dwnlds[file_type] = 420
                 if remove and file_type in {'fna', 'gff3'}:
                     break
-        eprint(spacer + '\t' + file_type + ': ' + os.path.basename(file_path), flush = True)
+        eprint(f'{spacer}\t{file_type}: {os.path.basename(file_path)}', 
+               flush = True)
 
     return dwnlds, count
 
@@ -573,7 +719,7 @@ def main(
 
     # check if ncbi_df is a dataframe, and import if not
     if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
-        ncbi_df = db2df(ncbi_df)
+        ncbi_df = ncbidb2df(ncbi_df)
     if len(ncbi_df.index) == 0:
         ncbi_df = pd.DataFrame(
             {i: [v] for i, v in enumerate(list(ncbi_df.keys()))}
@@ -656,7 +802,7 @@ def main(
     return new_df, failed
 
 
-def getSRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
+def get_SRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
 
     handle = Entrez.esearch(db='SRA', term=assembly_acc)
     ids = Entrez.read(handle)['IdList']
@@ -729,7 +875,7 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
 
     for i, row in df.iterrows():
         print('\t' + row[row_key], flush = True)
-        getSRA(row[row_key], fastqdump[0])
+        get_SRA(row[row_key], fastqdump[0])
         count +=1
         if count >= 10:
             time.sleep(1)
@@ -737,7 +883,9 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
 
 
 def cli():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description = 'GenBank downloading utility. Downloads ' \
+                    + 'accession by accession, files without MD5s are excluded')
     parser.add_argument('-i', '--input', required = True, \
     help = 'Space delimited accession; tab delimited file with -c')
     parser.add_argument('-a', '--assembly', action = 'store_true')
