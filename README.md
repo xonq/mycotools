@@ -1,16 +1,14 @@
 <p align="center">
     <img
-        src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/pictogo.white.png"
+        src="https://github.com/xonq/mycotools/blob/master/misc/pictogo.white.png"
     >
 </p>
-
 <br /><br />
 
-# NOTE
-This software is a beta release - kindly raise an issue for errors.
-
 # PURPOSE
-Bring broadscale comparative genomics to the masses. 
+Bring broadscale comparative genomics to the masses. Operational with
+prokaryote and fungal genome data - generalized taxonomy-agnostic integration
+on the way.
 
 Mycotools is a compilation of computational biology tools and database
 ([MycotoolsDB/MTDB](https://github.com/xonq/mycotools/wiki/MycotoolsDB)) software
@@ -26,9 +24,15 @@ assimilates NCBI and MycoCosm (Joint Genome Institute) genomes into a database s
 
 <p align="center">
     <img
-        src="https://gitlab.com/xonq/mycotools/-/raw/master/misc/mtdb.png"
+        src="https://github.com/xonq/mycotools/blob/master/misc/mtdb.png"
     >
 </p>
+
+<br />
+
+# INSTALL
+
+Please review the [wiki](https://github.com/xonq/mycotools/wiki/Install) for installation and usage information!
 
 <br />
 
@@ -42,8 +46,4 @@ Comparative Genomics. bioRxiv 2023.09.08.556886; doi: https://doi.org/10.1101/20
 
 ---
 
-<br />
 
-# INSTALL
-
-Please review the [wiki](https://github.com/xonq/mycotools/wiki/Install) for installation and usage information!

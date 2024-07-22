@@ -468,8 +468,13 @@ def collect_ftps(
                 with open(output_path + '.tmpmd5', 'r') as raw:
                     for line in raw:
                         data = line.rstrip().split('  ')
-                        if data:
-                            md5s[ftp_path + '/' + os.path.basename(data[1])] = data[0]
+#                        data = line.rstrip().split()
+                        if data and len(data) == 2:
+                            try:
+                                md5s[ftp_path + '/' + os.path.basename(data[1])] = data[0]
+                            except IndexError: # 404 error or something else
+                                md5s = {}
+                                break
             else:
                 md5s = {}
 

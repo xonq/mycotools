@@ -114,17 +114,21 @@
 ### ncbiDwnld
 - [ ] db check to ensure log is relevant to input
 - [ ] convert downloading to NCBI datasets
+- [ ] add strain parsing from within GenBank records for entries that don't
+  have an obvious strain entry
 
 ### predb2mtdb
 - [ ] source to reference the annotation source/project name
 - [ ] *integrate prokka/bakta*
 - [ ] error check FAA
 - [ ] allow for just assembly accession in known sources
+- [ ] allow inputting GBK
 
 ### update_mtdb
 - [x] optimize dereplication, currently too slow
 - [x] initial JGI predb2mtdb fails because assemblyPath doesn't exist as a
   column, but restarts are fine
+- [ ] allow updating from Predb.tsv immediately
 - [ ] update introduction output
 - [ ] need a verbose option
 - [ ] reversion option
@@ -149,6 +153,6 @@
 - [ ] sp. will also not dereplicate
 - [ ] make add option check for overwriting entries (indicating incorrect PREDB
   linkage)
-- [ ] ensure `-t` overlloks non-JGI/NCBI sources
+- [ ] ensure `-t` overlooks non-JGI/NCBI sources
 - [ ] ensure assembly accessions from non-JGI/NCBI sources are not included in
   download

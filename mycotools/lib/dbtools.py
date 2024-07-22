@@ -150,6 +150,12 @@ class mtdb(dict):
                             output[ome][file_type] = output[ome][file_type].replace(
                                 abb_paths[file_type][0] + ome + abb_paths[file_type][1], ''
                                 ) # abbreviate when possible
+                    for rank in ['species', 'genus', 'strain']:
+                        try:
+                            del output[ome]['taxonomy'][rank]
+                        except KeyError:
+                            pass
+
                     if output[ome]['taxonomy']:
                         output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                     else:
@@ -749,7 +755,7 @@ def assimilate_tax(db, tax_dicts, ome_index = 'ome',
         return mtdb(db), tax_dicts
     else:
         for i, row in db.iterrows():
-            db.at[i, 'taxonomy'] = tax_dicts[genus]
+            db.at[i, 'taxonomy'] = tax_dicts[row['genus']]
 
     return db, tax_dicts
 

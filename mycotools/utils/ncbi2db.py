@@ -117,10 +117,14 @@ def main(
             if failure in prev_omes:
                 if failed_dict[failure]['version']:
                     version = ncbi_df['version'][failure]
-                    prev_version = datetime.strptime(
-                        failed_dict[failure]['version'], '%Y%m%d'
-                        )
-                    if not version > prev_version:
+                    try:
+                        prev_version = datetime.strptime(
+                            failed_dict[failure]['version'], '%Y%m%d'
+                            )
+                        if not version > prev_version:
+                            todel.append(failure)
+                    except ValueError: # if there isnt a date version in the
+                    # failed log
                         todel.append(failure)
         for i in todel:
             ncbi_df = ncbi_df.drop(i)

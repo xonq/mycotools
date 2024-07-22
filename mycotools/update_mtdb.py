@@ -742,11 +742,12 @@ def ref_update(
         new_db = pd.concat([new_db, ncbi_db])
 
     print('\nAssimilating NCBI taxonomy data', flush = True)
+    new_mtdb = mtdb.pd2mtdb(new_db)
+
     if kingdom.lower() == 'fungi':
         rank = 'kingdom'
     else:
         rank = 'superkingdom'
-
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
@@ -759,18 +760,17 @@ def ref_update(
         eprint('\nNo updates', flush = True)
         sys.exit(0)
 
-    if not taxonomy: #already completed
-        tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
+    if taxonomy: #already completed
+        tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
-        new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
+        new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
         dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
     
         for ome, row in update_mtdb.items():
             if row['genus'] in genus_dicts:
-                print(genus_dicts[row['genus']])
                 row['taxonomy'] = genus_dicts[row['genus']]
     
-    return new_db, update_mtdb 
+    return new_mtdb, update_mtdb 
 
 
 def extract_constraint_lineages(df, ncbi_api, kingdom,
@@ -999,7 +999,7 @@ def rogue_update(
         new_db = db
         new_dups = duplicates
 
-    print('\nAssimilating NCBI (10 download/minute w/API key, 3 w/o)', flush = True)
+    print('\nAssimilating NCBI (10 download/second w/API key, 3 w/o)', flush = True)
     new_db['version'] = new_db['version'].astype(str)
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
 #    if not os.path.isfile(update_path + date + '.ncbi.predb'):
@@ -1054,15 +1054,17 @@ def rogue_update(
         df2db(ncbi_db, ncbi_db_path)
         new_db = pd.concat([new_db, ncbi_db])
 
+    new_mtdb = mtdb.pd2mtdb(new_db)
+
     print('\nAssimilating NCBI taxonomy data', flush = True)
     if kingdom.lower() == 'fungi':
         rank = 'kingdom'
     else:
         rank = 'superkingdom'
-    tax_dicts = gather_taxonomy(new_db, api_key = ncbi_api, 
+    tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
                                 king=kingdom, rank = rank)
-    new_db, genus_dicts = assimilate_tax(new_db, tax_dicts) 
-    dupFiles = { 'fna': {}, 'faa': {}, 'gff3': {} }
+    new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
+    dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb({**jgi_mtdb.set_index(), **ncbi_mtdb.set_index()}, 
@@ -1075,7 +1077,7 @@ def rogue_update(
         eprint('\nNo updates', flush = True)
         sys.exit(0)
 
-    return new_db, update_mtdb 
+    return new_mtdb, update_mtdb 
 
 
 def rm_raw_data(out_dir):
@@ -1109,25 +1111,37 @@ def gen_algn_db(update_path, omes):
      #   + date + '_mmseqsdb.sh')
   
 
-def check_add_mtdb(orig_mtdb, add_mtdb, update_path):
+def check_add_mtdb(orig_mtdb, add_mtdb, update_path, overwrite = True):
     """Check the original MTDB for overlapping omes and curate if necessary"""
     orig_mtdb = orig_mtdb.set_index()
     add_mtdb = add_mtdb.set_index()
+    orig_aa2ome = {v['assembly_acc']: k for k, v in orig_mtdb.items()}
 
+#    failed_aas = []
+    overwrite_omes = []
+    for assembly_acc, row in add_mtdb.items():
+        if assembly_acc in orig_aa2ome:
+ #           failed_aas.append(assembly_acc)
+            if overwrite:
+                overwrite_omes.append(orig_aa2ome[assembly_acc])
+            else:
+                overwrite_omes.append(row['ome'])
+
+#    if failed_aas:
+    if overwrite:
+        for ome in overwrite_omes:
+            del orig_mtdb[ome]
+    else:
+        for ome in overwrite_omes:
+            del add_mtdb[ome]
+#        eprint('\nERROR: assembly accessions ("assembly_acc") must be ' \
+ #              'unique between databases: ', flush = True)
+  #      eprint(', '.join(failed_aas), flush = True)
+   #     sys.exit(123)
+        
     orig_omes = set(orig_mtdb.keys())
     new_omes = set(add_mtdb.keys())
-    orig_aas = set(v['assembly_acc'] for k, v in orig_mtdb.items())
     inter_omes = orig_omes.intersection(new_omes)
-
-    failed_aas = []
-    for assembly_acc in add_mtdb.reset_index()['assembly_acc']:
-        if assembly_acc in orig_aas:
-            failed_aas.append(assembly_acc)
-    if failed_aas:
-        eprint('\nERROR: assembly accessions ("assembly_acc") must be ' \
-               'unique between databases: ', flush = True)
-        eprint(', '.join(failed_aas), flush = True)
-        sys.exit(123)
 
     # if there are overlapping omes between the addition MTDB and existing
     if inter_omes:
@@ -1259,7 +1273,7 @@ def control_flow(init, update, reference, add, taxonomy,
                  predb, save, nonpublished,
                  ncbi_only, lineage, rank, prokaryote, failed,
                  forbidden, resume, no_md5, cpu, ncbi_email = False,
-                 ncbi_api = None):
+                 ncbi_api = None, overwrite = True):
 
     if not init \
         and not update \
@@ -1482,7 +1496,7 @@ def control_flow(init, update, reference, add, taxonomy,
         tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
                                     king=king, rank = rank)
         addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
-        addDB = check_add_mtdb(orig_mtdb, addDB, update_path)
+        addDB = check_add_mtdb(orig_mtdb, addDB, update_path, overwrite)
 
         write_forbid_omes(set(addDB['ome']), format_path('$MYCODB/../log/relics.txt'))
 
@@ -1508,14 +1522,15 @@ def control_flow(init, update, reference, add, taxonomy,
         if any(not x for x in ref_db['published']) and not nonpublished:
             eprint('\nWARNING: nonpublished data detected in reference and will be ignored', 
                    flush = True)
-        new_db, update_mtdb = ref_update(
+        
+        new_mtdb, update_mtdb = ref_update(
             ref_db, update_path, date, failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = cpu, check_MD5 = not bool(no_md5),
             jgi = jgi, group = group, kingdom = king,
-            remove = not save, taxonomy = not taxonomy
+            remove = not save, taxonomy = True
             )
     else:
-        new_db, update_mtdb = rogue_update(
+        new_mtdb, update_mtdb = rogue_update(
             orig_db, update_path, date, failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = cpu, 
             check_MD5 = not bool(no_md5), jgi = jgi, group = group,
@@ -1532,9 +1547,8 @@ def control_flow(init, update, reference, add, taxonomy,
         # output new database and new list of omes
 
         eprint('\nMoving data into database', flush = True)
-        write_forbid_omes(set(new_db['ome']), format_path('$MYCODB/../log/relics.txt'))
+        write_forbid_omes(set(new_mtdb['ome']), format_path('$MYCODB/../log/relics.txt'))
 
-        new_mtdb = mtdb.pd2mtdb(new_db)
         new_path = format_path('$MYCODB/' + date + '.mtdb')
         if format_path(db_path) == new_path:
             shutil.copy(db_path, db_path + '.tmp')
@@ -1554,7 +1568,6 @@ def control_flow(init, update, reference, add, taxonomy,
   #          )
     else:
         # NEED to: insert note aboutrunning updatedb on predb
-        new_mtdb = mtdb.pd2mtdb(new_db)
         new_mtdb.df2db(format_path(update_path + date + '.mtdb'))
         eprint(f'\nUpdate ready for `mtdb u -a` at ' \
             +  f'{format_path(update_path + date + ".mtdb")}')
@@ -1581,6 +1594,8 @@ def main():
     upd_args.add_argument('-a', '--add', help = '.mtdb with full paths to add to database')
     upd_args.add_argument('-t', '--taxonomy', action = 'store_true',
         help = 'Update taxonomy and exit')
+    upd_args.add_argument('-k', '--keep', action = 'store_true',
+        help = '[-a] Keep original MTDB data when adding overlapping accessions')
     upd_args.add_argument('--save', action = 'store_true', 
         help = '[-u] Do not integrate/delete new data; -a to complete')
 
@@ -1611,8 +1626,6 @@ def main():
     run_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
     run_args.add_argument('--no_md5', action = 'store_true', help = 'Skip NCBI MD5'
         + ' (expedite large reruns)')
-#    run_args.add_argument('--overwrite', action = 'store_true',
-#        help = 'Remove entries that violate new MTDB parameters')
     run_args.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 
@@ -1630,7 +1643,7 @@ def main():
                  args.predb, args.save, args.nonpublished,
                  args.ncbi_only, args.lineage, args.rank, args.prokaryote, args.failed,
                  args.forbidden, args.resume, args.no_md5, args.cpu, 
-                 ncbi_email = None)
+                 ncbi_email = None, overwrite = not args.keep)
 
     outro(start_time)
 
