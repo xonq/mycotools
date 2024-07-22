@@ -12,6 +12,8 @@
 - [ ] configuration to output mtdb name + date in output directory
 - [ ] discuss multigene phylo pipeline
 - [x] discuss db2hgs
+- [ ] uniform argument parser
+- [ ] allow for inputting multiple DBs with full paths
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
