@@ -25,6 +25,7 @@ import argparse
 import subprocess
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from Bio import Entrez
 from datetime import datetime
 from collections import defaultdict
@@ -474,7 +475,7 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, jgi2ncbi, fails = set(), api = 3):
                  for k, v in mycocosm_df.iterrows()}
     jgi_gen_sp = {f"{v['genus']}_{v['species']}" \
                  for k, v in mycocosm_df.iterrows()}
-    for i, row in ncbi_df.iterrows():
+    for i, row in tqdm(ncbi_df.iterrows(), total = len(ncbi_df)):
         if row['assembly_acc'] in ncbi2jgi:
             jgi2biosample[ncbi2jgi[row['assembly_acc']]] = \
                 row['BioSample Accession']
