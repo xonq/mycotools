@@ -631,7 +631,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
 
     count += 1
     if not ids:
-        print('\t\tTaxID acquisition failed', flush = True)
+        eprint(f'\t\t{genus} TaxID acquisition failed', flush = True)
         return None, count 
 
     # for each taxID acquired, fetch the actual taxonomy information
