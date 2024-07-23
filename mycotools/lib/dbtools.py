@@ -12,6 +12,7 @@ import base64
 import urllib
 import getpass
 import datetime
+from tqdm import tqdm
 from Bio import Entrez
 from io import StringIO
 from collections import defaultdict
@@ -677,7 +678,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
             taxid = tax 
    
     if taxid == 0:
-        print(f'\t\tNo taxon matches {king}', flush = True)
+        eprint(f'\t\t{genus} not recovered in {king}', flush = True)
         return None, count 
 
     # for each taxonomic classification, add it to the taxonomy dictionary string
@@ -696,8 +697,7 @@ def gather_taxonomy(df, api_key = None, king='fungi',
     need_tax, tax_dicts = prepare_tax_dicts(df, tax_dicts)
 
     count = 0
-    for genus in sorted(need_tax):
-        print('\t' + genus, flush = True)
+    for genus in tqdm(sorted(need_tax), total = len(need_tax)):
         # if there is no api key, sleep for a second after 3 queries
         # if there is an api key, sleep for a second after 10 queries
         if not api_key and count >= 2:
