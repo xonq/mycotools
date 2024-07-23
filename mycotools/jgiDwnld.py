@@ -16,6 +16,7 @@ import argparse
 import subprocess
 import pandas as pd
 import xml.etree.ElementTree as ET
+from tqdm import tqdm
 from mycotools.lib.kontools import eprint, format_path, outro, intro
 from mycotools.lib.dbtools import loginCheck
 
@@ -499,7 +500,7 @@ def main(
 # perhaps add a counter here, but one that checks if it is actually querying jgi
     print('\nRetrieving `xml` directories', flush = True)
     ome_set, count = set(), 0
-    for i,row in df.iterrows():
+    for i, row in tqdm(df.iterrows(), total = len(df)):
         error_check, attempt = True, 0
         while error_check != -1 and attempt < 3:
             attempt += 1
@@ -516,7 +517,8 @@ def main(
                 flush = True)
             ome_set.add(row[ome_col])
     
-    eprint(spacer + 'Downloading JGI files\n\tMaximum rate: 1 file/min' , flush = True)
+    eprint(f'{spacer}Downloading {len(df)} JGI files\n\t' \
+          + 'Maximum rate: 1 file/min' , flush = True)
     
     dwnlds = []
     if assembly:

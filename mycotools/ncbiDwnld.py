@@ -18,6 +18,7 @@ import subprocess
 import numpy as np
 import pandas as pd
 from contextlib import closing
+from tqdm import tqdm
 from Bio import Entrez
 from datetime import datetime
 from mycotools.lib.kontools import intro, outro, format_path, prep_output, eprint, vprint, findExecs
@@ -68,7 +69,7 @@ def prepare_folders(output_path, gff, prot, assem, transcript):
 
 def compile_log(output_path, remove = False):
 
-    ass_prots = {}
+    acc2log = {}
     if not os.path.isfile( output_path + 'ncbiDwnld.log' ):
         with open( output_path + 'ncbiDwnld.log', 'w' ) as out:
             out.write('#ome\tassembly_acc\tassembly\tproteome\tgff3\ttranscript\t' + \
@@ -83,7 +84,7 @@ def compile_log(output_path, remove = False):
                     data = [x.rstrip() for x in line.split('\t')]
                     while len(data) < 13:
                         data.append('')
-                    ass_prots[data[0]] = { 
+                    acc2log[data[0]] = { 
                         'assembly_acc': str(data[1]), 'fna': str(data[2]), 
                         'faa': str(data[3]), 'gff3': str(data[4]), 
                         'transcript': str(data[5]), 'fna_md5': str(data[6]),
@@ -93,7 +94,7 @@ def compile_log(output_path, remove = False):
                         'strain': str(data[13])
                         }
 
-    return ass_prots
+    return acc2log
 
 def wait_for_ncbi(count, api = False):
     if count >= 2:
@@ -147,7 +148,7 @@ def esummary_ncbi(ID, database):
 
 # collects paths to download proteomes and assemblies
 def collect_ftps(
-    ncbi_df, ass_prots, api_key=0, column = 'assembly_acc',
+    ncbi_df, acc2log, api_key=0, column = 'assembly_acc',
     ncbi_column='Assembly Accession', database="assembly", output_path = '',
     verbose=True, remove = False, spacer = '\t\t'
     ):
@@ -156,17 +157,17 @@ def collect_ftps(
 
 # for each row in the assembly, grab the accession number, form the search term for Entrez, use Entrez,
     if ncbi_column in {'assembly', 'genome', 'uid'}:
-        out_df = ncbi_df[ncbi_df.index.isin(set(ass_prots.keys()))]
-        ncbi_df = ncbi_df[~ncbi_df.index.isin(set(ass_prots.keys()))]
-    for accession, row in ncbi_df.iterrows():
-        if accession in ass_prots: # add all rows that have indices associated with this
+        out_df = ncbi_df[ncbi_df.index.isin(set(acc2log.keys()))]
+        ncbi_df = ncbi_df[~ncbi_df.index.isin(set(acc2log.keys()))]
+    for accession, row in tqdm(ncbi_df.iterrows(), total = len(ncbi_df)):
+        if accession in acc2log: # add all rows that have indices associated with this
             # query type
             out_df = pd.concat([out_df, row.to_frame().T])
             icount = 1
             test = str(accession) + '_' + str(icount)
-            while test in ass_prots:
+            while test in acc2log:
                 count += 1
-    #                row['assembly_acc'] = ass_prots[test]['genome_id']
+    #                row['assembly_acc'] = acc2log[test]['genome_id']
                 if 'ome' in row.keys():
                     row['ome'] = None # haven't assigned a mycotools ID yet
                 out_df = pd.concat([out_df, row.to_frame().T])
@@ -175,7 +176,7 @@ def collect_ftps(
             continue
 
         elif pd.isnull(row[column]) or not row[column]: # ignore blank entries
-            ass_prots[str(accession)] = {
+            acc2log[str(accession)] = {
                 'assembly_acc': accession, 'fna': '',
                 'faa': '', 'gff3': '', 'transcript': '',
                 'fna_md5': '', 'faa_md5': '',
@@ -212,7 +213,7 @@ def collect_ftps(
             else:
                 new_acc = accession
 # obtain the path from a summary of the ftp directory and create the standard paths for proteomes and assemblies
-            ass_prots[str(new_acc)] = {
+            acc2log[str(new_acc)] = {
                 'assembly_acc': accession, 'fna': '', 'faa': '', 
                 'gff3': '', 'transcript': '', 'fna_md5': '',
                 'faa_md5': '', 'gff3_md5': '', 
@@ -324,7 +325,7 @@ def collect_ftps(
                 ass_md5 + '\t' + prot_md5 + '\t' + gff_md5 + '\t' + trans_md5 + \
                 '\t' + ID + f'\t{genus}\t{species}\t{strain}'
                 )
-            ass_prots[str(new_acc)] = {
+            acc2log[str(new_acc)] = {
                 'assembly_acc': accession, 'fna': assembly, 'fna_md5': ass_md5,
                 'faa': proteome, 'faa_md5': prot_md5,
                 'gff3': gff3, 'gff3_md5': gff_md5,
@@ -342,7 +343,7 @@ def collect_ftps(
     # if no API key is used, we can only generate 3 queries per second, otherwise we can use 10
             count = wait_for_ncbi(count, api_key)
     
-    return ass_prots, failed, out_df
+    return acc2log, failed, out_df
 
 # download the file depending on the type inputted
 def download_files(acc_prots, acc, file_types, output_dir, count,
@@ -526,7 +527,7 @@ def main(
     file_types = prepare_folders( 
         output_path, gff3, proteome, assembly, transcript
         )
-    ass_prots = compile_log(output_path, remove)
+    acc2log = compile_log(output_path, remove)
 
     # check if ncbi_df is a dataframe, and import if not
     if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
@@ -546,24 +547,25 @@ def main(
     ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
     # preserve the original column, but index ncbi_df on it as well
     vprint('\n' + spacer + 'Assembling NCBI ftp directories', v = verbose, flush = True)
-    ass_prots, failed, ncbi_df = collect_ftps( 
-            ncbi_df, ass_prots, remove = remove,
+    acc2log, failed, ncbi_df = collect_ftps( 
+            ncbi_df, acc2log, remove = remove,
             ncbi_column = ncbi_column, column = column, api_key=api,
             output_path = output_path, verbose = verbose,
             spacer = spacer
             )
 
     if remove:
-        ass_prots = { 
-            o: ass_prots[o] for o in ass_prots \
-            if all(ass_prots[o][p] for p in ['fna', 'gff3'])
+        acc2log = { 
+            o: acc2log[o] for o in acc2log \
+            if all(acc2log[o][p] for p in ['fna', 'gff3'])
             }
     new_df = pd.DataFrame()
 
-    vprint('\n' + spacer + 'Downloading NCBI files', v = verbose, flush = True)
+    vprint(f'\n{spacer}Downloading {len(acc2log)} NCBI files', 
+           v = verbose, flush = True)
     count = 0
     if check_MD5:
-        for acc, data in ass_prots.items():
+        for acc, data in acc2log.items():
             eprint(spacer + '\t' + str(acc), flush = True)
             if data:
                 fail, count = dwnld_mngr(
@@ -574,14 +576,14 @@ def main(
                     failed.append(fail)
                 else:
                     ncbi_df.at[acc, 'assemblyPath'] = output_path + 'fna/' + \
-                        os.path.basename(ass_prots[acc]['fna'])
+                        os.path.basename(acc2log[acc]['fna'])
                     ncbi_df.at[acc, 'faa'] = output_path + 'faa/' + \
-                        os.path.basename(ass_prots[acc]['faa'])
+                        os.path.basename(acc2log[acc]['faa'])
                     ncbi_df.at[acc, 'gffPath'] = output_path + 'gff3/' + \
-                        os.path.basename(ass_prots[acc]['gff3'])
-                    ncbi_df.at[acc, 'genus'] = ass_prots[acc]['genus']
-                    ncbi_df.at[acc, 'species'] = ass_prots[acc]['species']
-                    ncbi_df.at[acc, 'strain'] = ass_prots[acc]['strain']
+                        os.path.basename(acc2log[acc]['gff3'])
+                    ncbi_df.at[acc, 'genus'] = acc2log[acc]['genus']
+                    ncbi_df.at[acc, 'species'] = acc2log[acc]['species']
+                    ncbi_df.at[acc, 'strain'] = acc2log[acc]['strain']
                     new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
             else:
                 check = ncbi_df[ncbi_df[column] == acc[:acc.find('$')]]
@@ -591,7 +593,7 @@ def main(
                 failed.append([acc, db_vers])
     else: # there is no checking md5, this is for efficient, so make it
     # efficient by avoiding conditional expressions
-        for acc, data in ass_prots.items():
+        for acc, data in acc2log.items():
             eprint(spacer + '\t' + str(acc), flush = True)
             fail, count = dwnld_mngr_no_MD5(
                 ncbi_df, data, acc, file_types, output_path, 
