@@ -68,6 +68,61 @@ def reverse_complement(seq):
 
     return new_seq
 
+def fq2dict(fastq_input): #file_ = True):
+    fastq_dict = {}
+    if fastq_input.endswith(('.gz', '.gzip')):
+        with gzip.open(fastq_input, 'rt') as raw:
+            for line in raw:
+                data = line.rstrip()
+                if data.startswith('@'):
+                    header = data[1:].split(' ')
+                    seq_name = header[0]
+                    fastq_dict[seq_name] = {'sequence': '', 
+                                             'description': ' '.join(header[1:]),
+                                             'score': ''}
+                    append_seq = 'sequence'
+                elif data == '+':
+                    append_seq = 'score'
+                else:
+                    fastq_dict[seq_name][append_seq] += data
+    else:
+        with open(fastq_input, 'r') as raw:
+            for line in raw:
+                data = line.rstrip()
+                if data.startswith('@'):
+                    header = data[1:].split(' ')
+                    seq_name = header[0]
+                    fastq_dict[seq_name] = {'sequence': '', 
+                                             'description': ' '.join(header[1:]),
+                                             'score': ''}
+                    append_seq = 'sequence'
+                elif data == '+':
+                    append_seq = 'score'
+                else:
+                    fastq_dict[seq_name][append_seq] += data
+    return fastq_dict
+
+def dict2fq(fastq_dict, description = True):
+    """Convert a fastq dictionary to a fastq string"""
+    fastq_string = ''
+    if description:
+        for seq in fastq_dict:
+            fastq_string += '>' + seq.rstrip()
+            if 'description' in fastq_dict[seq]:
+                fastq_string += (' ' + fastq_dict[seq]['description']).rstrip() + '\n'
+            else:
+                fastq_string += '\n'
+            fastq_string += fastq_dict[seq]['sequence'].rstrip() + '\n+\n' \
+                          + fastq_dict[seq]['score'].rstrip() + '\n'
+
+    else:
+        for seq in fastq_dict:
+            fastq_string += '>' + seq.rstrip() + '\n' \
+                + fastq_dict[seq]['sequence'].rstrip() + '\n+\n' \
+                + fastq_dict[seq]['score'].rstrip() + '\n'
+
+    return fastq_string
+
 
 def fa2dict(fasta_input): #file_ = True):
     fasta_dict = {}
