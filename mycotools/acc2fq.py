@@ -52,7 +52,7 @@ def acc2fq(fq_path, accs):
                             append_seq = 'sequence'
                             accs.remove(seq_name)
                 elif parse:
-                    if data == '+':
+                    if data == '+' and append_seq != 'score':
                         append_seq = 'score'
                     else:
                         fq_dict[seq_name][append_seq] += data
@@ -87,7 +87,7 @@ def acc2fq(fq_path, accs):
                             append_seq = 'sequence'
                             accs.remove(seq_name)
                 elif parse:
-                    if data == '+':
+                    if data == '+' and append_seq != 'score':
                         append_seq = 'score'
                     else:
                         fq_dict[seq_name][append_seq] += data
