@@ -120,7 +120,7 @@
 ### predb2mtdb
 - [ ] source to reference the annotation source/project name
 - [ ] *integrate prokka/bakta*
-- [ ] error check FAA
+- [x] error check FAA
 - [ ] allow for just assembly accession in known sources
 - [ ] allow inputting GBK
 
@@ -156,3 +156,5 @@
 - [ ] ensure `-t` overlooks non-JGI/NCBI sources
 - [ ] ensure assembly accessions from non-JGI/NCBI sources are not included in
   download
+- [ ] still use a redundancy check when --ncbi_only is specified, or prevent
+  changing between NCBI only and non-ncbi database
