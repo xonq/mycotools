@@ -469,6 +469,10 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
         try:
             faa = gff2seq(gff2list(cur_gff_path), fa2dict(cur_fna_path),
                           spacer = spacer)
+            # raise a value error if there is not a sequence for all predicted
+            # CDSs
+            if not all(v['sequence'] for k, v in faa):
+                raise ValueError
         except Exception as e: # catch all errors
             eprint(spacer + ome + '|' + assembly_accession \
                  + ' failed proteome generation', flush  = True)
