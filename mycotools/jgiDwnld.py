@@ -114,7 +114,8 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
 
     ft2fn = {'fna$masked': ['masked', 'Genome Assembly (masked)'], 
              'fna$unmasked': ['AssembledScaffolds', 'scaffolds',
-                              'Genome Assembly (unmasked)'],
+                              'Genome Assembly (unmasked)',
+                              'AssemblyScaffolds'],
              'gff3': ['GeneCatalog', 'FilteredModels'],
              'transcripts': ['transcripts'],
              'est': ['EST']}
@@ -131,6 +132,7 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
     root = tree.getroot()
     flip = True
     org_name = None
+    has_flipped = False
 
     # flip is a way to rerun the loop if the file type changes (e.g. from
     # masked to unmasked); parse through the XML hiearchy in accord with the
@@ -197,10 +199,16 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
         # vice versa
         if not url and ft == 'fna$masked':
             ft = 'fna$unmasked'
-            flip = False
+            if not has_flipped:
+                flip = True 
+            else:
+                flip = False
         elif not url and ft == 'fna$unmasked':
             ft = 'fna$masked'
-            flip = False
+            if not has_flipped:
+                flip = True
+            else:
+                flip = False
         else:
             break
 
