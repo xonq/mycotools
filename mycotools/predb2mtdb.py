@@ -471,7 +471,7 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
                           spacer = spacer)
             # raise a value error if there is not a sequence for all predicted
             # CDSs
-            if not all(v['sequence'] for k, v in faa):
+            if not all(v['sequence'] for k, v in faa.items()):
                 raise ValueError
         except Exception as e: # catch all errors
             eprint(spacer + ome + '|' + assembly_accession \
