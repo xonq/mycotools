@@ -154,7 +154,7 @@ class mtdb(dict):
                     for rank in ['species', 'genus', 'strain']:
                         try:
                             del output[ome]['taxonomy'][rank]
-                        except KeyError:
+                        except (KeyError, TypeError) as e:
                             pass
 
                     if output[ome]['taxonomy']:
@@ -182,7 +182,7 @@ class mtdb(dict):
                 for rank in ['species', 'genus', 'strain']:
                     try:
                         del output[ome]['taxonomy'][rank]
-                    except KeyError:
+                    except (KeyError, TypeError) as e:
                         pass
                 output[ome]['taxonomy'] = json.dumps(output[ome]['taxonomy'])
                 print(ome + '\t' + \
