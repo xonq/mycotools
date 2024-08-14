@@ -14,6 +14,7 @@
 - [x] discuss db2hgs
 - [ ] uniform argument parser
 - [ ] allow for inputting multiple DBs with full paths
+- [ ] robust conda update checks
 
 ### crap
 - [ ] *Outgroup manager for clusters that fit within min and maximum sequences*
