@@ -160,6 +160,8 @@ def run_mf(clipkit_files, out_dir, constraint = False,
     cpus_per_cmd = 3
     # determine the concurrent ModelFinder runs that are possible
     concurrent_cmds = round((cpus - 1)/4 - 0.5) # round down
+    if not concurrent_cmds:
+        concurrent_cmds = 1
 
     # prepare a scaffold for each command
     cmds = [['iqtree', '-m', 'MFP+MERGE', '-nt', 'AUTO',
