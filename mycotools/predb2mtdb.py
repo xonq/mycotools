@@ -471,8 +471,12 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
                           spacer = spacer)
             # raise a value error if there is not a sequence for all predicted
             # CDSs
-            if not all(v['sequence'] for k, v in faa.items()):
-                raise ValueError
+            missing_seq = [0 for k, v in faa.items() if not v['sequence']]
+            if faa and len(missing_seq) == len(faa):
+                raise ValueError('no sequences generated in proteome')
+            else:
+                eprint(f'{spacer}\tWARNING: {len(missing_seq)} ' \
+                     +  'CDSs translated blank sequences', flush = True)
         except Exception as e: # catch all errors
             eprint(spacer + ome + '|' + assembly_accession \
                  + ' failed proteome generation', flush  = True)
