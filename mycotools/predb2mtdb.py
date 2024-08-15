@@ -474,7 +474,7 @@ def cur_mngr(ome, raw_fna_path, raw_gff_path, wrk_dir,
             missing_seq = [0 for k, v in faa.items() if not v['sequence']]
             if faa and len(missing_seq) == len(faa):
                 raise ValueError('no sequences generated in proteome')
-            else:
+            elif missing_seq:
                 eprint(f'{spacer}\tWARNING: {len(missing_seq)} ' \
                      +  'CDSs translated blank sequences', flush = True)
         except Exception as e: # catch all errors
