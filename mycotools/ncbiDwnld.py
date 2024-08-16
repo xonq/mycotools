@@ -8,11 +8,11 @@ import os
 import re
 import sys
 import gzip
+import json
 import time
 import shutil
 import urllib
-import urllib.request
-import requests
+import zipfile
 import argparse
 import subprocess
 import numpy as np
@@ -21,8 +21,12 @@ from contextlib import closing
 from tqdm import tqdm
 from Bio import Entrez
 from datetime import datetime
-from mycotools.lib.kontools import intro, outro, format_path, prep_output, eprint, vprint, findExecs
+from mycotools.lib.kontools import intro, outro, format_path, prep_output, \
+                                   mkOutput, eprint, vprint, findExecs, \
+                                   read_json
 from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
+
+pd.options.mode.chained_assignment = None
 
 def ncbidb2df(data, stdin = False):
     import pandas as pd, pandas
@@ -67,32 +71,18 @@ def prepare_folders(output_path, gff, prot, assem, transcript):
     return file_types  
 
 
-def compile_log(output_path, remove = False):
+def compile_log(output_path):
 
     acc2log = {}
-    if not os.path.isfile( output_path + 'ncbiDwnld.log' ):
-        with open( output_path + 'ncbiDwnld.log', 'w' ) as out:
-            out.write('#ome\tassembly_acc\tassembly\tproteome\tgff3\ttranscript\t' + \
-            'fna_md5\tfaa_md5\tgff3_md5\ttrans_md5\tgenome_id(s)\tgenus\tspecies\tstrain')
-
-        # too risky, too many things can go wrong and then users would be in a
-        # loop, but necessary for huge downloads
+    if not os.path.isfile(output_path):
+        with open(output_path, 'w' ) as out:
+            out.write('#acc\tassembly_acc\n')
     else:
-        with open(output_path + 'ncbiDwnld.log', 'r') as raw:
+        with open(output_path, 'r') as raw:
             for line in raw:
                 if not line.startswith('#'):
-                    data = [x.rstrip() for x in line.split('\t')]
-                    while len(data) < 13:
-                        data.append('')
-                    acc2log[data[0]] = { 
-                        'assembly_acc': str(data[1]), 'fna': str(data[2]), 
-                        'faa': str(data[3]), 'gff3': str(data[4]), 
-                        'transcript': str(data[5]), 'fna_md5': str(data[6]),
-                        'faa_md5': str(data[7]), 'gff3_md5': str(data[8]),
-                        'transcript_md5': str(data[9]), 'genome_id': data[10],
-                        'genus': str(data[11]), 'species': str(data[12]),
-                        'strain': str(data[13])
-                        }
+                    data = line.rstrip().split('\t')
+                    acc2log[data[0]] = data[1]
 
     return acc2log
 
@@ -107,7 +97,7 @@ def wait_for_ncbi(count, api = False):
     return count
 
 def esearch_ncbi(accession, column, database = 'assembly'):
-    search_term, esc_count = accession + '[' + column + ']', 0
+    search_term, esc_count = f'{accession}[{column}]', 0
     while esc_count < 3:
         try:
             handle = Entrez.esearch(db=database, term=search_term)
@@ -147,10 +137,10 @@ def esummary_ncbi(ID, database):
 
 
 # collects paths to download proteomes and assemblies
-def collect_ftps(
+def collect_assembly_accs(
     ncbi_df, acc2log, api_key=0, column = 'assembly_acc',
     ncbi_column='Assembly Accession', database="assembly", output_path = '',
-    verbose=True, remove = False, spacer = '\t\t'
+    verbose=True, spacer = '\t\t'
     ):
 
     count, failed = 0, []
@@ -159,6 +149,7 @@ def collect_ftps(
     if ncbi_column in {'assembly', 'genome', 'uid'}:
         out_df = ncbi_df[ncbi_df.index.isin(set(acc2log.keys()))]
         ncbi_df = ncbi_df[~ncbi_df.index.isin(set(acc2log.keys()))]
+        out_df['assembly_acc'] = pd.Series(acc2log)
     for accession, row in tqdm(ncbi_df.iterrows(), total = len(ncbi_df)):
         if accession in acc2log: # add all rows that have indices associated with this
             # query type
@@ -167,22 +158,23 @@ def collect_ftps(
             test = str(accession) + '_' + str(icount)
             while test in acc2log:
                 count += 1
-    #                row['assembly_acc'] = acc2log[test]['genome_id']
                 if 'ome' in row.keys():
                     row['ome'] = None # haven't assigned a mycotools ID yet
                 out_df = pd.concat([out_df, row.to_frame().T])
-                sys.exit()
+#                sys.exit()
                 test = str(accession) + '_' + str(icount)
+            continue
+        elif accession.startswith(('GCA_', 'GCF_')):
+            row['assembly_acc'] = accession
+            out_df = pd.concat([out_df, row.to_frame().T])
+            acc2log[accession] = accession
+            log_editor(output_path + 'ncbiDwnld.log', accession, 
+                       str(accession) + '\t' + accession)
+
             continue
 
         elif pd.isnull(row[column]) or not row[column]: # ignore blank entries
-            acc2log[str(accession)] = {
-                'assembly_acc': accession, 'fna': '',
-                'faa': '', 'gff3': '', 'transcript': '',
-                'fna_md5': '', 'faa_md5': '',
-                'gff3_md5': '', 'transcript_md5': '', 'genome_id': '',
-                'genus': '', 'species': '', 'strain': ''
-                }
+            acc2log[str(accession)] = ''
             failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
             continue
 
@@ -212,307 +204,131 @@ def collect_ftps(
                 new_acc = str(accession) + '$' + str(icount)
             else:
                 new_acc = accession
-# obtain the path from a summary of the ftp directory and create the standard paths for proteomes and assemblies
-            acc2log[str(new_acc)] = {
-                'assembly_acc': accession, 'fna': '', 'faa': '', 
-                'gff3': '', 'transcript': '', 'fna_md5': '',
-                'faa_md5': '', 'gff3_md5': '', 
-                'transcript_md5': '', 'genome_id': ID,
-                'genus': '', 'species': '', 'strain': ''
-                }
 
             record = esummary_ncbi(ID, database)
             record_info = record['DocumentSummarySet']['DocumentSummary'][0]
             assemblyID = record_info['AssemblyAccession']
-            org = record_info['Organism'].split()
-            genus = org[0]
-            if len(org) > 2:
-                species = org[1]
-                strain = ''.join(org[2:])
-            elif len(org) == 2:
-                species = org[1]
-                strain = ''
-            else:
-                species = 'sp.'
-                strain = ''
-            
-            ftp_path = str(record_info['FtpPath_GenBank'])
-
-            if not ftp_path:
-                eprint(spacer + '\t' + new_acc + ' failed to return any FTP path', flush = True)
-                try:
-                    failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
-                except TypeError:
-                    failed.append([accession, str(row['version'])])
-                continue
-
+           
             esc_count = 0
-            ass_md5, gff_md5, trans_md5, prot_md5, md5s = '', '', '', '', {}
-            basename = os.path.basename(ftp_path)
-
-            dwnld = 0
-            for attempt in range(3):
-                try:
-                    r = requests.head(ftp_path.replace('ftp://', 'https://'),
-                                      allow_redirects = True)
-                    break
-                except:
-                    time.sleep(1)
-            
-            if r.status_code != 200:
-                dwnld = -1
-            else:
-                md5_path = ftp_path.replace('ftp://', 'https://') + '/md5checksums.txt'
-    
-                dwnld = subprocess.call(['curl', md5_path, '-o', 
-                                        output_path + '.tmpmd5',
-                                        '--connect-timeout', '5'],
-                                        stdout = subprocess.PIPE, 
-                                        stderr = subprocess.PIPE)
-    
-                count += 1
-            if dwnld == 0:
-                with open(output_path + '.tmpmd5', 'r') as raw:
-                    for line in raw:
-                        data = line.rstrip().split('  ')
-#                        data = line.rstrip().split()
-                        if data and len(data) == 2:
-                            try:
-                                md5s[ftp_path + '/' + os.path.basename(data[1])] = data[0]
-                            except IndexError: # 404 error or something else
-                                md5s = {}
-                                break
-            else:
-                md5s = {}
-
-            tranname = os.path.basename(ftp_path.replace('/GCA','/GCF'))
-  #          tranname = os.path.basename(ftp_path)
-            assembly = ftp_path + '/' + basename + '_genomic.fna.gz'
-            if assembly in md5s:
-                ass_md5 = md5s[assembly]
-            else:
-                assembly = ''
-            proteome = ftp_path + '/' + basename + '_protein.faa.gz'
-            if proteome in md5s:
-                prot_md5 = md5s[proteome]
-            else:
-                proteome = ''
-            gff3 = ftp_path + '/' + basename + '_genomic.gff3.gz'
-            test_gff3 = re.sub( r'\.gff3\.gz$', '.gff.gz', gff3 )
-            if gff3 in md5s:
-                gff_md5 = md5s[gff3]
-            elif test_gff3 in md5s:
-                gff3 = test_gff3
-                gff_md5 = md5s[gff3]
-            else:
-                gff3 = ''
-    
-            transcript = ftp_path.replace('/GCA', '/GCF') + '/' + tranname + '_rna.fna.gz'
- #           transcript = f'{ftp_path}/{tranname}_rna.fna.gz'
-            if transcript in md5s:
-                trans_md5 = md5s[transcript]
-    
-            if (not assembly or not gff3) and remove:
-                try:
-                    failed.append([accession, datetime.strftime(row['version'], '%Y%m%d')])
-                except TypeError:
-                    failed.append([accession, datetime.strftime(datetime.now(), '%Y%m%d')])
-    
-            log_editor( 
-                output_path + 'ncbiDwnld.log', str(new_acc), 
-                str(accession) + '\t' + accession + '\t' +  assembly + '\t' + \
-                proteome + '\t' + gff3 + '\t' + transcript + '\t' + \
-                ass_md5 + '\t' + prot_md5 + '\t' + gff_md5 + '\t' + trans_md5 + \
-                '\t' + ID + f'\t{genus}\t{species}\t{strain}'
-                )
-            acc2log[str(new_acc)] = {
-                'assembly_acc': accession, 'fna': assembly, 'fna_md5': ass_md5,
-                'faa': proteome, 'faa_md5': prot_md5,
-                'gff3': gff3, 'gff3_md5': gff_md5,
-                'transcript': transcript, 'transcript_md5': trans_md5,
-                'genome_id': ID,
-                'genus': genus, 'species': species, 'strain': strain
-                }
-            row['dwnld_id'] = ID
-            if icount:
-                if 'ome' in row:
-                    row['ome'] = None
+            log_editor(output_path + 'ncbiDwnld.log', str(new_acc), 
+                       str(accession) + '\t' + assemblyID)
+            acc2log[str(new_acc)] = assemblyID
+            row['assembly_acc'] = assemblyID
             out_df = pd.concat([out_df, row.to_frame().T])
             icount += 1
     
-    # if no API key is used, we can only generate 3 queries per second, otherwise we can use 10
             count = wait_for_ncbi(count, api_key)
     
     return acc2log, failed, out_df
 
-# download the file depending on the type inputted
-def download_files(acc_prots, acc, file_types, output_dir, count,
-                   remove = False, spacer = '\t\t'):
-
-    dwnlds = {}
-    for file_type in file_types:
-        ftp_link = acc_prots[file_type]
-        dwnlds[file_type] = -1
-        if file_type == 'fna':
-            file_path = output_dir + 'fna/' + \
-                os.path.basename(acc_prots[file_type])
-        elif file_type == 'gff3':
-            file_path = output_dir + 'gff3/' + \
-                os.path.basename(acc_prots[file_type])
-        elif file_type == 'faa':
-            file_path = output_dir + 'faa/' + \
-                os.path.basename(acc_prots[file_type])
-        elif file_type == 'transcript':
-            file_path = output_dir + 'transcript/' + \
-                os.path.basename(acc_prots[file_type])
-
-        if os.path.isfile(file_path):
-            count += 1
-            md5_cmd = subprocess.run([
-                'md5sum', file_path],
-                stdout = subprocess.PIPE) # check the md5
-            md5_res = md5_cmd.stdout.decode('utf-8')
-            md5_find = re.search(r'\w+', md5_res)
-            md5 = md5_find[0]
-
-            if md5 == acc_prots[file_type + '_md5']:
-                eprint(f'{spacer}\t{file_type}: {os.path.basename(file_path)}', 
-                       flush = True)
-                dwnlds[file_type] = 0
-                continue
-        elif os.path.isfile(file_path[:-3]):
-            eprint(f'{spacer}\t{file_type}: {os.path.basename(file_path)}', 
-                   flush = True)
-            dwnlds[file_type] = 0
-            continue
-
-        if ftp_link == '':
-            dwnlds[file_type] = 15
-            continue
- #       esc_count = 0
-        for esc_count in range(3):
-            count += 1
-            dwnld = subprocess.call(['curl', ftp_link, '-o', 
-                                        file_path + '.tmp',
-                                        '--connect-timeout', '5'],
-                                        stdout = subprocess.PIPE, 
-                                        stderr = subprocess.PIPE)
-            if not dwnld:
-                os.rename(file_path + '.tmp', file_path)
-                break
-            else:
-                time.sleep(1)
-                count = 0
-                
-        if dwnld:
-            eprint(f'{spacer}\t\tERROR: {file_type} failed', flush = True)
-            dwnlds[file_type] = 69
-            acc_prots[file_type] = ''
-            log_editor(output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
-                '\t' + str(acc_prots['assembly_acc']) + '\t' + str(acc_prots['fna']) + \
-                '\t' + str(acc_prots['faa']) + '\t' + str(acc_prots['gff3']) + \
-                '\t' + str(acc_prots['transcript']) + '\t' + \
-                str(acc_prots['fna_md5']) + '\t' + \
-                str(acc_prots['faa_md5']) + '\t' + \
-                str(acc_prots['gff3_md5']) + '\t' + \
-                str(acc_prots['transcript_md5']) + '\t' + \
-                f"{acc_prots['genome_id']}\t{acc_prots['genus']}\t" + \
-                f"{acc_prots['species']}\t{acc_prots['strain']}")
-            if remove and file_type in {'fna', 'gff3'}:
-                break
-            continue
-
-        if not os.path.isfile(file_path):
-            dwnlds[file_type] = 1
-            eprint(f'{spacer}\t\tERROR: {file_type} missing', flush = True)
-            if remove and file_type in {'fna', 'gff3'}:
-                break
-        else:
-            dwnlds[file_type] = 0
-            if os.stat(file_path).st_size < 150:
-                eprint(f'{spacer}\t{file_type}: ERROR, file too small', flush = True)
-                dwnlds[file_type] = 420
-                if remove and file_type in {'fna', 'gff3'}:
-                    break
-        eprint(f'{spacer}\t{file_type}: {os.path.basename(file_path)}', 
-               flush = True)
-
-    return dwnlds, count
-
-
-def dwnld_mngr(
-    ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
-    ):
-    fail = []
-    exits, count = download_files( 
-        data, acc, file_types, output_path, 
-        count, remove = remove, spacer = spacer
-        )
-    count = wait_for_ncbi(count, api)
-    t_acc = acc
-    try:
-        if exits['fna'] != 0:
-            if '$' in acc:
-                t_acc = acc[:acc.find('$')]
-            fail = [t_acc, ncbi_df['version'][t_acc]]
-            return fail, count
-    except KeyError:
-        pass
-    try:
-        if exits['gff3'] != 0:
-            if '$' in acc: # is this correct?
-                t_acc = acc[:acc.find('$')]
-            fail = [t_acc, ncbi_df['version'][t_acc]]
-            return fail, count
-    except KeyError:
-        pass
-    return fail, count
-
-def dwnld_mngr_no_MD5(
-    ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
-    ):
-    run, fail = False, []
-    for file_type in file_types:
-        file_path = output_path + file_type \
-            + '/' + os.path.basename(data[file_type])
-        if not os.path.isfile(file_path):
-            run = True
-            break
-
-    if run:
-        exits, count = download_files( 
-            data, acc, file_types, output_path, 
-            count, remove = remove,
-            spacer = spacer
-            )
-        count = wait_for_ncbi(count, api)
+def run_datasets(include, accs_file, output_path, 
+                 annotated, api = None, verbose = False):
+    """Run NCBI datasets to download genomes or metadata"""
+    dataset_scaf = ['datasets', 'download', 'genome', 'accession',
+                    '--inputfile', accs_file] #, '--no-progressbar']
+    if include:
+        dataset_scaf.extend(['--include', include])
     else:
-        exits = {x: 0 for x in file_types}
-        # we aren't checking md5s, so assume the exit is 0
-        return fail, count
-    try:
-        if exits['fna'] != 0:
-            if '$' in acc:
-                t_acc = acc[:acc.find('$')]
+        dataset_scaf.append('--dehydrated')
+    if api:
+        dataset_scaf += ['--api-key', api]
+    if annotated:
+        dataset_scaf.append('--annotated')
+
+    cwd = os.getcwd()
+    os.chdir(output_path)
+    if verbose:
+        v = None
+    else:
+        v = subprocess.DEVNULL
+    dataset_call = subprocess.call(dataset_scaf, stdout = v, stderr = v)
+    os.chdir(cwd)
+
+    return dataset_call
+
+def compile_organism_names(unzip_path, spacer = '\t'):
+    acc2org, acc2meta = {}, {}
+    with open(unzip_path + 'data/assembly_data_report.jsonl', 'r') as raw:
+        for line in raw:
+            data = json.loads(line.rstrip())
+            if 'accession' in data:
+                acc = data['accession']
+                org0 = data['organism']['organismName']
+                org1 = re.sub(r'[^ a-zA-Z0-9]', '', org0) 
+                org = org1.split()
+                genus = org[0] 
+                if len(org) > 2:
+                    species = org[1]
+                    strain = ''.join(org[2:])
+                elif len(org) == 2:
+                    species = org[1]
+                    strain = ''
+                else:
+                    species = 'sp.'
+                    strain = ''
+                try:
+                    if 'infraspecificNames' in data['organism']:
+                        if 'strain' in data['organism']['infraspecificNames']:
+                            strain = data['organism']['infraspecificNames']['strain']
+                        elif 'isolate' in data['organism']['infraspecificNames']:
+                            strain = data['organism']['infraspecificNames']['isolate']
+                    elif not strain:
+                        for attr in data['assemblyInfo']['biosample']['attributes']:
+                            if attr['name'].lower() == 'strain':
+                                strain = attr['value']
+                                if strain.lower() in {'missing', 'none'}:
+                                    strain = ''
+                                break
+                except KeyError:
+                    pass
+                strain = re.sub(r'[^a-zA-Z0-9]', '', strain) 
+
+                try: 
+                    acc2meta[acc] = {'accession': data['assemblyInfo']['assemblyName'],
+                                     'submitter': data['annotationInfo']['provider']}
+                except KeyError:
+                    pass
+#                if not strain:
+ #                   eprint(f'{spacer}WARNING: {acc} no strain metadata', flush = True)
+                acc2org[acc] = {'genus': genus, 'species': species, 'strain': strain}
+    return acc2org, acc2meta
+
+def parse_datasets(datasets_path, unzip_base, req_files, spacer = '\t'):
+    """Unzip, identify complete downloads, parse file outputs and metadata, 
+    report missing data to check alternative repository"""
+    with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
+        zip_ref.extractall(unzip_base) 
+    os.remove(datasets_path)
+    unzip_path = unzip_base + 'ncbi_dataset/'
+
+    type2ncbi = {'fna': 'GENOMIC_NUCLEOTIDE_FASTA',
+                 'gff3': 'GFF3',
+                 'faa': 'PROTEIN_FASTA',
+                 'rna': 'RNA_NUCLEOTIDE_FASTA'}
+    ncbi2type = {v: k for k, v in type2ncbi.items()}
+
+    failed = []
+    data_dict = read_json(unzip_path + 'data/dataset_catalog.json') 
+    acc2data = {}
+    basename = unzip_path + 'data/'
+    for data in data_dict['assemblies']:
+        if 'accession' in data:
+            files_p = {x['fileType']: x['filePath'] \
+                     for x in data['files']}
+             
+            files = {ncbi2type[k]: basename + v for k, v in files_p.items()}
+            # if there are missing files
+            if req_files.difference(set(files.keys())):
+                failed.append(data['accession'])
+                for t, f_ in files.items():
+                    if os.path.isfile(f_):
+                        os.remove(f_)
             else:
-                t_acc = acc
-            fail = [t_acc, ncbi_df['version'][t_acc]]
-            return fail, count
-    except KeyError:
-        pass
-    try:
-        if exits['gff3'] != 0:
-             if '$' in acc: # dont know if this should be here
-                 t_acc = acc[:acc.find('$')]
-             else:
-                 t_acc = acc
+                acc2data[data['accession']] = files
 
-             fail = [t_acc, ncbi_df['version'][t_acc]]
-             return fail, count
-    except KeyError:
-        pass
-    return fail, count
+    acc2org, acc2meta = compile_organism_names(unzip_path, spacer)
 
+    return acc2data, acc2org, failed
 
 def main( 
     api = None, 
@@ -524,10 +340,8 @@ def main(
 
     # initialize run directory and information
     output_path = format_path(output_path)
-    file_types = prepare_folders( 
-        output_path, gff3, proteome, assembly, transcript
-        )
-    acc2log = compile_log(output_path, remove)
+#    file_types = prepare_folders(output_path, gff3, proteome, 
+ #                                assembly, transcript)
 
     # check if ncbi_df is a dataframe, and import if not
     if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
@@ -544,75 +358,140 @@ def main(
     elif 'version' not in ncbi_df.keys():
         ncbi_df['version'] = ''
 
-    ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
     # preserve the original column, but index ncbi_df on it as well
-    vprint('\n' + spacer + 'Assembling NCBI ftp directories', v = verbose, flush = True)
-    acc2log, failed, ncbi_df = collect_ftps( 
-            ncbi_df, acc2log, remove = remove,
+    ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
+
+    ## CHANGE TO ACCOMODATE BIOSAMPLE/OTHER NCBICOLUMNS
+    if ncbi_column.lower() != 'assembly':
+        vprint('\n' + spacer + 'Assembling NCBI ftp directories', v = verbose, flush = True)
+        acc2log = compile_log(output_path + 'ncbiDwnld.log')
+        acc2log, failed, ncbi_df = collect_assembly_accs( 
+            ncbi_df, acc2log,
             ncbi_column = ncbi_column, column = column, api_key=api,
             output_path = output_path, verbose = verbose,
             spacer = spacer
             )
+        column = 'assembly_acc'
 
-    if remove:
-        acc2log = { 
-            o: acc2log[o] for o in acc2log \
-            if all(acc2log[o][p] for p in ['fna', 'gff3'])
-            }
+        ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
     new_df = pd.DataFrame()
 
-    vprint(f'\n{spacer}Downloading {len(acc2log)} NCBI files', 
-           v = verbose, flush = True)
-    count = 0
-    if check_MD5:
-        for acc, data in acc2log.items():
-            eprint(spacer + '\t' + str(acc), flush = True)
-            if data:
-                fail, count = dwnld_mngr(
-                    ncbi_df, data, acc, file_types, output_path,
-                    count, remove, api, spacer
-                    )
-                if fail:
-                    failed.append(fail)
-                else:
-                    ncbi_df.at[acc, 'assemblyPath'] = output_path + 'fna/' + \
-                        os.path.basename(acc2log[acc]['fna'])
-                    ncbi_df.at[acc, 'faa'] = output_path + 'faa/' + \
-                        os.path.basename(acc2log[acc]['faa'])
-                    ncbi_df.at[acc, 'gffPath'] = output_path + 'gff3/' + \
-                        os.path.basename(acc2log[acc]['gff3'])
-                    ncbi_df.at[acc, 'genus'] = acc2log[acc]['genus']
-                    ncbi_df.at[acc, 'species'] = acc2log[acc]['species']
-                    ncbi_df.at[acc, 'strain'] = acc2log[acc]['strain']
-                    new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
-            else:
-                check = ncbi_df[ncbi_df[column] == acc[:acc.find('$')]]
-                # check for entries in the inputted table that match the accession
-                # provided without version modification
-                db_vers = datetime.strftime(row['version'], '%Y%m%d')
-                failed.append([acc, db_vers])
-    else: # there is no checking md5, this is for efficient, so make it
-    # efficient by avoiding conditional expressions
-        for acc, data in acc2log.items():
-            eprint(spacer + '\t' + str(acc), flush = True)
-            fail, count = dwnld_mngr_no_MD5(
-                ncbi_df, data, acc, file_types, output_path, 
-                count, remove, api, spacer
-                )
-            if fail:
-                failed.append(fail)
-            else:
-                for file_type in file_types:
-                    ncbi_df.at[acc, file_type] = output_path + file_type \
-                        + '/' + os.path.basename(data[file_type])
+    ## GUARANTEE ASSEMBLY ACCESSIONS ARE LABELED THIS COLUMN NAME
+    acc_file = output_path + 'assembly_accs.txt'
+    ncbi_df['assembly_acc'] = list([x.upper() for x in ncbi_df['assembly_acc']])
+    with open(acc_file, 'w') as out:
+        out.write('\n'.join([str(x) for x in list(ncbi_df['assembly_acc'])]))
+
+    include = ''
+    req_files = set()
+    if assembly:
+        include += 'genome,'
+        req_files.add('fna')
+    if proteome:
+        include += 'protein,'
+        req_files.add('faa')
+    if gff3:
+        include += 'gff3,'
+        req_files.add('gff3')
+    if transcript:
+        include += 'rna,'
+        req_files.add('rna')
+    include = include[:-1]
+
+    # Download via datasets
+    if proteome or gff3:
+        annotated = True
+    else:
+        annotated = False
+
+    # Run downloads
+    run_datasets(include, acc_file, output_path, api = api,
+                 verbose = verbose, annotated = annotated)
+
+    # Parse download output, add to df
+    acc2files, acc2org, failed = parse_datasets(output_path + 'ncbi_dataset.zip', 
+                   output_path, req_files, spacer)
+    failed.extend(sorted(set(ncbi_df['assembly_acc']).difference(set(acc2files.keys()))))
+
+    # Attempt RefSeq accessions 
+    if failed:
+        reattempt_acc = []
+        for acc in failed:
+            if acc.upper().startswith('GCA'):
+                reattempt_acc.append(acc.upper().replace('GCA_', 'GCF_'))
+            elif acc.upper().startswith('GCF'):
+                reattempt_acc.append(acc.upper().replace('GCF_', 'GCA_'))    
+        acc_file_re = output_path + 'assembly_accs.reattempt.txt'
+        with open(acc_file_re, 'w') as out:
+            out.write('\n'.join(reattempt_acc))
+
+        run_datasets(include, acc_file_re, output_path, verbose = verbose,
+                     annotated = annotated)
+        acc2files_r, acc2org_r, failed_r = parse_datasets(output_path + 'ncbi_dataset.zip',
+                                              output_path, req_files)
+        acc2files = {**acc2files, **acc2files_r}
+        acc2org = {**acc2org, **acc2org_r}
+
+        failed = []
+        for acc in failed_r:
+            if acc.upper().startswith('GCA'):
+                failed.append(acc.upper().replace('GCA_', 'GCF_'))
+            elif acc.upper().startswith('GCF'):
+                failed.append(acc.upper().replace('GCF_', 'GCA_'))
+
+    # Parse download output, add to df
+    # Report failed
+    failed_set = set(failed)
+    rep_failed = []
+    for acc, row in ncbi_df.iterrows():
+        if acc.startswith('GCA_'):
+            check_acc = acc.replace('GCA_', 'GCF_')
+        elif acc.startswith('GCF_'):
+            check_acc = acc.replace('GCF_', 'GCA_')
+        if acc in failed_set:
+            try:
+                rep_failed.append([acc, datetime.strftime(row['version'], '%Y%m%d')])
+            except TypeError:
+                rep_failed.append([acc, row['version']])
+        elif acc in acc2files:
+            try:
+                for file_t, file_p in acc2files[acc].items():
+                    ncbi_df.at[acc, file_t] = file_p
+                for tax, name in acc2org[acc].items():
+                    ncbi_df.at[acc, tax] = name
                 new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
+            except AttributeError: # multiple entries
+                eprint(f'{spacer}WARNING: {acc} is redundant', flush = True)
+                for acc1, row1 in ncbi_df.loc[acc].iterrows():
+                    for file_t, file_p in acc2files[acc].items():
+                        row1[file_t] = file_p
+                    for tax, name in acc2org[acc].items():
+                        row1[tax] = name
+                    new_df = pd.concat([new_df, row1.to_frame().T])
+                    
+        elif check_acc in acc2files:
+            try:
+                for file_t, file_p in acc2files[check_acc].items():
+                    ncbi_df.at[acc, file_t] = file_p
+                for tax, name in acc2org[check_acc].items():
+                    ncbi_df.at[acc, tax] = name
+                new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
+            except AttributeError: # multiple entries
+                eprint(f'{spacer}WARNING: {check_acc} is redundant', flush = True)
+                for acc1, row1 in ncbi_df.loc[acc].iterrows():
+                    for file_t, file_p in acc2files[check_acc].items():
+                        row1[file_t] = file_p
+                    for tax, name in acc2org[check_acc].items():
+                        row1[tax] = name
+                    new_df = pd.concat([new_df, row1.to_frame().T])
+                    
 
     if 'fna' in new_df.keys():
         new_df = new_df.rename(columns = {'fna': 'assemblyPath'})
     if 'gff3' in new_df.keys():
         new_df = new_df.rename(columns = {'gff3': 'gffPath'})
     new_df = new_df.reset_index()
-    return new_df, failed
+    return new_df, rep_failed
 
 
 def get_SRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
@@ -697,8 +576,8 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
 
 def cli():
     parser = argparse.ArgumentParser(
-        description = 'GenBank downloading utility. Downloads ' \
-                    + 'accession by accession, files without MD5s are excluded')
+        description = 'GenBank/RefSeq downloading utility. Downloads ' \
+                    + 'accession by accession')
     parser.add_argument('-i', '--input', required = True, \
     help = 'Space delimited accession; tab delimited file with -c')
     parser.add_argument('-a', '--assembly', action = 'store_true')
@@ -735,7 +614,7 @@ def cli():
             Entrez.api_key = ncbi_api
 
     if not args.output:
-        output = os.getcwd() + '/'
+        output = mkOutput(None, 'ncbiDwnld')
     else:
         output = format_path(args.output)
 
@@ -746,14 +625,9 @@ def cli():
         'Proteomes': args.proteome,
         ".gff3's": args.gff3,
         'Transcripts': args.transcript,
-        'SRA': args.sra
-    }
+        'SRA': args.sra}
 
     start_time = intro('Download NCBI files',args_dict)
-#    if not args.assembly and not args.proteome and not args.gff3 and not args.sra and not args.transcript:
- #       eprint('\nERROR: You must choose at least one download option\nExit code 37', flush = True)
-  #      sys.exit( 37 )
-
     if args.sra:
         if os.path.isfile(format_path(args.input)):
             goSRA(pd.read_csv(format_path(args.input), sep = '\t'), output, pe = args.paired)
@@ -808,12 +682,13 @@ def cli():
         new_df = new_df.rename(columns = {'index': '#assembly_accession'})
         new_df['source'] = 'ncbi'
         new_df['useRestriction (yes/no)'] = 'no'
-#        if 'index' in new_df.columns:
- #           del new_df['index']
         if 0 in new_df.columns:
             del new_df[0]
 
-        new_df.to_csv(args.input + '.predb', sep = '\t', index = None)
+        new_df.to_csv(output + 'ncbiDwnld.predb', sep = '\t', index = None)
+        if failed:
+            eprint('ERROR: ' + ','.join([str(x[0]) for x in failed]), flush = True)
+           
 
     outro(start_time)
 
