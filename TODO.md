@@ -114,7 +114,7 @@
 
 ### ncbiDwnld
 - [ ] db check to ensure log is relevant to input
-- [ ] convert downloading to NCBI datasets
+- [x] convert downloading to NCBI datasets
 - [ ] add strain parsing from within GenBank records for entries that don't
   have an obvious strain entry
 
@@ -159,3 +159,4 @@
   download
 - [ ] still use a redundancy check when --ncbi_only is specified, or prevent
   changing between NCBI only and non-ncbi database
+- [ ] acquire strain metadata and submitter organization from ncbi datasets
