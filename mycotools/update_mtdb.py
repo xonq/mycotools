@@ -21,6 +21,7 @@ import base64
 import shutil
 import getpass
 import hashlib
+import zipfile
 import argparse
 import subprocess
 import numpy as np
@@ -36,7 +37,8 @@ from mycotools.lib.kontools import intro, outro, format_path, eprint, \
                                    prep_output, collect_files, read_json, \
                                    write_json, split_input
 from mycotools.lib.biotools import fa2dict, gff2list, dict2fa, list2gff
-from mycotools.ncbiDwnld import esearch_ncbi, esummary_ncbi, main as ncbiDwnld
+from mycotools.ncbiDwnld import esearch_ncbi, esummary_ncbi, run_datasets, \
+                                   compile_organism_names, main as ncbiDwnld
 from mycotools.jgiDwnld import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
@@ -347,7 +349,7 @@ def dwnld_mycocosm(
     return jgi_df
 
 
-def dwnld_ncbi_table( 
+def dwnld_ncbi_metadata( 
     ncbi_file,
     ncbi_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/',
     group = 'eukaryotes'
@@ -365,21 +367,40 @@ def dwnld_ncbi_table(
  
     return ncbi_df
 
-def prep_taxa_cols(df, col = '#Organism/Name'):
+def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
+
+    # NEED to acquire strain name from datasets download of strain metadata
+    if not os.path.isdir(taxonomy_dir):
+        os.mkdir(taxonomy_dir)
+    aa_file = taxonomy_dir + 'assembly_accs.txt'
+    with open(aa_file, 'w') as out:
+        out.write('\n'.join(list(df['assembly_acc'])))
+
+    run_datasets(None, aa_file, taxonomy_dir, False, api = api)
+    datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
+    with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
+        zip_ref.extractall(taxonomy_dir)
+    os.remove(datasets_path)
+
+    acc2org, acc2meta = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
 
     df['strain'] = ''
     for i, row in df.iterrows():
-        organism = \
-          re.sub(r'[^ a-zA-Z0-9]', '', row[col]).split()
-        df.at[i, 'genus'] = organism[0]
-        if len(organism) > 1:
-            df.at[i, 'species'] = organism[1]
-            if len(organism) > 2:
-                df.at[i, 'strain'] = ''.join(organism[2:])
-        else:
-            df.at[i, 'species'] = 'sp.'
+        acc = row['assembly_acc']
+        df.at[i, 'genus'] = acc2org[acc]['genus']
+        df.at[i, 'species'] = acc2org[acc]['species']
+        df.at[i, 'strain'] = acc2org[acc]['strain']
+#        organism = \
+ #         re.sub(r'[^ a-zA-Z0-9]', '', row[col]).split()
+  #      df.at[i, 'genus'] = organism[0]
+   #     if len(organism) > 1:
+    #        df.at[i, 'species'] = organism[1]
+     #       if len(organism) > 2:
+      #          df.at[i, 'strain'] = ''.join(organism[2:])
+       # else:
+        #    df.at[i, 'species'] = 'sp.'
 
-    return df
+    return df, acc2meta
 
 
 def prep_jgi_cols(jgi_df, name_col = 'name'):
@@ -453,7 +474,8 @@ def exec_rm_overlap(ncbi_df, todel_i):
     return ncbi_jgi_overlap, ncbi_df
 
 
-def rm_ncbi_overlap(ncbi_df, mycocosm_df, jgi2ncbi, fails = set(), api = 3):
+def rm_ncbi_overlap(ncbi_df, mycocosm_df, jgi2ncbi, 
+                    fails = set(), acc2meta = {}, api = 3):
     """Acquire MycoCosm assembly accessions from NCBI.
     pd.DataFrame(ncbi_df) = post clean ncbi_df;
     set(mycocosm_omes) = set of lower-cased mycocosm genome codes;
@@ -484,19 +506,23 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, jgi2ncbi, fails = set(), api = 3):
  #           pass
 #            todel.append(i)
         elif row['assembly_acc'] not in fails:
-            ass_uid = esearch_ncbi(row['assembly_acc'],
-                                   'assembly', 'assembly')
-            if not ass_uid:
-                fails.add(row['assembly_acc'])
-                continue
-            ncbi_df.at[i, 'uid'] = ass_uid
-            # this is a huge bottleneck, taking approximately 1s per query
-            summary = esummary_ncbi(max(ass_uid), 'assembly')
-            ass_name_prep = \
-                summary['DocumentSummarySet']['DocumentSummary'][0]['AssemblyName']
-            ass_name = version_comp.sub('', ass_name_prep)
-            submitter = \
-                summary['DocumentSummarySet']['DocumentSummary'][0]['SubmitterOrganization']
+            if row['assembly_acc'] in acc2meta:
+                ass_name = acc2meta[row['assembly_acc']]['accession']
+                submitter = acc2meta[row['assembly_acc']]['submitter']
+            else:
+                ass_uid = esearch_ncbi(row['assembly_acc'],
+                                       'assembly', 'assembly')
+                if not ass_uid:
+                    fails.add(row['assembly_acc'])
+                    continue
+                ncbi_df.at[i, 'uid'] = ass_uid
+                # this is a huge bottleneck, taking approximately 1s per query
+                summary = esummary_ncbi(max(ass_uid), 'assembly')
+                ass_name_prep = \
+                    summary['DocumentSummarySet']['DocumentSummary'][0]['AssemblyName']
+                ass_name = version_comp.sub('', ass_name_prep)
+                submitter = \
+                    summary['DocumentSummarySet']['DocumentSummary'][0]['SubmitterOrganization']
             if ass_name.lower() in mycocosm_omes:
                 todel.append(i)
                 jgi2ncbi[ass_name.lower()] = row['assembly_acc']
@@ -860,11 +886,13 @@ def rogue_update(
     else:
         api = 3
     ncbi_db_path = update_path + date + '.ncbi.mtdb'
-    pre_ncbi_df0 = dwnld_ncbi_table(update_path + date + '.ncbi.tsv',
+    pre_ncbi_df0 = dwnld_ncbi_metadata(update_path + date + '.ncbi.tsv',
                                    group = group) 
-    pre_ncbi_df1 = prep_taxa_cols(pre_ncbi_df0)
-    ncbi_df = clean_ncbi_df(pre_ncbi_df1, kingdom = kingdom)
-    ncbi_df = ncbi_df.rename(columns={'Assembly Accession': 'assembly_acc'})
+    pre_ncbi_df1 = pre_ncbi_df0.rename(columns={'Assembly Accession': 'assembly_acc'})
+    pre_ncbi_df2, acc2meta = prep_taxa_cols(pre_ncbi_df1, 
+                                            output_path + 'taxonomy/', 
+                                            api = ncbi_api)
+    ncbi_df = clean_ncbi_df(pre_ncbi_df2, kingdom = kingdom)
 
     # begin extracting lineages of interest and store tax_dicts for later
     tax_dicts = {v['genus']: v['taxonomy'] for k, v in db.iterrows() \
@@ -925,7 +953,7 @@ def rogue_update(
             ncbi_df, jgi2ncbi, jgi2biosample, \
             true_ncbi, ncbi_jgi_overlap, todel_i \
                 = rm_ncbi_overlap(ncbi_df, jgi_df, jgi2ncbi, 
-                                  true_ncbi, api = api)
+                                  true_ncbi, acc2meta, api = api)
 
             print('\t\t' + str(len(jgi2ncbi)) + ' overlapping genomes',
                  flush = True)
