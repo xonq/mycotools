@@ -70,15 +70,15 @@ def prepare_folders(output_path, gff, prot, assem, transcript):
 def compile_log(output_path, remove = False):
 
     acc2log = {}
-    if not os.path.isfile( output_path + 'ncbiDwnld.log' ):
-        with open( output_path + 'ncbiDwnld.log', 'w' ) as out:
+    if not os.path.isfile(output_path + 'ncbiDwnld.fallback.log'):
+        with open( output_path + 'ncbiDwnld.fallback.log', 'w' ) as out:
             out.write('#ome\tassembly_acc\tassembly\tproteome\tgff3\ttranscript\t' + \
             'fna_md5\tfaa_md5\tgff3_md5\ttrans_md5\tgenome_id(s)\tgenus\tspecies\tstrain')
 
         # too risky, too many things can go wrong and then users would be in a
         # loop, but necessary for huge downloads
     else:
-        with open(output_path + 'ncbiDwnld.log', 'r') as raw:
+        with open(output_path + 'ncbiDwnld.fallback.log', 'r') as raw:
             for line in raw:
                 if not line.startswith('#'):
                     data = [x.rstrip() for x in line.split('\t')]
@@ -220,22 +220,35 @@ def collect_ftps(
                 'transcript_md5': '', 'genome_id': ID,
                 'genus': '', 'species': '', 'strain': ''
                 }
-
             record = esummary_ncbi(ID, database)
+
             record_info = record['DocumentSummarySet']['DocumentSummary'][0]
             assemblyID = record_info['AssemblyAccession']
-            org = record_info['Organism'].split()
+            org = record_info['SpeciesName'].split()
             genus = org[0]
             if len(org) > 2:
                 species = org[1]
-                strain = ''.join(org[2:])
+                strain1 = ''.join(org[2:])
             elif len(org) == 2:
                 species = org[1]
-                strain = ''
+                strain1 = ''
             else:
                 species = 'sp.'
-                strain = ''
-            
+                strain1 = ''
+
+            try:
+                for attr in record_info['Biosource']['InfraspeciesList']:
+                    if attr['Sub_type'].lower() == 'strain':
+                        strain = attr['Sub_value']
+                        if strain.lower() in {'missing', 'none'}:
+                            strain = ''
+                        break
+            except KeyError:
+                if strain1:
+                    strain = strain1
+                pass
+            strain = re.sub(r'[^a-zA-Z0-9]', '', strain) 
+
             ftp_path = str(record_info['FtpPath_GenBank'])
 
             if not ftp_path:
@@ -319,7 +332,7 @@ def collect_ftps(
                     failed.append([accession, datetime.strftime(datetime.now(), '%Y%m%d')])
     
             log_editor( 
-                output_path + 'ncbiDwnld.log', str(new_acc), 
+                output_path + 'ncbiDwnld.fallback.log', str(new_acc), 
                 str(accession) + '\t' + accession + '\t' +  assembly + '\t' + \
                 proteome + '\t' + gff3 + '\t' + transcript + '\t' + \
                 ass_md5 + '\t' + prot_md5 + '\t' + gff_md5 + '\t' + trans_md5 + \
@@ -408,7 +421,7 @@ def download_files(acc_prots, acc, file_types, output_dir, count,
             eprint(f'{spacer}\t\tERROR: {file_type} failed', flush = True)
             dwnlds[file_type] = 69
             acc_prots[file_type] = ''
-            log_editor(output_dir + 'ncbiDwnld.log', str(acc), str(acc) + \
+            log_editor(output_dir + 'ncbiDwnld.fallback.log', str(acc), str(acc) + \
                 '\t' + str(acc_prots['assembly_acc']) + '\t' + str(acc_prots['fna']) + \
                 '\t' + str(acc_prots['faa']) + '\t' + str(acc_prots['gff3']) + \
                 '\t' + str(acc_prots['transcript']) + '\t' + \
@@ -564,6 +577,8 @@ def main(
     vprint(f'\n{spacer}Downloading {len(acc2log)} NCBI files', 
            v = verbose, flush = True)
     count = 0
+    if 'strain' not in ncbi_df.columns:
+        ncbi_df['strain'] = ''
     if check_MD5:
         for acc, data in acc2log.items():
             eprint(spacer + '\t' + str(acc), flush = True)
@@ -583,7 +598,9 @@ def main(
                         os.path.basename(acc2log[acc]['gff3'])
                     ncbi_df.at[acc, 'genus'] = acc2log[acc]['genus']
                     ncbi_df.at[acc, 'species'] = acc2log[acc]['species']
-                    ncbi_df.at[acc, 'strain'] = acc2log[acc]['strain']
+                    if not ncbi_df.loc[acc, 'strain'] \
+                        or pd.isnull(ncbi_df.loc[acc, 'strain']):
+                        ncbi_df.at[acc, 'strain'] = acc2log[acc]['strain']
                     new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
             else:
                 check = ncbi_df[ncbi_df[column] == acc[:acc.find('$')]]
