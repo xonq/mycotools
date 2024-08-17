@@ -149,7 +149,8 @@ def collect_assembly_accs(
     if ncbi_column in {'assembly', 'genome', 'uid'}:
         out_df = ncbi_df[ncbi_df.index.isin(set(acc2log.keys()))]
         ncbi_df = ncbi_df[~ncbi_df.index.isin(set(acc2log.keys()))]
-        out_df['assembly_acc'] = pd.Series(acc2log)
+        if acc2log:
+            out_df['assembly_acc'] = pd.Series(acc2log)
     for accession, row in tqdm(ncbi_df.iterrows(), total = len(ncbi_df)):
         if accession in acc2log: # add all rows that have indices associated with this
             # query type
@@ -296,8 +297,11 @@ def compile_organism_names(unzip_path, spacer = '\t'):
 def parse_datasets(datasets_path, unzip_base, req_files, spacer = '\t'):
     """Unzip, identify complete downloads, parse file outputs and metadata, 
     report missing data to check alternative repository"""
-    with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
-        zip_ref.extractall(unzip_base) 
+    try:
+        with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
+            zip_ref.extractall(unzip_base) 
+    except zipfile.BadZipFile:
+        return False, False, False
     os.remove(datasets_path)
     unzip_path = unzip_base + 'ncbi_dataset/'
 
@@ -363,7 +367,7 @@ def main(
 
     ## CHANGE TO ACCOMODATE BIOSAMPLE/OTHER NCBICOLUMNS
     if ncbi_column.lower() != 'assembly':
-        vprint('\n' + spacer + 'Assembling NCBI ftp directories', v = verbose, flush = True)
+        vprint(f'{spacer}Assembling NCBI ftp directories', v = verbose, flush = True)
         acc2log = compile_log(output_path + 'ncbiDwnld.log')
         acc2log, failed, ncbi_df = collect_assembly_accs( 
             ncbi_df, acc2log,
@@ -405,16 +409,40 @@ def main(
         annotated = False
 
     # Run downloads
-    run_datasets(include, acc_file, output_path, api = api,
-                 verbose = verbose, annotated = annotated)
+    count = 0
+    while count < 3:
+        if not count:
+            vprint(f'{spacer}Downloading data', v = verbose, flush = True)
+            count += 1
+        else:
+            count += 1
+            vprint(f'{spacer}\tAttempt {count}', v = verbose, flush = True)
 
-    # Parse download output, add to df
-    acc2files, acc2org, failed = parse_datasets(output_path + 'ncbi_dataset.zip', 
-                   output_path, req_files, spacer)
+        run_datasets(include, acc_file, output_path, api = api,
+                     verbose = verbose, annotated = annotated)
+
+            # Parse download output, add to df
+        acc2files, acc2org, failed = parse_datasets(output_path + 'ncbi_dataset.zip', 
+                       output_path, req_files, spacer)
+        if acc2files == False and acc2org == False and failed == False:
+            continue
+        else:
+            break
+
+    if acc2files == False and acc2org == False and failed == False:
+        eprint(f'{spacer}ERROR: ncbiDwnld failed {count} attempts', 
+            flush = True)
+        # maybe add a fallback to the old methodology here
+        eprint(f'{spacer}Consider --fallback',
+            flush = True)
+        sys.exit(10)
+
     failed.extend(sorted(set(ncbi_df['assembly_acc']).difference(set(acc2files.keys()))))
 
     # Attempt RefSeq accessions 
     if failed:
+        vprint(f'{spacer}Attempting alternative repository for failed downloads', 
+               v = verbose, flush = True)
         reattempt_acc = []
         for acc in failed:
             if acc.upper().startswith('GCA'):
@@ -477,7 +505,8 @@ def main(
                     ncbi_df.at[acc, tax] = name
                 new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
             except AttributeError: # multiple entries
-                eprint(f'{spacer}WARNING: {check_acc} is redundant', flush = True)
+                vprint(f'{spacer}\tWARNING: {check_acc} is redundant', 
+                       v = verbose, e = True, flush = True)
                 for acc1, row1 in ncbi_df.loc[acc].iterrows():
                     for file_t, file_p in acc2files[check_acc].items():
                         row1[file_t] = file_p
