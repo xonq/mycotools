@@ -656,7 +656,7 @@ def ref_update(
     ref_db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
     jgi = True, group = 'eukaryotes', kingdom = 'Fungi',
-    remove = True, taxonomy = True
+    remove = True, taxonomy = True, ncbi_fallback = False
     ):
     """Initialize/Update the primary MTDB based on a reference database
     acquired external from any existing primary MTDB"""
@@ -726,12 +726,23 @@ def ref_update(
     print('\nAssimilating NCBI', flush = True)
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
-        ncbi_predb, ncbi_failed1 = ncbiDwnld(
-            assembly = True, proteome = False, gff3 = True,
-            ncbi_df = ncbi_df, remove = True, output_path = update_path,
-            column = 'assembly_acc', ncbi_column = 'genome', 
-            check_MD5 = check_MD5, verbose = True
-            )
+        if ncbi_fallback:
+            from mycotools.ncbi_dwnld_fallback \
+                import main as ncbi_dwnld_fallback
+            ncbi_predb, ncbi_failed1 = ncbi_dwnld_fallback(
+                assembly = True, proteome = False, gff3 = True,
+                ncbi_df = ncbi_df, remove = True, output_path = update_path,
+                column = 'assembly_acc', ncbi_column = 'genome', 
+                check_MD5 = check_MD5, verbose = True
+                )
+
+        else:
+            ncbi_predb, ncbi_failed1 = ncbiDwnld(
+                assembly = True, proteome = False, gff3 = True,
+                ncbi_df = ncbi_df, remove = True, output_path = update_path,
+                column = 'assembly_acc', ncbi_column = 'genome', 
+                check_MD5 = check_MD5, verbose = True
+                )
 
         for failure in ncbi_failed1:
             add_failed(failure[0], 'ncbi', str(failure[1]), date,
@@ -868,7 +879,7 @@ def rogue_update(
     db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
     jgi = True, group = 'eukaryotes', kingdom = 'Fungi',
-    remove = True, lineage_constraints = {}
+    remove = True, lineage_constraints = {}, ncbi_fallback = False
     ):
     """Initialize/update a standalone primary MTDB"""
 # NEED to mark none for new databases' refdb
@@ -1035,12 +1046,11 @@ def rogue_update(
     if not os.path.isfile(update_path + date + '.ncbi.predb'):
 #    if not os.path.isfile(update_path + date + '.ncbi.predb'):
         print('\tDownloading NCBI data', flush = True)
-
         ncbi_predb, new_db, ncbi_failed1 = ncbi2db( 
             update_path, ncbi_df, ref_db = new_db, 
             date = date, failed_dict = prev_failed, 
             rerun = rerun, duplicates = duplicates,
-            check_MD5 = check_MD5
+            check_MD5 = check_MD5, fallback = ncbi_fallback
             )
 
         for failure in ncbi_failed1:
@@ -1304,7 +1314,7 @@ def control_flow(init, update, reference, add, taxonomy,
                  predb, save, nonpublished,
                  ncbi_only, lineage, rank, prokaryote, failed,
                  forbidden, resume, no_md5, cpu, ncbi_email = False,
-                 ncbi_api = None, overwrite = True):
+                 ncbi_api = None, overwrite = True, fallback = False):
 
     if not init \
         and not update \
@@ -1558,7 +1568,7 @@ def control_flow(init, update, reference, add, taxonomy,
             ref_db, update_path, date, failed, jgi_email, jgi_pwd,
             config, ncbi_email, ncbi_api, cpus = cpu, check_MD5 = not bool(no_md5),
             jgi = jgi, group = group, kingdom = king,
-            remove = not save, taxonomy = True
+            remove = not save, taxonomy = True, ncbi_fallback = fallback
             )
     else:
         new_mtdb, update_mtdb = rogue_update(
@@ -1566,7 +1576,8 @@ def control_flow(init, update, reference, add, taxonomy,
             config, ncbi_email, ncbi_api, cpus = cpu, 
             check_MD5 = not bool(no_md5), jgi = jgi, group = group,
             kingdom = king, remove = not save, 
-            lineage_constraints = config['lineage_constraints']
+            lineage_constraints = config['lineage_constraints'],
+            ncbi_fallback = fallback
             )
 
 
@@ -1648,7 +1659,8 @@ def main():
         help = '[PROKARY, -i]: Initialize prokaryote MTDB')
     conf_args.add_argument('--failed', action = 'store_true', 
         help = 'Rerun/ignore failed')
-    conf_args.add_argument('--forbidden', action = 'store_true', help = 'Rerun forbidden')
+    conf_args.add_argument('--forbidden', action = 'store_true', 
+        help = 'Rerun forbidden')
 
 #    conf_args.add_argument('--deviate', action = 'store_true', help = 'Deviate' \
  #       + ' from existing config without prompting')
@@ -1657,6 +1669,8 @@ def main():
     run_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
     run_args.add_argument('--no_md5', action = 'store_true', help = 'Skip NCBI MD5'
         + ' (expedite large reruns)')
+    run_args.add_argument('--fallback', action = 'store_true', 
+        help = 'NCBI fallback script')
     run_args.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 
@@ -1674,7 +1688,8 @@ def main():
                  args.predb, args.save, args.nonpublished,
                  args.ncbi_only, args.lineage, args.rank, args.prokaryote, args.failed,
                  args.forbidden, args.resume, args.no_md5, args.cpu, 
-                 ncbi_email = None, overwrite = not args.keep)
+                 ncbi_email = None, overwrite = not args.keep, 
+                 fallback = args.fallback)
 
     outro(start_time)
 

@@ -586,7 +586,7 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
     if not os.path.isdir(sra_dir):
         os.mkdir(sra_dir)
     os.chdir(sra_dir)
-    fastqdump = findExecs('fastq-dump', exit = set('fastq-dump'))
+    fastqdump = findExecs('fastq-dump', exit = {'fastq-dump'})
     count = 0
 
     if 'sra' in df.keys():
@@ -626,6 +626,8 @@ def cli():
     parser.add_argument('-o', '--output', help = 'Output directory' )
     parser.add_argument('-e', '--email', help = 'NCBI email')
     parser.add_argument('--api', help = 'NCBI API key for high query rate')
+    parser.add_argument('--fallback', action = 'store_true', 
+        help = 'Fallback mode if datasets fails', flush = True)
     args = parser.parse_args()
 
     if args.email:
@@ -646,6 +648,9 @@ def cli():
         output = mkOutput(None, 'ncbiDwnld')
     else:
         output = format_path(args.output)
+
+    if not args.fallback:
+        findExecs('datasets', exit = {'datasets'})
 
     args_dict = {
         'NCBI Table': args.input,
@@ -701,13 +706,21 @@ def cli():
             ncbi_column = 'assembly'
 
         ncbi_df = ncbi_df.drop_duplicates(column)
-
-        new_df, failed = main( 
-            assembly = args.assembly, column = column, 
-            ncbi_column = ncbi_column, proteome = args.proteome, 
-            gff3 = args.gff3, transcript = args.transcript, ncbi_df = ncbi_df,
-            output_path = output, verbose = True, spacer = ''
-            )
+        if args.fallback:
+            from mycotools.ncbi_dwnld_fallback import main as main_fallback
+            new_df, failed = main_fallback( 
+                assembly = args.assembly, column = column, 
+                ncbi_column = ncbi_column, proteome = args.proteome, 
+                gff3 = args.gff3, transcript = args.transcript, ncbi_df = ncbi_df,
+                output_path = output, verbose = True, spacer = ''
+                )
+        else:
+            new_df, failed = main( 
+                assembly = args.assembly, column = column, 
+                ncbi_column = ncbi_column, proteome = args.proteome, 
+                gff3 = args.gff3, transcript = args.transcript, ncbi_df = ncbi_df,
+                output_path = output, verbose = True, spacer = ''
+                )
         new_df = new_df.rename(columns = {'index': '#assembly_accession'})
         new_df['source'] = 'ncbi'
         new_df['useRestriction (yes/no)'] = 'no'

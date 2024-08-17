@@ -98,7 +98,7 @@ def main(
     out_dir, ncbi_df = None, date = datetime.today().strftime('%Y%m%d'),
     ref_db = None, assem = True, prot = False, gff = True, transcript = False,
     rerun = False, failed_dict = {}, duplicates = {}, check_MD5 = True,
-    spacer = '\t\t'
+    spacer = '\t\t', fallback = False
     ):
 
     os.chdir( out_dir )
@@ -149,13 +149,23 @@ def main(
 
     if len(ncbi_df) > 0:
         print(spacer + 'Initializing NCBI acquisition', flush = True)
-        ncbi_df, failed = ncbi_dwnld(
-            assembly = assem, proteome = prot,
-            gff3 = gff, ncbi_df = ncbi_df, remove = True, output_path = out_dir,
-            column = ass_acc, ncbi_column = 'assembly',
-            check_MD5 = check_MD5, verbose = True, spacer = '\t\t\t'
-            )
-    
+        if fallback:
+            from mycotools.ncbi_dwnld_fallback \
+                import main as ncbi_dwnld_fallback
+            ncbi_df, failed = ncbi_dwnld_fallback(
+                assembly = assem, proteome = prot,
+                gff3 = gff, ncbi_df = ncbi_df, remove = True, output_path = out_dir,
+                column = ass_acc, ncbi_column = 'assembly',
+                check_MD5 = check_MD5, spacer = '\t\t\t'
+                )
+        else:
+            ncbi_df, failed = ncbi_dwnld(
+                assembly = assem, proteome = prot,
+                gff3 = gff, ncbi_df = ncbi_df, remove = True, output_path = out_dir,
+                column = ass_acc, ncbi_column = 'assembly',
+                check_MD5 = check_MD5, verbose = True, spacer = '\t\t\t'
+                )
+        
         print(spacer + '\t' + str(len(ncbi_df)) + ' entries with assemblies and gffs', flush = True)
         ncbi_df = ncbi_df.rename(columns = {
             'Release Date': 'published', 'Assembly Accession': 'assembly_acc',
