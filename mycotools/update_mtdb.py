@@ -376,7 +376,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
     with open(aa_file, 'w') as out:
         out.write('\n'.join(list(df['assembly_acc'])))
 
-    run_datasets(None, aa_file, taxonomy_dir, False, api = api)
+    run_datasets(None, aa_file, taxonomy_dir, True, api = api)
     datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
     with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
         zip_ref.extractall(taxonomy_dir)
@@ -385,20 +385,17 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
     acc2org, acc2meta = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
 
     df['strain'] = ''
+    todel = set()
     for i, row in df.iterrows():
         acc = row['assembly_acc']
-        df.at[i, 'genus'] = acc2org[acc]['genus']
-        df.at[i, 'species'] = acc2org[acc]['species']
-        df.at[i, 'strain'] = acc2org[acc]['strain']
-#        organism = \
- #         re.sub(r'[^ a-zA-Z0-9]', '', row[col]).split()
-  #      df.at[i, 'genus'] = organism[0]
-   #     if len(organism) > 1:
-    #        df.at[i, 'species'] = organism[1]
-     #       if len(organism) > 2:
-      #          df.at[i, 'strain'] = ''.join(organism[2:])
-       # else:
-        #    df.at[i, 'species'] = 'sp.'
+        if acc in acc2org:
+            df.at[i, 'genus'] = acc2org[acc]['genus']
+            df.at[i, 'species'] = acc2org[acc]['species']
+            df.at[i, 'strain'] = acc2org[acc]['strain']
+        else:
+            todel.add(i)
+
+    df = df[~df.index.isin(todel)]
 
     return df, acc2meta
 
@@ -431,12 +428,17 @@ def prep_jgi_cols(jgi_df, name_col = 'name'):
     return jgi_df
 
 
-def clean_ncbi_df(ncbi_df, kingdom = 'Fungi'):
+def clean_ncbi_df(ncbi_df, update_path, kingdom = 'Fungi', api = None):
     ncbi_df = ncbi_df.astype(str).replace(np.nan, '')
 
     if kingdom.lower() == 'fungi':
         # extract group of interest (case sensitive to first letter)
         ncbi_df = ncbi_df[ncbi_df['Group'] == 'Fungi']
+
+    ncbi_df, acc2meta = prep_taxa_cols(ncbi_df, 
+                                       update_path + 'taxonomy/', 
+                                       api = api)
+
 
     # remove entries without sufficient metadata
     ncbi_df = ncbi_df.dropna(subset = ['genus'])
@@ -444,24 +446,24 @@ def clean_ncbi_df(ncbi_df, kingdom = 'Fungi'):
     # remove assembly- & annotation-lacking entries
     ncbi_df = ncbi_df[~ncbi_df['Genes'].isin({'-', '', '0'})]
     ncbi_df = ncbi_df[~ncbi_df['Proteins'].isin({'-', '' ,'0'})]
-    ncbi_df = ncbi_df[~ncbi_df['Assembly Accession'].isin({'-', '', '0'})]
+    ncbi_df = ncbi_df[~ncbi_df['assembly_acc'].isin({'-', '', '0'})]
 
     # sort by version, keep most recent version of duplicate assemblies
     ncbi_df['version'] = pd.to_datetime(ncbi_df['Modify Date'])
     ncbi_df = ncbi_df.sort_values(by = 'version', ascending = False)
-    ncbi_df = ncbi_df.drop_duplicates('Assembly Accession')
+    ncbi_df = ncbi_df.drop_duplicates('assembly_acc')
 
     # check for explicit new versions of assemblies
     ncbi_df['assembly_base'] = [
-        x[:x.find('.')] for x in list(ncbi_df['Assembly Accession'])
+        x[:x.find('.')] for x in list(ncbi_df['assembly_acc'])
         ]
     ncbi_df['assembly_vers'] = [
-        x[x.find('.'):] for x in list(ncbi_df['Assembly Accession'])
+        x[x.find('.'):] for x in list(ncbi_df['assembly_acc'])
         ]
     ncbi_df = ncbi_df.sort_values(by = 'assembly_vers', ascending = False)
     ncbi_df = ncbi_df.drop_duplicates('assembly_base')
 
-    return ncbi_df
+    return ncbi_df, acc2meta
 
 
 def exec_rm_overlap(ncbi_df, todel_i):
@@ -727,7 +729,8 @@ def ref_update(
         ncbi_predb, ncbi_failed1 = ncbiDwnld(
             assembly = True, proteome = False, gff3 = True,
             ncbi_df = ncbi_df, remove = True, output_path = update_path,
-            column = 'assembly_acc', ncbi_column = 'genome', check_MD5 = check_MD5
+            column = 'assembly_acc', ncbi_column = 'genome', 
+            check_MD5 = check_MD5, verbose = True
             )
 
         for failure in ncbi_failed1:
@@ -889,10 +892,9 @@ def rogue_update(
     pre_ncbi_df0 = dwnld_ncbi_metadata(update_path + date + '.ncbi.tsv',
                                    group = group) 
     pre_ncbi_df1 = pre_ncbi_df0.rename(columns={'Assembly Accession': 'assembly_acc'})
-    pre_ncbi_df2, acc2meta = prep_taxa_cols(pre_ncbi_df1, 
-                                            output_path + 'taxonomy/', 
-                                            api = ncbi_api)
-    ncbi_df = clean_ncbi_df(pre_ncbi_df2, kingdom = kingdom)
+    print('\tAcquiring NCBI metadata', flush = True)
+    ncbi_df, acc2meta = clean_ncbi_df(pre_ncbi_df1, update_path, 
+                            kingdom = kingdom, api = ncbi_api)
 
     # begin extracting lineages of interest and store tax_dicts for later
     tax_dicts = {v['genus']: v['taxonomy'] for k, v in db.iterrows() \
