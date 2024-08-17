@@ -627,7 +627,7 @@ def cli():
     parser.add_argument('-e', '--email', help = 'NCBI email')
     parser.add_argument('--api', help = 'NCBI API key for high query rate')
     parser.add_argument('--fallback', action = 'store_true', 
-        help = 'Fallback mode if datasets fails', flush = True)
+        help = 'Fallback mode if datasets fails')
     args = parser.parse_args()
 
     if args.email:
@@ -649,8 +649,7 @@ def cli():
     else:
         output = format_path(args.output)
 
-    if not args.fallback:
-        findExecs('datasets', exit = {'datasets'})
+    findExecs('datasets', exit = {'datasets'})
 
     args_dict = {
         'NCBI Table': args.input,
