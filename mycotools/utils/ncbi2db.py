@@ -148,12 +148,12 @@ def main(
             print(spacer + '\t' + str(len(ncbi_df)) + ' genomes to assimilate', flush = True)
 
     if len(ncbi_df) > 0:
-        print(spacer + 'Downloading NCBI data', flush = True)
+        print(spacer + 'Initializing NCBI acquisition', flush = True)
         ncbi_df, failed = ncbi_dwnld(
             assembly = assem, proteome = prot,
             gff3 = gff, ncbi_df = ncbi_df, remove = True, output_path = out_dir,
-            column = ass_acc, ncbi_column = 'genome',
-            check_MD5 = check_MD5
+            column = ass_acc, ncbi_column = 'assembly',
+            check_MD5 = check_MD5, verbose = True, spacer = '\t\t\t'
             )
     
         print(spacer + '\t' + str(len(ncbi_df)) + ' entries with assemblies and gffs', flush = True)
