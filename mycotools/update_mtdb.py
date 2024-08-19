@@ -368,6 +368,7 @@ def dwnld_ncbi_metadata(
 
 def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
 
+    # NEED to output checkpoint here
     if not os.path.isdir(taxonomy_dir):
         os.mkdir(taxonomy_dir)
     aa_file = taxonomy_dir + 'assembly_accs.genbank.txt'
@@ -804,7 +805,8 @@ def ref_update(
 
     if taxonomy: #already completed
         tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
-                                king=kingdom, rank = rank)
+                                king=kingdom, rank = rank, 
+                                output_path = update_path)
         new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
         dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
     
@@ -816,7 +818,8 @@ def ref_update(
 
 
 def extract_constraint_lineages(df, ncbi_api, kingdom,
-                                lineage_constraints, tax_dicts):
+                                lineage_constraints, tax_dicts,
+                                tax_dir):
     """Extract genera from NCBI and JGI Pandas dataframes 
     that hit a dictionary of lineages of interest"""
 
@@ -837,7 +840,7 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
 
     tax_dicts = gather_taxonomy(df, api_key = ncbi_api,
                                 king = kingdom, rank = query_rank,
-                                tax_dicts = tax_dicts)
+                                tax_dicts = tax_dicts, output_path = tax_dir)
 
     lineage_constraints = {k: set(v) for k, v in lineage_constraints.items()}
 
@@ -867,7 +870,8 @@ def taxonomy_update(orig_db, update_path, date,
     taxless_db = orig_db.reset_index()
     taxless_db['taxonomy'] = [{} for x in taxless_db['taxonomy']]
     tax_dicts = gather_taxonomy(taxless_db, api_key = ncbi_api,
-                                    king=group, rank = rank)
+                                    king=group, rank = rank, 
+                                    output_path = update_path)
     tax_db, genus_dicts = assimilate_tax(taxless_db, tax_dicts)
     if not isinstance(tax_db, mtdb):
         return tax_db, mtdb.pd2mtdb(tax_db)
@@ -915,12 +919,12 @@ def rogue_update(
     if lineage_constraints:
         lineage_path = update_path + date + '.ncbi.posttax.df'
         if not os.path.isfile(lineage_path):
-            print('\nExtracting taxonomy from NCBI', flush = True)
+            print('\nExtracting lineages from NCBI', flush = True)
             # NEED to transition to datasets
             tax_dicts, ncbi_df = extract_constraint_lineages(ncbi_df, 
                                                       ncbi_api, kingdom,
                                                       lineage_constraints,
-                                                      tax_dicts)
+                                                      tax_dicts, update_path)
             ncbi_df.to_csv(lineage_path, sep = '\t', index = None)
         else:
             ncbi_df = pd.read_csv(lineage_path, sep = '\t')
@@ -950,7 +954,7 @@ def rogue_update(
                 tax_dicts, jgi_df = extract_constraint_lineages(jgi_df, 
                                                         ncbi_api, kingdom,
                                                         lineage_constraints,
-                                                        tax_dicts)
+                                                        tax_dicts, update_path)
                 jgi_df.to_csv(lineage_path, sep = '\t', index = None)
             else:
                 jgi_df = pd.read_csv(lineage_path, sep = '\t')
@@ -1105,7 +1109,8 @@ def rogue_update(
     else:
         rank = 'superkingdom'
     tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
-                                king=kingdom, rank = rank)
+                                king=kingdom, rank = rank,
+                                output_path = update_path)
     new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
     dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
@@ -1537,7 +1542,8 @@ def control_flow(init, update, reference, add, taxonomy,
         shutil.copy(primaryDB(), update_path)
 
         tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
-                                    king=king, rank = rank)
+                                    king=king, rank = rank, 
+                                    output_path = update_path)
         addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
         addDB = check_add_mtdb(orig_mtdb, addDB, update_path, overwrite)
 
