@@ -1319,9 +1319,20 @@ def db2primary(addDB, refDB, save = False, combined = False):
 
 def control_flow(init, update, reference, add, taxonomy,
                  predb, save, nonpublished,
-                 ncbi_only, lineage, rank, prokaryote, failed,
+                 ncbi_only, lineage, rank, kingdom, failed,
                  forbidden, resume, no_md5, cpu, ncbi_email = False,
                  ncbi_api = None, overwrite = True, fallback = False):
+
+    abbr2king = {'a': 'animals', 'r': 'archaea', 'f': 'fungi', 
+                 'b': 'bacteria', 'p': 'plants'} 
+
+    kingdom = kingdom.lower()
+    if kingdom not in abbr2king:
+        if kingdom not in set(abbr2king.values()):
+            eprint('\nERROR: invalid --kingdom', flush = True)
+            sys.exit(431)
+    else:
+        kingdom = abbr2king[kingdom]
 
     if not init \
         and not update \
@@ -1415,8 +1426,8 @@ def control_flow(init, update, reference, add, taxonomy,
                 eprint('\nERROR: MTDB linked. Unlink via `mtdb -u`')
                 sys.exit(175)
 
-    # prokaryote is nonpublished by default because it is all GenBank
-    if prokaryote:
+    # nonfungi is nonpublished by default because it is all GenBank
+    if kingdom != 'fungi':
         nonpublished = True
     # archaic placeholder for reference / rogue DB setup
     elif nonpublished and rogue_bool: 
@@ -1439,10 +1450,7 @@ def control_flow(init, update, reference, add, taxonomy,
 
 
     if init:
-        if prokaryote:
-            dbtype = 'prokaryote'
-        else:
-            dbtype = 'fungi'
+        dbtype = kingdom
         init_dir = format_path(init)
         if os.path.isdir(init_dir):
             init_dir += 'mycotoolsdb/'
@@ -1487,10 +1495,30 @@ def control_flow(init, update, reference, add, taxonomy,
 
     orig_db = orig_db.dropna(subset = ['ome'])
 
-    if config['branch'] == 'prokaryote':
+    if config['branch'] in {'prokaryote', 'bacteria'}:
         jgi = False
         group = 'prokaryotes'
         king = 'bacteria' # NEED to make DB tools pull from this
+        rank = 'superkingdom'
+    elif config['branch'] in {'plant'}:
+        jgi = False
+        group = 'eukaryotes'
+        king = 'viridiplantae'
+        rank = 'kingdom'
+#    elif config['branch'] in {'protists'}:
+ #       jgi = False
+  #      group = 'eukaryotes'
+   #     king = 'protists'
+    #    rank = 'kingdom'
+    elif config['branch'] in {'animals'}:
+        jgi = False
+        group = 'eukaryotes'
+        king = 'metazoa'
+        rank = 'kingdom'
+    elif config['branch'] in {'archaea'}:
+        jgi = False
+        group = 'prokaryotes'
+        king = 'Archaea'
         rank = 'superkingdom'
     else:
         jgi = not ncbi_only
@@ -1628,8 +1656,11 @@ def control_flow(init, update, reference, add, taxonomy,
 
 def main():
 
+    abbr2king = {'a': '[a]nimals', 'r': 'a[r]chaea', 'f': '[f]ungi', 
+                 'b': '[b]acteria', 'p': '[p]lants'} 
     parser = argparse.ArgumentParser(description = "Initializes or updates " \
-        + "MycotoolsDB (MTDB)")
+        + "MycotoolsDB (MTDB) derived from a kingdom of interest. Animals " \
+        + "= metazoa, plants = viridiplantae")
 
     init_args = parser.add_argument_group('MTDB Initializiation')
     init_args.add_argument('-i', '--init', 
@@ -1644,7 +1675,7 @@ def main():
     upd_args.add_argument('-a', '--add', help = '.mtdb with full paths to add to database')
     upd_args.add_argument('-t', '--taxonomy', action = 'store_true',
         help = 'Update taxonomy and exit')
-    upd_args.add_argument('-k', '--keep', action = 'store_true',
+    upd_args.add_argument('--keep', action = 'store_true',
         help = '[-a] Keep original MTDB data when adding overlapping accessions')
     upd_args.add_argument('--save', action = 'store_true', 
         help = '[-u] Do not integrate/delete new data; -a to complete')
@@ -1663,8 +1694,9 @@ def main():
     conf_args.add_argument('-rk', '--rank',
                            help = '[-i, -l]: Rank(s) that positionally ' \
                                 + 'correspond to -l')
-    conf_args.add_argument('-p', '--prokaryote', action = 'store_true',
-        help = '[PROKARY, -i]: Initialize prokaryote MTDB')
+    conf_args.add_argument('-k', '--kingdom', default = 'fungi',
+        help = '[-i]: Kingdom - ' + str(sorted(abbr2king.values())) \
+             + '; DEFAULT: fungi')
     conf_args.add_argument('--failed', action = 'store_true', 
         help = 'Rerun/ignore failed')
     conf_args.add_argument('--forbidden', action = 'store_true', 
@@ -1694,7 +1726,7 @@ def main():
 
     control_flow(args.init, args.update, args.reference, args.add, args.taxonomy,
                  args.predb, args.save, args.nonpublished,
-                 args.ncbi_only, args.lineage, args.rank, args.prokaryote, args.failed,
+                 args.ncbi_only, args.lineage, args.rank, args.kingdom, args.failed,
                  args.forbidden, args.resume, args.no_md5, args.cpu, 
                  ncbi_email = None, overwrite = not args.keep, 
                  fallback = args.fallback)
