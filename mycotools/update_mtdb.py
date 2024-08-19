@@ -1669,8 +1669,8 @@ def main():
     run_args.add_argument('--resume', type = int, help = 'Resume previous date (YYYYmmdd)')
     run_args.add_argument('--no_md5', action = 'store_true', help = 'Skip NCBI MD5'
         + ' (expedite large reruns)')
-    run_args.add_argument('--fallback', action = 'store_true', 
-        help = 'NCBI fallback script')
+    run_args.add_argument('--fallback', action = 'store_false', default = True, 
+        help = '[ALPHA] use NCBI datasets utility for downloading NCBI data')
     run_args.add_argument('-c', '--cpu', type = int, default = 1)
     args = parser.parse_args()
 
