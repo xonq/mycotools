@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-#NEED to add taxonomy for --add options
 #NEED reinit implementation
 #NEED to update introduction
 #NEED a verbose option
@@ -382,6 +381,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
     os.remove(datasets_path)
 
     acc2org, acc2meta = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+    print(f'\t\t{len(acc2meta)} genomes queried from GenBank', flush = True)
 
     # check for RefSeq for failed entries
     missing_accs = \
@@ -392,17 +392,18 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
             reattempt_acc.append(acc.upper().replace('GCA_', 'GCF_'))
         elif acc.upper().startswith('GCF'):
             reattempt_acc.append(acc.upper().replace('GCF_', 'GCA_'))
-    acc_file_re = output_path + 'assembly_accs.refseq.txt'
+    acc_file_re = taxonomy_dir + 'assembly_accs.refseq.txt'
     with open(acc_file_re, 'w') as out:
         out.write('\n'.join(reattempt_acc))
 
-    run_datasets(None, aa_file_re, taxonomy_dir, True, api = api)
+    run_datasets(None, acc_file_re, taxonomy_dir, True, api = api)
     datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
     with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
         zip_ref.extractall(taxonomy_dir)
     os.remove(datasets_path)
 
     acc2org_rs, acc2meta_rs = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+    print(f'\t\t{len(acc2meta_rs)} genome(s) queried from RefSeq', flush = True)
     acc2org, acc2meta = {**acc2org, **acc2org_rs}, {**acc2meta, **acc2meta_rs}
 
     df['strain'] = ''
@@ -914,7 +915,8 @@ def rogue_update(
     if lineage_constraints:
         lineage_path = update_path + date + '.ncbi.posttax.df'
         if not os.path.isfile(lineage_path):
-            print('\nExtracting lineages from NCBI', flush = True)
+            print('\nExtracting taxonomy from NCBI', flush = True)
+            # NEED to transition to datasets
             tax_dicts, ncbi_df = extract_constraint_lineages(ncbi_df, 
                                                       ncbi_api, kingdom,
                                                       lineage_constraints,
