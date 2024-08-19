@@ -1681,6 +1681,10 @@ def main():
         help = '[-i]: Initialize primary MTDB using a reference .mtdb')
     init_args.add_argument('--predb', 
         help = '[-i]: Initialize primary MTDB using a reference predb .tsv')
+    init_args.add_argument('-k', '--kingdom', default = 'fungi',
+        help = '[-i]: Kingdom - ' + str(sorted(abbr2king.values())) \
+             + '; DEFAULT: fungi')
+
 
     upd_args = parser.add_argument_group("MTDB Updating")
     upd_args.add_argument('-u', '--update', action = 'store_true')
@@ -1706,9 +1710,6 @@ def main():
     conf_args.add_argument('-rk', '--rank',
                            help = '[-i, -l]: Rank(s) that positionally ' \
                                 + 'correspond to -l')
-    conf_args.add_argument('-k', '--kingdom', default = 'fungi',
-        help = '[-i]: Kingdom - ' + str(sorted(abbr2king.values())) \
-             + '; DEFAULT: fungi')
     conf_args.add_argument('--failed', action = 'store_true', 
         help = 'Rerun/ignore failed')
     conf_args.add_argument('--forbidden', action = 'store_true', 
