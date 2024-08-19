@@ -369,10 +369,9 @@ def dwnld_ncbi_metadata(
 
 def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
 
-    # NEED to acquire strain name from datasets download of strain metadata
     if not os.path.isdir(taxonomy_dir):
         os.mkdir(taxonomy_dir)
-    aa_file = taxonomy_dir + 'assembly_accs.txt'
+    aa_file = taxonomy_dir + 'assembly_accs.genbank.txt'
     with open(aa_file, 'w') as out:
         out.write('\n'.join(list(df['assembly_acc'])))
 
@@ -383,6 +382,28 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
     os.remove(datasets_path)
 
     acc2org, acc2meta = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+
+    # check for RefSeq for failed entries
+    missing_accs = \
+        sorted(set(df['assembly_acc']).difference(set(acc2org.keys())))
+    reattempt_acc = []
+    for acc in missing_accs:
+        if acc.upper().startswith('GCA'):
+            reattempt_acc.append(acc.upper().replace('GCA_', 'GCF_'))
+        elif acc.upper().startswith('GCF'):
+            reattempt_acc.append(acc.upper().replace('GCF_', 'GCA_'))
+    acc_file_re = output_path + 'assembly_accs.refseq.txt'
+    with open(acc_file_re, 'w') as out:
+        out.write('\n'.join(reattempt_acc))
+
+    run_datasets(None, aa_file_re, taxonomy_dir, True, api = api)
+    datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
+    with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
+        zip_ref.extractall(taxonomy_dir)
+    os.remove(datasets_path)
+
+    acc2org_rs, acc2meta_rs = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+    acc2org, acc2meta = {**acc2org, **acc2org_rs}, {**acc2meta, **acc2meta_rs}
 
     df['strain'] = ''
     todel = set()
@@ -664,12 +685,6 @@ def ref_update(
     # initialize update
     print('\nInitializing run', flush = True)
     mk_wrk_dirs(update_path)
-#    prev_failed = parse_failed(rerun = rerun, file_path = format_path('$MYCODB/../log/failed.tsv'))
-#    duplicates = parse_dups(format_path('$MYCODB/../log/duplicates.tsv'))
-
-#    forbid_omes = acq_forbid_omes(
- #       file_path = format_path('$MYCODB/../log/relics.txt')
-  #      )
 
     jgi_df, ncbi_df = prepare_ref_db(ref_db, date)
 
@@ -704,23 +719,8 @@ def ref_update(
         else:
             jgi_mtdb = mtdb(jgi_predb_path)
 
-    
-#        new_db_path = update_path + date + '.checkpoint.jgi.mtdb'
- #       if not os.path.isfile(new_db_path): 
-  #          if len(jgi_db) > 0:
-   #             df2db( jgi_db, jgi_db_path )
-#                if not db is None:
- #                   new_db = pd.concat([jgi_db, db])
-  #              else:
-   #                 new_db = jgi_db
-#            else:
- #               new_db = db
-  #          df2db(new_db, new_db_path)
-   #     else:
-    #        new_db = db2df(new_db_path)
     else:
         jgi_mtdb = mtdb()
-#        new_dups = duplicates
     new_db = jgi_mtdb.mtdb2pd()
 
     print('\nAssimilating NCBI', flush = True)
