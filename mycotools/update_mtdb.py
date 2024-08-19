@@ -1667,7 +1667,8 @@ def control_flow(init, update, reference, add, taxonomy,
 
 def main():
 
-    abbr2king = {'a': '[a]nimals', 'r': 'a[r]chaea', 'f': '[f]ungi', 
+    abbr2king = {'a': '[a]nimals', #'r': 'a[r]chaea', 
+                 'f': '[f]ungi', 
                  'b': '[b]acteria', 'p': '[p]lants'} 
     parser = argparse.ArgumentParser(description = "Initializes or updates " \
         + "MycotoolsDB (MTDB) derived from a kingdom of interest. Animals " \
