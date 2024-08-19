@@ -11,7 +11,9 @@ import time
 import base64
 import urllib
 import getpass
+import zipfile
 import datetime
+import subprocess
 from tqdm import tqdm
 from Bio import Entrez
 from io import StringIO
@@ -691,7 +693,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count = 0):
 
 
 def gather_taxonomy(df, api_key = None, king='fungi',
-                    rank = 'kingdom', tax_dicts = {}):
+                    rank = 'kingdom', tax_dicts = {}, output_path = None):
     """Gather taxonomy for an MTDB or deprecated pd MTDB by querying NCBI's
     taxonomy hierarchy"""
     need_tax, tax_dicts = prepare_tax_dicts(df, tax_dicts)
@@ -712,6 +714,82 @@ def gather_taxonomy(df, api_key = None, king='fungi',
             tax_dicts[genus] = genus_tax
     
     return tax_dicts
+
+
+def gather_taxonomy_dataset(df, api_key = None, king = 'fungi',
+                    rank = 'kingdom', tax_dicts = {},
+                    output_path = None, verbose = False):
+    """Gather taxonomy for an MTDB or deprecated pd MTDB by querying NCBI's
+    taxonomy hierarchy"""
+    if not output_path:
+        tax_dicts = gather_taxonomy_fallback(df, api_key = api_key, king=key,
+                                 rank = rank, tax_dicts = tax_dicts)
+        return tax_dicts
+
+    need_tax, tax_dicts = prepare_tax_dicts(df, tax_dicts)
+
+    tax_accs_file = output_path + 'query_genera.txt'
+    with open(tax_accs_file, 'w') as out:
+        out.write('\n'.join(sorted(need_tax)))
+
+    cwd = os.getcwd()
+    os.chdir(output_path)
+    cmd_scaf = ['datasets', 'download', 'taxonomy', 'taxon', 
+                '--inputfile', tax_accs_file]
+    if api_key:
+        cmd_scaf.extend(['--api-key', api_key])
+
+#    if verbose:
+ #       v = None
+  #  else:
+   #     v = subprocess.DEVNULL
+    v = None
+    count = 0
+    dataset_path = output_path + 'ncbi_dataset.zip'
+    while count < 3:
+        cmd_call = subprocess.call(cmd_scaf, stdout = v, stderr = v)
+        try:
+            with zipfile.ZipFile(dataset_path, 'r') as zip_ref:
+                zip_ref.extractall(zip_ref)
+        except zipfile.BadZipFile:
+            count += 1
+            if count == 3:
+                eprint('ERROR: taxonomy acquisition failed', flush = True)
+                sys.exit(130)
+            continue
+        break
+    
+    os.remove(dataset_path)
+    unzip_path = output_path + 'ncbi_dataset/'
+
+    tax_dicts = parse_dataset_taxonomy(f'{unzip_path}data/taxonomy_report.jsonl',
+                                        tax_dicts, king, rank)
+
+    os.chdir(cwd)
+    return tax_dicts
+
+def parse_dataset_taxonomy(tax_json, tax_dicts, tax_head, rank_head):
+    """Parse the dataset taxonomy list"""
+    tax_strs = {'superkingdom', 'kingdom', 'phylum', 'subphylum', 'class', 
+                'order', 'family', 'subfamily'}
+
+    with open(tax_json, 'r') as raw:
+        for line in raw:
+            tax_line = json.loads(line.rstrip())
+            tax_dict = {}
+            if rank_head.lower() in tax_line['classification']:
+                if tax_line['classification'][rank_head.lower()].lower() \
+                    != tax_head.lower():
+                    continue
+                for rank, data in tax_line['classification']:
+                    if rank.lower() in tax_strs:
+                        tax = data['name']
+                        tax_dict[rank] = tax
+                genus = tax_dict['genus']['name']
+                tax_dicts[genus] = tax_dict
+
+    return tax_dicts
+
 
 
 def read_tax(taxonomy_string):
