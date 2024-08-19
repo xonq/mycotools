@@ -1679,7 +1679,7 @@ def main():
                            help = 'Initialize MTDB in dir')
     init_args.add_argument('-r', '--reference', 
         help = '[-i]: Initialize primary MTDB using a reference .mtdb')
-    init_args.add_argument('--predb', 
+    init_args.add_argument('-p', '--predb', 
         help = '[-i]: Initialize primary MTDB using a reference predb .tsv')
     init_args.add_argument('-k', '--kingdom', default = 'fungi',
         help = '[-i]: Kingdom - ' + str(sorted(abbr2king.values())) \
