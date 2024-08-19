@@ -375,7 +375,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
     with open(aa_file, 'w') as out:
         out.write('\n'.join(list(df['assembly_acc'])))
 
-    run_datasets(None, aa_file, taxonomy_dir, True, api = api)
+    run_datasets(None, aa_file, taxonomy_dir, True, api = api, verbose = True)
     datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
     with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
         zip_ref.extractall(taxonomy_dir)
@@ -457,6 +457,16 @@ def clean_ncbi_df(ncbi_df, update_path, kingdom = 'Fungi', api = None):
     if kingdom.lower() == 'fungi':
         # extract group of interest (case sensitive to first letter)
         ncbi_df = ncbi_df[ncbi_df['Group'] == 'Fungi']
+    elif kingdom.lower() in {'plants', 'viridiplantae'}:
+        ncbi_df = ncbi_df[ncbi_df['Group'] == 'Plants']
+    elif kingdom.lower() in {'animals', 'metazoa'}:
+        ncbi_df = ncbi_df[ncbi_df['Group'] == 'Animals']
+    elif kingdom.lower() in {'bacteria', 'prokaryotes'}:
+        ncbi_df = ncbi_df[ncbi_df['Group'] != 'Archaea']
+    elif kingdom.lower() in {'archaea'}:
+        ncbi_df = ncbi_df[ncbi_df['Group'] == 'Archaea']
+
+    ncbi_df = ncbi_df[ncbi_df['assembly_acc'].str.startswith(('GCA', 'GCF'))]
 
     ncbi_df, acc2meta = prep_taxa_cols(ncbi_df, 
                                        update_path + 'taxonomy/', 
@@ -826,7 +836,8 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
     # begin extracting lineages of interest and store tax_dicts for later
     if 'taxonomy' not in df.columns:
         df['taxonomy'] = [{} for x in range(len(df))]
-    if kingdom.lower() == 'fungi':
+    if kingdom.lower() in {'fungi', 'plants', 'animals', 'metazoa',
+                           'viridiplantae'}:
         query_rank = 'kingdom'
     else:
         query_rank = 'superkingdom'
@@ -1500,7 +1511,7 @@ def control_flow(init, update, reference, add, taxonomy,
         group = 'prokaryotes'
         king = 'bacteria' # NEED to make DB tools pull from this
         rank = 'superkingdom'
-    elif config['branch'] in {'plant'}:
+    elif config['branch'] in {'plants'}:
         jgi = False
         group = 'eukaryotes'
         king = 'viridiplantae'
