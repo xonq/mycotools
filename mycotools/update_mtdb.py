@@ -34,7 +34,7 @@ from mycotools.lib.dbtools import db2df, df2db, gather_taxonomy, assimilate_tax,
     mtdb_initialize
 from mycotools.lib.kontools import intro, outro, format_path, eprint, \
                                    prep_output, collect_files, read_json, \
-                                   write_json, split_input
+                                   write_json, split_input, findExecs
 from mycotools.lib.biotools import fa2dict, gff2list, dict2fa, list2gff
 from mycotools.ncbiDwnld import esearch_ncbi, esummary_ncbi, run_datasets, \
                                    compile_organism_names, main as ncbiDwnld
@@ -1735,6 +1735,7 @@ def main():
         'Save raw data': args.save
         }
 
+    findExecs(['datasets'], exit = {'datasets'})
     start_time = intro('Update MycotoolsDB', args_dict)
 
     control_flow(args.init, args.update, args.reference, args.add, args.taxonomy,
