@@ -175,6 +175,8 @@ def run_mf(clipkit_files, out_dir, constraint = False,
 
     # if scripts of each ModelFinder run are desired to be run independently
     if scripts:
+        clipkit_files = [x for x in clipkit_files \
+                         if not os.path.isfile(f'{out_dir}{os.path.basename(x)}.contree')]
         return {os.path.basename(v): cmds[i] for i, v in enumerate(clipkit_files)}
 
     # otherwise parallelize and run ModelFinder directly
