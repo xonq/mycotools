@@ -23,7 +23,7 @@ from Bio import Entrez
 from datetime import datetime
 from mycotools.lib.kontools import intro, outro, format_path, prep_output, \
                                    mkOutput, eprint, vprint, findExecs, \
-                                   read_json
+                                   read_json, split_input
 from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
 
 pd.options.mode.chained_assignment = None
@@ -548,7 +548,7 @@ def get_SRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
                     cmd = subprocess.call([
                         fastqdump, '--split-3', '--gzip', srr], 
                         stdout = subprocess.PIPE)
-                    if os.path.isfile(srr + '_1.fastq'):
+                    if os.path.isfile(f'../{srr}_1.fastq.gz'):
   #                  if os.path.isfile(srr + '_1.fastq'):
 #                        cmd = subprocess.call(['gzip', f'{srr}_1.fastq'])
  #                       cmd = subprocess.call(['gzip', f'{srr}_2.fastq'])
@@ -573,13 +573,13 @@ def get_SRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
                     if cmd:
                         continue
 #                    cmd = subprocess.call(['gzip', f'{srr}.fastq'])
-                    if os.path.isfile(srr + '.fastq.gz'):
-                        shutil.move(srr + '.fastq.gz', assembly_acc + '_' + srr + '.fq.gz')
+                    if os.path.isfile(f'../{srr}.fastq.gz'):
+                        shutil.move(f'{srr}.fastq.gz', f'{assembly_acc}_{srr}.fq.gz')
                     else:
                         print('\t\t\tERROR: file failed', flush = True)
 
 
-def goSRA(df, output = os.getcwd() + '/', pe = True):
+def goSRA(df, output = os.getcwd() + '/', pe = True, column = 'sra'):
 
     print()
     sra_dir = output + 'sra/'
@@ -589,14 +589,9 @@ def goSRA(df, output = os.getcwd() + '/', pe = True):
     fastqdump = findExecs('fastq-dump', exit = {'fastq-dump'})
     count = 0
 
-    if 'sra' in df.keys():
-        row_key = 'sra'
-    else:
-        row_key = 'assembly_acc'
-
     for i, row in df.iterrows():
-        print('\t' + row[row_key], flush = True)
-        get_SRA(row[row_key], fastqdump[0])
+        print('\t' + row[column], flush = True)
+        get_SRA(row[column], fastqdump[0])
         count +=1
         if count >= 10:
             time.sleep(1)
@@ -663,9 +658,17 @@ def cli():
     start_time = intro('Download NCBI files',args_dict)
     if args.sra:
         if os.path.isfile(format_path(args.input)):
-            goSRA(pd.read_csv(format_path(args.input), sep = '\t'), output, pe = args.paired)
+            if not args.column:
+                goSRA(pd.read_csv(format_path(args.input), sep = '\t',
+                                  names = ['sra']), output, 
+                      pe = args.paired, column = 'sra')
+            else:
+                goSRA(pd.read_csv(format_path(args.input), sep = '\t'), 
+                      output, 
+                      pe = args.paired, column = args.column)
         else:
-            goSRA(pd.DataFrame({'sra': [args.input.rstrip()]}), output, pe = args.paired)
+            goSRA(pd.DataFrame({'sra': split_input(args.input)}), output, 
+                  pe = args.paired, column = 'sra')
     else:
         if os.path.isfile(format_path(args.input)):
             ncbi_df = pd.read_csv(args.input, sep = '\t', header = None)
@@ -700,7 +703,7 @@ def cli():
             else:
                 ncbi_column = args.ncbi_column.lower()
         else:
-            ncbi_df = pd.DataFrame({'assembly_acc': args.input.replace('"','').replace("'",'').split()})
+            ncbi_df = pd.DataFrame({'assembly_acc': split_input(args.input)})
             column = 'assembly_acc'
             ncbi_column = 'assembly'
 
