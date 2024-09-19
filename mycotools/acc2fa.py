@@ -29,7 +29,10 @@ def extract_mtdb_accs(fa_dict, accs, spacer = ''):
                 try:
                     start, end = [int(x) for x in coords.split('-')]
                 except ValueError: # invalid coordinates, try whole acc
-                    out_fa[acc] = fa_dict[acc]
+                    try:
+                        out_fa[acc] = fa_dict[acc]
+                    except KeyError:
+                        eprint(f'WARNING: {acc} has no CDS', flush = True)    
                     continue
             acc_name = acc[:acc.find('[')]
             if start < end:
