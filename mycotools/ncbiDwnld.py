@@ -548,12 +548,14 @@ def get_SRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
                     cmd = subprocess.call([
                         fastqdump, '--split-3', '--gzip', srr], 
                         stdout = subprocess.PIPE)
-                    if os.path.isfile(f'../{srr}_1.fastq.gz'):
+                    if os.path.isfile(f'{srr}_1.fastq.gz'):
   #                  if os.path.isfile(srr + '_1.fastq'):
 #                        cmd = subprocess.call(['gzip', f'{srr}_1.fastq'])
  #                       cmd = subprocess.call(['gzip', f'{srr}_2.fastq'])
-                        shutil.move(srr + '_1.fastq.gz', assembly_acc + '_' + srr + '_1.fq.gz')
-                        shutil.move(srr + '_2.fastq.gz', assembly_acc + '_' + srr + '_2.fq.gz')
+                        shutil.move(f'{srr}_1.fastq.gz', 
+                                    f'{assembly_acc}_{srr}_1.fq.gz')
+                        shutil.move(f'{srr}_2.fastq.gz', 
+                                    f'{assembly_acc}_{srr}_2.fq.gz')
                     else:
 #                        cmd = subprocess.call(['gzip', f'{srr}.fastq'])
                         print('\t\t\tWARNING: file failed or not paired-end', flush = True)
@@ -573,7 +575,7 @@ def get_SRA(assembly_acc, fastqdump = 'fastq-dump', pe = True):
                     if cmd:
                         continue
 #                    cmd = subprocess.call(['gzip', f'{srr}.fastq'])
-                    if os.path.isfile(f'../{srr}.fastq.gz'):
+                    if os.path.isfile(f'{srr}.fastq.gz'):
                         shutil.move(f'{srr}.fastq.gz', f'{assembly_acc}_{srr}.fq.gz')
                     else:
                         print('\t\t\tERROR: file failed', flush = True)
