@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import os
+import re
 import sys
 import argparse
 from itertools import chain
@@ -45,6 +46,10 @@ def prune_to_new(phylo, tips = [], spacer = ''):
             phylo.prune()
     return phylo
 
+def rm_support(phylo_str):
+    """Remove support values (IQ-TREE tested)"""
+    phylo_str = re.sub(r'\)\d+\.?\d*:', '):', phylo_str)
+    return phylo_str
 
 def main(phylo_path, db = None, 
          tips = [], root = [], trim = False,
@@ -62,6 +67,8 @@ def main(phylo_path, db = None,
     return phylo
 
 
+
+
 def cli():
     parser = argparse.ArgumentParser(description = \
         'Phylogeny manipulation tools')
@@ -72,8 +79,9 @@ def cli():
     parser.add_argument('-p', '--prune', action = 'store_true',
                         help = 'Remove omes absent from input')
     parser.add_argument('-c', '--convert', help = 'File of tips to new names')
-    parser.add_argument('-r', '--root',
-                        help = 'Root on tip(s)')
+    parser.add_argument('-r', '--root', help = 'Root on tip(s)')
+    parser.add_argument('-s', '--support', action = 'store_false', default = True,
+                        help = 'Omit support values')
     args = parser.parse_args()
 
     root = split_input(args.root)
@@ -110,10 +118,16 @@ def cli():
             tips = sorted(db['ome'])
     else:
         db = None
+
     phylo = main(format_path(args.input), db, tips, 
                  trim = args.prune, root = root, convert = convert)
+
     eprint(f'{len(phylo.get_tip_names())} tips on output', flush = True)
-    print(phylo.get_newick(with_distances = True), flush = True)
+    p_str = phylo.get_newick(with_distances = True)
+    if args.support:
+        print(p_str, flush = True)
+    else:
+        print(rm_support(p_str), flush = True)
 
 
 if __name__ == '__main__':
