@@ -9,7 +9,7 @@ def main(in_file, in_fmt, out_fmt):
     SeqIO.convert(in_file, in_fmt, sys.stdout, out_fmt)
 
 def cli():
-    usage = 'bioreform.py <INPUT_FILE> <OUT_FORMAT> [IN_FORMAT]' \
+    usage = 'bioreform <INPUT_FILE> <OUT_FORMAT> [IN_FORMAT]' \
           + '\nIN_FORMAT is required for ambiguous extensions'
     args = sys_start(sys.argv[1:], usage, 2, files = [sys.argv[1]])
     in_file, out_fmt = format_path(args[0]), args[1]

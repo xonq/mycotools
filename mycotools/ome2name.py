@@ -128,7 +128,7 @@ def main(db, data_input, genus = True, species = True, strain = True,
 
 def cli():
     """Command line entry point"""
-    usage = 'USAGE: ome2name.py <INPUTFILE> | ome2name.py <INPUTFILE>' \
+    usage = 'USAGE: ome2name <INPUTFILE> | ome2name.py <INPUTFILE>' \
         + ' [.mtdb] asvg*&\nDEFAULTS: master db, see script for default' \
         + ' forbidden characters' + \
         '\nInput file to regex sub omes with their name.\n' + \

@@ -36,7 +36,7 @@ def cli():
     """Command-line interface for extracting sequences from a FASTA or set of
     FASTA inputs"""
     usage = 'Input nucleotide fasta/tsv input, extract coordinates\n' \
-        + 'coords2fa.py <FA> <SEQID> <START_COORD> <END_COORD> <STRAND_SENSE>' \
+        + 'coords2fa <FA> <SEQID> <START_COORD> <END_COORD> <STRAND_SENSE>' \
         + '\nExtract full sequence from sense strand: coords2fa.py test.fna ' \
         + 'scaffold_20 0 -1' \
         + '\nExtract coordinates from antisense strand: coords2fa.py ' \
