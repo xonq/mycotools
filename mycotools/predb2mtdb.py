@@ -625,10 +625,10 @@ def main(
 
 
 def cli():
-    usage = 'Generate a predb file:\npredb2mtdb.py\n\nCreate a mycotoolsdb ' + \
-    'from a predb file:\npredb2mtdb.py <PREDBFILE>\n\nCreate a mycotoolsdb ' + \
-    'referencing an alternative master database:\npredb2mtdb.py <PREDBFILE> ' + \
-    '<REFERENCEDB>\nSkip failing genomes:\npredb2mtdb.py <PREDBFILE> -s'
+    usage = 'Generate a predb file:\npredb2mtdb\n\nCreate a mycotoolsdb ' + \
+    'from a predb file:\npredb2mtdb <PREDBFILE>\n\nCreate a mycotoolsdb ' + \
+    'referencing an alternative master database:\npredb2mtdb <PREDBFILE> ' + \
+    '<REFERENCEDB>\nSkip failing genomes:\npredb2mtdb <PREDBFILE> -s'
 
     if any(x in {'-h', '--help', '-help'} for x in sys.argv):
         eprint('\n' + usage + '\n', flush = True)
