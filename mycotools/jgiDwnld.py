@@ -133,11 +133,13 @@ def parse_xml(ft, xml_file, masked = False, forbidden = {}, filtered = True):
     flip = True
     org_name = None
     has_flipped = False
+    attempt = 0
 
     # flip is a way to rerun the loop if the file type changes (e.g. from
     # masked to unmasked); parse through the XML hiearchy in accord with the
     # hashes established above
-    while flip:
+    while flip and attempt < 10:
+        attempt += 1
         for child in root:
             # conserved subdirectory we need
             if 'Files' == child.attrib['name']:
