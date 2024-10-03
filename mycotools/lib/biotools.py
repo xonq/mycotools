@@ -123,6 +123,29 @@ def dict2fq(fastq_dict, description = True):
 
     return fastq_string
 
+def xmfa2dict(xmfa_in):
+    xmfa_dict = defaultdict(dict)
+    count = 0
+    with open(xmfa_in, 'r') as raw:
+        for line in raw:
+            data = line.rstrip()
+            if data == '=':
+                count += 1
+            elif data.startswith('>'):
+                header = data[2:].split(' ')
+                seq_info = header[0]
+                seq_name, coords = seq_info.split(':')
+                xmfa_dict[seq_name][count] = {'sequence': '', 
+                                              'description': \
+                                              ' '.join(header[1:])}
+
+            elif not data.startswith('#'):
+                xmfa_dict[seq_name][count]['sequence'] += data
+    if not xmfa_dict[-1]:
+        del xmfa_dict[-1]
+
+    return xmfa_dict
+                
 
 def fa2dict(fasta_input): #file_ = True):
     fasta_dict = {}
