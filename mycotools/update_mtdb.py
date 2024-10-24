@@ -21,6 +21,7 @@ import shutil
 import getpass
 import hashlib
 import zipfile
+import requests
 import argparse
 import subprocess
 import numpy as np
@@ -327,20 +328,30 @@ def dwnld_mycocosm(
     """Download the MycoCosm genome data spreadsheet, format to UTF-8 and
     return a Pandas dataframe of the data"""
 
+    check_curl = findExecs(['curl'], verbose = False)
+
     if not os.path.isfile(out_file):
         for attempt in range(3):
-            curl_cmd = subprocess.call(
-                ['curl', mycocosm_url, '-o', out_file + '.tmp'],
-                stdout = subprocess.PIPE
-                )
-            if not curl_cmd:
+            if check_curl:
+                curl_cmd = subprocess.call(
+                    ['curl', mycocosm_url, '-o', out_file + '.tmp'],
+                    stdout = subprocess.PIPE
+                    )
+                if not curl_cmd:
+                    shutil.move(out_file + '.tmp', out_file)
+                    break
+            if curl_cmd:
+                eprint('\nERROR: failed to retrieve MycoCosm table', flush = True)
+            else:
+                resp = requests.get(url)
+                with open(out_file + '.tmp', 'wb') as f:
+                    f.write(resp.content)
                 shutil.move(out_file + '.tmp', out_file)
-                break
-        if curl_cmd:
-            eprint('\nERROR: failed to retrieve MycoCosm table', flush = True)
                 
     try:
         jgi_df = pd.read_csv(out_file, encoding = 'cp1252')
+    except UnicodeDecodeError:
+        jgi_df = pd.read_csv(out_file, encoding = 'latin1')
     except UnicodeDecodeError:
         jgi_df = pd.read_csv(out_file, encoding = 'utf-8')
     jgi_df.columns = [x.replace('"','').replace('"','') for x in jgi_df.columns]
@@ -1488,7 +1499,12 @@ def control_flow(init, update, reference, add, taxonomy,
             os.mkdir(update_path)
         mtdb_initialize(init_dir, init = True) #init_dir + 'config/mtdb.json', init = True)
     else:
-        output = format_path('$MYCODB/..')
+        try:
+            output = format_path('$MYCODB/..')
+        except KeyError:
+            eprint('\nERROR: MTDB not linked. Link via `mtdb -i <DB_PATH>`',
+                    flush = True)
+            sys.exit(50)
         update_path = output + 'log/' + date + '/'
         if not os.path.isdir(update_path):
             os.mkdir(update_path)
