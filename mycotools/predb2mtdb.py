@@ -608,8 +608,13 @@ def main(
             ])
 
     vprint('\nCurating data', v = verbose, flush = True)
-    with mp.Pool(processes = cpus) as pool:
-        cur_data = pool.starmap(cur_mngr, tqdm(cur_cmds, total = len(cur_cmds)))
+    if cpus > 1:
+        with mp.Pool(processes = cpus) as pool:
+            cur_data = pool.starmap(cur_mngr, tqdm(cur_cmds, total = len(cur_cmds)))
+    else:
+        cur_data = []
+        for cur_cmd in tqdm(cur_cmds, total = len(cur_cmds)):
+            cur_data.append(cur_mngr(*cur_cmd))
 
     for data in cur_data:
         if not data[1]:
