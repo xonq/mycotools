@@ -4,6 +4,7 @@
 
 import re
 import sys
+from collections import defaultdict
 from mycotools.lib.kontools import eprint
 
 aa_weights = {
