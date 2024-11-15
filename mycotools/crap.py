@@ -901,8 +901,14 @@ def crap_mngr(
    
 def write_loci(ome2genes, loc_dir):
     for ome, genes in ome2genes.items():
-        with open(f'{loc_dir}/{ome}.txt', 'w') as out:
-            out.write('\n'.join(genes))
+        if genes:
+            with open(f'{loc_dir}/{ome}.txt', 'w') as out:
+                for gene, query in genes.items():
+                    queries = ','.join(query)
+                    out.write(f'{gene}\t{queries}\n')
+        else:
+            eprint(f'\t{ome} no hits', flush = True)
+#            out.write('\n'.join(genes))
 
 def calc_sorensen(interlen, len0, len1):
     return 2*interlen/(len0 + len1)
@@ -917,6 +923,7 @@ def parse_search_col_loci(ome, files, queries, rep_dir,
     """Extract the most similar locus based on similarity index of overlapping
     genes with the queries"""
     loc2sim = {}
+    alias2quer = {}
     for f in files:
         hgs = set()
         gff = gff2list(f)
@@ -927,6 +934,7 @@ def parse_search_col_loci(ome, files, queries, rep_dir,
             alia.append(alias)
             hit = re_comp.search(entry['attributes'])
             if hit is not None:
+                alias2quer[alias] = hit[1].split('|')
                 hgs = hgs.union(set(hit[1].split('|')))
                 alia_set.add(alias)
                         
@@ -964,8 +972,7 @@ def parse_search_col_loci(ome, files, queries, rep_dir,
     top_loc = set(chain(*[v[0] for k, v in loc2sim.items() \
         if v[1] == max_sim]))
 
-    return ome, sorted(top_loc)
-
+    return ome, {k: alias2quer[k] for k in sorted(top_loc)}
 
 
 def parse_collected_loci(ome, files, queries, report_dir, calc_index = calc_jaccard,
@@ -973,6 +980,7 @@ def parse_collected_loci(ome, files, queries, report_dir, calc_index = calc_jacc
     """Extract the most similar locus based on similarity index of overlapping
     genes with the queries"""
     loc2sim = {}
+    alias2quer = {}
     for f in files:
         hgs = set()
         gff = gff2list(f)
@@ -982,6 +990,7 @@ def parse_collected_loci(ome, files, queries, report_dir, calc_index = calc_jacc
             alia.append(alias)
             hit = re_comp.search(entry['attributes'])
             if hit is not None:
+                alias2quer[alias] = hit[1].split('|')
                 hgs = hgs.union(set(hit[1].split('|')))
         intersection = hgs.intersection(queries)
         locus_sim = calc_index(len(intersection), len(hgs), len(queries))
@@ -997,7 +1006,7 @@ def parse_collected_loci(ome, files, queries, report_dir, calc_index = calc_jacc
     top_loc = set(chain(*[v[0] for k, v in loc2sim.items() \
         if v[1] == max_sim]))
 
-    return ome, sorted(top_loc)
+    return ome, {k: alias2quer[k] for k in sorted(top_loc)}
 
 def locus_output_mngr(gff_dir, loc_dir, queries, report_dir = None,
                       re_comp = re.compile(r'HG=([^;]+)'),
@@ -1044,6 +1053,11 @@ def hg_main(
     wrk_dir, loc_dir = out_dir + 'working/', out_dir + 'loci/'
     gff_dir, tre_dir = wrk_dir + 'genes/', wrk_dir + 'trees/'
     clus_dir = wrk_dir + 'clus/'
+    if fast:
+        tree_suffix = '.fa.mafft.clipkit.treefile'
+    else:
+        tree_suffix = '.fa.mafft.clipkit.contree'
+
     db = db.set_index()
 
     print('\nCompiling homolog data', flush = True)
@@ -1071,6 +1085,18 @@ def hg_main(
     if not input_hgs:
         eprint('\nERROR: no HGs for any inputted genes', flush = True)
         sys.exit(3)
+
+    if output_loci:
+        if all(os.path.isfile(f'{tre_dir}{gene}{tree_suffix}') \
+               for gene in input_hgs):
+            print('\nSkipping to outputting most similar loci to query',
+                  flush = True)
+            locus_output_mngr(gff_dir, loc_dir, set(input_hgs),
+                          None, 
+                          re_comp = re.compile(r'HG=([^;]+)'),
+                          calc_index = calc_jaccard, cpus = cpus)
+            return
+
 
     hg_fas = {}
     if not all(os.path.isfile(f'{faa_dir}{hg}.faa') for gene, hg in input_hgs.items()):
@@ -1112,10 +1138,6 @@ def hg_main(
 
     print('\nCRAP', flush = True)
     ome_gene2hg = gene2hg2ome2hg(gene2hg)
-    if fast:
-        tree_suffix = '.fa.mafft.clipkit.treefile'
-    else:
-        tree_suffix = '.fa.mafft.clipkit.contree'
     fas4trees = {k: v for k, v in sorted(fas4trees.items(), key = lambda x: len(x[1]))}
     for query, query_fa in fas4trees.items():
         out_keys = None
@@ -1216,8 +1238,14 @@ def search_main(
     wrk_dir, loc_dir = out_dir + 'working/', out_dir + 'loci/'
     gff_dir, tre_dir = wrk_dir + 'genes/', wrk_dir + 'trees/'
     clus_dir = wrk_dir + 'clus/'
+    if fast:
+        tree_suffix = '.fa.mafft.clipkit.treefile'
+    else:
+        tree_suffix = '.fa.mafft.clipkit.contree'
+
 
     query2color, conversion_dict = make_color_palette(input_genes, conversion_dict)
+
 
     if query_gff:
         print('\tCleaning input GFF', flush = True)
@@ -1262,6 +1290,18 @@ def search_main(
         elif os.path.isfile(wrk_dir + query + '.fa'):
             search_fas[query] = fa2dict(wrk_dir + query + '.fa')
             search_fas[query][query] = query_fa[query]
+
+    if output_loci:
+        if all(os.path.isfile(f'{tre_dir}{gene}{tree_suffix}') \
+               for gene in search_fas):
+            print('\nSkipping to outputting most similar loci to query',
+                  flush = True)
+            locus_output_mngr(gff_dir, loc_dir, set(search_fas.keys()),
+                      report_dir = wrk_dir + 'reports/',
+                      re_comp = re.compile(r'SearchQuery=([^;]+)'),
+                      calc_index = calc_jaccard, cpus = cpus)
+            return
+
 
     skips = list(search_fas.keys())
     omes = set(db['ome'])
@@ -1309,10 +1349,6 @@ def search_main(
 
     print('\nCRAP', flush = True)
     ome2genes = {}
-    if fast:
-        tree_suffix = '.fa.mafft.clipkit.treefile'
-    else:
-        tree_suffix = '.fa.mafft.clipkit.contree'
     fas4trees = {k: v for k, v in sorted(fas4trees.items(), key = lambda x: len(x[1]))}
     for query, query_fa in fas4trees.items():
         out_keys = None
