@@ -422,7 +422,8 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
     if not os.path.isdir(refseq_dir):
         os.mkdir(refseq_dir)
     missing_accs = \
-        sorted(set(df['assembly_acc']).difference(set(acc2org.keys())))
+        sorted(set(df['assembly_acc']).difference(
+                       set(acc2org_n.keys()).union(set(acc2org.keys()))))
     reattempt_acc = []
     for acc in missing_accs:
         if acc.upper().startswith('GCA'):
@@ -435,7 +436,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
 
     # attempt to download the ncbi_datasets zip file until allowed attempts are
     # exhausted
-    if not os.path.isdir(taxonomy_dir + 'ncbi_dataset'):
+    if not os.path.isdir(refseq_dir + 'ncbi_dataset'):
         print(f'\t\tChecking RefSeq for {len(reattempt_acc)} entries', flush = True)
         rs_datasets_path = refseq_dir + 'ncbi_dataset.zip'
         attempts = 0
@@ -458,7 +459,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
                     sys.exit(10)
 
     
-    acc2org_rs, acc2meta_rs = compile_organism_names(refseq_dir + 'ncbi_dataset/')
+    acc2org_rs, acc2meta_rs, org_failed_2 = compile_organism_names(refseq_dir + 'ncbi_dataset/')
     print(f'\t\t{len(acc2meta_rs)} genome(s) queried from RefSeq', flush = True)
     acc2org, acc2meta = {**acc2org, **acc2org_n, **acc2org_rs}, {**acc2meta, **acc2meta_rs}
 
