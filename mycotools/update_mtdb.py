@@ -411,7 +411,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
                 if attempts == max_attempts:
                     sys.exit(11)
     
-    acc2org, acc2meta, org_failed = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+    acc2org_n, acc2meta, org_failed = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
     print(f'\t\t{len(acc2meta) + len(org_failed)}', 
           'genomes queried from GenBank', flush = True)
     print(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed', flush = True)
@@ -460,7 +460,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
     
     acc2org_rs, acc2meta_rs = compile_organism_names(refseq_dir + 'ncbi_dataset/')
     print(f'\t\t{len(acc2meta_rs)} genome(s) queried from RefSeq', flush = True)
-    acc2org, acc2meta = {**acc2org, **acc2org_rs}, {**acc2meta, **acc2meta_rs}
+    acc2org, acc2meta = {**acc2org, **acc2org_n, **acc2org_rs}, {**acc2meta, **acc2meta_rs}
 
     df['strain'] = ''
     todel = set()
