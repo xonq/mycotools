@@ -1595,18 +1595,23 @@ def control_flow(init, update, reference, add, taxonomy,
         gff_fail, fna_fail, faa_fail = False, False, False
         if not all(os.path.isfile(format_path(x)) \
                    for x in addDB.reset_index()['gff3']):
-            gff_fail = True
+            eprint('\nERROR: some GFF paths do not exist', flush = True)
+            gff_fail = [x for x in addDB.reset_index()['gff3'] \
+                        if not os.path.isfile(format_path(x))]
+            print(','.join(gff_fail), flush = True)
         if not all(os.path.isfile(format_path(x)) \
                    for x in addDB.reset_index()['fna']):
-            fna_fail = True
+            eprint('\nERROR: some FNA paths do not exist', flush = True)
+            fna_fail = [x for x in addDB.reset_index()['fna'] \
+                        if not os.path.isfile(format_path(x))]
+            print(','.join(fna_fail), flush = True)
         if not all(os.path.isfile(format_path(x)) \
                    for x in addDB.reset_index()['faa']):
-            faa_fail = True
+            eprint('\nERROR: some FAA paths do not exist', flush = True)
+            faa_fail = [x for x in addDB.reset_index()['faa'] \
+                        if not os.path.isfile(format_path(x))]
+            print(','.join(faa_fail), flush = True)
         if gff_fail or fna_fail or faa_fail:
-            eprint('\nERROR: some paths in addition MTDB do not exist: ',
-                   flush = True)
-            eprint(f'\tFNA: {fna_fail}; GFF3: {gff_fail}; FAA: {faa_fail}',
-                   flush = True)
             sys.exit(124)
 
         addDB['aquisition_date'] = [date for x in addDB['ome']] 

@@ -17,7 +17,6 @@ def compile_tree(tree_path, root = [], verbose = False):
 
     if len(root) == 1:
         phylo = phylo.rooted_with_tip(root[0])
-        phylo.write(tree_path, with_distances = True)
     elif len(root) > 1:
         nodes = {k: (v, len(v.get_tip_names())) \
                  for k, v in phylo.get_nodes_dict().items() \
