@@ -377,6 +377,7 @@ def dwnld_ncbi_metadata(
  
     return ncbi_df
 
+
 def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
 
     # NEED to output checkpoint here
@@ -462,7 +463,8 @@ def prep_jgi_cols(jgi_df, name_col = 'name'):
     return jgi_df
 
 
-def clean_ncbi_df(ncbi_df, update_path, kingdom = 'Fungi', api = None):
+def clean_ncbi_df(ncbi_df, update_path, kingdom = 'Fungi', 
+                  api = None, fallback = False):
     ncbi_df = ncbi_df.astype(str).replace(np.nan, '')
 
     if kingdom.lower() == 'fungi':
@@ -482,7 +484,6 @@ def clean_ncbi_df(ncbi_df, update_path, kingdom = 'Fungi', api = None):
     ncbi_df, acc2meta = prep_taxa_cols(ncbi_df, 
                                        update_path + 'taxonomy/', 
                                        api = api)
-
 
     # remove entries without sufficient metadata
     ncbi_df = ncbi_df.dropna(subset = ['genus'])
@@ -696,6 +697,17 @@ def internal_redundancy_check(db):
     return db2df(db.reset_index())
 
 
+def read_prev_tax(tax_path):
+    """Open a genus to taxonomy JSON path"""
+    tax_dicts = {}
+    if os.path.isfile(tax_path):
+        with open(tax_path, 'r') as raw:
+            for line in raw:
+                data = line.rstrip().split('\t')
+                tax_dicts[data[0]] = json.loads(data[1])
+    return tax_dicts
+
+
 def ref_update(
     ref_db, update_path, date, rerun, jgi_email, jgi_pwd,
     config, ncbi_email, ncbi_api, cpus = 1, check_MD5 = True,
@@ -825,9 +837,11 @@ def ref_update(
         sys.exit(0)
 
     if taxonomy: #already completed
+        tax_path = f'{update_path}../taxonomy.tsv'
+        tax_dicts = read_prev_tax(tax_path)
         tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
                                 king=kingdom, rank = rank, 
-                                output_path = update_path)
+                                output_path = tax_path, tax_dicts = tax_dicts)
         new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
         dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
     
@@ -840,7 +854,7 @@ def ref_update(
 
 def extract_constraint_lineages(df, ncbi_api, kingdom,
                                 lineage_constraints, tax_dicts,
-                                tax_dir):
+                                tax_path):
     """Extract genera from NCBI and JGI Pandas dataframes 
     that hit a dictionary of lineages of interest"""
 
@@ -862,7 +876,7 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
 
     tax_dicts = gather_taxonomy(df, api_key = ncbi_api,
                                 king = kingdom, rank = query_rank,
-                                tax_dicts = tax_dicts, output_path = tax_dir)
+                                tax_dicts = tax_dicts, output_path = tax_path)
 
     lineage_constraints = {k: set(v) for k, v in lineage_constraints.items()}
 
@@ -888,12 +902,14 @@ def extract_constraint_lineages(df, ncbi_api, kingdom,
 def taxonomy_update(orig_db, update_path, date, 
                     config, ncbi_email, ncbi_api,
                     rank = 'kingdom', group = 'fungi'):
-
+    """Reset the taxonomy for the entire database and overwrite the previous
+    tax path data to accomodate new taxonomy"""
     taxless_db = orig_db.reset_index()
     taxless_db['taxonomy'] = [{} for x in taxless_db['taxonomy']]
+    tax_path = f'{update_path}../taxonomy.tsv'
     tax_dicts = gather_taxonomy(taxless_db, api_key = ncbi_api,
                                     king=group, rank = rank, 
-                                    output_path = update_path)
+                                    output_path = tax_path)
     tax_db, genus_dicts = assimilate_tax(taxless_db, tax_dicts)
     if not isinstance(tax_db, mtdb):
         return tax_db, mtdb.pd2mtdb(tax_db)
@@ -935,9 +951,11 @@ def rogue_update(
                             kingdom = kingdom, api = ncbi_api)
 
     # begin extracting lineages of interest and store tax_dicts for later
-    tax_dicts = {v['genus']: v['taxonomy'] for k, v in db.iterrows() \
-                 if any(y for x, y in v['taxonomy'].items() \
-                        if x not in {'genus', 'species', 'strain'})}
+    tax_path = f'{update_path}../taxonomy.tsv'
+    tax_dicts = read_prev_tax(tax_path)
+#    tax_dicts = {v['genus']: v['taxonomy'] for k, v in db.iterrows() \
+ #                if any(y for x, y in v['taxonomy'].items() \
+  #                      if x not in {'genus', 'species', 'strain'})}
     if lineage_constraints:
         lineage_path = update_path + date + '.ncbi.posttax.df'
         if not os.path.isfile(lineage_path):
@@ -946,7 +964,7 @@ def rogue_update(
             tax_dicts, ncbi_df = extract_constraint_lineages(ncbi_df, 
                                                       ncbi_api, kingdom,
                                                       lineage_constraints,
-                                                      tax_dicts, update_path)
+                                                      tax_dicts, tax_path)
             ncbi_df.to_csv(lineage_path, sep = '\t', index = None)
         else:
             ncbi_df = pd.read_csv(lineage_path, sep = '\t')
@@ -976,7 +994,7 @@ def rogue_update(
                 tax_dicts, jgi_df = extract_constraint_lineages(jgi_df, 
                                                         ncbi_api, kingdom,
                                                         lineage_constraints,
-                                                        tax_dicts, update_path)
+                                                        tax_dicts, tax_path)
                 jgi_df.to_csv(lineage_path, sep = '\t', index = None)
             else:
                 jgi_df = pd.read_csv(lineage_path, sep = '\t')
@@ -1130,9 +1148,12 @@ def rogue_update(
         rank = 'kingdom'
     else:
         rank = 'superkingdom'
+
+    tax_path = f'{update_path}../taxonomy.tsv'
     tax_dicts = gather_taxonomy(new_mtdb, api_key = ncbi_api, 
-                                king=kingdom, rank = rank,
-                                output_path = update_path)
+                                king=kingdom, rank = rank, 
+                                tax_dicts = tax_dicts,
+                                output_path = tax_path)
     new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts) 
     dupFiles = {'fna': {}, 'faa': {}, 'gff3': {}}
 
@@ -1596,9 +1617,12 @@ def control_flow(init, update, reference, add, taxonomy,
             os.mkdir(update_path)
         shutil.copy(primaryDB(), update_path)
 
+        tax_path = f'{update_path}../taxonomy.tsv'
+        tax_dicts = read_prev_tax(tax_path)
         tax_dicts = gather_taxonomy(addDB, api_key = ncbi_api, 
                                     king=king, rank = rank, 
-                                    output_path = update_path)
+                                    tax_dicts = tax_dicts, 
+                                    output_path = tax_path)
         addDB, genus_dicts = assimilate_tax(addDB, tax_dicts) 
         addDB = check_add_mtdb(orig_mtdb, addDB, update_path, overwrite)
 
