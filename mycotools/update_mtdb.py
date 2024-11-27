@@ -377,20 +377,18 @@ def dwnld_ncbi_metadata(
  
     return ncbi_df
 
-<<<<<<< HEAD
-
-def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
-=======
 def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
-                   max_attempts = 3):
->>>>>>> 2e26898 (reattempt datasets corrupted zip)
+                   acc2org = {}, max_attempts = 3):
 
-    # NEED to output checkpoint here
+    skip_prep = list(acc2org.keys())
+    gca_prep = [x.upper().replace('GCF', 'GCA') for x in skip_prep]
+    gcf_prep = [x.upper().replace('GCA', 'GCF') for x in skip_prep]
+    skip = set(gca_prep + gcf_prep)
     if not os.path.isdir(taxonomy_dir):
         os.mkdir(taxonomy_dir)
     aa_file = taxonomy_dir + 'assembly_accs.genbank.txt'
     with open(aa_file, 'w') as out:
-        out.write('\n'.join(list(df['assembly_acc'])))
+        out.write('\n'.join([x for x in list(df['assembly_acc']) if x not in skip]))
 
     attempts = 0
     if not os.path.isdir(taxonomy_dir + 'ncbi_dataset'):
@@ -477,7 +475,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
 
     df = df[~df.index.isin(todel)]
 
-    return df, acc2meta
+    return df, acc2meta, acc2org
 
 
 def prep_jgi_cols(jgi_df, name_col = 'name'):
@@ -509,8 +507,17 @@ def prep_jgi_cols(jgi_df, name_col = 'name'):
 
 
 def clean_ncbi_df(ncbi_df, update_path, kingdom = 'Fungi', 
-                  api = None, fallback = False):
+                  api = None, max_attempts = 3):
     ncbi_df = ncbi_df.astype(str).replace(np.nan, '')
+
+    acc2org_path = update_path + '../gca2org.tsv'
+    acc2org = {}
+    if os.path.isfile(acc2org_path):
+        with open(acc2org_path, 'r') as raw:
+            for line in raw:
+                d = line.split('\t')
+                acc2org[d[0]] = {'genus': d[1], 'species': d[2],
+                                 'strain': d[3].rstrip()}
 
     if kingdom.lower() == 'fungi':
         # extract group of interest (case sensitive to first letter)
@@ -525,10 +532,15 @@ def clean_ncbi_df(ncbi_df, update_path, kingdom = 'Fungi',
         ncbi_df = ncbi_df[ncbi_df['Group'] == 'Archaea']
 
     ncbi_df = ncbi_df[ncbi_df['assembly_acc'].str.startswith(('GCA', 'GCF'))]
-
-    ncbi_df, acc2meta = prep_taxa_cols(ncbi_df, 
+    ncbi_df, acc2meta, acc2org = prep_taxa_cols(ncbi_df, 
                                        update_path + 'taxonomy/', 
-                                       api = api)
+                                       api = api, acc2org = acc2org)
+
+    with open(acc2org_path + '.tmp', 'w') as out:
+        for acc, org in acc2org.items():
+            org_meta = f'{org["genus"]}\t{org["species"]}\t{org["strain"]}'
+            out.write(f'{acc}\t{org_meta}\n')
+    os.rename(acc2org_path + '.tmp', acc2org_path)
 
     # remove entries without sufficient metadata
     ncbi_df = ncbi_df.dropna(subset = ['genus'])
@@ -952,6 +964,11 @@ def taxonomy_update(orig_db, update_path, date,
     taxless_db = orig_db.reset_index()
     taxless_db['taxonomy'] = [{} for x in taxless_db['taxonomy']]
     tax_path = f'{update_path}../taxonomy.tsv'
+    gca_path = f'{update_path}../gca2org.tsv'
+    if os.path.isfile(tax_path):
+        os.rename(tax_path, update_path + 'old_taxonomy.tsv')
+    if os.path.isfile(gca_path):
+        os.rename(gca_path, update_path + 'old_gca2org.tsv')
     tax_dicts = gather_taxonomy(taxless_db, api_key = ncbi_api,
                                     king=group, rank = rank, 
                                     output_path = tax_path)
@@ -1780,7 +1797,7 @@ def main():
     upd_args.add_argument('-u', '--update', action = 'store_true')
     upd_args.add_argument('-a', '--add', help = '.mtdb with full paths to add to database')
     upd_args.add_argument('-t', '--taxonomy', action = 'store_true',
-        help = 'Update taxonomy and exit')
+        help = 'Remove old taxonomy metadata, update taxonomy, and exit')
     upd_args.add_argument('--keep', action = 'store_true',
         help = '[-a] Keep original MTDB data when adding overlapping accessions')
     upd_args.add_argument('--save', action = 'store_true', 
