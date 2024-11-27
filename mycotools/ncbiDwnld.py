@@ -249,12 +249,16 @@ def run_datasets(include, accs_file, output_path,
 
 def compile_organism_names(unzip_path, spacer = '\t'):
     acc2org, acc2meta = {}, {}
+    failed = []
     with open(unzip_path + 'data/assembly_data_report.jsonl', 'r') as raw:
         for line in raw:
             data = json.loads(line.rstrip())
             if 'accession' in data:
                 acc = data['accession']
-                org0 = data['organism']['organismName']
+                try:
+                    org0 = data['organism']['organismName']
+                except KeyError:
+                    failed.append(acc)
                 org1 = re.sub(r'[^ a-zA-Z0-9]', '', org0) 
                 org = org1.split()
                 genus = org[0] 
@@ -281,6 +285,7 @@ def compile_organism_names(unzip_path, spacer = '\t'):
                                     strain = ''
                                 break
                 except KeyError:
+                    failed.append(acc)
                     pass
                 strain = re.sub(r'[^a-zA-Z0-9]', '', strain) 
 
@@ -288,11 +293,12 @@ def compile_organism_names(unzip_path, spacer = '\t'):
                     acc2meta[acc] = {'accession': data['assemblyInfo']['assemblyName'],
                                      'submitter': data['annotationInfo']['provider']}
                 except KeyError:
+                    failed.append(acc)
                     pass
 #                if not strain:
  #                   eprint(f'{spacer}WARNING: {acc} no strain metadata', flush = True)
                 acc2org[acc] = {'genus': genus, 'species': species, 'strain': strain}
-    return acc2org, acc2meta
+    return acc2org, acc2meta, failed
 
 def parse_datasets(datasets_path, unzip_base, req_files, spacer = '\t'):
     """Unzip, identify complete downloads, parse file outputs and metadata, 
@@ -330,7 +336,7 @@ def parse_datasets(datasets_path, unzip_base, req_files, spacer = '\t'):
             else:
                 acc2data[data['accession']] = files
 
-    acc2org, acc2meta = compile_organism_names(unzip_path, spacer)
+    acc2org, acc2meta, org_failed = compile_organism_names(unzip_path, spacer)
 
     return acc2data, acc2org, failed
 
