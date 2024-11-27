@@ -377,8 +377,13 @@ def dwnld_ncbi_metadata(
  
     return ncbi_df
 
+<<<<<<< HEAD
 
 def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
+=======
+def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
+                   max_attempts = 3):
+>>>>>>> 2e26898 (reattempt datasets corrupted zip)
 
     # NEED to output checkpoint here
     if not os.path.isdir(taxonomy_dir):
@@ -387,16 +392,37 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
     with open(aa_file, 'w') as out:
         out.write('\n'.join(list(df['assembly_acc'])))
 
-    run_datasets(None, aa_file, taxonomy_dir, True, api = api, verbose = True)
-    datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
-    with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
-        zip_ref.extractall(taxonomy_dir)
-    os.remove(datasets_path)
+    attempts = 0
+    if not os.path.isdir(taxonomy_dir + 'ncbi_dataset'):
+        datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
+        while attempts < max_attempts:
+            if attempts:
+                eprint('\t\t\tReattempting', flush = True)
+                os.remove(datasets_path)
+            attempts += 1
+            run_datasets(None, aa_file, taxonomy_dir, True, 
+                         api = api, verbose = True)
+            try:
+                with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
+                    zip_ref.extractall(taxonomy_dir)
+                os.remove(datasets_path)
+                break
+            except zipfile.BadZipFile:
+                eprint(f'\t\tERROR: datasets download corrupted - {attempts}',
+                        flush = True)
+                if attempts == max_attempts:
+                    sys.exit(11)
+    
+    acc2org, acc2meta, org_failed = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+    print(f'\t\t{len(acc2meta) + len(org_failed)}', 
+          'genomes queried from GenBank', flush = True)
+    print(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed', flush = True)
 
-    acc2org, acc2meta = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
-    print(f'\t\t{len(acc2meta)} genomes queried from GenBank', flush = True)
 
     # check for RefSeq for failed entries
+    refseq_dir = taxonomy_dir + 'refseq/'
+    if not os.path.isdir(refseq_dir):
+        os.mkdir(refseq_dir)
     missing_accs = \
         sorted(set(df['assembly_acc']).difference(set(acc2org.keys())))
     reattempt_acc = []
@@ -405,17 +431,36 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None):
             reattempt_acc.append(acc.upper().replace('GCA_', 'GCF_'))
         elif acc.upper().startswith('GCF'):
             reattempt_acc.append(acc.upper().replace('GCF_', 'GCA_'))
-    acc_file_re = taxonomy_dir + 'assembly_accs.refseq.txt'
+    acc_file_re = refseq_dir + 'assembly_accs.refseq.txt'
     with open(acc_file_re, 'w') as out:
         out.write('\n'.join(reattempt_acc))
 
-    run_datasets(None, acc_file_re, taxonomy_dir, True, api = api)
-    datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
-    with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
-        zip_ref.extractall(taxonomy_dir)
-    os.remove(datasets_path)
+    # attempt to download the ncbi_datasets zip file until allowed attempts are
+    # exhausted
+    if not os.path.isdir(taxonomy_dir + 'ncbi_dataset'):
+        print(f'\t\tChecking RefSeq for {len(reattempt_acc)} entries', flush = True)
+        rs_datasets_path = refseq_dir + 'ncbi_dataset.zip'
+        attempts = 0
+        while attempts < max_attempts:
+            if attempts:
+                eprint('\t\t\t\tReattempting', flush = True)
+                os.remove(rs_datasets_path)
+            attempts += 1
+            run_datasets(None, acc_file_re, refseq_dir, True, 
+                        api = api, verbose = True)
+            try:
+                with zipfile.ZipFile(rs_datasets_path, 'r') as zip_ref:
+                    zip_ref.extractall(refseq_dir)
+                os.remove(rs_datasets_path)
+                break
+            except zipfile.BadZipFile:
+                eprint(f'\t\t\tERROR: datasets download corrupted - {attempts}',
+                        flush = True)
+                if attempts == max_attempts:
+                    sys.exit(10)
 
-    acc2org_rs, acc2meta_rs = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+    
+    acc2org_rs, acc2meta_rs = compile_organism_names(refseq_dir + 'ncbi_dataset/')
     print(f'\t\t{len(acc2meta_rs)} genome(s) queried from RefSeq', flush = True)
     acc2org, acc2meta = {**acc2org, **acc2org_rs}, {**acc2meta, **acc2meta_rs}
 
