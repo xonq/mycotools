@@ -712,7 +712,12 @@ def gather_taxonomy(df, api_key = None, king='fungi',
         genus_tax, count = query_ncbi4taxonomy(genus, api_key, king, rank, count)
         if genus_tax:
             tax_dicts[genus] = genus_tax
-    
+
+    if output_path:
+        with open(output_path + '.tmp', 'w') as out:
+            for genus, tax_dict in tax_dicts.items():
+                out.write(f'{genus}\t{json.dumps(tax_dict)}\n')
+        os.rename(f'{output_path}.tmp', output_path) 
     return tax_dicts
 
 
