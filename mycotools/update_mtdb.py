@@ -16,6 +16,7 @@ import os
 import re
 import sys
 import time
+import json
 import base64
 import shutil
 import getpass
@@ -390,16 +391,17 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
     with open(aa_file, 'w') as out:
         out.write('\n'.join([x for x in list(df['assembly_acc']) if x not in skip]))
 
-    attempts = 0
+    attempts, datasets_cmd = 0, 0
     if not os.path.isdir(taxonomy_dir + 'ncbi_dataset'):
         datasets_path = taxonomy_dir + 'ncbi_dataset.zip'
         while attempts < max_attempts:
             if attempts:
                 eprint('\t\t\tReattempting', flush = True)
-                os.remove(datasets_path)
+                if os.path.isfile(datasets_path):
+                    os.remove(datasets_path)
             attempts += 1
-            run_datasets(None, aa_file, taxonomy_dir, True, 
-                         api = api, verbose = True)
+            datasets_cmd = run_datasets(None, aa_file, taxonomy_dir, True, 
+                                         api = api, verbose = True)
             try:
                 with zipfile.ZipFile(datasets_path, 'r') as zip_ref:
                     zip_ref.extractall(taxonomy_dir)
@@ -410,12 +412,20 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
                         flush = True)
                 if attempts == max_attempts:
                     sys.exit(11)
-    
-    acc2org_n, acc2meta, org_failed = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
-    print(f'\t\t{len(acc2meta) + len(org_failed)}', 
-          'genomes queried from GenBank', flush = True)
-    print(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed', flush = True)
+            except FileNotFoundError:
+                eprint(f'\t\tERROR: datasets failed - {attempts}',
+                        flush = True)
 
+    if datasets_cmd:
+        eprint(f'\t\tWARNING: datasets failed, assuming no genomes found',
+               flush = True)
+        acc2org_n, acc2meta = {}, {}
+    else:
+        acc2org_n, acc2meta, org_failed = compile_organism_names(taxonomy_dir + 'ncbi_dataset/')
+        print(f'\t\t{len(acc2meta) + len(org_failed)}', 
+              'genomes queried from GenBank', flush = True)
+        print(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed', flush = True)
+    
 
     # check for RefSeq for failed entries
     refseq_dir = taxonomy_dir + 'refseq/'
@@ -436,6 +446,7 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
 
     # attempt to download the ncbi_datasets zip file until allowed attempts are
     # exhausted
+    rs_datasets_cmd = 0
     if not os.path.isdir(refseq_dir + 'ncbi_dataset'):
         print(f'\t\tChecking RefSeq for {len(reattempt_acc)} entries', flush = True)
         rs_datasets_path = refseq_dir + 'ncbi_dataset.zip'
@@ -443,10 +454,11 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
         while attempts < max_attempts:
             if attempts:
                 eprint('\t\t\t\tReattempting', flush = True)
-                os.remove(rs_datasets_path)
+                if os.path.isfile(rs_datasets_path):
+                    os.remove(rs_datasets_path)
             attempts += 1
-            run_datasets(None, acc_file_re, refseq_dir, True, 
-                        api = api, verbose = True)
+            rs_datasets_cmd = run_datasets(None, acc_file_re, refseq_dir, True, 
+                                   api = api, verbose = True)
             try:
                 with zipfile.ZipFile(rs_datasets_path, 'r') as zip_ref:
                     zip_ref.extractall(refseq_dir)
@@ -457,10 +469,18 @@ def prep_taxa_cols(df, taxonomy_dir, col = '#Organism/Name', api = None,
                         flush = True)
                 if attempts == max_attempts:
                     sys.exit(10)
+            except FileNotFoundError:
+                eprint(f'\t\tERROR: datasets failed - {attempts}',
+                        flush = True)
 
-    
-    acc2org_rs, acc2meta_rs, org_failed_2 = compile_organism_names(refseq_dir + 'ncbi_dataset/')
-    print(f'\t\t{len(acc2meta_rs)} genome(s) queried from RefSeq', flush = True)
+    if rs_datasets_cmd:
+        eprint(f'\t\tWARNING: datasets failed, assuming no genomes found',
+               flush = True)
+        acc2org_rs, acc2meta_rs = {}, {}
+    else:
+        acc2org_rs, acc2meta_rs, org_failed_2 = compile_organism_names(refseq_dir + 'ncbi_dataset/')
+        print(f'\t\t{len(acc2meta_rs)} genome(s) queried from RefSeq', flush = True)
+   
     acc2org, acc2meta = {**acc2org, **acc2org_n, **acc2org_rs}, {**acc2meta, **acc2meta_rs}
 
     df['strain'] = ''
