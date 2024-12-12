@@ -67,7 +67,13 @@ def redundancy_check(db, ncbi_df, ass_acc, duplicates = {}):
                 db_row = copy.deepcopy(check.iloc[0])
             db_ome = db_row['ome']
             db_organism = '_'.join([db_row['genus'], db_row['species'], str(db_row['strain'])])
-            version = row['version']
+            if isinstance(row['version'], datetime):
+                version = row['version']
+            else:
+                try:
+                    version = datetime.strptime(row['version'], '%Y%m%d')
+                except ValueError:
+                    raise ValueError(row['version'], assembly_acc)
             try: # check if the version is new (by datetime)
                 if version > datetime.strptime(db_row['version'].replace(' 00:00:00','').replace('-',''), '%Y%m%d'):
                     updates.append([
@@ -101,7 +107,7 @@ def main(
     spacer = '\t\t', fallback = False
     ):
 
-    os.chdir( out_dir )
+    os.chdir(out_dir)
     todel = []
 
     if 'assembly_acc' in ncbi_df.columns:
