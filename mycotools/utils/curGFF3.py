@@ -717,7 +717,10 @@ def rename_and_organize(gff_list):
     for i, entry in enumerate(gff_list):
         seqid = entry['seqid']
         if entry['type'] in {'pseudogene', 'gene'}:
-            alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            try:
+                alias = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+            except TypeError:
+                raise TypeError(entry)
             alias_list = alias.split('|')
             if len(alias_list) > 1:
                 gene_id = 'gene_' + alias_list[0] + '-' \
