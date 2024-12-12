@@ -222,6 +222,7 @@ def collect_ftps(
                 }
             record = esummary_ncbi(ID, database)
 
+            strain = '' # populate a fallback strain
             record_info = record['DocumentSummarySet']['DocumentSummary'][0]
             assemblyID = record_info['AssemblyAccession']
             org = record_info['SpeciesName'].split()
@@ -246,7 +247,7 @@ def collect_ftps(
             except KeyError:
                 if strain1:
                     strain = strain1
-                pass
+
             strain = re.sub(r'[^a-zA-Z0-9]', '', strain) 
 
             ftp_path = str(record_info['FtpPath_GenBank'])
