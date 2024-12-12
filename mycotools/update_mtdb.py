@@ -1051,6 +1051,7 @@ def rogue_update(
             ncbi_df.to_csv(lineage_path, sep = '\t', index = None)
         else:
             ncbi_df = pd.read_csv(lineage_path, sep = '\t')
+            ncbi_df['version'] = pd.to_datetime(ncbi_df['version'])
 
     old_len = len(db['ome'])
     new_len = len(db['ome'])
