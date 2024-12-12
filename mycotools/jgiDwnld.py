@@ -69,7 +69,6 @@ def retrieve_xml(ome, output):
             os.remove(f'{output}/{ome}.xml')
         else:
             xml_cmd = -1
-
     else:
         xml_cmd = dwnld_xml(output, ome)
 
@@ -497,9 +496,9 @@ def main(
 
     eprint(spacer + 'Logging into JGI', flush = True)
     login_attempt = 0
-    while jgi_login( user, pwd ) != 0 and login_attempt < 5:
+    while jgi_login(user, pwd) != 0 and login_attempt < 5:
         eprint(spacer + '\tJGI Login Failed. Attempt: ' + str(login_attempt), flush = True)
-        time.sleep( 5 )
+        time.sleep(5)
         login_attempt += 1
         if login_attempt == 3:
             eprint(spacer + '\tERROR: Failed 3 login attempts.', flush = True)
