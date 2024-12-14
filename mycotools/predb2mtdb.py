@@ -265,8 +265,10 @@ def predb2mtdb(predb):
             }
         if predb['published'][i]:
             toAdd['published'] = predb['published'][i]
-        else:
+        elif 'restriction' in predb:
             toAdd['published'] = not predb['restriction'][i]
+        else:
+            toAdd['published'] = None
 #        if predb['published'][i]:
  #           toAdd['published'] = predb['published'][i]
         infdb = infdb.append(toAdd)
