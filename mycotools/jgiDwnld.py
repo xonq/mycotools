@@ -304,7 +304,7 @@ def jgi_dwnld(ome, file_type, output, masked = True, spacer = '\t'):
         dwnld_url = prefix + url.replace('&amp;', '&')
    
         dwnld = f'{output}{file_type}/{os.path.basename(dwnld_url)}'
-        unzip_dwnld = re.sub(r'\.gz$', '', dwnld_prep)
+        unzip_dwnld = re.sub(r'\.gz$', '', dwnld)
         # assume unzipped downloads have passed the checks
         if os.path.isfile(unzip_dwnld):
             md5 = dwnld_md5
