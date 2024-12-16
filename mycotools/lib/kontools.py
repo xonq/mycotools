@@ -372,7 +372,7 @@ def fmt_float(val, sig_dig = None):
     return val_str
 
 
-def findExecs( deps, exit = set(), verbose = True ):
+def findExecs(deps, exit = set(), verbose = True):
     '''
     Inputs list of dependencies, `dep`, to check path.
     If dependency is in exit and dependency is not in path,
@@ -381,10 +381,10 @@ def findExecs( deps, exit = set(), verbose = True ):
 
     vprint('\nDependency check:', v = verbose, e = True, flush = True)
     checks, failed = [], []
-    if type(deps) is str:
+    if isinstance(deps, str):
         deps = [deps]
     for dep in sorted(deps):
-        check = shutil.which( dep )
+        check = shutil.which(dep)
         vprint('{:<15}'.format(dep + ':', flush = True) + \
             str(check), v = verbose, e = True)
         if not check and dep in exit:
