@@ -1293,10 +1293,10 @@ def search_main(
 
     if output_loci:
         if all(os.path.isfile(f'{tre_dir}{gene}{tree_suffix}') \
-               for gene in search_fas):
+               for gene in query_fa):
             print('\nSkipping to outputting most similar loci to query',
                   flush = True)
-            locus_output_mngr(gff_dir, loc_dir, set(search_fas.keys()),
+            locus_output_mngr(gff_dir, loc_dir, set(query_fa.keys()),
                       report_dir = wrk_dir + 'reports/',
                       re_comp = re.compile(r'SearchQuery=([^;]+)'),
                       calc_index = calc_jaccard, cpus = cpus)
