@@ -600,7 +600,9 @@ def svg2node(node):
     if node.is_leaf():
         try:
             accName = re.search(r'([^_]+_[^_]+$)', node.name)[1]
-            svg_path = svg_dir + accName + '.locus.svg'
+            # assumes you are in the standard crap output directory,
+            # which svgs2tree sets you up for
+            svg_path = f'working/svg/{accName}.locus.svg'
             nodeFace = faces.ImgFace(svg_path)
             nodeFace.margin_top = 5
             nodeFace.margin_bottom = 5
@@ -608,7 +610,7 @@ def svg2node(node):
             faces.add_face_to_node(nodeFace, node, column = 0)
         # assume the node is an ome code
         except TypeError:
-            svg_path = svg_dir + node.name + '.locus.svg'
+            svg_path = f'working/svg/{node.name}.locus.svg'
             nodeFace = faces.ImgFace(svg_path)
             nodeFace.margin_top = 5
             nodeFace.margin_bottom = 5
@@ -617,8 +619,12 @@ def svg2node(node):
             pass
 
 def svgs2tree(input_gene, og, tree_data, db, tree_path,
-              out_dir, root_key = None, midpoint = True,
+              out_dir, svg_dir, root_key = None, midpoint = True,
               ext = '.svg', circular = False):#svg_dir, out_dir):
+
+    init_dir = os.getcwd()
+    os.chdir(out_dir)
+
     tree = Tree(tree_data)
     if root_key:
         try:
@@ -672,6 +678,8 @@ def svgs2tree(input_gene, og, tree_data, db, tree_path,
         else:
             tree.render(out_dir + input_gene + '.' + adj + ext, 
                         w=800, tree_style = ts)
+
+    os.chdir(init_dir)
 
 def merge_color_palette(merges, query2color):
     for merge in merges:
@@ -822,7 +830,7 @@ def parse_log(log_path, new_log, out_dir):
 
 
 def crap_mngr(
-    db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, 
+    db, query, query_hits, out_dir, wrk_dir, tre_dir, svg_dir, fast, 
     tree_suffix, genes2query, plusminus, query2color, 
     cpus = 1, verbose = False, hg = None, hgs = None, reoutput = True,
     out_keys = [], labels = True, midpoint = True, ext = '.svg',
@@ -882,8 +890,8 @@ def crap_mngr(
         try:
             svgs2tree(
                 query, hg, raw_tree, db, tree_file,
-                out_dir, root_key, midpoint = midpoint,
-                ext = ext, circular = circular #svg_dir, out_dir
+                out_dir, svg_dir, root_key, midpoint = midpoint,
+                ext = ext, circular = circular
                 )
         except NewickError:
             eprint('\t\t\tERROR: newick malformatted', flush = True)
@@ -891,7 +899,7 @@ def crap_mngr(
         try:
             svgs2tree(
                 query, hg, raw_tree, db, tree_file,
-                out_dir, midpoint = midpoint, ext = ext,
+                out_dir, svg_dir, midpoint = midpoint, ext = ext,
                 circular = circular #svg_dir, out_dir
                 )
         except NewickError:
@@ -1167,7 +1175,7 @@ def hg_main(
                     )            
         HG = input_hgs[re.sub(r'\.outgroup$','',query)] # bulletproof against outgroups
         hg2color = crap_mngr(
-            db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, tree_suffix, 
+            db, query, query_hits, out_dir, wrk_dir, tre_dir, svg_dir, fast, tree_suffix, 
             ome_gene2hg, plusminus, hg2color, cpus, verbose, HG, list(input_hgs.values()),
             reoutput = reoutput, out_keys = out_keys, labels = labels,
             midpoint = midpoint, ext = ext, circular = circular
@@ -1207,7 +1215,7 @@ def hg_main(
             query_hits = list(query_fa.keys())
         HG = input_hgs[re.sub(r'\.outgroup$','',query)] # bulletproof against outgroups
         hg2color = crap_mngr(
-            db, query, query_hits, out_dir, wrk_dir, tre_dir, fast, tree_suffix,
+            db, query, query_hits, out_dir, wrk_dir, tre_dir, svg_dir, fast, tree_suffix,
             ome_gene2hg, plusminus, hg2color, cpus, verbose, HG, 
             list(input_hgs.values()), reoutput = reoutput, labels = labels,
             out_keys = out_keys, midpoint = midpoint, ext = ext, 
@@ -1377,7 +1385,7 @@ def search_main(
                     flush = True
                     )
         null = crap_mngr(
-            db, query, query_hits, out_dir, wrk_dir, tre_dir, 
+            db, query, query_hits, out_dir, wrk_dir, tre_dir, svg_dir,
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
             out_keys = out_keys, labels = labels, midpoint = midpoint,
@@ -1428,7 +1436,7 @@ def search_main(
         else:
             query_fa = fa2dict(wrk_dir + query + '.fa')
         null = crap_mngr(
-            db, query, query_hits, out_dir, wrk_dir, tre_dir, 
+            db, query, query_hits, out_dir, wrk_dir, tre_dir, svg_dir,
             fast, tree_suffix, genes2query, plusminus, query2color, 
             cpus = cpus, verbose = verbose, reoutput = reoutput,
             out_keys = out_keys, labels = labels, midpoint = midpoint,
