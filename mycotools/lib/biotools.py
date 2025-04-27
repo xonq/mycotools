@@ -5,6 +5,7 @@
 import re
 import sys
 from collections import defaultdict
+from itertools import chain
 from mycotools.lib.kontools import eprint
 
 aa_weights = {
@@ -133,12 +134,14 @@ def xmfa2dict(xmfa_in):
             if data == '=':
                 count += 1
             elif data.startswith('>'):
-                header = data[2:].split(' ')
-                seq_info = header[0]
-                seq_name, coords = seq_info.split(':')
+                seq_info = data[2:]
+                seq_name, descrip_p = seq_info.split(':')
+                coords = ' '.join(descrip_p.split()[:2])
+                description = ' '.join(descrip_p.split()[2:])
                 xmfa_dict[seq_name][count] = {'sequence': '', 
                                               'description': \
-                                              ' '.join(header[1:])}
+                                               description,
+                                              'coords': coords}
 
             elif not data.startswith('#'):
                 xmfa_dict[seq_name][count]['sequence'] += data
@@ -146,7 +149,28 @@ def xmfa2dict(xmfa_in):
         del xmfa_dict[-1]
 
     return xmfa_dict
-                
+
+def dict2xmfa(xmfa_dict, description = True):
+    """Output an xmfa formatted string from xmfa dict"""
+   
+    counts = max(list(chain(*[list(x.keys()) for k, x in xmfa_dict.items()])))
+    xmfa_string = '#FormatVersion Mauve1\n'
+    if description:
+        for count in range(counts):
+            for gene, genes_dict in xmfa_dict.items():
+                if count in genes_dict:
+                    gene_dict = genes_dict[count]
+                    xmfa_string += f'> {gene.rstrip()}:{gene_dict["coords"]}'
+                    if 'description' in xmfa_dict[gene]:
+                        xmfa_string += f' {gene_dict["description"].rstrip()}\n'
+                    else:
+                        xmfa_string += '\n'
+                    xmfa_string += gene_dict['sequence'].rstrip() + '\n'
+            xmfa_string += '=\n'
+
+    return xmfa_string.rstrip()
+
+
 
 def fa2dict(fasta_input): #file_ = True):
     fasta_dict = {}

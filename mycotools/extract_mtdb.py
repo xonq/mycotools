@@ -256,7 +256,6 @@ def cli():
         lineage_list = [args.lineage]
     else:
         lineage_list = []
-
     new_db = main( 
         db, lineage_list = lineage_list,
         omes_set = omes, source = args.source, rank = args.rank, 
