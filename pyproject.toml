@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mycotools"
-version = "0.32.11"
+version = "1.0.0"
 authors = [{name="Zachary Konkel", email="konkelzach@protonmail.com"}]
 description = "Comparative genomics automation and standardization software"
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = '>=3.0,<4'
 dependencies = ['biopython', 'pandas', 'requests', 'scipy', 'openpyxl', 'tqdm',
-                'cryptography']
+                'cryptography', 'ete3', 'pyqt5']
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
