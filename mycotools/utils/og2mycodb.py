@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 
-import os
 import re
 import sys
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
 from mycotools.lib.kontools import format_path, sys_start
+from pathlib import Path
 
 
 def og2dict(orthogroup_file):
@@ -107,7 +107,7 @@ def extract_ogs(ogInfo_dict, ogtag):
 def og2mycoDB(ogInfo_dict, omes=set(), file_path=format_path("$MYCOGFF3/../ogs.tsv")):
 
     out_list = []
-    if os.path.isfile(file_path):
+    if Path(file_path).is_file():
         with open(file_path, "r") as raw:
             for line in raw:
                 data = line.rstrip().split("\t")

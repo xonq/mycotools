@@ -15,6 +15,7 @@
 # NEED assembly reference method, i.e. tblastn
 # NEED cluster variable input default
 
+import logging
 import os
 import re
 import sys
@@ -36,7 +37,6 @@ except ImportError:
     )
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.kontools import (
-    eprint,
     format_path,
     findExecs,
     intro,
@@ -46,6 +46,7 @@ from mycotools.lib.kontools import (
     stdin2str,
     getColors,
     collect_files,
+    setup_logging,
 )
 from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Comps
 from mycotools.acc2fa import dbmain as acc2fa
@@ -64,6 +65,9 @@ from mycotools.ome2name import main as ome2name
 
 # from mycotools.utils.og2mycodb import mycodbHGs, extract_ogs
 from mycotools.db2microsyntree import compile_homolog_groups
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
@@ -172,8 +176,8 @@ def input_genes2input_hgs(input_genes, gene2hg):
         try:
             input_hgs[gene] = gene2hg[gene]
         except KeyError:
-            eprint("ERROR: " + gene + " query with no HG", flush=True)
-            eprint("\t" + gene + " will be ignored.", flush=True)
+            logger.error("" + gene + " query with no HG")
+            logger.info("" + gene + " will be ignored.")
     return input_hgs
 
 
@@ -189,11 +193,11 @@ def check_fa_size(fas, max_size):
     submitted to tree building"""
     fas4clus, fas4trees = {}, {}
     for query, fa in fas.items():
-        print("\t" + query + "\t" + str(len(fa)) + " genes", flush=True)
+        logger.debug("" + query + "\t" + str(len(fa)) + " genes")
         if len(fa) > max_size:
             fas4clus[query] = fa
         elif len(fa) < 3:
-            eprint(f"\t\tWARNING: too few hits ({len(fa)})", flush=True)
+            logger.warning(f"too few hits ({len(fa)})")
         else:
             fas4trees[query] = fa
 
@@ -208,13 +212,13 @@ def write_seq_clus(gene_module, focal_gene, db, output_path, out_fa):
     try:
         fa_dict = acc2fa(db, gene_module)
     except KeyError:
-        eprint("\t\t\tWARNING: some hits not in database", flush=True)
+        logger.warning("some hits not in database")
         db_omes = set(db.keys())
         gene_module = [x for x in gene_module if x[: x.find("_")] in db_omes]
         fa_dict = acc2fa(db, gene_module)
 
     # need to implement some method to choose if the max and min parameters couldn't be met
-    print("\t\t\t" + str(len(fa_dict)) + " genes in group", flush=True)
+    logger.debug("" + str(len(fa_dict)) + " genes in group")
     with open(out_fa, "w") as out:
         out.write(dict2fa(fa_dict))
 
@@ -247,15 +251,15 @@ def run_fa2clus(
 
     # output Diamond data to a diamond directory
     dmnd_dir = output + "dmnd/"
-    if not os.path.isdir(dmnd_dir):
-        os.mkdir(dmnd_dir)
+    if not Path(dmnd_dir).is_dir():
+        Path(dmnd_dir).mkdir()
 
     # create an output path and a log path for the inputted gene
     output_path = output + str(focal_gene)
     log_path = output + "." + str(focal_gene) + ".log"
 
     # parse an existing fa2clus_log
-    if os.path.isfile(log_path):
+    if Path(log_path).is_file():
         fa2clus_log = read_json(log_path)
     else:
         fa2clus_log = {"algorithm": "null"}
@@ -282,10 +286,7 @@ def run_fa2clus(
         return False, False, fa2clus_log
     except ClusteringError as le:  # if cluster error, try aggclus
         if not error:
-            eprint(
-                spacer + "mmseqs failed, attempting hierarchical " + "clustering",
-                flush=True,
-            )
+            logger.info(spacer + "mmseqs failed, attempting hierarchical " + "clustering")
             try:
                 cluster, newick, overshot, fa2clus_log = fa2clus(
                     fa_path,
@@ -507,23 +508,23 @@ def make_output(base_dir, new_log):
         #           eprint('\nERROR: base output directory missing: ' + base_dir, flush = True)
         #          sys.exit(2)
         curdate = datetime.datetime.now().strftime("%Y%m%d")
-        output_dir = os.getcwd() + "/crap_" + curdate + "/"
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
+        output_dir = str(Path.cwd()) + "/crap_" + curdate + "/"
+        if not Path(output_dir).is_dir():
+            Path(output_dir).mkdir()
     else:
-        if not os.path.isdir(base_dir):
-            os.mkdir(base_dir)
+        if not Path(base_dir).is_dir():
+            Path(base_dir).mkdir()
         output_dir = format_path(base_dir)
 
     # initialize a log in the output directory
     log_path = output_dir + ".craplog.json"
     parse_log(log_path, new_log, output_dir)
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
+    if not Path(output_dir).is_dir():
+        Path(output_dir).mkdir()
 
     loc_dir = output_dir + "loci/"
-    if not os.path.isdir(loc_dir):
-        os.mkdir(loc_dir)
+    if not Path(loc_dir).is_dir():
+        Path(loc_dir).mkdir()
 
     wrk_dir = output_dir + "working/"
     global svg_dir  # needs to be global for etetree
@@ -532,12 +533,12 @@ def make_output(base_dir, new_log):
     svg_dir = wrk_dir + "svg/"
     gff_dir = wrk_dir + "genes/"
     tre_dir = wrk_dir + "trees/"
-    if not os.path.isdir(wrk_dir):
-        os.mkdir(wrk_dir)
-    if not os.path.isdir(svg_dir):
-        os.mkdir(svg_dir)
-    if not os.path.isdir(gff_dir):
-        os.mkdir(gff_dir)
+    if not Path(wrk_dir).is_dir():
+        Path(wrk_dir).mkdir()
+    if not Path(svg_dir).is_dir():
+        Path(svg_dir).mkdir()
+    if not Path(gff_dir).is_dir():
+        Path(gff_dir).mkdir()
 
     return output_dir, wrk_dir, gff_dir, tre_dir
 
@@ -593,20 +594,20 @@ def extract_locus_hg(
     try:
         gff_list = gff2list(gff3)
     except FileNotFoundError:
-        eprint(f"\t\t\tWARNING: {ome} MTDB entry without GFF3", flush=True)
+        logger.warning(f"{ome} MTDB entry without GFF3")
         return
 
     # grab the locus for the genes that do not currently have a locus SVG
     # (and thus also not a locus GFF)
     genes_to_grab = [
-        x for x in genes_to_grab if not os.path.isfile(f"{wrk_dir}svg/{x}.locus.svg")
+        x for x in genes_to_grab if not Path(f"{wrk_dir}svg/{x}.locus.svg").is_file()
     ]
     try:
         out_indices, rna_gff = acc2locus(
             gff_list, genes_to_grab, plusminus, mycotools=True, geneGff=True, nt=True
         )
     except ValueError:  # KeyError:
-        eprint(f"\t\t\tWARNING: {ome} could not parse GFF", flush=True)
+        logger.warning(f"{ome} could not parse GFF")
         return
 
     # parse the loci and the genes associated with each locus, with the
@@ -667,20 +668,20 @@ def extract_locus_gene(
     try:
         gff_list = gff2list(gff3)
     except FileNotFoundError:
-        eprint("\t\t\tWARNING: " + ome + " mycotoolsdb entry without GFF3", flush=True)
+        logger.warning("" + ome + " mycotoolsdb entry without GFF3")
         return
-    accs = [x for x in accs if not os.path.isfile(wrk_dir + "svg/" + x + ".locus.svg")]
+    accs = [x for x in accs if not Path(wrk_dir + "svg/" + x + ".locus.svg").is_file()]
     try:
         out_indices, rna_gff = acc2locus(
             gff_list, accs, plusminus, mycotools=True, geneGff=True, nt=True
         )
     except KeyError:
-        eprint("\t\t\tWARNING: " + ome + " could not parse gff", flush=True)
+        logger.warning("" + ome + " could not parse gff")
         return
 
     extracted_genes, final_loci = {}, set()
     for locus_id, genes in out_indices.items():
-        if os.path.isfile(wrk_dir + "svg/" + locus_id + ".locus.svg"):
+        if Path(wrk_dir + "svg/" + locus_id + ".locus.svg").is_file():
             # NEED to rerun if there's a change in output parameters
             continue
         start_i, end_i = None, None
@@ -757,7 +758,7 @@ def svgs2tree(
     circular=False,
 ):  # svg_dir, out_dir):
 
-    init_dir = os.getcwd()
+    init_dir = str(Path.cwd())
     os.chdir(out_dir)
 
     tree = Tree(tree_data)
@@ -806,8 +807,8 @@ def svgs2tree(
             tree.render(out_dir + input_gene + "." + adj + ext, w=800, tree_style=ts)
     except TypeError:  # QStandardPaths doesn't have permissions
         # this does not work
-        if not os.path.isdir(out_dir + ".XDG/"):
-            os.mkdir(out_dir + ".XDG/")
+        if not Path(out_dir + ".XDG/").is_dir():
+            Path(out_dir + ".XDG/").mkdir()
         os.environ["XDG_RUNTIME_DIR"] = out_dir + ".XDG/"
         if og is not None:
             tree.render(
@@ -837,9 +838,7 @@ def extend_color_palette(hgs, color_dict):
         try:
             color_dict[str(v)] = new_colors[i - cor_i]
         except IndexError:
-            eprint(
-                "\t\t\tWARNING: input too large for discrete arrow colors", flush=True
-            )
+            logger.warning("input too large for discrete arrow colors")
             cor_i = i
             new_colors = colors
             color_dict[str(v)] = new_colors[i - cor_i]
@@ -914,7 +913,7 @@ def make_color_palette(inputs, conversion_dict={}):
         for i, v in enumerate(inputs):
             color_dict[conversion_dict[v]] = extColors[i]
     else:
-        eprint("\nWARNING: input too large for discrete arrow colors", flush=True)
+        logger.warning("input too large for discrete arrow colors")
         try:
             for i, v in enumerate(inputs):
                 color_dict[conversion_dict[v]] = extColors[i]
@@ -938,7 +937,7 @@ def tree_mngr(
 ):
 
     query_fa_path = wrk_dir + query + ".fa"
-    if os.path.isfile(tre_dir + str(query) + tree_suffix) and reoutput:
+    if Path(tre_dir + str(query) + tree_suffix).is_file() and reoutput:
         return
     else:
         try:
@@ -981,28 +980,28 @@ def parse_log(log_path, new_log, out_dir):
             #           if db5 != old_log['db']: if md5 changes do somethign
             #                rerun_search = True
             if old_log["search"] != new_log["search"]:
-                if os.path.isdir(out_dir):
+                if Path(out_dir).is_dir():
                     shutil.rmtree(out_dir)
                 return
             elif old_log["bitscore"] != new_log["bitscore"]:
                 fas = collect_files(wrk_dir, "fa")
                 for fa in fas:
-                    os.remove(fa)
+                    Path(fa).unlink()
                 fas = collect_files(clus_dir, "fa")
                 for fa in fas:
-                    os.remove(fa)
-                if os.path.isdir(wrk_dir + "tree/"):
+                    Path(fa).unlink()
+                if Path(wrk_dir + "tree/").is_dir():
                     shutil.rmtree(wrk_dir + "tree/")
             elif old_log["plusminus"] != new_log["plusminus"]:
-                if os.path.isdir(wrk_dir + "genes/"):
+                if Path(wrk_dir + "genes/").is_dir():
                     shutil.rmtree(wrk_dir + "genes/")
-                if os.path.isdir(wrk_dir + "svg/"):
+                if Path(wrk_dir + "svg/").is_dir():
                     shutil.rmtree(wrk_dir + "svg/")
             elif old_log["labels"] != new_log["labels"]:
-                if os.path.isdir(wrk_dir + "svg/"):
+                if Path(wrk_dir + "svg/").is_dir():
                     shutil.rmtree(wrk_dir + "svg/")
         except KeyError:
-            eprint("\tERROR: log file corrupted. Hoping for the best.", flush=True)
+            logger.error("log file corrupted. Hoping for the best.")
     write_json(new_log, log_path)
 
 
@@ -1039,7 +1038,7 @@ def crap_mngr(
     if info:
         return query2color
 
-    print("\t\tExtracting loci and generating synteny diagrams", flush=True)
+    logger.info("Extracting loci and generating synteny diagrams")
     extract_loci_cmds = []
     if hg:
         for ome, ome_genes2hg in genes2query.items():
@@ -1091,7 +1090,7 @@ def crap_mngr(
         with mp.Pool(processes=cpus) as pool:
             gene_res = pool.starmap(extract_locus_gene, extract_loci_cmds)
 
-    print("\t\tMapping synteny diagrams on phylogeny", flush=True)
+    logger.info("Mapping synteny diagrams on phylogeny")
     tree_file = tre_dir + query + tree_suffix
     with open(tree_file, "r") as raw:
         raw_tree = raw.read()
@@ -1117,7 +1116,7 @@ def crap_mngr(
                 circular=circular,
             )
         except NewickError:
-            eprint("\t\t\tERROR: newick malformatted", flush=True)
+            logger.error("newick malformatted")
     else:
         try:
             svgs2tree(
@@ -1133,7 +1132,7 @@ def crap_mngr(
                 circular=circular,  # svg_dir, out_dir
             )
         except NewickError:
-            eprint("\t\t\tERROR: newick malformatted", flush=True)
+            logger.error("newick malformatted")
 
     return query2color
 
@@ -1146,7 +1145,7 @@ def write_loci(ome2genes, loc_dir):
                     queries = ",".join(query)
                     out.write(f"{gene}\t{queries}\n")
         else:
-            eprint(f"\t{ome} no hits", flush=True)
+            logger.info(f"{ome} no hits")
 
 
 #            out.write('\n'.join(genes))
@@ -1206,7 +1205,7 @@ def parse_search_col_loci(
                 id_mean = sum(identities) / len(identities)
                 loc2sim[f] = [alia, locus_sim * id_mean]
             except FileNotFoundError:
-                eprint(f"\tWARNING: {ome} locus not weighted by %ID", flush=True)
+                logger.warning(f"{ome} locus not weighted by %ID")
                 loc2sim[f] = [alia, locus_sim]
 
     # sort the loci by similarity
@@ -1279,7 +1278,7 @@ def locus_output_mngr(
     ome2files = defaultdict(list)
     ome2locs = defaultdict(list)
     for f in files:
-        ome = os.path.basename(f)[: os.path.basename(f).find("_")]
+        ome = Path(f).name[: Path(f).name.find("_")]
         ome2files[ome].append(f)
 
     if not report_dir:
@@ -1349,8 +1348,8 @@ def hg_main(
 
     db = db.set_index()
 
-    print("\nCompiling homolog data", flush=True)
-    print("\tCompiling homologs", flush=True)
+    logger.info("Compiling homolog data")
+    logger.info("Compiling homologs")
     #    og_info_dict = mycodbHGs(omes = set(db['ome']))
     #   hg2gene, gene2hg = extract_ogs(og_info_dict, ogtag)
     ome2i, gene2hg, i2ome, hg2gene = compile_homolog_groups(
@@ -1375,12 +1374,12 @@ def hg_main(
 
     # in the future, genes without HGs will be placed into HGs via RBH
     if not input_hgs:
-        eprint("\nERROR: no HGs for any inputted genes", flush=True)
+        logger.error("no HGs for any inputted genes")
         sys.exit(3)
 
     if output_loci:
-        if all(os.path.isfile(f"{tre_dir}{gene}{tree_suffix}") for gene in input_hgs):
-            print("\nSkipping to outputting most similar loci to query", flush=True)
+        if all(Path(f"{tre_dir}{gene}{tree_suffix}").is_file() for gene in input_hgs):
+            logger.info("Skipping to outputting most similar loci to query")
             locus_output_mngr(
                 gff_dir,
                 loc_dir,
@@ -1393,60 +1392,56 @@ def hg_main(
             return
 
     hg_fas = {}
-    if not all(os.path.isfile(f"{faa_dir}{hg}.faa") for gene, hg in input_hgs.items()):
-        print("\tPreparing homolog fastas", flush=True)
+    if not all(Path(f"{faa_dir}{hg}.faa").is_file() for gene, hg in input_hgs.items()):
+        logger.info("Preparing homolog fastas")
         compile_hg_fa_cmds = [
             [db, hg2gene[hg], gene]
             for gene, hg in input_hgs.items()
-            if not os.path.isfile(wrk_dir + gene + ".fa")
+            if not Path(wrk_dir + gene + ".fa").is_file()
         ]
         with mp.Pool(processes=cpus) as pool:
             hg_fas = {
                 x[0]: x[1] for x in pool.starmap(compile_hg_fa, compile_hg_fa_cmds)
             }
         for gene, hg in input_hgs.items():
-            if os.path.isfile(
-                wrk_dir + gene + ".fa"
-            ):  # add finished in working directory back
+            if Path(wrk_dir + gene + ".fa").is_file():  # add finished in working directory back
                 hg_fas = {**hg_fas, **{gene: fa2dict(wrk_dir + gene + ".fa")}}
     else:
         for gene, hg in input_hgs.items():
             hg_fas = {**hg_fas, **{gene: fa2dict(f"{faa_dir}{hg}.faa")}}
         for gene in input_hgs:
             if gene not in hg_fas[gene]:
-                eprint(
-                    f"\t\tERROR: {gene} not in homologs. Incorrect input?", flush=True
-                )
+                logger.error(f"{gene} not in homologs. Incorrect input?")
                 sys.exit(3)
 
-    print("\nChecking fasta sizes", flush=True)
+    logger.info("Checking fasta sizes")
     fas4clus, fas4trees = check_fa_size(hg_fas, max_size)
     for query, hit_fa in fas4trees.items():
         hit_fa_path = wrk_dir + query + ".fa"
         with open(hit_fa_path, "w") as out:
             out.write(dict2fa(hit_fa))
 
-    if not os.path.isdir(clus_dir):
-        os.mkdir(clus_dir)
+    if not Path(clus_dir).is_dir():
+        Path(clus_dir).mkdir()
     if fas4clus:
         for query, fa in fas4clus.items():
             clus_fa_path = clus_dir + query + ".fa"
-            if not os.path.isfile(clus_fa_path):
+            if not Path(clus_fa_path).is_file():
                 with open(clus_fa_path, "w") as out:
                     out.write(dict2fa(fa))
-        print("\nRunning clustering on " + str(len(fas4clus)) + " fastas", flush=True)
+        logger.debug("Running clustering on " + str(len(fas4clus)) + " fastas")
 
-    print("\nCRAP", flush=True)
+    logger.info("CRAP")
     ome_gene2hg = gene2hg2ome2hg(gene2hg)
     fas4trees = {k: v for k, v in sorted(fas4trees.items(), key=lambda x: len(x[1]))}
     for query, query_fa in fas4trees.items():
         out_keys = None
         query_hits = list(query_fa.keys())
-        print("\tQuery: " + str(query), flush=True)
+        logger.debug("Query: " + str(query))
         if outgroups:
-            print("\t\tOutgroup detection", flush=True)
-            if os.path.isfile(clus_dir + query + ".fa"):
-                if not os.path.isfile(wrk_dir + query + ".outgroup.fa"):
+            logger.info("Outgroup detection")
+            if Path(clus_dir + query + ".fa").is_file():
+                if not Path(wrk_dir + query + ".outgroup.fa").is_file():
                     in_keys, all_keys = outgroup_mngr(
                         db,
                         query,
@@ -1462,11 +1457,11 @@ def hg_main(
                 out_query = query + ".outgroup"
                 query_hits = all_keys
                 out_keys = list(set(all_keys).difference(set(in_keys)))
-                print("\t\t\t" + str(len(in_keys)) + " gene ingroup", flush=True)
+                logger.debug("" + str(len(in_keys)) + " gene ingroup")
                 if out_keys:
-                    print("\t\t\t" + str(len(out_keys)) + " gene outgroup", flush=True)
+                    logger.debug("" + str(len(out_keys)) + " gene outgroup")
             else:
-                eprint("\t\t\tWARNING: Could not detect outgroup for root", flush=True)
+                logger.warning("Could not detect outgroup for root")
         HG = input_hgs[
             re.sub(r"\.outgroup$", "", query)
         ]  # bulletproof against outgroups
@@ -1496,8 +1491,8 @@ def hg_main(
         )
 
     for query in fas4clus:
-        print("\tQuery: " + str(query), flush=True)
-        print("\t\tSequence clustering", flush=True)
+        logger.debug("Query: " + str(query))
+        logger.info("Sequence clustering")
         out_keys = None
         res, overshot, fa2clus_log = run_fa2clus(
             clus_dir + query + ".fa",
@@ -1515,11 +1510,11 @@ def hg_main(
             algorithm=clus_meth,
         )
         if not res:
-            print("\t\t\tERROR: query had no significant hits", flush=True)
+            logger.error("query had no significant hits")
             continue
         if outgroups and not overshot:
-            print("\t\tOutgroup detection", flush=True)
-            if not os.path.isfile(wrk_dir + query + ".outgroup.fa"):
+            logger.info("Outgroup detection")
+            if not Path(wrk_dir + query + ".outgroup.fa").is_file():
                 in_keys, all_keys = outgroup_mngr(
                     db,
                     query,
@@ -1535,9 +1530,9 @@ def hg_main(
             out_query = query + ".outgroup"
             query_hits = all_keys
             out_keys = list(set(all_keys).difference(in_keys))
-            print("\t\t\t" + str(len(in_keys)) + " gene ingroup", flush=True)
+            logger.debug("" + str(len(in_keys)) + " gene ingroup")
             if out_keys:
-                print("\t\t\t" + str(len(out_keys)) + " gene outgroup", flush=True)
+                logger.debug("" + str(len(out_keys)) + " gene outgroup")
         else:
             query_fa = fa2dict(wrk_dir + query + ".fa")
             query_hits = list(query_fa.keys())
@@ -1570,7 +1565,7 @@ def hg_main(
         )
 
     if output_loci:
-        print("\nOutputting most similar loci to query", flush=True)
+        logger.info("Outputting most similar loci to query")
         locus_output_mngr(
             gff_dir,
             loc_dir,
@@ -1616,7 +1611,7 @@ def search_main(
 ):
     """input_genes is a list of genes within an inputted cluster"""
 
-    print("\nPreparing run", flush=True)
+    logger.info("Preparing run")
     wrk_dir, loc_dir = out_dir + "working/", out_dir + "loci/"
     gff_dir, tre_dir = wrk_dir + "genes/", wrk_dir + "trees/"
     clus_dir = wrk_dir + "clus/"
@@ -1628,7 +1623,7 @@ def search_main(
     query2color, conversion_dict = make_color_palette(input_genes, conversion_dict)
 
     if query_gff:
-        print("\tCleaning input GFF", flush=True)
+        logger.info("Cleaning input GFF")
         par_dict, prot_hits, RNA, query_gff = prep_gff(
             query_gff, set(input_genes), gff3Comps()
         )
@@ -1639,16 +1634,14 @@ def search_main(
                 query_gff, set(input_genes), gff3Comps(), prot_hits, par_dict
             )
         if par_dict:
-            eprint("\nIncorrectly formatted GFF", flush=True)
+            logger.info("Incorrectly formatted GFF")
             sys.exit(5)
         elif set(input_genes).difference(prot_hits):
-            eprint("\nProteins missing from GFF", flush=True)
-            eprint(
-                "\t"
+            logger.info("Proteins missing from GFF")
+            logger.info(""
                 + ",".join(
                     [str(x) for x in list(set(input_genes).difference(prot_hits))]
-                )
-            )
+                ))
             sys.exit(6)
         clean_gff = [
             x
@@ -1663,22 +1656,22 @@ def search_main(
         query_fa = acc2fa(db, input_genes)
         with open(query_path, "w") as out:
             out.write(dict2fa(query_fa))
-    elif not os.path.isfile(query_path):
+    elif not Path(query_path).is_file():
         with open(query_path, "w") as out:
             out.write(dict2fa(query_fa))
 
     search_fas = {}
     for query in query_fa:
-        if os.path.isfile(clus_dir + query + ".fa"):
+        if Path(clus_dir + query + ".fa").is_file():
             search_fas[query] = fa2dict(clus_dir + query + ".fa")
             search_fas[query][query] = query_fa[query]
-        elif os.path.isfile(wrk_dir + query + ".fa"):
+        elif Path(wrk_dir + query + ".fa").is_file():
             search_fas[query] = fa2dict(wrk_dir + query + ".fa")
             search_fas[query][query] = query_fa[query]
 
     if output_loci:
-        if all(os.path.isfile(f"{tre_dir}{gene}{tree_suffix}") for gene in query_fa):
-            print("\nSkipping to outputting most similar loci to query", flush=True)
+        if all(Path(f"{tre_dir}{gene}{tree_suffix}").is_file() for gene in query_fa):
+            logger.info("Skipping to outputting most similar loci to query")
             locus_output_mngr(
                 gff_dir,
                 loc_dir,
@@ -1720,14 +1713,14 @@ def search_main(
         for query in search_fas:
             search_fas[query][query] = query_fa[query]
 
-    print("\nChecking hit fasta sizes", flush=True)
+    logger.info("Checking hit fasta sizes")
     genes2query, merges = compile_genes_by_omes(
         search_fas, conversion_dict, set(db["ome"])
     )
     query2color = merge_color_palette(merges, query2color)
 
     for query in search_fas:  # revert back to other fas
-        if os.path.isfile(wrk_dir + query + ".fa"):
+        if Path(wrk_dir + query + ".fa").is_file():
             search_fas[query] = fa2dict(wrk_dir + query + ".fa")
     fas4clus, fas4trees = check_fa_size(search_fas, max_size)
     for query, hit_fa in fas4trees.items():
@@ -1736,26 +1729,26 @@ def search_main(
             out.write(dict2fa(hit_fa))
 
     if fas4clus:
-        if not os.path.isdir(clus_dir):
-            os.mkdir(clus_dir)
+        if not Path(clus_dir).is_dir():
+            Path(clus_dir).mkdir()
         for query, fa in fas4clus.items():
             clus_fa_path = clus_dir + query + ".fa"
-            if not os.path.isfile(clus_fa_path):
+            if not Path(clus_fa_path).is_file():
                 with open(clus_fa_path, "w") as out:
                     out.write(dict2fa(fa))
-        print("\tRunning clustering on " + str(len(fas4clus)) + " fastas", flush=True)
+        logger.debug("Running clustering on " + str(len(fas4clus)) + " fastas")
 
-    print("\nCRAP", flush=True)
+    logger.info("CRAP")
     ome2genes = {}
     fas4trees = {k: v for k, v in sorted(fas4trees.items(), key=lambda x: len(x[1]))}
     for query, query_fa in fas4trees.items():
         out_keys = None
         query_hits = list(query_fa.keys())
-        print("\tQuery: " + str(query), flush=True)
+        logger.debug("Query: " + str(query))
         if outgroups:
-            print("\t\tOutgroup detection", flush=True)
-            if os.path.isfile(clus_dir + query + ".fa"):
-                if not os.path.isfile(wrk_dir + query + ".outgroup.fa"):
+            logger.info("Outgroup detection")
+            if Path(clus_dir + query + ".fa").is_file():
+                if not Path(wrk_dir + query + ".outgroup.fa").is_file():
                     in_keys, all_keys = outgroup_mngr(
                         db,
                         query,
@@ -1771,11 +1764,11 @@ def search_main(
                 out_query = query + ".outgroup"
                 query_hits = all_keys
                 out_keys = list(set(all_keys).difference(set(in_keys)))
-                print("\t\t\t" + str(len(in_keys)) + " gene ingroup", flush=True)
+                logger.debug("" + str(len(in_keys)) + " gene ingroup")
                 if out_keys:
-                    print("\t\t\t" + str(len(out_keys)) + " gene outgroup", flush=True)
+                    logger.debug("" + str(len(out_keys)) + " gene outgroup")
             else:
-                eprint("\t\t\tWARNING: could not detect outgroup for root", flush=True)
+                logger.warning("could not detect outgroup for root")
         null = crap_mngr(
             db,
             query,
@@ -1806,8 +1799,8 @@ def search_main(
             clus_cpus = cpus
 
     for query in fas4clus:
-        print("\tQuery: " + str(query), flush=True)
-        print("\t\tSequence clustering", flush=True)
+        logger.debug("Query: " + str(query))
+        logger.info("Sequence clustering")
         out_keys = None
         query_hits = list(query_fa.keys())
 
@@ -1827,12 +1820,12 @@ def search_main(
             algorithm=clus_meth,
         )
         if not res:
-            print("\t\t\tFAILED: query had no significant hits", flush=True)
+            logger.warning("FAILED: query had no significant hits")
             continue
 
         if outgroups and not overshot:
-            print("\t\tOutgroup detection", flush=True)
-            if not os.path.isfile(wrk_dir + query + ".outgroup.fa"):
+            logger.info("Outgroup detection")
+            if not Path(wrk_dir + query + ".outgroup.fa").is_file():
                 # WILL RAISE AN ERROR IF THIS EXISTS BECAUSE ALL_KEYS DOESNT
                 in_keys, all_keys = outgroup_mngr(
                     db,
@@ -1849,9 +1842,9 @@ def search_main(
             query_hits = all_keys
             out_query = query + ".outgroup"
             out_keys = list(set(all_keys).difference(set(in_keys)))
-            print("\t\t\t" + str(len(in_keys)) + " gene ingroup", flush=True)
+            logger.debug("" + str(len(in_keys)) + " gene ingroup")
             if out_keys:
-                print("\t\t\t" + str(len(out_keys)) + " gene outgroup", flush=True)
+                logger.debug("" + str(len(out_keys)) + " gene outgroup")
         else:
             query_fa = fa2dict(wrk_dir + query + ".fa")
         null = crap_mngr(
@@ -1878,7 +1871,7 @@ def search_main(
         )
 
     if output_loci:
-        print("\nOutputting most similar loci to query", flush=True)
+        logger.info("Outputting most similar loci to query")
         locus_output_mngr(
             gff_dir,
             loc_dir,
@@ -2044,11 +2037,12 @@ def cli():
         help='Output format: ["svg", "pdf", "png"]',
     )
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     execs = ["diamond", "clipkit", "mafft", "iqtree"]
     if args.search:
         if args.search not in {"mmseqs", "blastp", "diamond"}:
-            eprint("\nERROR: invalid -s", flush=True)
+            logger.error("invalid -s")
             sys.exit(3)
         else:
             execs.append(args.search)
@@ -2056,25 +2050,25 @@ def cli():
     findExecs(execs, exit=set(execs))
 
     if args.out_format.lower() not in {"svg", "pdf", "png"}:
-        eprint("\nERROR: invalid -of", flush=True)
+        logger.error("invalid -of")
         sys.exit(10)
     else:
         out_ext = "." + args.out_format.lower()
 
     if not args.homologs and args.faa:
-        eprint("\nERROR: -hf requires -hg", flush=True)
+        logger.error("-hf requires -hg")
         sys.exit(12)
 
     input_fa, input_GFF = False, False
 
     if args.query == "-":
         if args.gff:
-            eprint("\nERROR: GFF input requires fasta input", flush=True)
+            logger.error("GFF input requires fasta input")
             sys.exit(3)
         input_genes = stdin2str().replace('"', "").replace("'", "").split()
     elif "'" in args.query or '"' in args.query:
         if args.gff:
-            eprint("\nERROR: GFF input requires fasta input", flush=True)
+            logger.error("GFF input requires fasta input")
             sys.exit(3)
         input_genes = (
             args.query.replace('"', "").replace("'", "").replace(",", " ").split()
@@ -2088,7 +2082,7 @@ def cli():
     gene0 = input_genes[0]
     ome = input_genes[0][: input_genes[0].find("_")]
     if not ome in set(db["ome"]):
-        if os.path.isfile(args.query):
+        if Path(args.query).is_file():
             if args.query.lower().endswith((".fasta", ".fa", ".faa", ".fna", ".fsa")):
                 input_fa = fa2dict(args.query)
                 input_genes = list(input_fa.keys())
@@ -2099,12 +2093,9 @@ def cli():
                     data = raw.read()
                 input_genes = data.rstrip().split()
         else:
-            print("\nDetected non-mycotools input", flush=True)
+            logger.info("Detected non-mycotools input")
             if not input_fa or not args.search:
-                eprint(
-                    "\tnon-mycotools input requires -s, -i as a fasta, optionally -g",
-                    flush=True,
-                )
+                logger.info("non-mycotools input requires -s, -i as a fasta, optionally -g")
                 sys.exit(4)
 
     #        eprint('\nERROR: invalid input', flush = True)
@@ -2123,7 +2114,7 @@ def cli():
         fast = True
 
     if args.agg_clus and args.linclust:
-        eprint("\nERROR: multiple clustering methods specified", flush=True)
+        logger.error("multiple clustering methods specified")
         sys.exit(5)
     elif args.agg_clus:
         clus_meth = "diamond"
@@ -2174,7 +2165,7 @@ def cli():
             args.plusminus,
             not args.no_label,
         )
-        print("\nPreparing output directory", flush=True)
+        logger.info("Preparing output directory")
         out_dir, wrk_dir, gff_dir, tre_dir = make_output(output, new_log)
         hg_main(
             db,
@@ -2210,7 +2201,7 @@ def cli():
             args.plusminus,
             not args.no_label,
         )
-        print("\nPreparing output directory", flush=True)
+        logger.info("Preparing output directory")
         out_dir, wrk_dir, gff_dir, tre_dir = make_output(output, new_log)
         search_main(
             db,

@@ -1,13 +1,15 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
 import argparse
 from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
 from mycotools.lib.dbtools import mtdb, primaryDB
-from mycotools.lib.kontools import format_path, eprint, stdin2str
+from mycotools.lib.kontools import format_path, stdin2str, setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def extract_mtdb_accs_exp(fa_dict, accs):
@@ -34,7 +36,7 @@ def extract_mtdb_accs(fa_dict, accs, spacer=""):
                     try:
                         out_fa[acc] = fa_dict[acc]
                     except KeyError:
-                        eprint(f"WARNING: {acc} has no CDS", flush=True)
+                        logger.warning(f"{acc} has no CDS")
                     continue
             acc_name = acc[: acc.find("[")]
             if start < end:
@@ -44,9 +46,7 @@ def extract_mtdb_accs(fa_dict, accs, spacer=""):
                         "description": fa_dict[acc_name]["description"],
                     }
                 except KeyError:
-                    eprint(
-                        spacer + "WARNING: invalid accession " + acc_name, flush=True
-                    )
+                    logger.warning(spacer + "invalid accession " + acc_name)
             else:
                 try:
                     out_fa[acc] = {
@@ -56,14 +56,12 @@ def extract_mtdb_accs(fa_dict, accs, spacer=""):
                         "description": fa_dict[acc_name]["description"],
                     }
                 except KeyError:
-                    eprint(
-                        spacer + "WARNING: invalid accession " + acc_name, flush=True
-                    )
+                    logger.warning(spacer + "invalid accession " + acc_name)
         else:  # no coordinates
             try:
                 out_fa[acc] = fa_dict[acc]  # extract the whole accession
             except KeyError:
-                eprint(spacer + "WARNING: invalid accession " + acc_name, flush=True)
+                logger.warning(spacer + "invalid accession " + acc_name)
 
     return out_fa
 
@@ -138,7 +136,7 @@ def dbmain(db, accs, error=True, spacer="\t\t\t", coord_check=True):
                 if error:
                     raise KeyError("invalid ome: " + ome)
                 else:
-                    eprint(spacer + ome + " not in database", flush=True)
+                    logger.info(spacer + ome + " not in database")
             fa_dict = {**fa_dict, **extract_mtdb_accs(ome_fasta, ome_accs)}
     else:
         for ome, ome_accs in ome_data.items():
@@ -148,7 +146,7 @@ def dbmain(db, accs, error=True, spacer="\t\t\t", coord_check=True):
                 if error:
                     raise KeyError
                 else:
-                    eprint(spacer + ome + " not in database", flush=True)
+                    logger.info(spacer + ome + " not in database")
             fa_dict = {**fa_dict, **extract_mtdb_accs_exp(ome_fasta, ome_accs)}
 
     return fa_dict
@@ -187,6 +185,7 @@ def cli():
     parser.add_argument("-e", "--end", help="End index column (1 indexed)", type=int)
     parser.add_argument("-d", "--mtdb", default=primaryDB())
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.input:  # input file
         input_file = format_path(args.input)

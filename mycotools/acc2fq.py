@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
 import gzip
@@ -9,7 +9,9 @@ from Bio import SeqIO
 from collections import defaultdict
 
 # from mycotools.lib.biotools import dict2fq
-from mycotools.lib.kontools import format_path, eprint, stdin2str
+from mycotools.lib.kontools import format_path, stdin2str, setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def dict2fq(fastq_dict, description=True):
@@ -189,6 +191,7 @@ def cli():
     parser.add_argument("-i", "--input", help="File with accessions")
     parser.add_argument("-f", "--fastq", help="FASTQ input", required=True)
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.input:  # input file
         input_file = format_path(args.input)

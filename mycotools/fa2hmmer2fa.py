@@ -2,6 +2,7 @@
 
 # NEED to ditch extracthmm and move to simplified output parsing
 
+import logging
 import os
 import re
 import sys
@@ -9,13 +10,16 @@ import argparse
 import datetime
 import subprocess
 import multiprocessing as mp
-from mycotools.extractHmmsearch import main as exHmm, grabNames
-from mycotools.extractHmmAcc import main as extr_hmm
+from mycotools.utils.extractHmmsearch import main as exHmm, grab_names as grabNames
+from mycotools.utils.extractHmmAcc import main as extr_hmm
 from mycotools.db2search import compAcc2fa
 from mycotools.acc2fa import famain as acc2fa
-from mycotools.lib.kontools import intro, outro, findExecs, eprint, format_path
+from mycotools.lib.kontools import intro, outro, findExecs, format_path, setup_logging
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import dict2fa
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def runextractHmmAcc(hmm, accession, output):
@@ -80,7 +84,7 @@ def run_acc2fa(db, biotype, output_res, subhit=True, cpu=1):
     acc2fa_cmds = compAcc2fa(db, biotype, output_res, subhit)
     output_fas = {}
     for query in acc2fa_cmds:
-        print("\t" + query, flush=True)
+        logger.debug("" + query)
         with mp.get_context("spawn").Pool(processes=cpu) as pool:
             results = pool.starmap(acc2fa, acc2fa_cmds[query])
         output_fas[query] = "\n".join([dict2fa(x) for x in results])
@@ -116,12 +120,12 @@ def main(
         biotype = "faa"
 
     if accession:
-        print("\nExtracting " + accession, flush=True)
+        logger.debug("Extracting " + accession)
         hmm_path = runextractHmmAcc(hmm_path, accession, out_dir + accession + ".hmm")
-        if os.path.isfile(accession):
+        if Path(accession).is_file():
             accession = []
     else:
-        print("\nExtracting accessions", flush=True)
+        logger.info("Extracting accessions")
         with open(hmm_path, "r") as raw:
             hmm_data = raw.read()
         accession = []
@@ -131,18 +135,18 @@ def main(
     else:
         hmm_cpu = cpu
     hmmer_out = out_dir + "hmmer.out"
-    print("\nRunning " + binary, flush=True)
+    logger.debug("Running " + binary)
     if runHmmer(fasta_path, hmm_path, hmmer_out, cpu=hmm_cpu, binary=binary):
-        eprint("\tERROR: " + binary + " failed", flush=True)
+        logger.error("" + binary + " failed")
         sys.exit(2)
 
-    print("\nParsing output", flush=True)
+    logger.info("Parsing output")
     hmm_data = run_extract_hmm(
         hmmer_out, top_hits, cov_threshold, evalue, not accession_search, accession
     )
     output_res = parse_hmm_data(hmm_data)
 
-    print("\nCompiling fastas", flush=True)
+    logger.info("Compiling fastas")
     output_fas = run_acc2fa(db, biotype, output_res, subhit=subhit, cpu=cpu)
 
     return output_fas
@@ -180,9 +184,10 @@ def cli():
     parser.add_argument("-o", "--output", help="Output directory")
     parser.add_argument("--cpu", default=1, type=int)
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.binary not in {"hmmsearch", "nhmmer"}:
-        eprint("\nERROR: invalid --binary", flush=True)
+        logger.error("invalid --binary")
         sys.exit(1)
     findExecs([args.binary], exit={args.binary})
 
@@ -190,9 +195,9 @@ def cli():
         out_dir = args.output
     else:
         date = datetime.datetime.today().strftime("%Y%m%d")
-        out_dir = os.getcwd() + "/" + date + "_fa2hmm2fa/"
-    if not os.path.isdir(out_dir):
-        os.mkdir(out_dir)
+        out_dir = str(Path.cwd()) + "/" + date + "_fa2hmm2fa/"
+    if not Path(out_dir).is_dir():
+        Path(out_dir).mkdir()
     out_dir = format_path(out_dir)
 
     if args.evalue:
@@ -235,7 +240,7 @@ def cli():
         subhit=not args.whole,
     )
     fastaname = re.sub(
-        r"\.fa[^\.]*$", "", os.path.basename(os.path.abspath(args.fasta))
+        r"\.fa[^\.]*$", "", Path(os.path.abspath(args.fasta)).name
     )
     outputFas(output_fas, out_dir, fastaname)
 

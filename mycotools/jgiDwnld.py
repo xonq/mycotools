@@ -11,21 +11,25 @@ import os
 import re
 import sys
 import time
+import logging
 import getpass
 import argparse
 import subprocess
 import pandas as pd
 import xml.etree.ElementTree as ET
 from tqdm import tqdm
-from mycotools.lib.kontools import eprint, format_path, outro, intro
+from mycotools.lib.kontools import format_path, outro, intro, setup_logging
 from mycotools.lib.dbtools import loginCheck
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def jgi_login(user, pwd):
     """Login via JGI's prescribed method by creating a cookie cache and
     downloading JGI's sign-in file."""
 
-    null = os.path.expanduser("~/.nulljgi_dwnld")
+    null = str(Path("~/.nulljgi_dwnld").expanduser())
 
     login_cmd = subprocess.call(
         [
@@ -49,7 +53,7 @@ def jgi_login(user, pwd):
 
 def dwnld_xml(output, ome, max_tempts=2):
     attempts = 0
-    while not os.path.isfile(f"{output}/{ome}.xml") and attempts < max_tempts:
+    while not Path(f"{output}/{ome}.xml").is_file() and attempts < max_tempts:
         attempts += 1
         xml_cmd = subprocess.call(
             [
@@ -65,8 +69,8 @@ def dwnld_xml(output, ome, max_tempts=2):
             stderr=subprocess.PIPE,
         )
         if xml_cmd != 0:
-            print(f"\tERROR: {ome} xml curl error: {xml_cmd}", flush=True)
-    if not os.path.isfile(f"{output}/{ome}.xml"):
+            logger.error(f"\t{ome} xml curl error: {xml_cmd}")
+    if not Path(f"{output}/{ome}.xml").is_file():
         return -1
     else:
         return xml_cmd
@@ -77,16 +81,16 @@ def retrieve_xml(ome, output):
     download it using JGI's prescribed method. Then open the xml and check for
     the common 'Portal does not exist' error. If so, report."""
 
-    if os.path.exists(output + "/" + str(ome) + ".xml"):
+    if Path(output + "/" + str(ome) + ".xml").exists():
         with open(output + "/" + str(ome) + ".xml", "r") as xml_raw:
             xml_data = xml_raw.read()
         if xml_data == "Portal does not exist":
-            print("\tERROR: `" + ome + " not in JGIs `organism` database", flush=True)
+            logger.error("\t`" + ome + " not in JGIs `organism` database")
             xml_cmd = 1
-            os.remove(output + "/" + ome + ".xml")
+            Path(output + "/" + ome + ".xml").unlink()
         elif not xml_data:
             xml_cmd = None
-            os.remove(f"{output}/{ome}.xml")
+            Path(f"{output}/{ome}.xml").unlink()
         else:
             xml_cmd = -1
     else:
@@ -96,12 +100,12 @@ def retrieve_xml(ome, output):
         with open(output + "/" + ome + ".xml", "r") as xml_raw:
             xml_data = xml_raw.read()
         if xml_data == "Portal does not exist":
-            print("\tERROR: `" + ome + " not in JGIs `organism` database", flush=True)
+            logger.error("\t`" + ome + " not in JGIs `organism` database")
             xml_cmd = 1
-            os.remove(output + "/" + ome + ".xml")
+            Path(output + "/" + ome + ".xml").unlink()
         elif not xml_data:
             xml_cmd = None
-            os.remove(f"{output}/{ome}.xml")
+            Path(f"{output}/{ome}.xml").unlink()
 
     return xml_cmd
 
@@ -267,9 +271,8 @@ def handle_redirect_307(
 ):
     """Handle a redirection error by identifying a new file URL to download
     from, or return the original if none exist"""
-    print(
-        spacer + "\t" + dwnld + " link has moved. " + "Trying a different link.",
-        flush=True,
+    logger.info(
+        spacer + "\t" + dwnld + " link has moved. " + "Trying a different link."
     )
     filename, n_url, dwnld_md5, t_org_name = parse_xml(
         file_type, xml_file, masked=masked, forbidden={url}.union(urls)
@@ -278,7 +281,7 @@ def handle_redirect_307(
     if n_url:
         url = n_url
         dwnld_url = prefix + url.replace("&amp;", "&")
-        dwnld = f"{output}{file_type}/{os.path.basename(dwnld_url)}"
+        dwnld = f"{output}{file_type}/{Path(dwnld_url).name}"
     return url, dwnld_url, dwnld, {url}.union(urls), t_org_name
 
 
@@ -286,11 +289,11 @@ def no_md5_checks(dwnld, md5, spacer):
     """If there is no MD5, simply check the file has content in it"""
     check_size = subprocess.run(["wc", "-l", dwnld], stdout=subprocess.PIPE)
     check_size_res = check_size.stdout.decode("utf-8")
-    print(spacer + "\t\tFile exists - no md5 to check.", flush=True)
+    logger.info(spacer + "\t\tFile exists - no md5 to check.")
     check_size_find = re.search(r"\d+", check_size_res)
     size = check_size_find[0]
     if int(size) < 10:
-        print(spacer + "\tInvalid file size.", flush=True)
+        logger.warning(spacer + "\tInvalid file size.")
     else:
         md5 = None
     return md5
@@ -348,17 +351,17 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
 
         dwnld_url = prefix + url.replace("&amp;", "&")
 
-        dwnld = f"{output}{file_type}/{os.path.basename(dwnld_url)}"
+        dwnld = f"{output}{file_type}/{Path(dwnld_url).name}"
         unzip_dwnld = re.sub(r"\.gz$", "", dwnld)
         # assume unzipped downloads have passed the checks
-        if os.path.isfile(unzip_dwnld):
+        if Path(unzip_dwnld).is_file():
             md5 = dwnld_md5
             curl_cmd = 0
             check = unzip_dwnld
             preexisting = True
 
         # if the file currently exists, then check its MD5
-        elif os.path.exists(dwnld):
+        elif Path(dwnld).exists():
             if dwnld_md5:
                 md5_cmd = subprocess.run(
                     ["md5sum", dwnld], stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -404,7 +407,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                                 preexisting = True
                                 check = dwnld
                         else:
-                            print(spacer + "\tmd5 does not match.", flush=True)
+                            logger.warning(spacer + "\tmd5 does not match.")
                         break
 
         # while the MD5 doesn't match, or there is a curl error, try up to 3
@@ -434,7 +437,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                         md5 = md5_find[0]
                     except TypeError:
                         md5 = False
-                        if not os.path.isfile(dwnld):
+                        if not Path(dwnld).is_file():
                             attempt += 1
                             continue
                 # if there is no MD5 attempt the crude file check
@@ -460,7 +463,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                                 org_name = t_org_name
 
                             if t_url == url:
-                                print(spacer + "\t\tNo valid alternative", flush=True)
+                                logger.warning(spacer + "\t\tNo valid alternative")
                                 attempt = 4
                                 break
                             else:
@@ -478,10 +481,9 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
 
                 # the download may have failed, so prepare to retry
                 elif md5 != dwnld_md5 and attempt == 1:
-                    print(
-                        f"{spacer}\tERROR: md5 does not match JGI. "
-                        + f"Attempt {attempt}",
-                        flush=True,
+                    logger.error(
+                        f"{spacer}\tmd5 does not match JGI. "
+                        + f"Attempt {attempt}"
                     )
                     curl_cmd = -1
                     check = 2
@@ -506,8 +508,8 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                                 if t_org_name:
                                     org_name = t_org_name
                                 if t_url == url:
-                                    print(
-                                        spacer + "\t\tNo valid alternative", flush=True
+                                    logger.warning(
+                                        spacer + "\t\tNo valid alternative"
                                     )
                                     attempt = 4
                                     break
@@ -521,9 +523,8 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                         time.sleep(60)
                 # if there are two fails, attempt a new URL
                 elif md5 != dwnld_md5 and attempt == 2:
-                    print(
-                        f"{spacer}\tERROR: md5 does not match JGI. Attempt {attempt}",
-                        flush=True,
+                    logger.error(
+                        f"{spacer}\tmd5 does not match JGI. Attempt {attempt}"
                     )
                     curl_cmd = -1
                     filename, n_url, dwnld_md5, t_org_name = parse_xml(
@@ -536,32 +537,30 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                         url = n_url
                         dwnld_url = prefix + url.replace("&amp;", "&")
                         f_ulrs = {url}.union(f_urls)
-                        dwnld = f"{output}{file_type}/{os.path.basename(dwnld_url)}"
+                        dwnld = f"{output}{file_type}/{Path(dwnld_url).name}"
                     time.sleep(60)
                     check = 2
                 elif md5 != dwnld_md5:
-                    print(
-                        f"{spacer}\tERROR: md5 does not match JGI. Attempt {attempt}",
-                        flush=True,
+                    logger.error(
+                        f"{spacer}\tmd5 does not match JGI. Attempt {attempt}"
                     )
                     check = 2
             else:
-                print(
-                    f"{spacer}\tERROR: Failed to retrieve {file_type}. `curl` error: "
-                    + f"{curl_cmd}\n{spacer}\tAttempt {attempt}",
-                    flush=True,
+                logger.error(
+                    f"{spacer}\tFailed to retrieve {file_type}. `curl` error: "
+                    + f"{curl_cmd}\n{spacer}\tAttempt {attempt}"
                 )
                 check = 2
 
         # three strikes and the file is out
         if attempt == 3:
             if md5 != dwnld_md5:
-                print(
-                    spacer + "\tExcluding from database - potential failure", flush=True
+                logger.warning(
+                    spacer + "\tExcluding from database - potential failure"
                 )
                 curl_cmd = 0
             if curl_cmd != 0:
-                print(spacer + "\tFile failed to download", flush=True)
+                logger.error(spacer + "\tFile failed to download")
 
     return check, preexisting, file_type, ran_dwnld, org_name
 
@@ -582,31 +581,30 @@ def main(
     #    pd.options.mode.chained_assignment = None  # default='warn'
     if not "assembly_acc" in df.columns:
         if len(df.columns) != 1:
-            eprint(
-                "\nInvalid input. No assembly_acc column and more than one column.",
-                flush=True,
+            logger.error(
+                "Invalid input. No assembly_acc column and more than one column."
             )
         else:
             ome_col = list(df.columns)[0]
     else:
         ome_col = "assembly_acc"
 
-    eprint(spacer + "Logging into JGI", flush=True)
+    logger.info(spacer + "Logging into JGI")
     login_attempt = 0
     while jgi_login(user, pwd) != 0 and login_attempt < 5:
-        eprint(
-            spacer + "\tJGI Login Failed. Attempt: " + str(login_attempt), flush=True
+        logger.warning(
+            spacer + "\tJGI Login Failed. Attempt: " + str(login_attempt)
         )
         time.sleep(5)
         login_attempt += 1
         if login_attempt == 3:
-            eprint(spacer + "\tERROR: Failed 3 login attempts.", flush=True)
+            logger.error(spacer + "\tFailed 3 login attempts.")
             sys.exit(100)
 
-    if not os.path.exists(output + "/xml"):
-        os.mkdir(output + "/xml")
+    if not Path(output + "/xml").exists():
+        Path(output + "/xml").mkdir()
     # perhaps add a counter here, but one that checks if it is actually querying jgi
-    print("\nRetrieving `xml` directories", flush=True)
+    logger.info("Retrieving `xml` directories")
     ome_set, count = set(), 0
     for i, row in tqdm(df.iterrows(), total=len(df)):
         error_check, attempt = True, 0
@@ -621,12 +619,11 @@ def main(
             elif error_check != -1:
                 time.sleep(0.3)
         if error_check != -1:
-            eprint(f"{spacer}\t{row[ome_col]} failed to retrieve XML", flush=True)
+            logger.warning(f"{spacer}\t{row[ome_col]} failed to retrieve XML")
             ome_set.add(row[ome_col])
 
-    eprint(
-        f"{spacer}Downloading {len(df)} JGI files\n\t" + "Maximum rate: 1 file/min",
-        flush=True,
+    logger.info(
+        f"{spacer}Downloading {len(df)} JGI files\n\t" + "Maximum rate: 1 file/min"
     )
 
     dwnlds = []
@@ -643,8 +640,8 @@ def main(
         dwnlds.append("est")
 
     for typ in dwnlds:
-        if not os.path.isdir(output + "/" + typ):
-            os.mkdir(output + "/" + typ)
+        if not Path(output + "/" + typ).is_dir():
+            Path(output + "/" + typ).mkdir()
 
     preexisting, ran_dwnld = True, False
     for i, row in df.iterrows():
@@ -654,18 +651,18 @@ def main(
         if ome not in ome_set:
             jgi_login(user, pwd)
             if "ome" in row.keys():
-                eprint(spacer + row["ome"] + "\t" + ome, flush=True)
+                logger.info(spacer + row["ome"] + "\t" + ome)
             else:
-                eprint(spacer + ome, flush=True)
+                logger.info(spacer + ome)
             for typ in dwnlds:
                 check, preexisting, new_typ, ran_dwnld, org_name = jgi_dwnld(
                     ome, typ, output, masked=masked, spacer=spacer
                 )
                 if type(check) != int:
                     df.at[i, new_typ + "_path"] = (
-                        output + "/" + new_typ + "/" + os.path.basename(check)
+                        output + "/" + new_typ + "/" + Path(check).name
                     )
-                    check = os.path.basename(os.path.abspath(check))
+                    check = Path(os.path.abspath(check)).name
                     if org_name:
                         org_d = org_name.split()
                         genus = org_d[0]
@@ -684,16 +681,16 @@ def main(
                     df.at[i, "strain"] = strain
                 elif type(check) == int:
                     ome_set.add(row[ome_col])
-                eprint(
-                    spacer + "\t" + new_typ + ": exit status " + str(check), flush=True
+                logger.info(
+                    spacer + "\t" + new_typ + ": exit status " + str(check)
                 )
         else:
-            eprint(spacer + ome + " failed.", flush=True)
+            logger.warning(spacer + ome + " failed.")
 
-    if os.path.exists("cookies"):
-        os.remove("cookies")
-    if os.path.exists(os.path.expanduser("~/.null")):
-        os.remove(os.path.expanduser("~/.null"))
+    if Path("cookies").exists():
+        Path("cookies").unlink()
+    if Path(str(Path("~/.null").expanduser())).exists():
+        Path(str(Path("~/.null").expanduser())).unlink()
 
     if "gff3" in df.columns:
         del df["gff3"]
@@ -753,8 +750,9 @@ def cli():
         action="store_true",
         help="[-a] Download nonmasked assemblies",
     )
-    parser.add_argument("-o", "--output", default=os.getcwd(), help="Output dir")
+    parser.add_argument("-o", "--output", default=str(Path.cwd()), help="Output dir")
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.nonmasked:
         args.assembly = True
@@ -766,7 +764,7 @@ def cli():
         and not args.est
         and not args.gff
     ):
-        eprint("\nERROR: You must choose at least one download option.", flush=True)
+        logger.error("You must choose at least one download option.")
 
     ncbi_email, ncbi_api, user, pwd = loginCheck(ncbi=False)
     #    user = input( 'JGI username: ' )
@@ -783,16 +781,15 @@ def cli():
     }
 
     start_time = intro("Download JGI files", args_dict)
-    eprint(
-        "\nWARNING: This script does NOT account for use-restricted data. "
+    logger.warning(
+        "This script does NOT account for use-restricted data. "
         + "It is user responsibility to determine use restriction status "
         + "in accord with the MycoCosm terms and conditions: "
-        + "https://jgi.doe.gov/user-programs/pmo-overview/policies/legacy-data-policies/",
-        flush=True,
+        + "https://jgi.doe.gov/user-programs/pmo-overview/policies/legacy-data-policies/"
     )
-    eprint(flush=True)
+    logger.info("")
 
-    if os.path.isfile(args.input):
+    if Path(args.input).is_file():
         with open(args.input, "r") as raw:
             for line in raw:
                 if "assembly_acc" in line.rstrip().split("\t"):
@@ -822,7 +819,7 @@ def cli():
     jgi_df = jgi_df.rename(columns={"assembly_acc": "#assembly_acc"})
     jgi_df["source"] = "jgi"
     jgi_df["restriction"] = "no"
-    jgi_df.to_csv(os.path.normpath(args.input) + ".predb.tsv", sep="\t", index=False)
+    jgi_df.to_csv(str(Path(args.input)) + ".predb.tsv", sep="\t", index=False)
 
     outro(start_time)
 

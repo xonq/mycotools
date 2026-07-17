@@ -1,10 +1,13 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
 import argparse
-from mycotools.lib.kontools import intro, outro, file2list, format_path, mkOutput
+from mycotools.lib.kontools import intro, outro, file2list, format_path, mkOutput, setup_logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def grab_names(data, query=False):
@@ -98,10 +101,7 @@ def grab_hits(
                     if x != "" and x != ".." and "[" not in x and "]" not in x
                 ]
                 if len(outLine) != 13:
-                    print(
-                        "\nINVALID ALIGNMENT HEADERS - CHECK SCRIPT/ALIGNMENT\n",
-                        flush=True,
-                    )
+                    logger.error("INVALID ALIGNMENT HEADERS - CHECK SCRIPT/ALIGNMENT")
                     sys.exit(5)
                 if threshold:
                     hmmStart = int(outLine[6])
@@ -196,7 +196,7 @@ def grab_hits(
 
     else:
         hit_str, aln_str = None, None
-        print("did not work", flush=True)
+        logger.error("did not work")
 
     return hit_str, aln_str
 
@@ -327,13 +327,14 @@ def cli():
         "-o", "--output", help="Output file name/path (extensions automatically applied"
     )
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     # initialize output file structure
     output = format_path(args.output)
     if not args.output:
-        output = mkOutput(os.getcwd() + "/", "extractHmmsearch")
-    elif not os.path.isdir(output):
-        os.mkdir(args.output)
+        output = mkOutput(str(Path.cwd()) + "/", "extractHmmsearch")
+    elif not Path(output).is_dir():
+        Path(args.output).mkdir()
 
     args_dict = {
         "Input": args.input,
@@ -352,24 +353,24 @@ def cli():
         args.accession = True
     else:
         if args.query:
-            if os.path.isfile(args.query):
+            if Path(args.query).is_file():
                 ques = file2list(args.query)
             else:
                 ques = [args.query]
             args.query = True
         elif args.accession:
-            if os.path.isfile(args.accession):
+            if Path(args.accession).is_file():
                 ques = file2list(args.accession)
             else:
                 ques = [args.accession]
             args.accession = True
         else:
-            print("\nNeed `-q` or `-a` specified\n", flush=True)
+            logger.error("Need `-q` or `-a` specified")
             sys.exit(8)
 
-    if not os.path.isfile(args.input):
-        print("\n\tNot a valid input file\n", flush=True)
-        sys.eixt(2)
+    if not Path(args.input).is_file():
+        logger.error("Not a valid input file")
+        sys.exit(2)
     with open(args.input, "r") as raw:
         data = raw.read()
 

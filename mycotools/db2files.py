@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import logging
 import os
 import re
 import sys
@@ -7,7 +8,10 @@ import argparse
 from datetime import datetime
 from shutil import copy as cp
 from mycotools.lib.dbtools import primaryDB, mtdb
-from mycotools.lib.kontools import format_path, prep_output, eprint, vprint
+from mycotools.lib.kontools import format_path, prep_output, setup_logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def soft_main(filetypes, db, output_path, print_link=False, verbose=False):
@@ -18,27 +22,23 @@ def soft_main(filetypes, db, output_path, print_link=False, verbose=False):
     if not print_link:
         # make the directories for each requested file type
         for ftype in filetypes:
-            if not os.path.isdir(output_path + ftype):
-                os.mkdir(output_path + ftype)
+            if not Path(output_path + ftype).is_dir():
+                Path(output_path + ftype).mkdir()
         # grab the files for each genome code
         for ome, row in db.items():
             for ftype in filetypes:
-                if os.path.isfile(row[ftype]):
+                if Path(row[ftype]).is_file():
                     sym_path = f"{output_path}{ftype}/{ome}.{ftype}"
                     try:
-                        os.symlink(row[ftype], sym_path)
+                        Path(sym_path).symlink_to(row[ftype])
                     except FileExistsError:
-                        if os.path.islink(sym_path):
-                            os.remove(sym_path)
-                            os.symlink(row[ftype], sym_path)
+                        if Path(sym_path).is_symlink():
+                            Path(sym_path).unlink()
+                            Path(sym_path).symlink_to(row[ftype])
                         else:
-                            vprint(
-                                "\t" + ome + " " + ftype + " exists",
-                                v=verbose,
-                                flush=True,
-                            )
+                            logger.debug("" + ome + " " + ftype + " exists")
                 else:
-                    vprint("\tERROR: " + ome + " " + ftype, flush=True, v=verbose)
+                    logger.debug("" + ome + " " + ftype)
     # simply print the link for each file
     else:
         for ome, row in db.items():
@@ -52,16 +52,16 @@ def hard_main(filetypes, db, output_path):
     db = db.set_index("ome")
     # create the directories to output each file type
     for ftype in filetypes:
-        if not os.path.isdir(output_path + ftype):
-            os.mkdir(output_path + ftype)
+        if not Path(output_path + ftype).is_dir():
+            Path(output_path + ftype).mkdir()
 
     # copy each file by genome
     for ome, row in db.items():
         for ftype in filetypes:
             try:
-                cp(row[ftype], output_path + ftype + "/" + os.path.basename(row[ftype]))
+                cp(row[ftype], output_path + ftype + "/" + Path(row[ftype]).name)
             except FileNotFoundError:
-                eprint("\tERROR: " + ome + " " + ftype, flush=True)
+                logger.error("" + ome + " " + ftype)
 
 
 def mtdb_main(db, output_path, og_mtdb_path):
@@ -69,12 +69,12 @@ def mtdb_main(db, output_path, og_mtdb_path):
 
     # generate the base directory for output
     if not output_path:
-        output_path = os.getcwd() + "/"
-    if not os.path.isdir(output_path):
-        os.mkdir(output_path)
+        output_path = str(Path.cwd()) + "/"
+    if not Path(output_path).is_dir():
+        Path(output_path).mkdir()
     mtdb_dir = output_path + "mycotoolsdb/"
-    if not os.path.isdir(mtdb_dir):
-        os.mkdir(mtdb_dir)
+    if not Path(mtdb_dir).is_dir():
+        Path(mtdb_dir).mkdir()
 
     # generate the MTDB hierarchy subdirectories
     sub_dirs = [
@@ -84,8 +84,8 @@ def mtdb_main(db, output_path, og_mtdb_path):
         f"{mtdb_dir}data/",
     ]
     for dir_ in sub_dirs:
-        if not os.path.isdir(dir_):
-            os.mkdir(dir_)
+        if not Path(dir_).is_dir():
+            Path(dir_).mkdir()
 
     # copy the og_mtdb configuration
     cp(og_mtdb_path + "config/mtdb.json", f"{mtdb_dir}config/mtdb.json")
@@ -112,11 +112,12 @@ def cli():
     parser.add_argument(
         "-n", "--new_mtdb", action="store_true", help="Create MTDB directory hierarchy"
     )
-    parser.add_argument("-o", "--output", default=os.getcwd())
+    parser.add_argument("-o", "--output", default=str(Path.cwd()))
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if not args.assembly and not args.proteome and not args.gff and not args.new_mtdb:
-        print("\nERROR: --assembly/--proteome/--gff/--new_mtdb required", flush=True)
+        logger.error("--assembly/--proteome/--gff/--new_mtdb required")
         sys.exit(4)
     if args.new_mtdb:
         args.hard = False

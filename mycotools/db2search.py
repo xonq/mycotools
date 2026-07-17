@@ -16,6 +16,7 @@ import os
 import re
 import sys
 import copy
+import logging
 import datetime
 import argparse
 import subprocess
@@ -30,12 +31,12 @@ from mycotools.lib.kontools import (
     multisub,
     findExecs,
     untardir,
-    eprint,
     format_path,
     mkOutput,
     tardir,
     inject_args,
     stdin2str,
+    setup_logging,
 )
 from mycotools.lib.dbtools import primaryDB, mtdb
 from mycotools.lib.biotools import dict2fa, fa2dict, fa2dict_str
@@ -44,6 +45,9 @@ from mycotools.lib.biotools import dict2fa, fa2dict, fa2dict_str
 from mycotools.acc2fa import dbmain as acc2fa_db, famain as acc2fa_fa
 from mycotools.utils.extractHmmsearch import main as exHmm
 from mycotools.utils.extractHmmAcc import grabAccs, main as absHmm
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def compile_hmm_cmd(db, hmm_path, output, ome_set=set(), cpu=1):
@@ -100,13 +104,13 @@ def compileextractHmmCmd(db, args, output):
 
 def run_ex_hmm(args, hmmsearch_out, output):
 
-    ome = os.path.basename(hmmsearch_out).replace(".out", "")
+    ome = Path(hmmsearch_out).name.replace(".out", "")
 
     try:
         with open(hmmsearch_out, "r") as raw:
             data = raw.read()
     except FileNotFoundError:
-        eprint("\tWARNING: " + ome + " failed", flush=True)
+        logger.warning("\t" + ome + " failed")
         return ome, False
     if len(data) > 100:  # check for data # check for data
         hmm_data = exHmm(
@@ -129,7 +133,7 @@ def run_ex_hmm(args, hmmsearch_out, output):
         # does this overwrite other hits?
         return ome, out_dict
     else:
-        eprint("\tWARNING: " + ome + " empty results", flush=True)
+        logger.warning("\t" + ome + " empty results")
         return ome, False
 
 
@@ -175,9 +179,9 @@ def compile_mafft_cmds(output, faa_dir):
     fas = collect_files(faa_dir, "faa")  # grab completed fastas
     cmds = []
     for fa in fas:
-        acc = os.path.basename(fa)[:-4]
+        acc = Path(fa).name[:-4]
         align = output + "/aligns/" + acc + ".mafft.fasta"
-        if os.path.isfile(align):  # check for data
+        if Path(align).is_file():  # check for data
             with open(align, "r") as raw:
                 data = raw.read()
             if len(data) > 10:
@@ -196,7 +200,7 @@ def compile_hmmalign_cmds(output, accessions):
         align = output + "/aligns/" + acc + ".stockholm"
         conv = output + "/aligns/" + acc + ".phylip"
         trim = output + "/trimmed/" + acc + ".clipkit.fa"
-        if os.path.isfile(conv):
+        if Path(conv).is_file():
             with open(conv, "r") as raw:
                 data = raw.read()
             if len(data) > 10:
@@ -233,14 +237,14 @@ def compile_trim_cmd(output, mod="", trimmed=None, ex="phylip"):
     cmd_tuples = []
     aligns = collect_files(output + "aligns/", ex)
     if trimmed:
-        trimmed = set(os.path.basename(x).replace(".clipkit", "") for x in trimmed)
+        trimmed = set(Path(x).name.replace(".clipkit", "") for x in trimmed)
         aligns = [
-            x for x in aligns if os.path.basename(x).replace(ex, "") not in trimmed
+            x for x in aligns if Path(x).name.replace(ex, "") not in trimmed
         ]
     for align in aligns:
         trim = (
             f"{output}trimmed/"
-            + os.path.basename(align).replace(ex, "clipkit")
+            + Path(align).name.replace(ex, "clipkit")
             + "."
             + ex
         )
@@ -288,28 +292,28 @@ def hmmer_main(
     queries = compile_hmm_queries(hmm_paths, hmm_out)
 
     ome_set, skip1 = set(), False
-    if os.path.isdir(faa_dir):  # is there a previous run?
-        print("\nCompiling previous run", flush=True)
+    if Path(faa_dir).is_dir():  # is there a previous run?
+        logger.info("Compiling previous run")
         # check if all fastas are made
         fas = collect_files(faa_dir, "faa")  # grab completed fastas
-        ranQueries = [os.path.basename(fa).replace(".faa", "") for fa in fas]
+        ranQueries = [Path(fa).name.replace(".faa", "") for fa in fas]
         if not set(queries).difference(set(ranQueries)):
             skip1 = True
 
     if not skip1:  # do not skip the first step
-        if os.path.isfile(output + "omes.tar.gz"):
-            if not os.path.isdir(ome_dir):
+        if Path(output + "omes.tar.gz").is_file():
+            if not Path(ome_dir).is_dir():
                 untardir(output + "omes.tar.gz")
         # check what reports have been generated
         omes = collect_files(ome_dir, "out")
-        ome_set = set(os.path.basename(x).replace(".out", "") for x in omes)
+        ome_set = set(Path(x).name.replace(".out", "") for x in omes)
     else:
-        print("\thmmsearch -> hits.faa DONE", flush=True)
+        logger.info("\thmmsearch -> hits.faa DONE")
 
     if not skip1:
-        print("\nRunning " + os.path.basename(binary), flush=True)
-        if not os.path.isdir(ome_dir):
-            os.mkdir(ome_dir)
+        logger.info("Running " + Path(binary).name)
+        if not Path(ome_dir).is_dir():
+            Path(ome_dir).mkdir()
 
         # run hmmer
         par_runs = round(((cpu - 1) / 2) - 0.5)
@@ -326,17 +330,17 @@ def hmmer_main(
         )
         for i, code in enumerate(hmmsearch_codes):
             if code:
-                eprint("\tERROR: " + str(hmmsearch_tuples[i]), flush=True)
+                logger.error("\t" + str(hmmsearch_tuples[i]))
 
         # extract results
-        print("\nExtracting hmmsearch output", flush=True)
+        logger.info("Extracting hmmsearch output")
         exHmm_args = [accessions, max_hits, query_cov, evalue, bitscore]
         exHmm_tuples = compileextractHmmCmd(db, exHmm_args, ome_dir)
         with mp.get_context("spawn").Pool(processes=cpu) as pool:
             hmmAligns = pool.starmap(run_ex_hmm, exHmm_tuples)
 
         mp.Process(target=tardir, args=[ome_dir])
-        print("\nCompiling fastas", flush=True)
+        logger.info("Compiling fastas")
         # q_dict = {query: ome: alignment}
         q_dict = defaultdict(dict)
         for ome, hits in hmmAligns:
@@ -414,8 +418,8 @@ def comp_diamond_tups(
     search_args=[],
 ):
 
-    if not os.path.isdir(out_dir + "dmnd/"):
-        os.mkdir(out_dir + "dmnd/")
+    if not Path(out_dir + "dmnd/").is_dir():
+        Path(out_dir + "dmnd/").mkdir()
     blast_scaf = [
         diamond,
         blast_type,
@@ -480,8 +484,8 @@ def run_mmseq(
 ):
     db_dir = format_path("$MYCOGFF3/../db")
 
-    if not os.path.isdir(f"{out_dir}db/"):
-        os.mkdir(f"{out_dir}db/")
+    if not Path(f"{out_dir}db/").is_dir():
+        Path(f"{out_dir}db/").mkdir()
     db_dir = format_path("$MYCOGFF3/../db/")
     createdb_cmds = []
     db_path = f"{out_dir}db/searchdb"
@@ -490,7 +494,7 @@ def run_mmseq(
     for i, ome in enumerate(seq_db["ome"]):
         db_path = f"{db_dir}{ome}_{biotype}"
         out_file = out_dir + ome + ".tsv"
-        if not os.path.isfile(db_path + ".dbtype"):
+        if not Path(db_path + ".dbtype").is_file():
             # will fail at fastas that dont have sequences on one line
             createdb_cmds.append(
                 (
@@ -506,7 +510,7 @@ def run_mmseq(
             )
 
     if createdb_cmds:
-        print(f"\nCreating {len(createdb_cmds)} mmseqs search dbs", flush=True)
+        logger.info(f"Creating {len(createdb_cmds)} mmseqs search dbs")
         createdb_outs = multisub(createdb_cmds, processes=cpus, verbose=2)
 
     # if len(query) > 1:
@@ -520,20 +524,20 @@ def run_mmseq(
     # query = [f'{out_dir}db/query'] # need to adjust check
 
     # create a concatenated mmseqs db for the search target
-    if not os.path.isfile(f"{out_dir}db/searchdb.dbtype"):
+    if not Path(f"{out_dir}db/searchdb.dbtype").is_file():
         mergedbs_cmd = ["mmseqs", "mergedbs"]
         mergedbs_cmd.extend([f"{db_dir}{ome}_{biotype}" for ome in seq_db["ome"]])
         mergedbs_cmd.insert(3, f"{out_dir}db/searchdb")
-        print("\nMerging search dbs", flush=True)
+        logger.info("Merging search dbs")
         mergedbs_out = subprocess.call(mergedbs_cmd)  # , stderr = subprocess.DEVNULL,
     #                                        stdout = subprocess.DEVNULL)
 
-    print("\nSearching", flush=True)
+    logger.info("Searching")
     for i, q in enumerate(query):
         out_file = f"{out_dir}{q}.tsv"
-        if os.path.isfile(out_file):
+        if Path(out_file).is_file():
             continue
-        print("\t" + q, flush=True)
+        logger.info("\t" + q)
         search_cmd = [
             mmseqs,
             "search",
@@ -582,7 +586,7 @@ def parseOutput(
 ):
 
     ome_results = [ome, []]
-    if os.path.exists(file_):
+    if Path(file_).exists():
         with open(file_, "r") as raw:
             data = [x.rstrip().split("\t") for x in raw if x.rstrip()]
         byq = defaultdict(list)
@@ -609,7 +613,7 @@ def parseOutput_mmseqs(
 ):
 
     ome_results = [ome, []]
-    if os.path.exists(file_):
+    if Path(file_).exists():
         with open(file_, "r") as raw:
             data = [x.rstrip().split("\t") for x in raw if x.rstrip()]
         byq = defaultdict(list)
@@ -713,7 +717,7 @@ def comp_blast_acc2fa(db, biotype, output_res, coords=False, skip=None):
                     try:
                         acc2fa_cmds[query].append([list(set(accs)), db[i][biotype]])
                     except KeyError:
-                        eprint("\t" + i + " not in db")
+                        logger.warning("\t" + i + " not in db")
 
     return acc2fa_cmds
 
@@ -723,23 +727,23 @@ def prepOutput(out_dir):
     out_dir = format_path(out_dir)
     if not out_dir.endswith("/"):
         out_dir += "/"
-    if not os.path.isdir(out_dir):
-        os.mkdir(out_dir)
+    if not Path(out_dir).is_dir():
+        Path(out_dir).mkdir()
     report_dir = out_dir + "reports/"
-    if not os.path.isdir(report_dir):
-        os.mkdir(report_dir)
+    if not Path(report_dir).is_dir():
+        Path(report_dir).mkdir()
 
     return report_dir
 
 
 def run_denovo(report_dir, log_list0, log_name):
-    if os.path.isdir(report_dir):
+    if Path(report_dir).is_dir():
         count = 0
-        while os.path.isdir(report_dir[:-1] + str(count)):
+        while Path(report_dir[:-1] + str(count)).is_dir():
             count += 1
         report_dir = report_dir[:-1] + str(count) + "/"
     log_list0[0] = report_dir
-    os.mkdir(report_dir)
+    Path(report_dir).mkdir()
     with open(log_name, "w") as out:
         out.write("\n".join(log_list0))
     return log_list0, report_dir
@@ -761,31 +765,31 @@ def db2searchLog(
     ]
 
     prev, reparse = False, False
-    log_name = out_dir + "." + os.path.basename(out_dir[:-1]) + ".log"
+    log_name = out_dir + "." + Path(out_dir[:-1]).name + ".log"
     log_list1 = None
-    if not os.path.isfile(log_name):  # generate a new log
+    if not Path(log_name).is_file():  # generate a new log
         with open(log_name, "w") as out:
             out.write("\n".join(log_list0))
     else:  # check the old one
         with open(log_name, "r") as raw:
             log_list1 = [x.rstrip() for x in raw if x]
         if blast != log_list1[1]:
-            eprint("\tInconsistent search algorithm, rerunning", flush=True)
+            logger.warning("\tInconsistent search algorithm, rerunning")
             log_list0, report_dir = run_denovo(report_dir, log_list0, log_name)
         elif blast == "mmseqs":
             if log_list1[-1] != log_list0[-1]:  # coverage is off, need a rerun
-                eprint("\tCoverage changed, rerunning", flush=True)
+                logger.warning("\tCoverage changed, rerunning")
                 log_list0, report_dir = run_denovo(report_dir, log_list0, log_name)
             # need to reparse if anything is different
             elif any(log_list0[i] != log_list1[i] for i in range(len(log_list0))):
-                eprint("\tDeleting old report compilations", flush=True)
+                logger.info("\tDeleting old report compilations")
                 reports = collect_files(report_dir, "tsv")
                 for r in reports:
-                    os.remove(r)
+                    Path(r).unlink()
                 reparse = True
             prev = True
         elif log_list1[1] != log_list0[1] and log_list1[3:] != log_list0[3:]:
-            eprint("\tInconsistent thresholds, rerunning", flush=True)
+            logger.warning("\tInconsistent thresholds, rerunning")
             log_list0, report_dir = run_denovo(report_dir, log_list0, log_name)
         else:
             prev = True
@@ -807,7 +811,7 @@ def prepare_search_run(
     if prev:
         #      reparse = False
         reports = collect_files(report_dir, "tsv")
-        finished = {os.path.basename(x)[:-4] for x in reports if os.path.getsize(x) > 0}
+        finished = {Path(x).name[:-4] for x in reports if Path(x).stat().st_size > 0}
         rundb, checkdb = mtdb({}).set_index("ome"), db.set_index("ome")
         for ome, val in checkdb.items():
             if ome not in finished:
@@ -821,10 +825,10 @@ def prepare_search_run(
 def prep_mmseq_output(rundb, report_dir, queries, convert=False):
     ome_res = defaultdict(str)
     for i, q in enumerate(queries):
-        if not os.path.isfile(f"{report_dir}{q}.tsv"):
+        if not Path(f"{report_dir}{q}.tsv").is_file():
             continue
         with open(f"{report_dir}{q}.tsv", "r") as raw:
-            base = os.path.basename(q)
+            base = Path(q).name
             if not convert:
                 for line in raw:
                     line_d = line.split()
@@ -845,7 +849,7 @@ def prep_mmseq_output(rundb, report_dir, queries, convert=False):
 def comp_mmseq_res(rundb, report_dir, queries, convert=False):
     for ome in rundb["ome"]:
         out_file = report_dir + ome + ".tsv"
-        if os.path.isfile(out_file):
+        if Path(out_file).is_file():
             continue
         out_str, todel = "", []
         for i, q in enumerate(queries):
@@ -853,7 +857,7 @@ def comp_mmseq_res(rundb, report_dir, queries, convert=False):
                 if not convert:
                     out_str += raw.read().rstrip() + "\n"
                 else:
-                    base = os.path.basename(q)
+                    base = Path(q).name
                     for line in raw:
                         line_d = line.split()
                         line_d[0] = base
@@ -863,7 +867,7 @@ def comp_mmseq_res(rundb, report_dir, queries, convert=False):
             out.write(out_str.rstrip())
 
         for todel_file in todel:
-            os.remove(todel_file)
+            Path(todel_file).unlink()
 
 
 def ObyOsearch(
@@ -887,7 +891,7 @@ def ObyOsearch(
     ppos=0,
 ):
     if len(rundb) > 0:
-        print("\nSearching on an ome-by-ome basis", flush=True)
+        logger.info("Searching on an ome-by-ome basis")
         if diamond:
             db_tups, search_tups = comp_diamond_tups(
                 rundb,
@@ -903,7 +907,7 @@ def ObyOsearch(
                 search_args=search_arg,
             )
             db_outs = multisub(db_tups, processes=cpus)
-            print(f"\t{len(search_tups)} searches to run", flush=True)
+            logger.info(f"\t{len(search_tups)} searches to run")
             search_outs = multisub(
                 search_tups, processes=cpus, verbose=2, injectable=True
             )
@@ -944,7 +948,7 @@ def ObyOsearch(
                 ]
             )
 
-    print("\nParsing reports", flush=True)
+    logger.info("Parsing reports")
     with mp.get_context("spawn").Pool(processes=cpus) as pool:
         results = pool.starmap(parseOutput, tuple(parse_tups))
     results_dict = {x[0]: x[1] for x in results}
@@ -981,10 +985,10 @@ def mmseqs_mngr(
         cpus=cpus,
     )
 
-    print("\nExtracting ome reports", flush=True)
+    logger.info("Extracting ome reports")
     prep_mmseq_output(rundb, report_dir, query, convert=convert)
 
-    print("\nParsing output", flush=True)
+    logger.info("Parsing output")
     # prepare report parsing commands for multiprocessing
     parse_tups = []
     for i, ome in enumerate(db["ome"]):
@@ -1010,24 +1014,24 @@ def mmseqs_mngr(
 
 def checkSearchDB(binary="blast"):
 
-    db_date = os.path.basename(primaryDB())
+    db_date = Path(primaryDB()).name
     if "blast" in binary:
         search_db = format_path("$MYCOFAA/blastdb/" + db_date + ".00.psd")
-        if os.path.isfile(search_db):
+        if Path(search_db).is_file():
             return search_db[:-7]
-        elif os.path.isfile(search_db[:-7] + ".psd"):
+        elif Path(search_db[:-7] + ".psd").is_file():
             return search_db[:-7]
     else:
         search_db = format_path(
             "$MYCOFAA/blastdb/" + db_date.replace(".db", "") + ".mmseqs.db"
         )
-        if os.path.isfile(search_db):
+        if Path(search_db).is_file():
             return search_db
 
 
 def db_blast(db_path, blast_type, query, evalue, hsps, cpus, report_dir, diamond=False):
 
-    out_file = report_dir + os.path.basename(db_path)[:-3] + ".out"
+    out_file = report_dir + Path(db_path).name[:-3] + ".out"
     if not diamond:
         blast_scaf = [
             blast_type,
@@ -1085,7 +1089,7 @@ def db_blast(db_path, blast_type, query, evalue, hsps, cpus, report_dir, diamond
 def dbmmseq(db_path, query, evalue, cpus, report_dir, mmseqs="mmseqs", mem=None):
 
     out_file = (
-        report_dir + os.path.basename(db_path)[:-3].replace(".mmseqs", "") + ".out"
+        report_dir + Path(db_path).name[:-3].replace(".mmseqs", "") + ".out"
     )
     #    output_str = '"query,target,pident,alen,mismatch,gapopen,qstart,qend,sstart,send,evalue,bits"'
     cmd_scaf = [
@@ -1202,7 +1206,7 @@ def mmseqs_main(
         reparse=reparse,
     )
 
-    print("\nCompiling fastas", flush=True)
+    logger.info("Compiling fastas")
     output_res = compileResults(results_dict, skip)
     output_fas = {}
     acc2fa_cmds = comp_mmseq_acc2fa(
@@ -1243,7 +1247,7 @@ def blast_main(
         seq_type = "nucl"
         biotype = "fna"
     else:
-        eprint("\nERROR: invalid search binary: " + blast, flush=True)
+        logger.error("invalid search binary: " + blast)
 
     #    if blastdb:
     # insert function to make blastdb
@@ -1264,12 +1268,12 @@ def blast_main(
     query = out_dir + "query.fa"
 
     if blastdb and not force:
-        print("\nSearching using MycotoolsDB searchdb", flush=True)
+        logger.info("Searching using MycotoolsDB searchdb")
         search_exit, search_output = db_blast(
             blastdb, blast, query, evalue, hsps, cpus, report_dir, diamond=diamond
         )
         if search_exit:
-            eprint("\nERROR: search failed: " + str(search_exit))
+            logger.error("search failed: " + str(search_exit))
             sys.exit(10)
         results_dict = parseDBout(
             db,
@@ -1314,7 +1318,7 @@ def blast_main(
             ppos=ppos,
         )
 
-    print("\nCompiling fastas", flush=True)
+    logger.info("Compiling fastas")
     output_res = compileResults(results_dict, skip)
     output_fas = {}
     acc2fa_cmds = comp_blast_acc2fa(
@@ -1323,7 +1327,7 @@ def blast_main(
     queryfa = fa2dict(query)
     for query1, cmd in acc2fa_cmds.items():
         output_fas[query1] = {}
-        print("\t" + query1, flush=True)
+        logger.info("\t" + query1)
         with mp.get_context("spawn").Pool(processes=cpus) as pool:
             results = pool.starmap(acc2fa_fa, acc2fa_cmds[query1])
         for x in results:
@@ -1436,19 +1440,18 @@ def cli():
     # parser.add_argument( '-c', '--coverage', type = float, help = 'Query coverage +/-, e.g. 0.5' )
     #    parser.add_argument('-f', '--force', action = 'store_true', help = 'Force ome-by-ome blast')
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.algorithm not in algorithms:
-        eprint("\nERROR: {args.algorithm} not implemented", flush=True)
+        logger.error("{args.algorithm} not implemented")
         sys.exit(19)
 
     # query parsing
     if not args.query and not args.query_dir and not args.query_file:
-        eprint(
-            "\nERROR: --query, --query_dir, or --query_file not specified", flush=True
-        )
+        logger.error("--query, --query_dir, or --query_file not specified")
         sys.exit(18)
     elif [args.query, args.query_dir, args.query_file].count(True) > 1:
-        eprint("\nERROR: multiple query types specified", flush=True)
+        logger.error("multiple query types specified")
         sys.exit(20)
     else:
         if args.query:
@@ -1459,7 +1462,7 @@ def cli():
         elif args.query_dir:
             queries = [
                 format_path(args.query_dir) + x
-                for x in os.listdir(format_path(args.query_dir))
+                for x in [p.name for p in Path(format_path(args.query_dir)).iterdir()]
             ]
         else:
             with open(format_path(args.query_file), "r") as raw:
@@ -1469,7 +1472,7 @@ def cli():
     # diamond specific
     if args.diamond:
         if "blast" not in args.algorithm:
-            eprint(f"\nERROR: --diamond incompatible with {args.algorithm}", flush=True)
+            logger.error(f"--diamond incompatible with {args.algorithm}")
             sys.exit(4)
         del deps[0]
         deps.append("diamond")
@@ -1477,7 +1480,7 @@ def cli():
     # mmseqs-specific
     if args.algorithm == "mmseqs":
         if not args.seqtype or args.seqtype not in {"aa", "nt"}:
-            eprint("\nERROR: -st required for mmseqs", flush=True)
+            logger.error("-st required for mmseqs")
             sys.exit(3)
         if args.seqtype == "aa":
             biotype = "faa"
@@ -1498,17 +1501,17 @@ def cli():
     # identity
     if args.identity:
         if args.algorithm == "hmmsearch":
-            eprint(f"\nERROR: --identity incompatible with hmmsearch", flush=True)
+            logger.error(f"--identity incompatible with hmmsearch")
             sys.exit(21)
 
     if not args.output:
-        base = os.getcwd() + "/"
+        base = str(Path.cwd()) + "/"
         output = mkOutput(base, "db2search")
     else:
         base = format_path(args.output, force_dir=True)
         output = base
-        if not os.path.isdir(output):
-            os.mkdir(output)
+        if not Path(output).is_dir():
+            Path(output).mkdir()
     #            output = mkOutput(base, 'db2search')
 
     if args.cpu and args.cpu < mp.cpu_count():
@@ -1598,8 +1601,8 @@ def cli():
             convert=args.convert,
             iterations=args.iterations,
         )
-    if not os.path.isdir(output + "fastas/"):
-        os.mkdir(output + "fastas/")
+    if not Path(output + "fastas/").is_dir():
+        Path(output + "fastas/").mkdir()
 
     for query in output_fas:
         with open(output + "fastas/" + query + ".search.fa", "w") as out:

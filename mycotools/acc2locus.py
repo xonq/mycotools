@@ -1,16 +1,18 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
 import argparse
 import multiprocessing as mp
 from itertools import chain
 from collections import defaultdict
-from mycotools.lib.kontools import eprint, format_path, file2list, stdin2str
+from mycotools.lib.kontools import format_path, file2list, stdin2str, setup_logging
 from mycotools.lib.dbtools import primaryDB, mtdb
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
 from mycotools.acc2gff import grab_gff_acc
+
+logger = logging.getLogger(__name__)
 
 
 def prep_gff_output(hit_list, gff_path, cpu=1):
@@ -262,6 +264,7 @@ def cli():
     )
     parser.add_argument("--cpu", type=int, default=1)
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.cpu < mp.cpu_count():
         cpu = args.cpu
@@ -284,15 +287,15 @@ def cli():
             else:
                 accs = [args.acc]
     else:
-        eprint("\nERROR: requires input or acc", flush=True)
+        logger.error("requires input or acc")
         sys.exit(1)
 
     if args.between:
         if len(accs) > 2:
-            eprint("\nERROR: -b needs 2 accessions", flush=True)
+            logger.error("-b needs 2 accessions")
             sys.exit(2)
         if args.nucleotide:
-            eprint("\nERROR: -b and -n are incompatible", flush=True)
+            logger.error("-b and -n are incompatible")
             sys.exit(3)
 
     db = None

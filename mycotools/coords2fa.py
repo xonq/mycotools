@@ -2,13 +2,16 @@
 
 # NEED to flag overlapping coordinates
 
-import os
+import logging
 import sys
 import argparse
 from Bio.Seq import Seq
 from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa
-from mycotools.lib.kontools import sys_start, eprint, format_path
+from mycotools.lib.kontools import sys_start, format_path
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def extractCoords(fa_dict, seqid, coord_start=0, coord_end=-1, sense="+", fa_name=""):
@@ -67,9 +70,9 @@ def cli():
     try:
         fa_file = format_path(args[0])
         if fa_file.endswith("/"):  # if it is a directory that was inputted
-            fa_name = os.path.basename(fa_file[:-1])
+            fa_name = Path(fa_file[:-1]).name
         else:
-            fa_name = os.path.basename(fa_file)
+            fa_name = Path(fa_file).name
 
         fa = fa2dict(fa_file)
 
@@ -91,7 +94,7 @@ def cli():
 
         # print the extracted sequences to stdout in FASTA format
         print(dict2fa(out_fa))
-        eprint(error)
+        logger.error(error)
         sys.exit(0)
 
     except IndexError:  # fasta was not parseable
@@ -125,7 +128,7 @@ def cli():
                     )
 
         except:
-            eprint("\nERROR: incorrectly formatted input", flush=True)
+            logger.error("incorrectly formatted input")
 
     # for each file and coordinates, prepare for output
     for fa_file, concats in files_data.items():
@@ -133,9 +136,9 @@ def cli():
 
         # extract the file name from the path
         if fa_file.endswith("/"):
-            fa_name = os.path.basename(fa_file[:-1])
+            fa_name = Path(fa_file[:-1]).name
         else:
-            fa_name = os.path.basename(fa_file)
+            fa_name = Path(fa_file).name
 
         for concat_id, rows in concats.items():
             if rows[0][-1] == "+":
@@ -166,7 +169,7 @@ def cli():
                 out_fa = {**out_fa, **{fa_name + "_concat" + str(concat_id): toadd_fa}}
 
     print(dict2fa(out_fa))
-    eprint(error)
+    logger.error(error)
     sys.exit(0)
 
 

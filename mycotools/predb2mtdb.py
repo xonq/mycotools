@@ -3,7 +3,7 @@
 # NEED source to reference the annotation source
 # NEED to error check FAA generation simply by file size
 
-import os
+import logging
 import re
 import sys
 import copy
@@ -11,7 +11,7 @@ import shutil
 import multiprocessing as mp
 from tqdm import tqdm
 from collections import Counter, defaultdict
-from mycotools.lib.kontools import gunzip, mkOutput, format_path, eprint, vprint
+from mycotools.lib.kontools import gunzip, mkOutput, format_path
 from mycotools.lib.biotools import (
     gff2list,
     list2gff,
@@ -27,6 +27,9 @@ from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.utils.curGFF3 import rename_and_organize as rename_and_organize
 from mycotools.gff2seq import aamain as gff2seq
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 predb_headers = [
     "assembly_accession",
@@ -47,7 +50,7 @@ predb_headers = [
 def acq_forbid_omes(file_path):
     """Parse a file with forbidden ome accessions - ome codes that have been
     used before and are no longer valid"""
-    if not os.path.isfile(file_path):
+    if not Path(file_path).is_file():
         return set()
     with open(file_path, "r") as raw:
         relics = set([x.rstrip() for x in raw])
@@ -59,8 +62,8 @@ def prep_output(base_dir):
     wrk_dir = out_dir + "working/"
     dirs = [out_dir, wrk_dir, wrk_dir + "gff3/", wrk_dir + "fna/", wrk_dir + "faa/"]
     for dir_ in dirs:
-        if not os.path.isdir(dir_):
-            os.mkdir(dir_)
+        if not Path(dir_).is_dir():
+            Path(dir_).mkdir()
     return dirs[:2]
 
 
@@ -74,7 +77,7 @@ def copy_file(old_path, new_path):
 
 def move_biofile(old_path, ome, typ, wrk_dir, suffix=""):
     if old_path.endswith(".gz"):
-        if not os.path.isfile(old_path[:-3]):
+        if not Path(old_path[:-3]).is_file():
             temp_path = gunzip(old_path)
             new_path = wrk_dir + ome + "." + typ + suffix
         else:
@@ -83,9 +86,9 @@ def move_biofile(old_path, ome, typ, wrk_dir, suffix=""):
         copy_file(format_path(temp_path), new_path)
     else:
         new_path = wrk_dir + ome + "." + typ + suffix
-        if not os.path.isfile(new_path) and os.path.isfile(old_path):
+        if not Path(new_path).is_file() and Path(old_path).is_file():
             copy_file(format_path(old_path), new_path)
-        elif not os.path.isfile(new_path):
+        elif not Path(new_path).is_file():
             raise IOError(old_path, new_path)
         else:
             copy_file(format_path(old_path), new_path)
@@ -108,15 +111,12 @@ def gen_predb():
         "no",
         "2018",
     ]
-    eprint(
-        'INSTRUCTIONS: fill in each column with the relevant information and \
+    logger.info('INSTRUCTIONS: fill in each column with the relevant information and \
         separate each column by a tab. The predb can be filled in \
         via spreadsheet software and exported as a tab delimited `.tsv`. \
         ASSEMBLY ACCESSIONS and PREVIOUS_OME fields must be unique to the \
         genome; otherwise predb2mtdb will update the corresponding database entry. \
-        Novel data must be filled in as "new" for the genomeSource column.',
-        flush=True,
-    )
+        Novel data must be filled in as "new" for the genomeSource column.')
     outputStr = "#" + "\t".join(predb_headers)
     outputStr += "\n#" + "\t".join(example) + "\n"
 
@@ -183,11 +183,8 @@ def read_predb(predb_path, spacer="\t"):
                 #                       required_headers.remove(head)
                 missing_headers = required_headers.difference(set(i2header.values()))
                 if missing_headers:
-                    eprint(
-                        f"{spacer}ERROR: Required columns missing: "
-                        + f"{missing_headers}",
-                        flush=True,
-                    )
+                    logger.error(f"{spacer}ERROR: Required columns missing: "
+                        + f"{missing_headers}")
                     sys.exit(4)
             #               if not headers:
             #                  predb = {x: [] for x in line.rstrip()[1:].split('\t')}
@@ -197,11 +194,8 @@ def read_predb(predb_path, spacer="\t"):
                 # proceed with default header organization scheme
                 if not i2header:
                     if len(entry) != len(predb_headers):
-                        eprint(
-                            spacer + "ERROR: Incorrect columns, line " + str(i),
-                            flush=True,
-                        )
-                        eprint(predb_headers, "\n", entry, flush=True)
+                        logger.error(spacer + "Incorrect columns, line " + str(i))
+                        logger.debug("%s\n%s", predb_headers, entry)
                         sys.exit(3)
                     for i1, v in enumerate(entry):
                         predb[predb_headers[i1]].append(v.rstrip())
@@ -254,10 +248,7 @@ def read_predb(predb_path, spacer="\t"):
             x.lower() not in {"y", "n", "yes", "no", "", "true", "false"}
             for x in predb["restriction"]
         ):
-            eprint(
-                spacer + "ERROR: useRestriction entries must be in {y, n, yes, no}",
-                flush=True,
-            )
+            logger.error(spacer + "useRestriction entries must be in {y, n, yes, no}")
             sys.exit(4)
     except KeyError:
         if not "restriction" in predb and "published" not in predb:
@@ -266,17 +257,12 @@ def read_predb(predb_path, spacer="\t"):
             predb["restriction"] = [bool(x) for x in predb["published"]]
 
     if any(x.lower() not in {"jgi", "ncbi", "new"} for x in predb["source"]):
-        eprint(
-            [
+        logger.info([
                 predb["assembly_acc"][i]
                 for i, v in enumerate(predb["source"])
                 if v not in {"jgi", "ncbi", "new"}
-            ]
-        )
-        eprint(
-            spacer + "ERROR: genomeSource entries must be in {jgi, ncbi, new}",
-            flush=True,
-        )
+            ])
+        logger.error(spacer + "genomeSource entries must be in {jgi, ncbi, new}")
         sys.exit(5)
 
     missing_from_predb = list(set(predb_headers).difference(set(predb.keys())))
@@ -384,7 +370,7 @@ def gen_omes(newdb, refdb=None, ome_col="ome", forbidden=set(), spacer="\t"):
                     new_ome = re.sub(r"\.\d+$", "." + str(v), ome)
                 else:
                     new_ome = ome + ".1"  # first modified version
-                eprint(spacer + ome + " update -> " + new_ome, flush=True)
+                logger.info(spacer + ome + " update -> " + new_ome)
                 newdb["ome"][i] = new_ome
                 continue
 
@@ -393,19 +379,13 @@ def gen_omes(newdb, refdb=None, ome_col="ome", forbidden=set(), spacer="\t"):
             except TypeError:
                 todel.append(i)
                 if not isinstance(newdb["assembly_acc"][i], float):
-                    eprint(
-                        spacer
+                    logger.info(spacer
                         + newdb["assembly_acc"][i]
                         + " no metadata - "
-                        + "failed",
-                        flush=True,
-                    )
+                        + "failed")
                 elif "index" in newdb:  # for updateDB
                     if not isinstance(newdb, float):
-                        eprint(
-                            spacer + newdb["index"][i] + " no metadata - " + "failed",
-                            flush=True,
-                        )
+                        logger.info(spacer + newdb["index"][i] + " no metadata - " + "failed")
                     continue
                 else:  # no use appending failed when there's no identifiable
                     # info
@@ -442,7 +422,7 @@ def gen_omes(newdb, refdb=None, ome_col="ome", forbidden=set(), spacer="\t"):
                     new_ome = re.sub(r"\.\d+$", "." + str(v), ome)
                 else:
                     new_ome = ome + ".1"  # first modified version
-                eprint(spacer + ome + " update -> " + new_ome, flush=True)
+                logger.info(spacer + ome + " update -> " + new_ome)
                 newdb["ome"][i] = new_ome
             elif ome in refdb_nover:  # has a version, wasn't given in predb
                 version_ome = refdb_nover[ome]
@@ -452,7 +432,7 @@ def gen_omes(newdb, refdb=None, ome_col="ome", forbidden=set(), spacer="\t"):
                     new_ome = ome + "." + str(v)
                 else:
                     raise TypeError("unknown error " + ome)
-                eprint(spacer + ome + " version added -> " + new_ome, flush=True)
+                logger.info(spacer + ome + " version added -> " + new_ome)
                 newdb["ome"][i] = new_ome
 
     for i in reversed(todel):
@@ -506,23 +486,20 @@ def cur_mngr(
     verbose=False,
 ):
 
-    predb_dir = os.path.basename(os.path.dirname(wrk_dir[:-1])) + "/working/"
+    predb_dir = Path(str(Path(wrk_dir[:-1]).parent)).name + "/working/"
 
     # assembly FNAs
-    vprint("\t" + ome, v=verbose, flush=True)
+    logger.debug("" + ome)
     uncur_fna_path = wrk_dir + "fna/" + ome + ".fna.uncur"
     cur_fna_path = wrk_dir + "fna/" + ome + ".fna"
-    vprint("\t\t" + predb_dir + "fna/" + ome + ".fna", v=verbose, flush=True)
-    if not os.path.isfile(cur_fna_path):
+    logger.debug("" + predb_dir + "fna/" + ome + ".fna")
+    if not Path(cur_fna_path).is_file():
         try:
             uncur_fna_path = move_biofile(
                 raw_fna_path, ome, "fa", wrk_dir + "fna/", suffix=".uncur"
             )
         except IOError as ie:
-            eprint(
-                spacer + ome + "|" + assembly_accession + " failed FNA parsing",
-                flush=True,
-            )
+            logger.info(spacer + ome + "|" + assembly_accession + " failed FNA parsing")
             if exit:
                 raise ie from None
             return ome, False, "fna"
@@ -531,17 +508,14 @@ def cur_mngr(
     # gene coordinate GFF3s
     uncur_gff_path = wrk_dir + "gff3/" + ome + ".gff3.uncur"
     cur_gff_path = wrk_dir + "gff3/" + ome + ".gff3"
-    vprint("\t\t" + predb_dir + "gff3/" + ome + ".gff3", v=verbose, flush=True)
-    if not os.path.isfile(cur_gff_path):
+    logger.debug("" + predb_dir + "gff3/" + ome + ".gff3")
+    if not Path(cur_gff_path).is_file():
         try:
             uncur_gff_path = move_biofile(
                 raw_gff_path, ome, "gff3", wrk_dir + "gff3/", suffix=".uncur"
             )
         except IOError as ie:
-            eprint(
-                spacer + ome + "|" + assembly_accession + " failed GFF3 parsing",
-                flush=True,
-            )
+            logger.info(spacer + ome + "|" + assembly_accession + " failed GFF3 parsing")
             if exit:
                 raise ie from None
             return ome, False, "gff3"
@@ -553,18 +527,15 @@ def cur_mngr(
         try:
             gff_mngr(ome, gff, cur_gff_path, source, assembly_accession)
         except Exception as e:  # catch all errors to continue script
-            eprint(
-                spacer + ome + "|" + assembly_accession + " failed GFF3 curation",
-                flush=True,
-            )
+            logger.info(spacer + ome + "|" + assembly_accession + " failed GFF3 curation")
             if exit:
                 raise e from None
             return ome, False, "gff3"
 
     # proteome FAAs
     faa_path = wrk_dir + "faa/" + ome + ".faa"
-    vprint("\t\t" + predb_dir + "faa/" + ome + ".faa", v=verbose, flush=True)
-    if not os.path.isfile(faa_path):
+    logger.debug("" + predb_dir + "faa/" + ome + ".faa")
+    if not Path(faa_path).is_file():
         try:
             faa = gff2seq(gff2list(cur_gff_path), fa2dict(cur_fna_path), spacer=spacer)
             # raise a value error if there is not a sequence for all predicted
@@ -573,16 +544,10 @@ def cur_mngr(
             if faa and len(missing_seq) == len(faa):
                 raise ValueError("no sequences generated in proteome")
             elif missing_seq:
-                eprint(
-                    f"{spacer}\tWARNING: {len(missing_seq)} "
-                    + "CDSs translated blank sequences",
-                    flush=True,
-                )
+                logger.warning(f"{spacer}\tWARNING: {len(missing_seq)} "
+                    + "CDSs translated blank sequences")
         except Exception as e:  # catch all errors
-            eprint(
-                spacer + ome + "|" + assembly_accession + " failed proteome generation",
-                flush=True,
-            )
+            logger.info(spacer + ome + "|" + assembly_accession + " failed proteome generation")
             if exit:
                 raise e
             return ome, False, "faa"
@@ -591,18 +556,18 @@ def cur_mngr(
         shutil.move(faa_path + ".tmp", faa_path)
 
     if remove:
-        if os.path.isfile(uncur_gff_path):
-            os.remove(uncur_gff_path)
-        if os.path.isfile(raw_gff_path):
-            os.remove(raw_gff_path)
-        if os.path.isfile(re.sub(r"\.gz$", "", raw_gff_path)):
-            os.remove(re.sub(r"\.gz$", "", raw_gff_path))
-        if os.path.isfile(uncur_fna_path):
-            os.remove(uncur_fna_path)
-        if os.path.isfile(raw_fna_path):
-            os.remove(raw_fna_path)
-        if os.path.isfile(re.sub(r"\.gz$", "", raw_fna_path)):
-            os.remove(re.sub(r"\.gz$", "", raw_fna_path))
+        if Path(uncur_gff_path).is_file():
+            Path(uncur_gff_path).unlink()
+        if Path(raw_gff_path).is_file():
+            Path(raw_gff_path).unlink()
+        if Path(re.sub(r"\.gz$", "", raw_gff_path)).is_file():
+            Path(re.sub(r"\.gz$", "", raw_gff_path)).unlink()
+        if Path(uncur_fna_path).is_file():
+            Path(uncur_fna_path).unlink()
+        if Path(raw_fna_path).is_file():
+            Path(raw_fna_path).unlink()
+        if Path(re.sub(r"\.gz$", "", raw_fna_path)).is_file():
+            Path(re.sub(r"\.gz$", "", raw_fna_path)).unlink()
 
     return ome, cur_fna_path, cur_gff_path, faa_path
 
@@ -699,11 +664,11 @@ def main(
 ):
 
     for dir_ in [wrk_dir + "fna/", wrk_dir + "gff3/", wrk_dir + "faa/"]:
-        if not os.path.isdir(dir_):
-            os.mkdir(dir_)
+        if not Path(dir_).is_dir():
+            Path(dir_).mkdir()
 
     infdb = predb2mtdb(predb)
-    vprint("\nGenerating omes", v=verbose, flush=True)
+    logger.debug("Generating omes")
     omedb, failed = gen_omes(
         infdb, refdb, ome_col="ome", forbidden=forbidden, spacer=spacer
     )
@@ -726,7 +691,7 @@ def main(
             ]
         )
 
-    vprint("\nCurating data", v=verbose, flush=True)
+    logger.debug("Curating data")
     if cpus > 1:
         with mp.Pool(processes=cpus) as pool:
             cur_data = pool.starmap(cur_mngr, tqdm(cur_cmds, total=len(cur_cmds)))
@@ -757,7 +722,7 @@ def cli():
     )
 
     if any(x in {"-h", "--help", "-help"} for x in sys.argv):
-        eprint("\n" + usage + "\n", flush=True)
+        logger.info("" + usage + "\n")
         sys.exit(0)
     elif len(sys.argv) == 1:
         print(gen_predb())
@@ -783,9 +748,9 @@ def cli():
     # if ncbi_api:
     #    Entrez.api_key = ncbi_api
 
-    eprint("\nPreparing run", flush=True)
+    logger.info("Preparing run")
     predb = read_predb(format_path(sys.argv[1]), spacer="\t")
-    out_dir, wrk_dir = prep_output(os.path.dirname(format_path(sys.argv[1])))
+    out_dir, wrk_dir = prep_output(str(Path(format_path(sys.argv[1])).parent))
 
     forbid_omes = acq_forbid_omes(file_path=format_path("$MYCODB/../log/relics.txt"))
 

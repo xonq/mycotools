@@ -12,6 +12,7 @@
 # will require logging whatever NCBI omes directly overlap MycoCosm
 # NEED to remove overlap when rerunning failed genomes
 
+import logging
 import os
 import re
 import sys
@@ -46,13 +47,14 @@ from mycotools.lib.kontools import (
     intro,
     outro,
     format_path,
-    eprint,
     prep_output,
     collect_files,
     read_json,
     write_json,
     split_input,
     findExecs,
+    setup_logging,
+    atomic_write,
 )
 from mycotools.lib.biotools import fa2dict, gff2list, dict2fa, list2gff
 from mycotools.ncbiDwnld import (
@@ -69,6 +71,27 @@ from mycotools.predb2mtdb import main as predb2mtdb
 from mycotools.predb2mtdb import predb_headers, read_predb, gen_omes
 from mycotools.assemblyStats import main as assStats
 from mycotools.annotationStats import main as annStats
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+
+def _read_ledger(file_path, comment="#"):
+    """Return the meaningful lines of a ledger/sidecar file.
+
+    Yields the shared read half of the ledger parsers below: returns a list of
+    right-stripped lines, skipping comment lines (those beginning with
+    `comment`) and lines that are empty once stripped. Returns an empty list if
+    the file does not exist, so callers can treat a missing ledger as empty.
+    """
+    if not Path(file_path).is_file():
+        return []
+    with open(file_path, "r") as raw:
+        return [
+            line.rstrip()
+            for line in raw
+            if not line.startswith(comment) and line.strip()
+        ]
 
 
 def validate_t_and_c(config, discrepancy=False):
@@ -89,15 +112,12 @@ def validate_t_and_c(config, discrepancy=False):
 
     # if there isnt a configuration, alert the user to use-restriction policies
     else:
-        print(
-            "\nPlease review JGI use-restricted data policy here: "
+        logger.debug("Please review JGI use-restricted data policy here: "
             + "https://jgi.doe.gov/user-programs/pmo-overview/policies/"
             + "\nPlease review GenBank use-restricted data policy here: "
             + "https://ncbi.nlm.nih.gov/genbank/"
             + "\nPlease review how Mycotools handles use-restricted data here:"
-            + " https://github.com/xonq/mycotools/blob/master/MTDB.md",
-            flush=True,
-        )
+            + " https://github.com/xonq/mycotools/blob/master/MTDB.md")
         check = ""
         if check.lower() not in {"y", "yes"}:
             check = input(
@@ -112,7 +132,7 @@ def validate_t_and_c(config, discrepancy=False):
                 + "\n\nPlease type [y]es/[N]o if you acknowledge these terms: "
             )
         if check.lower() not in {"y", "yes"}:
-            print("\nRerun without --nonpublished", flush=True)
+            logger.info("Rerun without --nonpublished")
             sys.exit(1)
 
         nonpublished = "yes"
@@ -176,8 +196,8 @@ def initDB(
     if not output.endswith("/"):
         output += "/"
     for new_dir in new_dirs:
-        if not os.path.isdir(new_dir):
-            os.mkdir(new_dir)
+        if not Path(new_dir).is_dir():
+            Path(new_dir).mkdir()
 
     config = gen_config(
         branch=branch,
@@ -193,7 +213,7 @@ def initDB(
     if not rogue:
         # this is a relic, and needs to be adjusted to a central reference if
         # that is ever created
-        if not os.path.isdir(init_dir + "mtdb"):
+        if not Path(init_dir + "mtdb").is_dir():
             # NEED TO CHANGE FROM SSH TO LINK ONCE OPEN (config['repository'])
             git_exit = subprocess.call(
                 [
@@ -205,42 +225,21 @@ def initDB(
                 ]
             )
             if git_exit != 0:
-                eprint("\nERROR: git clone failed.", flush=True)
+                logger.error("git clone failed.")
                 sys.exit(2)
         else:
-            print("\nmycotoolsdb directory already exists", flush=True)
+            logger.info("mycotoolsdb directory already exists")
         # NEED TO ADD GITIGNORE TO GIT
         if not primaryDB():
-            eprint(
-                "\nERROR: no YYYYmmdd.mtdb in " + format_path(envs["MYCODB"]),
-                flush=True,
-            )
+            logger.error("no YYYYmmdd.mtdb in " + format_path(envs["MYCODB"]))
             sys.exit(3)
     else:
         new_db_path = output + "mtdb/" + date + ".mtdb"
-        if not os.path.isfile(new_db_path):
+        if not Path(new_db_path).is_file():
             with open(output + "mtdb/" + date + ".mtdb", "w") as out:
                 out.write("".join(["\t" for x in mtdb.columns]))
 
     return output, config
-
-
-def parse_forbidden(forbidden_path):
-    """Read the log file containing information on forbidden genomes"""
-    # NEED to be rewritten to reference a central repository forbidden file
-
-    log_path = format_path(forbidden_path)
-    if os.path.isfile(log_path):
-        log_dict = readLog(log_path)
-    else:
-        log_dict = {}
-
-    return log_dict
-
-
-def add_forbidden(tag, source, file_path=None, flag="failed download"):
-    edit = tag + "\t" + source + "\t" + flag
-    log_editor(file_path, tag, edit)
 
 
 def parse_dups(file_path):
@@ -252,14 +251,10 @@ def parse_dups(file_path):
     this is also to some extent present in NCBI. Ultimately, a manually curated
     file is necessary for this and should be held in a central repository."""
     duplicates = {}
-    if os.path.isfile(file_path):
-        with open(file_path, "r") as raw:
-            for line in raw:
-                if not line.startswith("#"):
-                    data = [x.rstrip() for x in line.split("\t") if x]
-                    if data:
-                        duplicates[data[0]] = [data[1], data[2], data[3]]
-
+    for line in _read_ledger(file_path):
+        data = [x.rstrip() for x in line.split("\t") if x]
+        if data:
+            duplicates[data[0]] = [data[1], data[2], data[3]]
     return duplicates
 
 
@@ -273,87 +268,66 @@ def parse_dups(file_path):
 def acq_forbid_omes(file_path):
     """Parse a file with forbidden ome accessions - ome codes that have been
     used before and are no longer valid"""
-    if not os.path.isfile(file_path):
-        return set()
-    with open(file_path, "r") as raw:
-        relics = set([x.rstrip() for x in raw])
-    return relics
+    return set(_read_ledger(file_path))
 
 
 def write_forbid_omes(omes, file_path):
     """Add to a file of forbidden ome accessions so that these are not ever
     used again, even if the codename is removed from the database"""
-    if os.path.isfile(file_path):
-        with open(file_path, "r") as raw:
-            old_relics = set([x.rstrip() for x in raw])
-        new_relics = old_relics.union(set(omes))
-    else:
-        new_relics = set(omes)
-
-    with open(file_path + ".tmp", "w") as out:  # be cautious because if it
-        # cancels then we lose the old data
+    # union with any pre-existing relics; atomic_write guards against losing
+    # the old data if the write is cancelled midway
+    new_relics = set(_read_ledger(file_path)).union(set(omes))
+    with atomic_write(file_path) as out:
         out.write("\n".join([str(x) for x in sorted(new_relics)]))
-    shutil.move(file_path + ".tmp", file_path)
 
 
 def parse_failed(file_path=None, rerun=False):
     """Parse a file that stores the failed accessions and metadata of the
     attempted acquisition. Return a dictionary that contains the failed
     accession and its metadata."""
-    prev_failed = {}
-    if not os.path.isfile(file_path) or rerun:
+    if not Path(file_path).is_file() or rerun:
         with open(file_path, "w") as out:
             out.write("#code\tsource\tversion\tattempt_date")
-    else:
-        with open(file_path, "r") as raw:
-            for line in raw:
-                if not line.startswith("#"):
-                    data = [x.rstrip() for x in line.split("\t")]
-                    while len(data) < 4:
-                        data.append("")
-                    prev_failed[data[0]] = {
-                        "source": data[1],
-                        "version": data[2],
-                        "attempt_date": data[3],
-                    }
-
+        return {}
+    prev_failed = {}
+    for line in _read_ledger(file_path):
+        data = [x.rstrip() for x in line.split("\t")]
+        while len(data) < 4:
+            data.append("")
+        prev_failed[data[0]] = {
+            "source": data[1],
+            "version": data[2],
+            "attempt_date": data[3],
+        }
     return prev_failed
 
 
 def parse_jgi2ncbi(file_path):
     """Parse previously collected NCBI to JGI data to limit querying"""
-    jgi2ncbi = {}
-    if not os.path.isfile(file_path):
+    if not Path(file_path).is_file():
         with open(file_path, "w") as out:
             out.write("#ncbi_acc\tmycocosm_portal")
-    else:
-        with open(file_path, "r") as raw:
-            for line in raw:
-                if not line.startswith("#"):
-                    d = line.rstrip().split("\t")
-                    ncbi, jgi = d[0], d[1].lower()
-                    jgi2ncbi[jgi] = ncbi
-
+        return {}
+    jgi2ncbi = {}
+    for line in _read_ledger(file_path):
+        d = line.split("\t")
+        jgi2ncbi[d[1].lower()] = d[0]
     return jgi2ncbi
 
 
 def parse_true_ncbi(file_path):
     """Parse accessions considered to be unique to NCBI"""
-    true_ncbi = set()
-    if not os.path.isfile(file_path):
+    if not Path(file_path).is_file():
         with open(file_path, "w") as out:
             out.write("#ncbi_acc")
-    else:
-        with open(file_path, "r") as raw:
-            true_ncbi = set([x.rstrip() for x in raw if not x.startswith("#")])
-
-    return true_ncbi
+        return set()
+    return set(_read_ledger(file_path))
 
 
 def add_true_ncbi(true_ncbi, file_path=None):
     """Add to a ledger of accessions considered to be unique to NCBI"""
-    with open(file_path, "w") as out:
-        out.write("#ncbi_acc\n" + "\n".join([str(x) for x in list(true_ncbi)]))
+    with atomic_write(file_path) as out:
+        out.write("#ncbi_acc\n" + "\n".join([str(x) for x in true_ncbi]))
 
 
 def add_jgi2ncbi(jgi2ncbi, file_path=None):
@@ -361,7 +335,7 @@ def add_jgi2ncbi(jgi2ncbi, file_path=None):
     is prone to failure given that the field JGI uses to supply their genome
     accession is either absent from some NCBI entries, or is in a different
     field"""
-    with open(file_path, "w") as out:
+    with atomic_write(file_path) as out:
         out.write("#ncbi_acc\tmycocosm_portal\n")
         for jgi, ncbi in jgi2ncbi.items():
             out.write(ncbi + "\t" + jgi + "\n")
@@ -388,7 +362,7 @@ def dwnld_mycocosm(
 
     check_curl = findExecs(["curl"], verbose=False)
 
-    if not os.path.isfile(out_file):
+    if not Path(out_file).is_file():
         for attempt in range(3):
             if check_curl:
                 curl_cmd = subprocess.call(
@@ -399,7 +373,7 @@ def dwnld_mycocosm(
                     shutil.move(out_file + ".tmp", out_file)
                     break
             if curl_cmd:
-                eprint("\nERROR: failed to retrieve MycoCosm table", flush=True)
+                logger.error("failed to retrieve MycoCosm table")
             else:
                 resp = requests.get(url)
                 with open(out_file + ".tmp", "wb") as f:
@@ -426,7 +400,7 @@ def dwnld_ncbi_metadata(
     eukaryotes, and return a Pandas dataframe"""
 
     ncbi_url = ncbi_url + group + ".txt"
-    if not os.path.isfile(ncbi_file):
+    if not Path(ncbi_file).is_file():
         getTbl = subprocess.call(["curl", ncbi_url, "-o", ncbi_file + ".tmp"])
         shutil.move(ncbi_file + ".tmp", ncbi_file)
     ncbi_df = pd.read_csv(ncbi_file, sep="\t")
@@ -442,20 +416,20 @@ def prep_taxa_cols(
     gca_prep = [x.upper().replace("GCF", "GCA") for x in skip_prep]
     gcf_prep = [x.upper().replace("GCA", "GCF") for x in skip_prep]
     skip = set(gca_prep + gcf_prep)
-    if not os.path.isdir(taxonomy_dir):
-        os.mkdir(taxonomy_dir)
+    if not Path(taxonomy_dir).is_dir():
+        Path(taxonomy_dir).mkdir()
     aa_file = taxonomy_dir + "assembly_accs.genbank.txt"
     with open(aa_file, "w") as out:
         out.write("\n".join([x for x in list(df["assembly_acc"]) if x not in skip]))
 
     attempts, datasets_cmd = 0, 0
-    if not os.path.isdir(taxonomy_dir + "ncbi_dataset"):
+    if not Path(taxonomy_dir + "ncbi_dataset").is_dir():
         datasets_path = taxonomy_dir + "ncbi_dataset.zip"
         while attempts < max_attempts:
             if attempts:
-                eprint("\t\t\tReattempting", flush=True)
-                if os.path.isfile(datasets_path):
-                    os.remove(datasets_path)
+                logger.info("Reattempting")
+                if Path(datasets_path).is_file():
+                    Path(datasets_path).unlink()
             attempts += 1
             datasets_cmd = run_datasets(
                 None, aa_file, taxonomy_dir, True, api=api, verbose=True
@@ -463,35 +437,29 @@ def prep_taxa_cols(
             try:
                 with zipfile.ZipFile(datasets_path, "r") as zip_ref:
                     zip_ref.extractall(taxonomy_dir)
-                os.remove(datasets_path)
+                Path(datasets_path).unlink()
                 break
             except zipfile.BadZipFile:
-                eprint(
-                    f"\t\tERROR: datasets download corrupted - {attempts}", flush=True
-                )
+                logger.error(f"datasets download corrupted - {attempts}")
                 if attempts == max_attempts:
                     sys.exit(11)
             except FileNotFoundError:
-                eprint(f"\t\tERROR: datasets failed - {attempts}", flush=True)
+                logger.error(f"datasets failed - {attempts}")
 
     if datasets_cmd:
-        eprint(f"\t\tWARNING: datasets failed, assuming no genomes found", flush=True)
+        logger.warning(f"datasets failed, assuming no genomes found")
         acc2org_n, acc2meta = {}, {}
     else:
         acc2org_n, acc2meta, org_failed = compile_organism_names(
             taxonomy_dir + "ncbi_dataset/"
         )
-        print(
-            f"\t\t{len(acc2meta) + len(org_failed)}",
-            "genomes queried from GenBank",
-            flush=True,
-        )
-        print(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed', flush=True)
+        logger.info("%s %s", f"\t\t{len(acc2meta) + len(org_failed)}", "genomes queried from GenBank")
+        logger.debug(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed')
 
     # check for RefSeq for failed entries
     refseq_dir = taxonomy_dir + "refseq/"
-    if not os.path.isdir(refseq_dir):
-        os.mkdir(refseq_dir)
+    if not Path(refseq_dir).is_dir():
+        Path(refseq_dir).mkdir()
     missing_accs = sorted(
         set(df["assembly_acc"]).difference(
             set(acc2org_n.keys()).union(set(acc2org.keys()))
@@ -510,15 +478,15 @@ def prep_taxa_cols(
     # attempt to download the ncbi_datasets zip file until allowed attempts are
     # exhausted
     rs_datasets_cmd = 0
-    if not os.path.isdir(refseq_dir + "ncbi_dataset"):
-        print(f"\t\tChecking RefSeq for {len(reattempt_acc)} entries", flush=True)
+    if not Path(refseq_dir + "ncbi_dataset").is_dir():
+        logger.debug(f"Checking RefSeq for {len(reattempt_acc)} entries")
         rs_datasets_path = refseq_dir + "ncbi_dataset.zip"
         attempts = 0
         while attempts < max_attempts:
             if attempts:
-                eprint("\t\t\t\tReattempting", flush=True)
-                if os.path.isfile(rs_datasets_path):
-                    os.remove(rs_datasets_path)
+                logger.info("Reattempting")
+                if Path(rs_datasets_path).is_file():
+                    Path(rs_datasets_path).unlink()
             attempts += 1
             rs_datasets_cmd = run_datasets(
                 None, acc_file_re, refseq_dir, True, api=api, verbose=True
@@ -526,25 +494,23 @@ def prep_taxa_cols(
             try:
                 with zipfile.ZipFile(rs_datasets_path, "r") as zip_ref:
                     zip_ref.extractall(refseq_dir)
-                os.remove(rs_datasets_path)
+                Path(rs_datasets_path).unlink()
                 break
             except zipfile.BadZipFile:
-                eprint(
-                    f"\t\t\tERROR: datasets download corrupted - {attempts}", flush=True
-                )
+                logger.error(f"datasets download corrupted - {attempts}")
                 if attempts == max_attempts:
                     sys.exit(10)
             except FileNotFoundError:
-                eprint(f"\t\tERROR: datasets failed - {attempts}", flush=True)
+                logger.error(f"datasets failed - {attempts}")
 
     if rs_datasets_cmd:
-        eprint(f"\t\tWARNING: datasets failed, assuming no genomes found", flush=True)
+        logger.warning(f"datasets failed, assuming no genomes found")
         acc2org_rs, acc2meta_rs = {}, {}
     else:
         acc2org_rs, acc2meta_rs, org_failed_2 = compile_organism_names(
             refseq_dir + "ncbi_dataset/"
         )
-        print(f"\t\t{len(acc2meta_rs)} genome(s) queried from RefSeq", flush=True)
+        logger.debug(f"{len(acc2meta_rs)} genome(s) queried from RefSeq")
 
     acc2org, acc2meta = {**acc2org, **acc2org_n, **acc2org_rs}, {
         **acc2meta,
@@ -602,7 +568,7 @@ def clean_ncbi_df(ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=
 
     acc2org_path = update_path + "../gca2org.tsv"
     acc2org = {}
-    if os.path.isfile(acc2org_path):
+    if Path(acc2org_path).is_file():
         with open(acc2org_path, "r") as raw:
             for line in raw:
                 d = line.split("\t")
@@ -629,11 +595,10 @@ def clean_ncbi_df(ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=
         ncbi_df, update_path + "taxonomy/", api=api, acc2org=acc2org
     )
 
-    with open(acc2org_path + ".tmp", "w") as out:
+    with atomic_write(acc2org_path) as out:
         for acc, org in acc2org.items():
             org_meta = f'{org["genus"]}\t{org["species"]}\t{org["strain"]}'
             out.write(f"{acc}\t{org_meta}\n")
-    os.rename(acc2org_path + ".tmp", acc2org_path)
 
     # remove entries without sufficient metadata
     ncbi_df = ncbi_df.dropna(subset=["genus"])
@@ -763,8 +728,8 @@ def mk_wrk_dirs(update_path):
     """Make the download directories in the update path"""
     wrk_dirs = ["faa/", "fna/", "gff3/"]
     for wrk_dir in wrk_dirs:
-        if not os.path.isdir(update_path + wrk_dir):
-            os.mkdir(update_path + wrk_dir)
+        if not Path(update_path + wrk_dir).is_dir():
+            Path(update_path + wrk_dir).mkdir()
 
 
 def prepare_ref_db(ref_db, date):
@@ -780,9 +745,7 @@ def prepare_ref_db(ref_db, date):
         {k: v for k, v in ref_db.items() if v["source"].lower() == "ncbi"}, index="ome"
     )
     if set(ref_db.keys()).difference(set(jgi.keys()).union(set(ncbi.keys()))):
-        eprint(
-            '\tWARNING: reference entries that are not labeled "jgi/ncbi" are excluded'
-        )
+        logger.warning('\tWARNING: reference entries that are not labeled "jgi/ncbi" are excluded')
 
     return jgi.mtdb2pd(), ncbi.mtdb2pd()
 
@@ -852,11 +815,9 @@ def internal_redundancy_check(db):
 def read_prev_tax(tax_path):
     """Open a genus to taxonomy JSON path"""
     tax_dicts = {}
-    if os.path.isfile(tax_path):
-        with open(tax_path, "r") as raw:
-            for line in raw:
-                data = line.rstrip().split("\t")
-                tax_dicts[data[0]] = json.loads(data[1])
+    for line in _read_ledger(tax_path):
+        data = line.split("\t")
+        tax_dicts[data[0]] = json.loads(data[1])
     return tax_dicts
 
 
@@ -883,19 +844,19 @@ def ref_update(
     acquired external from any existing primary MTDB"""
     # NEED to mark none for new databases' refdb
     # initialize update
-    print("\nInitializing run", flush=True)
+    logger.info("Initializing run")
     mk_wrk_dirs(update_path)
 
     jgi_df, ncbi_df = prepare_ref_db(ref_db, date)
 
     # run JGI
     if jgi and len(jgi_df) > 0:
-        print("\nAssimilating MycoCosm", flush=True)
+        logger.info("Assimilating MycoCosm")
         jgi_db_path = update_path + date + ".jgi.mtdb"
         jgi_predb_path = update_path + date + ".jgi.predb2.mtdb"
 
-        if not os.path.isfile(jgi_predb_path):
-            print("\tDownloading MycoCosm data", flush=True)
+        if not Path(jgi_predb_path).is_file():
+            logger.info("Downloading MycoCosm data")
             post_jgi_df, jgi_failed = jgiDwnld(jgi_df, update_path, jgi_email, jgi_pwd)
             jgi_predb = post_jgi_df.rename(
                 columns={
@@ -905,7 +866,7 @@ def ref_update(
                 }
             )
 
-            print("\tCurating MycoCosm data", flush=True)
+            logger.info("Curating MycoCosm data")
             jgi_premtdb = jgi_predb.fillna("").to_dict(orient="list")
             jgi_mtdb, jgi_failed1 = predb2mtdb(
                 jgi_premtdb,
@@ -935,9 +896,9 @@ def ref_update(
         jgi_mtdb = mtdb()
     new_db = jgi_mtdb.mtdb2pd()
 
-    print("\nAssimilating NCBI", flush=True)
-    if not os.path.isfile(update_path + date + ".ncbi.predb"):
-        print("\tDownloading NCBI data", flush=True)
+    logger.info("Assimilating NCBI")
+    if not Path(update_path + date + ".ncbi.predb").is_file():
+        logger.info("Downloading NCBI data")
         if ncbi_fallback:
             from mycotools.ncbi_dwnld_fallback import main as ncbi_dwnld_fallback
 
@@ -984,8 +945,8 @@ def ref_update(
         #        refdbncbi = mtdb(update_path + date + '.ncbi.ref.mtdb')
         ncbi_predb = pd.read_csv(update_path + date + ".ncbi.predb", sep="\t")
 
-    print("\tCurating NCBI data", flush=True)
-    if not os.path.isfile(update_path + date + ".ncbi.predb2.mtdb"):
+    logger.info("Curating NCBI data")
+    if not Path(update_path + date + ".ncbi.predb2.mtdb").is_file():
         for key in ncbi_predb.columns:
             ncbi_predb[key] = ncbi_predb[key].fillna("")
         ncbi_predb["version"] = ncbi_predb["version"].astype(str)
@@ -1019,7 +980,7 @@ def ref_update(
         #        df2db(ncbi_db, ncbi_db_path)
         new_db = pd.concat([new_db, ncbi_db])
 
-    print("\nAssimilating NCBI taxonomy data", flush=True)
+    logger.info("Assimilating NCBI taxonomy data")
     new_mtdb = mtdb.pd2mtdb(new_db)
 
     if kingdom.lower() == "fungi":
@@ -1036,7 +997,7 @@ def ref_update(
     elif jgi_mtdb:
         update_mtdb = jgi_mtdb
     else:
-        eprint("\nNo updates", flush=True)
+        logger.info("No updates")
         sys.exit(0)
 
     if taxonomy:  # already completed
@@ -1126,10 +1087,10 @@ def taxonomy_update(
     taxless_db["taxonomy"] = [{} for x in taxless_db["taxonomy"]]
     tax_path = f"{update_path}../taxonomy.tsv"
     gca_path = f"{update_path}../gca2org.tsv"
-    if os.path.isfile(tax_path):
-        os.rename(tax_path, update_path + "old_taxonomy.tsv")
-    if os.path.isfile(gca_path):
-        os.rename(gca_path, update_path + "old_gca2org.tsv")
+    if Path(tax_path).is_file():
+        Path(tax_path).rename(update_path + "old_taxonomy.tsv")
+    if Path(gca_path).is_file():
+        Path(gca_path).rename(update_path + "old_gca2org.tsv")
     tax_dicts = gather_taxonomy(
         taxless_db, api_key=ncbi_api, king=group, rank=rank, output_path=tax_path
     )
@@ -1162,7 +1123,7 @@ def rogue_update(
     """Initialize/update a standalone primary MTDB"""
     # NEED to mark none for new databases' refdb
     # initialize update
-    print("\nInitializing run", flush=True)
+    logger.info("Initializing run")
     mk_wrk_dirs(update_path)
     prev_failed = parse_failed(
         rerun=rerun, file_path=format_path("$MYCODB/../log/failed.tsv")
@@ -1180,7 +1141,7 @@ def rogue_update(
     ncbi_db_path = update_path + date + ".ncbi.mtdb"
     pre_ncbi_df0 = dwnld_ncbi_metadata(update_path + date + ".ncbi.tsv", group=group)
     pre_ncbi_df1 = pre_ncbi_df0.rename(columns={"Assembly Accession": "assembly_acc"})
-    print("\tAcquiring NCBI metadata", flush=True)
+    logger.info("Acquiring NCBI metadata")
     ncbi_df, acc2meta = clean_ncbi_df(
         pre_ncbi_df1, update_path, kingdom=kingdom, api=ncbi_api
     )
@@ -1193,8 +1154,8 @@ def rogue_update(
     #                      if x not in {'genus', 'species', 'strain'})}
     if lineage_constraints:
         lineage_path = update_path + date + ".ncbi.posttax.df"
-        if not os.path.isfile(lineage_path):
-            print("\nExtracting lineages from NCBI", flush=True)
+        if not Path(lineage_path).is_file():
+            logger.info("Extracting lineages from NCBI")
             # NEED to transition to datasets
             tax_dicts, ncbi_df = extract_constraint_lineages(
                 ncbi_df, ncbi_api, kingdom, lineage_constraints, tax_dicts, tax_path
@@ -1207,11 +1168,11 @@ def rogue_update(
     old_len = len(db["ome"])
     new_len = len(db["ome"])
     if old_len - new_len:
-        print("\t" + str(old_len - new_len) + " redundant entries removed", flush=True)
+        logger.debug("" + str(old_len - new_len) + " redundant entries removed")
 
     # run JGI
     if jgi:
-        print("\nAssimilating MycoCosm (1 download/minute)", flush=True)
+        logger.info("Assimilating MycoCosm (1 download/minute)")
         jgi_db_path = update_path + date + ".jgi.mtdb"
         mycocosm_path = update_path + date + ".mycocosm.csv"
 
@@ -1223,8 +1184,8 @@ def rogue_update(
         # extract JGI lineages of interest and store tax_dicts for later
         if lineage_constraints:
             lineage_path = update_path + date + ".jgi.posttax.df"
-            if not os.path.isfile(lineage_path):
-                print("\tExtracting lineages from MycoCosm", flush=True)
+            if not Path(lineage_path).is_file():
+                logger.info("Extracting lineages from MycoCosm")
                 tax_dicts, jgi_df = extract_constraint_lineages(
                     jgi_df, ncbi_api, kingdom, lineage_constraints, tax_dicts, tax_path
                 )
@@ -1232,11 +1193,11 @@ def rogue_update(
             else:
                 jgi_df = pd.read_csv(lineage_path, sep="\t")
 
-        print("\tSearching NCBI for MycoCosm overlap", flush=True)
+        logger.info("Searching NCBI for MycoCosm overlap")
         jgi_ncbi_overlap_file = f"{update_path}/redundant_ncbi.tsv"
         jgi2ncbi = parse_jgi2ncbi(update_path + "../jgi2ncbi.tsv")
         ncbi_df = ncbi_df.set_index("assembly_acc", drop=False)
-        if os.path.isfile(jgi_ncbi_overlap_file):
+        if Path(jgi_ncbi_overlap_file).is_file():
             with open(jgi_ncbi_overlap_file, "r") as raw:
                 todel_i = [x.rstrip() for x in raw]
             ncbi_df, ncbi_jgi_overlap = exec_rm_overlap(ncbi_df, todel_i)
@@ -1246,10 +1207,9 @@ def rogue_update(
                 rm_ncbi_overlap(ncbi_df, jgi_df, jgi2ncbi, true_ncbi, acc2meta, api=api)
             )
 
-            print("\t\t" + str(len(jgi2ncbi)) + " overlapping genomes", flush=True)
-            with open(jgi_ncbi_overlap_file + ".tmp", "w") as out:
+            logger.debug("" + str(len(jgi2ncbi)) + " overlapping genomes")
+            with atomic_write(jgi_ncbi_overlap_file) as out:
                 out.write("\n".join([x for x in todel_i]))
-            os.rename(jgi_ncbi_overlap_file + ".tmp", jgi_ncbi_overlap_file)
             add_true_ncbi(true_ncbi, update_path + "../supported_ncbi.tsv")
             add_jgi2ncbi(jgi2ncbi, update_path + "../jgi2ncbi.tsv")
             for i, row in jgi_df.iterrows():
@@ -1259,7 +1219,7 @@ def rogue_update(
                 ):
                     jgi_df.at[i, "biosample"] = jgi2biosample[row["portal"].lower()]
 
-        print("\tDownloading MycoCosm data", flush=True)
+        logger.info("Downloading MycoCosm data")
         jgi_predb_path = update_path + date + ".jgi.predb2.mtdb"
         jgi_predb, db, jgi_failed = jgi2db(
             jgi_df,
@@ -1283,8 +1243,8 @@ def rogue_update(
         ncbi_df = pd.concat([ncbi_df, ncbi_jgi_overlap])
 
         refdbjgi = mtdb.pd2mtdb(db)
-        if not os.path.isfile(jgi_predb_path):
-            print("\tCurating MycoCosm data", flush=True)
+        if not Path(jgi_predb_path).is_file():
+            logger.info("Curating MycoCosm data")
             jgi_premtdb = jgi_predb.fillna("").to_dict(orient="list")
             if "assemblyPath" in jgi_premtdb:
                 jgi_mtdb, jgi_failed1 = predb2mtdb(
@@ -1318,7 +1278,7 @@ def rogue_update(
             jgi_db = pd.DataFrame({x: [] for x in refdbjgi.keys()})
 
         new_db_path = update_path + date + ".checkpoint.jgi.mtdb"
-        if not os.path.isfile(new_db_path):
+        if not Path(new_db_path).is_file():
             if len(jgi_db) > 0:
                 df2db(jgi_db, jgi_db_path)
                 if not db is None:
@@ -1335,11 +1295,11 @@ def rogue_update(
         new_db = db
         new_dups = duplicates
 
-    print("\nAssimilating NCBI (10 download/second w/API key, 3 w/o)", flush=True)
+    logger.info("Assimilating NCBI (10 download/second w/API key, 3 w/o)")
     new_db["version"] = new_db["version"].astype(str)
-    if not os.path.isfile(update_path + date + ".ncbi.predb"):
+    if not Path(update_path + date + ".ncbi.predb").is_file():
         #    if not os.path.isfile(update_path + date + '.ncbi.predb'):
-        print("\tDownloading NCBI data", flush=True)
+        logger.info("Downloading NCBI data")
         ncbi_predb, new_db, ncbi_failed1 = ncbi2db(
             update_path,
             ncbi_df,
@@ -1369,8 +1329,8 @@ def rogue_update(
         refdbncbi = mtdb(update_path + date + ".ncbi.ref.mtdb")
         ncbi_predb = pd.read_csv(update_path + date + ".ncbi.predb", sep="\t")
 
-    print("\tCurating NCBI data", flush=True)
-    if not os.path.isfile(update_path + date + ".ncbi.predb2.mtdb"):
+    logger.info("Curating NCBI data")
+    if not Path(update_path + date + ".ncbi.predb2.mtdb").is_file():
         for key in ncbi_predb.columns:
             ncbi_predb[key] = ncbi_predb[key].fillna("")
         ncbi_predb["version"] = ncbi_predb["version"].astype(str)
@@ -1410,7 +1370,7 @@ def rogue_update(
 
     new_mtdb = mtdb.pd2mtdb(new_db)
 
-    print("\nAssimilating NCBI taxonomy data", flush=True)
+    logger.info("Assimilating NCBI taxonomy data")
     if kingdom.lower() == "fungi":
         rank = "kingdom"
     else:
@@ -1437,7 +1397,7 @@ def rogue_update(
     elif jgi_mtdb:
         update_mtdb = jgi_mtdb
     else:
-        eprint("\nNo updates", flush=True)
+        logger.info("No updates")
         sys.exit(0)
 
     return new_mtdb, update_mtdb
@@ -1446,15 +1406,15 @@ def rogue_update(
 def rm_raw_data(out_dir):
     """Remove raw data after completion"""
     for i in ["faa", "gff3", "gff", "xml", "fna"]:
-        if os.path.isdir(out_dir + i):
+        if Path(out_dir + i).is_dir():
             shutil.rmtree(out_dir + i)
 
 
 def gen_algn_db(update_path, omes):
     """Generate an alignment database for the complete primary MTDB"""
-    date = os.path.basename(os.path.abspath(update_path))
+    date = Path(os.path.abspath(update_path)).name
     fas = collect_files(os.environ["MYCOFAA"] + "/", ".faa")
-    fas = [x for x in fas if os.path.basename(x)[:-6] in omes]
+    fas = [x for x in fas if Path(x).name[:-6] in omes]
     mkdb_base = "cat " + " ".join(fas)
     mkdb_blast = (
         mkdb_base
@@ -1476,13 +1436,11 @@ def gen_algn_db(update_path, omes):
     # with open(update_path + date + '_mmseqsdb.sh', 'w') as out:
     #   out.write(mkdb_mmseqs)
 
-    print(
-        "\nOPTIONAL: To generate blastdb | mmseqsdb, run the following"
+    logger.debug("OPTIONAL: To generate blastdb | mmseqsdb, run the following"
         + "\nbash "
         + update_path
         + date
-        + "_makeblastdb.sh"
-    )
+        + "_makeblastdb.sh")
     # bash ' + update_path \
     #   + date + '_mmseqsdb.sh')
 
@@ -1552,7 +1510,7 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path, overwrite=True):
         new_ome2old_ome = {v: k for k, v in old_ome2new_ome.items()}
         new_ome_mtdb = new_ome_mtdb.set_index("ome")
         for k, v in old_ome2new_ome.items():
-            print(f"\t{k} converted to {v}", flush=True)
+            logger.debug(f"{k} converted to {v}")
 
         # create directories for new files
         fna_dir, gff_dir, faa_dir = (
@@ -1561,8 +1519,8 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path, overwrite=True):
             f"{update_path}faa/",
         )
         for path_ in [fna_dir, gff_dir, faa_dir]:
-            if not os.path.isdir(path_):
-                os.mkdir(path_)
+            if not Path(path_).is_dir():
+                Path(path_).mkdir()
 
         # convert the file header names to the new omes
         for ome, old_ome in new_ome2old_ome.items():
@@ -1616,7 +1574,7 @@ def db2primary(addDB, refDB, save=False, combined=False):
     updates = {}
     refDB = refDB.set_index()
     if refOmes.intersection(addOmes) and not combined:
-        eprint(refOmes.intersection(addOmes), flush=True)
+        logger.info(refOmes.intersection(addOmes))
         raise KeyError(
             "ERROR: ome codes exist in database. Rerun predb2mtdb or remove manually"
         )
@@ -1626,17 +1584,17 @@ def db2primary(addDB, refDB, save=False, combined=False):
             update_ome = base_ome2update_ome[base_ome]
             updates[update_ome] = ome
             del refDB[update_ome]
-        if os.path.isfile(addDB["gff3"][i]):
+        if Path(addDB["gff3"][i]).is_file():
             move_ns(addDB["gff3"][i], format_path("$MYCOGFF3/" + ome + ".gff3"))
-        elif not os.path.isfile(format_path("$MYCOGFF3/" + ome + ".gff3")):
+        elif not Path(format_path("$MYCOGFF3/" + ome + ".gff3")).is_file():
             raise FileNotFoundError(f"{ome} missing gff3 for unknown reason")
-        if os.path.isfile(addDB["fna"][i]):
+        if Path(addDB["fna"][i]).is_file():
             move_ns(addDB["fna"][i], format_path("$MYCOFNA/" + ome + ".fna"))
-        elif not os.path.isfile(format_path("$MYCOFNA/" + ome + ".fna")):
+        elif not Path(format_path("$MYCOFNA/" + ome + ".fna")).is_file():
             raise FileNotFoundError(f"{ome} missing fna for unknown reason")
-        if os.path.isfile(addDB["faa"][i]):
+        if Path(addDB["faa"][i]).is_file():
             move_ns(addDB["faa"][i], format_path("$MYCOFAA/" + ome + ".faa"))
-        elif not os.path.isfile(format_path("$MYCOFAA/" + ome + ".faa")):
+        elif not Path(format_path("$MYCOFAA/" + ome + ".faa")).is_file():
             raise FileNotFoundError(f"{ome} missing faa for unknown reason")
         addDB["gff3"][i] = os.environ["MYCOGFF3"] + ome + ".gff3"
         addDB["fna"][i] = os.environ["MYCOFNA"] + ome + ".fna"
@@ -1683,37 +1641,35 @@ def control_flow(
     kingdom = kingdom.lower()
     if kingdom not in abbr2king:
         if kingdom not in set(abbr2king.values()):
-            eprint("\nERROR: invalid --kingdom", flush=True)
+            logger.error("invalid --kingdom")
             sys.exit(431)
     else:
         kingdom = abbr2king[kingdom]
 
     if not init and not update and not reference and not add and not taxonomy:
-        eprint(
-            "\nERROR: --update/--init/--reference/--add must be specified", flush=True
-        )
+        logger.error("--update/--init/--reference/--add must be specified")
         sys.exit(15)
     elif reference and not init:
-        eprint("\nERROR: --reference requires a --init directory", flush=True)
+        logger.error("--reference requires a --init directory")
         sys.exit(14)
     elif lineage and not rank:
-        eprint("\nERROR: --lineage requires --rank")
+        logger.error("--lineage requires --rank")
         sys.exit(16)
     elif lineage and not init:
-        eprint("\nERROR: --lineage requires --init")
+        logger.error("--lineage requires --init")
         sys.exit(17)
     elif predb and not init:
-        eprint("\nERROR: --predb requires --init")
+        logger.error("--predb requires --init")
         sys.exit(18)
     elif predb and lineage:
-        eprint("\nERROR: --predb and --lineage are incompatible")
+        logger.error("--predb and --lineage are incompatible")
         sys.exit(20)
     elif reference:
         if add:
-            eprint("\nERROR: --add and --reference are incompatible")
+            logger.error("--add and --reference are incompatible")
             sys.exit(13)
         elif predb:
-            eprint("\nERROR: --reference and --predb are incompatible")
+            logger.error("--reference and --predb are incompatible")
             sys.exit(19)
         else:
             ref_db = mtdb(format_path(reference), add_paths=False)
@@ -1735,11 +1691,11 @@ def control_flow(
         lineage_constraints = split_input(lineage)
         rank_constraints = split_input(rank)
         if len(lineage_constraints) != len(rank_constraints):
-            eprint("\nERROR: --lineage must be same length as --rank")
+            logger.error("--lineage must be same length as --rank")
             sys.exit(18)
         for rank_c in rank_constraints:
             if rank_c.lower() not in permitted_ranks:
-                eprint(f"\nERROR: accepted ranks: {permitted_ranks}")
+                logger.error(f"accepted ranks: {permitted_ranks}")
                 sys.exit(22)
         rank2lineages = defaultdict(set)
         for i, v in enumerate(lineage_constraints):
@@ -1753,14 +1709,14 @@ def control_flow(
     config = {}
     if "MYCODB" in os.environ:
         config_path = format_path("$MYCODB/../config/mtdb.json")
-        if os.path.isfile(config_path):
+        if Path(config_path).is_file():
             config = read_json(format_path(config_path))
             # for LEGACY installs:
             if "lineage_constraints" not in config:
                 config["lineage_constraints"] = {}
                 write_json(config, config_path)
         elif not init:
-            eprint("\nERROR: corrupted MycotoolsDB - no configuration found")
+            logger.error("corrupted MycotoolsDB - no configuration found")
             sys.exit(21)
         if not init:  # is MYCODB initialized?
             #            rogue_bool = config['rogue']
@@ -1769,13 +1725,11 @@ def control_flow(
                 config["nonpublished"] = validate_t_and_c(config, discrepancy=True)
                 write_json(config, config_path)
             if bool(config["jgi"]) and bool(ncbi_only):  # and not overwrite:
-                eprint(
-                    "\nERROR: --ncbi_only specified after initialization", flush=True
-                )
+                logger.error("--ncbi_only specified after initialization")
                 sys.exit(173)
         elif init:
             if format_path(init) != format_path(os.environ["MYCODB"] + "../../"):
-                eprint("\nERROR: MTDB linked. Unlink via `mtdb -u`")
+                logger.error("MTDB linked. Unlink via `mtdb -u`")
                 sys.exit(175)
 
     # nonfungi is nonpublished by default because it is all GenBank
@@ -1803,7 +1757,7 @@ def control_flow(
     if init:
         dbtype = kingdom
         init_dir = format_path(init)
-        if os.path.isdir(init_dir):
+        if Path(init_dir).is_dir():
             init_dir += "mycotoolsdb/"
         if not init_dir.endswith("/"):
             init_dir += "/"
@@ -1830,8 +1784,8 @@ def control_flow(
             os.environ[env] = envs[env]
         orig_db = db2df(mtdb())  # initialize a new database
         update_path = output + "log/" + date + "/"
-        if not os.path.isdir(update_path):
-            os.mkdir(update_path)
+        if not Path(update_path).is_dir():
+            Path(update_path).mkdir()
         mtdb_initialize(
             init_dir, init=True
         )  # init_dir + 'config/mtdb.json', init = True)
@@ -1839,14 +1793,14 @@ def control_flow(
         try:
             output = format_path("$MYCODB/..")
         except KeyError:
-            eprint("\nERROR: MTDB not linked. Link via `mtdb -i <DB_PATH>`", flush=True)
+            logger.error("MTDB not linked. Link via `mtdb -i <DB_PATH>`")
             sys.exit(50)
         update_path = output + "log/" + date + "/"
-        if not os.path.isdir(update_path):
-            os.mkdir(update_path)
+        if not Path(update_path).is_dir():
+            Path(update_path).mkdir()
         if not True:  # config['rogue']: # NEED TO MAKE THIS wget a particular URL
             old_db = db2df(db_path)
-            shutil.move(db_path, update_path + os.path.basename(db_path))
+            shutil.move(db_path, update_path + Path(db_path).name)
             git_pull = subprocess.call(
                 [
                     "git",
@@ -1906,39 +1860,39 @@ def control_flow(
             )
             if init_failed:
                 if not failed:
-                    eprint("\nERROR: some genomes failed curation", flush=True)
+                    logger.error("some genomes failed curation")
                     sys.exit(23)
                 else:
-                    eprint("\nWARNING: some genomes failed curation", flush=True)
+                    logger.warning("some genomes failed curation")
 
         else:
             addDB = mtdb(format_path(add))
         # we need full Paths for an addDB
         gff_fail, fna_fail, faa_fail = False, False, False
-        if not all(os.path.isfile(format_path(x)) for x in addDB.reset_index()["gff3"]):
-            eprint("\nERROR: some GFF paths do not exist", flush=True)
+        if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["gff3"]):
+            logger.error("some GFF paths do not exist")
             gff_fail = [
                 x
                 for x in addDB.reset_index()["gff3"]
-                if not os.path.isfile(format_path(x))
+                if not Path(format_path(x)).is_file()
             ]
-            print(",".join(gff_fail), flush=True)
-        if not all(os.path.isfile(format_path(x)) for x in addDB.reset_index()["fna"]):
-            eprint("\nERROR: some FNA paths do not exist", flush=True)
+            logger.debug(",".join(gff_fail))
+        if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["fna"]):
+            logger.error("some FNA paths do not exist")
             fna_fail = [
                 x
                 for x in addDB.reset_index()["fna"]
-                if not os.path.isfile(format_path(x))
+                if not Path(format_path(x)).is_file()
             ]
-            print(",".join(fna_fail), flush=True)
-        if not all(os.path.isfile(format_path(x)) for x in addDB.reset_index()["faa"]):
-            eprint("\nERROR: some FAA paths do not exist", flush=True)
+            logger.debug(",".join(fna_fail))
+        if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["faa"]):
+            logger.error("some FAA paths do not exist")
             faa_fail = [
                 x
                 for x in addDB.reset_index()["faa"]
-                if not os.path.isfile(format_path(x))
+                if not Path(format_path(x)).is_file()
             ]
-            print(",".join(faa_fail), flush=True)
+            logger.debug(",".join(faa_fail))
         if gff_fail or fna_fail or faa_fail:
             sys.exit(124)
 
@@ -1946,8 +1900,8 @@ def control_flow(
         # make date the acquisition time
         orig_mtdb = mtdb(primaryDB())
         update_path = format_path("$MYCODB/../" + "log/" + date + "/")
-        if not os.path.isdir(update_path):
-            os.mkdir(update_path)
+        if not Path(update_path).is_dir():
+            Path(update_path).mkdir()
         shutil.copy(primaryDB(), update_path)
 
         tax_path = f"{update_path}../taxonomy.tsv"
@@ -1972,7 +1926,7 @@ def control_flow(
 
         if new_db_path != db_path:
             if db_path:
-                os.remove(db_path)
+                Path(db_path).unlink()
         return new_db_path
 
     if taxonomy:
@@ -1991,10 +1945,7 @@ def control_flow(
         sys.exit(0)
     elif reference:
         if any(not x for x in ref_db["published"]) and not nonpublished:
-            eprint(
-                "\nWARNING: nonpublished data detected in reference and will be ignored",
-                flush=True,
-            )
+            logger.warning("nonpublished data detected in reference and will be ignored")
 
         new_mtdb, update_mtdb = ref_update(
             ref_db,
@@ -2037,13 +1988,13 @@ def control_flow(
         )
 
     if not update_mtdb:
-        eprint("\nNo new data acquired", flush=True)
+        logger.info("No new data acquired")
 
     if not save:  # add the predb2mtdb and remove files
         #        df2db(db, format_path('$MYCODB/' + date + '.mtdb'))
         # output new database and new list of omes
 
-        eprint("\nMoving data into database", flush=True)
+        logger.info("Moving data into database")
         write_forbid_omes(
             set(new_mtdb["ome"]), format_path("$MYCODB/../log/relics.txt")
         )
@@ -2056,23 +2007,21 @@ def control_flow(
         )
         full_mtdb.df2db(new_path + ".tmp")
         try:
-            shutil.move(primaryDB(), update_path + os.path.basename(primaryDB()))
+            shutil.move(primaryDB(), update_path + Path(primaryDB()).name)
             # move master database to log if it exists
         except FileNotFoundError:
             pass
         shutil.move(new_path + ".tmp", new_path)
         rm_raw_data(update_path)
-        eprint("\nMTDB update complete", flush=True)
+        logger.info("MTDB update complete")
     #        gen_algn_db(
     #           update_path, set(full_mtdb['ome'])
     #          )
     else:
         # NEED to: insert note aboutrunning updatedb on predb
         new_mtdb.df2db(format_path(update_path + date + ".mtdb"))
-        eprint(
-            f"\nUpdate ready for `mtdb u -a` at "
-            + f'{format_path(update_path + date + ".mtdb")}'
-        )
+        logger.info(f"Update ready for `mtdb u -a` at "
+            + f'{format_path(update_path + date + ".mtdb")}')
         # output new database and new list of omes
 
     return primaryDB()
@@ -2175,6 +2124,7 @@ def main():
     )
     run_args.add_argument("-c", "--cpu", type=int, default=1)
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     args_dict = {
         "Primary MTDB": primaryDB(verbose=False),

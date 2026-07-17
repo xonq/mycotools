@@ -2,15 +2,18 @@
 
 # NEED to arrive at a consensus for protein and transcript IDs
 
+import logging
 import re
 import sys
 import copy
 import argparse
 from collections import defaultdict
 from mycotools.lib.biotools import gff2list, list2gff, gff2Comps, gff3Comps
-from mycotools.lib.kontools import format_path, eprint, vprint
+from mycotools.lib.kontools import format_path, setup_logging
 from mycotools.utils.gtf2gff3 import add_genes, remove_start_stop
 from mycotools.utils.curGFF3 import rename_and_organize
+
+logger = logging.getLogger(__name__)
 
 
 def gff2gff3(gff_list, ome, jgi_ome):
@@ -236,14 +239,9 @@ def main(gff_list, ome, jgi_ome, safe=True, verbose=True):
         gff_list, safe=safe, comps=comps, gene_prefix=gene_prefix
     )
     if failed:
-        vprint(str(len(failed)) + "\tgenes failed", v=verbose, e=True, flush=True)
+        logger.debug(str(len(failed)) + "genes failed")
     if flagged:
-        vprint(
-            str(len(flagged)) + "\tgene coordinates from exons",
-            v=verbose,
-            e=True,
-            flush=True,
-        )
+        logger.debug(str(len(flagged)) + "gene coordinates from exons")
     pregff3 = gff2gff3(gff_prep, ome, jgi_ome)
     gff3 = resolve_alternate_splicing(pregff3)
     gff3 = rename_and_organize(gff3)
@@ -253,11 +251,11 @@ def main(gff_list, ome, jgi_ome, safe=True, verbose=True):
             err_name.append(err.upper())
             if verbose:
                 if err == "ob":
-                    eprint("ERROR: genes with out of bounds coordinates", flush=True)
-                    eprint(",".join(err_list), flush=True)
+                    logger.error("genes with out of bounds coordinates")
+                    logger.info(",".join(err_list))
                 elif err == "nr":
-                    eprint("ERROR: missing RNA", flush=True)
-                    eprint(",".join(err_list), flush=True)
+                    logger.error("missing RNA")
+                    logger.info(",".join(err_list))
 
     return gff3, errors
 
@@ -275,9 +273,10 @@ def cli():
         help="Fail genes w/o CDS sequences that lack start or stop codons",
     )
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     gff_list = gff2list(format_path(args.input))
-    eprint(args.ome + "\t" + args.input, flush=True)
+    logger.info(args.ome + "" + args.input)
     gff3, errors = main(gff_list, args.ome, args.jgi, args.fail)
     print(list2gff(gff3), flush=True)
 

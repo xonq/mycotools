@@ -4,6 +4,7 @@
 # NEED to convert to datasets
 # NEED to consider refseq genomes with annotations when genbank doesn't have them
 
+import logging
 import os
 import re
 import sys
@@ -26,11 +27,13 @@ from mycotools.lib.kontools import (
     outro,
     format_path,
     prep_output,
-    eprint,
-    vprint,
     findExecs,
+    setup_logging,
 )
 from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def ncbidb2df(data, stdin=False):
@@ -58,20 +61,20 @@ def prepare_folders(output_path, gff, prot, assem, transcript):
 
     file_types = []
     if assem:
-        if not os.path.exists(output_path + "fna"):
-            os.mkdir(output_path + "fna")
+        if not Path(output_path + "fna").exists():
+            Path(output_path + "fna").mkdir()
         file_types.append("fna")
     if gff:
-        if not os.path.exists(output_path + "gff3"):
-            os.mkdir(output_path + "gff3")
+        if not Path(output_path + "gff3").exists():
+            Path(output_path + "gff3").mkdir()
         file_types.append("gff3")
     if prot:
-        if not os.path.exists(output_path + "faa"):
-            os.mkdir(output_path + "faa")
+        if not Path(output_path + "faa").exists():
+            Path(output_path + "faa").mkdir()
         file_types.append("faa")
     if transcript:
-        if not os.path.exists(output_path + "transcript"):
-            os.mkdir(output_path + "transcript")
+        if not Path(output_path + "transcript").exists():
+            Path(output_path + "transcript").mkdir()
         file_types.append("transcript")
 
     return file_types
@@ -80,7 +83,7 @@ def prepare_folders(output_path, gff, prot, assem, transcript):
 def compile_log(output_path, remove=False):
 
     acc2log = {}
-    if not os.path.isfile(output_path + "ncbiDwnld.fallback.log"):
+    if not Path(output_path + "ncbiDwnld.fallback.log").is_file():
         with open(output_path + "ncbiDwnld.fallback.log", "w") as out:
             out.write(
                 "#ome\tassembly_acc\tassembly\tproteome\tgff3\ttranscript\t"
@@ -137,7 +140,7 @@ def esearch_ncbi(accession, column, database="assembly"):
             time.sleep(1)
             esc_count += 1
     else:
-        print("\tERROR:", accession, "failed to search NCBI")
+        logger.error("%s %s %s", "\tERROR:", accession, "failed to search NCBI")
         return None
     return genome_ids
 
@@ -234,7 +237,7 @@ def collect_ftps(
         if not genome_id:  # No IDs retrieved
             if "ome" in row.keys():
                 accession = row["ome"]
-            eprint(spacer + "\t" + accession + " failed to find genome ID", flush=True)
+            logger.info(spacer + "" + accession + " failed to find genome ID")
             try:
                 failed.append([accession, datetime.strftime(row["version"], "%Y%m%d")])
             except TypeError:  # if the row can't be formatted as a date
@@ -305,10 +308,7 @@ def collect_ftps(
             ftp_path = str(record_info["FtpPath_GenBank"])
 
             if not ftp_path:
-                eprint(
-                    spacer + "\t" + new_acc + " failed to return any FTP path",
-                    flush=True,
-                )
+                logger.info(spacer + "" + new_acc + " failed to return any FTP path")
                 try:
                     failed.append(
                         [accession, datetime.strftime(row["version"], "%Y%m%d")]
@@ -319,7 +319,7 @@ def collect_ftps(
 
             esc_count = 0
             ass_md5, gff_md5, trans_md5, prot_md5, md5s = "", "", "", "", {}
-            basename = os.path.basename(ftp_path)
+            basename = Path(ftp_path).name
 
             dwnld = 0
             for attempt in range(3):
@@ -357,7 +357,7 @@ def collect_ftps(
                         #                        data = line.rstrip().split()
                         if data and len(data) == 2:
                             try:
-                                md5s[ftp_path + "/" + os.path.basename(data[1])] = data[
+                                md5s[ftp_path + "/" + Path(data[1]).name] = data[
                                     0
                                 ]
                             except IndexError:  # 404 error or something else
@@ -366,7 +366,7 @@ def collect_ftps(
             else:
                 md5s = {}
 
-            tranname = os.path.basename(ftp_path.replace("/GCA", "/GCF"))
+            tranname = Path(ftp_path.replace("/GCA", "/GCF")).name
             #          tranname = os.path.basename(ftp_path)
             assembly = ftp_path + "/" + basename + "_genomic.fna.gz"
             if assembly in md5s:
@@ -469,17 +469,17 @@ def download_files(
         ftp_link = acc_prots[file_type]
         dwnlds[file_type] = -1
         if file_type == "fna":
-            file_path = output_dir + "fna/" + os.path.basename(acc_prots[file_type])
+            file_path = output_dir + "fna/" + Path(acc_prots[file_type]).name
         elif file_type == "gff3":
-            file_path = output_dir + "gff3/" + os.path.basename(acc_prots[file_type])
+            file_path = output_dir + "gff3/" + Path(acc_prots[file_type]).name
         elif file_type == "faa":
-            file_path = output_dir + "faa/" + os.path.basename(acc_prots[file_type])
+            file_path = output_dir + "faa/" + Path(acc_prots[file_type]).name
         elif file_type == "transcript":
             file_path = (
-                output_dir + "transcript/" + os.path.basename(acc_prots[file_type])
+                output_dir + "transcript/" + Path(acc_prots[file_type]).name
             )
 
-        if os.path.isfile(file_path):
+        if Path(file_path).is_file():
             count += 1
             md5_cmd = subprocess.run(
                 ["md5sum", file_path], stdout=subprocess.PIPE
@@ -489,13 +489,11 @@ def download_files(
             md5 = md5_find[0]
 
             if md5 == acc_prots[file_type + "_md5"]:
-                eprint(
-                    f"{spacer}\t{file_type}: {os.path.basename(file_path)}", flush=True
-                )
+                logger.info(f"{spacer}\t{file_type}: {Path(file_path).name}")
                 dwnlds[file_type] = 0
                 continue
-        elif os.path.isfile(file_path[:-3]):
-            eprint(f"{spacer}\t{file_type}: {os.path.basename(file_path)}", flush=True)
+        elif Path(file_path[:-3]).is_file():
+            logger.info(f"{spacer}\t{file_type}: {Path(file_path).name}")
             dwnlds[file_type] = 0
             continue
 
@@ -511,14 +509,14 @@ def download_files(
                 stderr=subprocess.PIPE,
             )
             if not dwnld:
-                os.rename(file_path + ".tmp", file_path)
+                Path(file_path + ".tmp").rename(file_path)
                 break
             else:
                 time.sleep(1)
                 count = 0
 
         if dwnld:
-            eprint(f"{spacer}\t\tERROR: {file_type} failed", flush=True)
+            logger.error(f"{spacer}\t\tERROR: {file_type} failed")
             dwnlds[file_type] = 69
             acc_prots[file_type] = ""
             log_editor(
@@ -551,19 +549,19 @@ def download_files(
                 break
             continue
 
-        if not os.path.isfile(file_path):
+        if not Path(file_path).is_file():
             dwnlds[file_type] = 1
-            eprint(f"{spacer}\t\tERROR: {file_type} missing", flush=True)
+            logger.error(f"{spacer}\t\tERROR: {file_type} missing")
             if remove and file_type in {"fna", "gff3"}:
                 break
         else:
             dwnlds[file_type] = 0
-            if os.stat(file_path).st_size < 150:
-                eprint(f"{spacer}\t{file_type}: ERROR, file too small", flush=True)
+            if Path(file_path).stat().st_size < 150:
+                logger.error(f"{spacer}\t{file_type}: ERROR, file too small")
                 dwnlds[file_type] = 420
                 if remove and file_type in {"fna", "gff3"}:
                     break
-        eprint(f"{spacer}\t{file_type}: {os.path.basename(file_path)}", flush=True)
+        logger.info(f"{spacer}\t{file_type}: {Path(file_path).name}")
 
     return dwnlds, count
 
@@ -599,8 +597,8 @@ def dwnld_mngr_no_MD5(
 ):
     run, fail = False, []
     for file_type in file_types:
-        file_path = output_path + file_type + "/" + os.path.basename(data[file_type])
-        if not os.path.isfile(file_path):
+        file_path = output_path + file_type + "/" + Path(data[file_type]).name
+        if not Path(file_path).is_file():
             run = True
             break
 
@@ -645,7 +643,7 @@ def main(
     transcript=False,
     ncbi_df=False,
     remove=False,
-    output_path=os.getcwd(),
+    output_path=str(Path.cwd()),
     verbose=False,
     column="assembly_acc",
     ncbi_column="Assembly",
@@ -659,7 +657,7 @@ def main(
     acc2log = compile_log(output_path, remove)
 
     # check if ncbi_df is a dataframe, and import if not
-    if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
+    if not isinstance(ncbi_df, pd.DataFrame) and Path(ncbi_df).is_file():
         ncbi_df = ncbidb2df(ncbi_df)
     if len(ncbi_df.index) == 0:
         ncbi_df = pd.DataFrame({i: [v] for i, v in enumerate(list(ncbi_df.keys()))})
@@ -673,7 +671,7 @@ def main(
 
     ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
     # preserve the original column, but index ncbi_df on it as well
-    vprint("\n" + spacer + "Assembling NCBI ftp directories", v=verbose, flush=True)
+    logger.debug("" + spacer + "Assembling NCBI ftp directories")
     acc2log, failed, ncbi_df = collect_ftps(
         ncbi_df,
         acc2log,
@@ -694,13 +692,13 @@ def main(
         }
     new_df = pd.DataFrame()
 
-    vprint(f"\n{spacer}Downloading {len(acc2log)} NCBI files", v=verbose, flush=True)
+    logger.debug(f"{spacer}Downloading {len(acc2log)} NCBI files")
     count = 0
     if "strain" not in ncbi_df.columns:
         ncbi_df["strain"] = ""
     if check_MD5:
         for acc, data in acc2log.items():
-            eprint(spacer + "\t" + str(acc), flush=True)
+            logger.info(spacer + "" + str(acc))
             if data:
                 fail, count = dwnld_mngr(
                     ncbi_df,
@@ -717,13 +715,13 @@ def main(
                     failed.append(fail)
                 else:
                     ncbi_df.at[acc, "assemblyPath"] = (
-                        output_path + "fna/" + os.path.basename(acc2log[acc]["fna"])
+                        output_path + "fna/" + Path(acc2log[acc]["fna"]).name
                     )
                     ncbi_df.at[acc, "faa"] = (
-                        output_path + "faa/" + os.path.basename(acc2log[acc]["faa"])
+                        output_path + "faa/" + Path(acc2log[acc]["faa"]).name
                     )
                     ncbi_df.at[acc, "gffPath"] = (
-                        output_path + "gff3/" + os.path.basename(acc2log[acc]["gff3"])
+                        output_path + "gff3/" + Path(acc2log[acc]["gff3"]).name
                     )
                     ncbi_df.at[acc, "genus"] = acc2log[acc]["genus"]
                     ncbi_df.at[acc, "species"] = acc2log[acc]["species"]
@@ -741,7 +739,7 @@ def main(
     else:  # there is no checking md5, this is for efficient, so make it
         # efficient by avoiding conditional expressions
         for acc, data in acc2log.items():
-            eprint(spacer + "\t" + str(acc), flush=True)
+            logger.info(spacer + "" + str(acc))
             fail, count = dwnld_mngr_no_MD5(
                 ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
             )
@@ -753,7 +751,7 @@ def main(
                         output_path
                         + file_type
                         + "/"
-                        + os.path.basename(data[file_type])
+                        + Path(data[file_type]).name
                     )
                 new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
 
@@ -774,7 +772,7 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
         records = Entrez.read(handle, validate=False)
         for record in records:
             srr = re.search(r'Run acc="(S\w+\d+)"', record["Runs"])[1]
-            print("\t\t" + srr, flush=True)
+            logger.debug("" + srr)
             cmd, count = 1, 0
             if pe:
                 while cmd and count < 3:
@@ -790,7 +788,7 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                     cmd = subprocess.call(
                         [fastqdump, "--split-3", "--gzip", srr], stdout=subprocess.PIPE
                     )
-                    if os.path.isfile(srr + "_1.fastq"):
+                    if Path(srr + "_1.fastq").is_file():
                         #                  if os.path.isfile(srr + '_1.fastq'):
                         #                        cmd = subprocess.call(['gzip', f'{srr}_1.fastq'])
                         #                       cmd = subprocess.call(['gzip', f'{srr}_2.fastq'])
@@ -802,9 +800,7 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                         )
                     else:
                         #                        cmd = subprocess.call(['gzip', f'{srr}.fastq'])
-                        print(
-                            "\t\t\tWARNING: file failed or not paired-end", flush=True
-                        )
+                        logger.warning("file failed or not paired-end")
             else:
                 while cmd and count < 3:
                     count += 1
@@ -820,20 +816,20 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                     if cmd:
                         continue
                     #                    cmd = subprocess.call(['gzip', f'{srr}.fastq'])
-                    if os.path.isfile(srr + ".fastq.gz"):
+                    if Path(srr + ".fastq.gz").is_file():
                         shutil.move(
                             srr + ".fastq.gz", assembly_acc + "_" + srr + ".fq.gz"
                         )
                     else:
-                        print("\t\t\tERROR: file failed", flush=True)
+                        logger.error("file failed")
 
 
-def goSRA(df, output=os.getcwd() + "/", pe=True):
+def goSRA(df, output=str(Path.cwd()) + "/", pe=True):
 
     print()
     sra_dir = output + "sra/"
-    if not os.path.isdir(sra_dir):
-        os.mkdir(sra_dir)
+    if not Path(sra_dir).is_dir():
+        Path(sra_dir).mkdir()
     os.chdir(sra_dir)
     fastqdump = findExecs("fastq-dump", exit=set("fastq-dump"))
     count = 0
@@ -844,7 +840,7 @@ def goSRA(df, output=os.getcwd() + "/", pe=True):
         row_key = "assembly_acc"
 
     for i, row in df.iterrows():
-        print("\t" + row[row_key], flush=True)
+        logger.debug("" + row[row_key])
         get_SRA(row[row_key], fastqdump[0])
         count += 1
         if count >= 10:
@@ -888,6 +884,7 @@ def cli():
     parser.add_argument("-e", "--email", help="NCBI email")
     parser.add_argument("--api", help="NCBI API key for high query rate")
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.email:
         ncbi_email = args.email
@@ -904,7 +901,7 @@ def cli():
             Entrez.api_key = ncbi_api
 
     if not args.output:
-        output = os.getcwd() + "/"
+        output = str(Path.cwd()) + "/"
     else:
         output = format_path(args.output)
 
@@ -924,14 +921,14 @@ def cli():
     #      sys.exit( 37 )
 
     if args.sra:
-        if os.path.isfile(format_path(args.input)):
+        if Path(format_path(args.input)).is_file():
             goSRA(
                 pd.read_csv(format_path(args.input), sep="\t"), output, pe=args.paired
             )
         else:
             goSRA(pd.DataFrame({"sra": [args.input.rstrip()]}), output, pe=args.paired)
     else:
-        if os.path.isfile(format_path(args.input)):
+        if Path(format_path(args.input)).is_file():
             ncbi_df = pd.read_csv(args.input, sep="\t", header=None)
             if not args.column:
                 if "assembly_acc" in ncbi_df.keys():

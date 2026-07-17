@@ -7,15 +7,18 @@ Zachary Konkel
 
 # NEED a protein_id import option
 
-import os
+import logging
 import re
 import sys
 import argparse
 from collections import defaultdict
-from mycotools.lib.kontools import sys_start, format_path, eprint, mkOutput
+from mycotools.lib.kontools import sys_start, format_path, mkOutput, setup_logging
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps, gff2Comps, gtfComps
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.utils.curGFF3 import rename_and_organize
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def determine_version(toadd_gff, ome=None):
@@ -32,7 +35,7 @@ def determine_version(toadd_gff, ome=None):
             from mycotools.utils.gtf2gff3 import main as curAnn
 
             if not ome:
-                eprint("\nOme required for gtf input", flush=True)
+                logger.info("Ome required for gtf input")
                 sys.exit(1)
             new_gff = curAnn(toadd_gff, ome)[0]
             return new_gff, gff3Comps()
@@ -100,7 +103,7 @@ def parse_toadd(toadd_gff, comps, ome, mtdb_acc=0):
         score, phase = gene["score"], gene["phase"]
         gene_acc = ome + "_manual" + str(mtdb_acc)
         if len(gene_dict["rna"]) > 1:
-            eprint("\nAlternately spliced loci currently not supported")
+            logger.info("Alternately spliced loci currently not supported")
             sys.exit(2)
 
         gene_dict["cds"] = sorted(gene_dict["cds"], key=lambda x: x[0])
@@ -229,7 +232,7 @@ def add_to_mtdb_gff(curadd_gff, addto_gff, ome, replace=False):
                                 ref_acc
                             ] = new_acc  # what about multiple gene
                             # updates? e.g. fusions? this would delete
-                            eprint(ref_acc + "\t->\t" + new_acc, flush=True)
+                            logger.info(ref_acc + "->\t" + new_acc)
 
         out_gff = []
         for entry in addto_gff:
@@ -262,16 +265,16 @@ def prep_mtdb_update(new_gff, ome, db):
     from mycotools.predb2mtdb import main as predb2mtdb
     from mycotools.lib.dbtools import mtdb, primaryDB
 
-    out_dir = mkOutput(format_path(os.getcwd()), "add2gff")
+    out_dir = mkOutput(format_path(str(Path.cwd())), "add2gff")
     wrk_dir = out_dir + "working/"
-    if not os.path.isdir(wrk_dir):
-        os.mkdir(out_dir + "working/")
-    if not os.path.isdir(wrk_dir + "fna/"):
-        os.mkdir(out_dir + "working/fna/")
-    if not os.path.isdir(wrk_dir + "gff3/"):
-        os.mkdir(out_dir + "working/gff3/")
-    if not os.path.isdir(wrk_dir + "faa/"):
-        os.mkdir(out_dir + "working/faa/")
+    if not Path(wrk_dir).is_dir():
+        Path(out_dir + "working/").mkdir()
+    if not Path(wrk_dir + "fna/").is_dir():
+        Path(out_dir + "working/fna/").mkdir()
+    if not Path(wrk_dir + "gff3/").is_dir():
+        Path(out_dir + "working/gff3/").mkdir()
+    if not Path(wrk_dir + "faa/").is_dir():
+        Path(out_dir + "working/faa/").mkdir()
 
     new_gff_path = out_dir + "working/gff3/" + ome + ".new.gff3"
     with open(new_gff_path, "w") as out:
@@ -298,7 +301,7 @@ def prep_mtdb_update(new_gff, ome, db):
 
     update_db_path = out_dir + "add2gff.mtdb"
     count = 1
-    while os.path.isfile(update_db_path):
+    while Path(update_db_path).is_file():
         update_db_path = re.sub(r"_\d+$", "", update_db_path)
         update_db_path += f"_{count}"
         count += 1
@@ -334,6 +337,7 @@ def cli():
     )
     parser.add_argument("-d", "--mtdb", default=primaryDB())
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     #    usage = 'Add gff to an existing mtdb gff.\n' \
     #         + 'add2gff.py <TOADD_GFF> <ADDTO_GFF> <REPLACE ACCS [y|N]>'
@@ -342,10 +346,10 @@ def cli():
 
     if not args.addto:
         if args.update:
-            eprint("\nERROR: -u requires -a", flush=True)
+            logger.error("-u requires -a")
             sys.exit(7)
         if not args.ome:
-            eprint("\nERROR: need -a or -o", flush=True)
+            logger.error("need -a or -o")
             sys.exit(5)
         else:
             ome = args.ome
@@ -353,14 +357,14 @@ def cli():
     else:
         ome = None
         addto_file = format_path(args.addto)
-        if not os.path.isfile(addto_file):
-            eprint("\nERROR: -a does not exist", flush=True)
+        if not Path(addto_file).is_file():
+            logger.error("-a does not exist")
             sys.exit(6)
         addto_gff = gff2list(addto_file)
 
     toadd_file = format_path(args.input)
-    if not os.path.isfile(toadd_file):
-        eprint("\nERROR: -i does not exist", flush=True)
+    if not Path(toadd_file).is_file():
+        logger.error("-i does not exist")
         sys.exit(7)
 
     toadd_gff = import_toadd_gff(toadd_file)

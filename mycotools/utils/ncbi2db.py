@@ -7,6 +7,7 @@
 #   NEED TO EDIT REDUNDANCY CHECK TO REFERENCE QUERIED ASSEMBLY ACCESSIONS FROM
 #   BIOSAMPLES
 
+import logging
 import os
 import re
 import sys
@@ -16,10 +17,12 @@ import subprocess
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from mycotools.lib.kontools import intro, outro, eprint
+from mycotools.lib.kontools import intro, outro
 from mycotools.lib.dbtools import db2df, df2db, primaryDB
 from mycotools.ncbiDwnld import main as ncbi_dwnld
 from mycotools.predb2mtdb import main as predb2mtdb
+
+logger = logging.getLogger(__name__)
 
 
 def redundancy_check(db, ncbi_df, ass_acc, duplicates={}):
@@ -157,7 +160,7 @@ def main(
             ncbi_df = ncbi_df.drop(i)
         ncbi_df = ncbi_df.reset_index()
 
-    print(spacer + "Redundancy check", flush=True)
+    logger.debug(spacer + "Redundancy check")
     update_check = {}
     if ref_db is not None:
         if len(ref_db) > 0:
@@ -174,12 +177,10 @@ def main(
             update_check = {i[-2]: i for i in updates if i[0]}
             # dict(update_check) = {assembly_accNEW: [organism, ref organism,
             # old_assembly_acc]}
-            print(
-                spacer + "\t" + str(len(ncbi_df)) + " genomes to assimilate", flush=True
-            )
+            logger.debug(spacer + "" + str(len(ncbi_df)) + " genomes to assimilate")
 
     if len(ncbi_df) > 0:
-        print(spacer + "Initializing NCBI acquisition", flush=True)
+        logger.debug(spacer + "Initializing NCBI acquisition")
         if fallback:
             from mycotools.ncbi_dwnld_fallback import main as ncbi_dwnld_fallback
 
@@ -210,10 +211,7 @@ def main(
                 spacer="\t\t\t",
             )
 
-        print(
-            spacer + "\t" + str(len(ncbi_df)) + " entries with assemblies and gffs",
-            flush=True,
-        )
+        logger.debug(spacer + "" + str(len(ncbi_df)) + " entries with assemblies and gffs")
         ncbi_df = ncbi_df.rename(
             columns={
                 "Release Date": "published",

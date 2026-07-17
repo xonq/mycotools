@@ -6,7 +6,6 @@ import re
 import sys
 from collections import defaultdict
 from itertools import chain
-from mycotools.lib.kontools import eprint
 
 aa_weights = {
     "A": 89.1,

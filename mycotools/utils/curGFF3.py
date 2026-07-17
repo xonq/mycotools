@@ -16,14 +16,16 @@
 # RNAs with no parent
 # CDS/exons with no parent
 
-import os
+import logging
 import re
 import sys
 import copy
 from collections import defaultdict
 from itertools import combinations, chain
-from mycotools.lib.kontools import format_path, sys_start, eprint
+from mycotools.lib.kontools import format_path, sys_start
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
+
+logger = logging.getLogger(__name__)
 
 
 class RNAError(Exception):
@@ -1018,7 +1020,7 @@ def main(gff_path, ome, cur_seqids=False):
     typ = True
 
     if not typ:
-        eprint("\tERROR: type unknown ", flush=True)
+        logger.error("type unknown ")
         return None
 
     new_gff = curGff3(gff, ome, cur_seqids)

@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import logging
 import os
 import re
 import sys
@@ -13,17 +14,20 @@ import pandas as pd
 import numpy as np
 from io import StringIO
 from mycotools.predb2mtdb import main as predb2mtdb
-from mycotools.lib.kontools import intro, outro, eprint
+from mycotools.lib.kontools import intro, outro, setup_logging
 from mycotools.lib.dbtools import db2df, df2db, readLog, log_editor
 from mycotools.jgiDwnld import jgi_login as jgi_login
 from mycotools.jgiDwnld import retrieve_xml as retrieve_xml
 from mycotools.jgiDwnld import jgi_dwnld as jgi_dwnld
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def compileLog(log_path):
 
     log = {}
-    if not os.path.isfile(log_path):
+    if not Path(log_path).is_file():
         with open(log_path, "w") as out:
             out.write("#assembly_acc\tfna\tgff3\tfaa")
     else:
@@ -158,22 +162,22 @@ def runjgi_dwnld(
 
     ran_dwnld = False
     if ome not in ome_set:
-        print(spacer + "\t" + ome + ": " + jgi_df["name"][i], flush=True)
+        logger.debug(spacer + "" + ome + ": " + jgi_df["name"][i])
         for typ in dwnlds:
             if log[ome][typ] == "error":
                 if not rerun:
-                    print(spacer + "\t\t" + typ + ": ERROR", flush=True)
+                    logger.debug(spacer + "" + typ + ": ERROR")
                     continue
             check, preexisting, new_typ, ran_dwnld, org_name = jgi_dwnld(
                 ome, typ, output, masked=masked
             )
             if not isinstance(check, int):
                 jgi_df.at[i, new_typ + "_path"] = check
-                base_check = os.path.basename(os.path.abspath(check))
-                print(spacer + "\t\t" + new_typ + ": " + str(base_check), flush=True)
+                base_check = Path(os.path.abspath(check)).name
+                logger.debug(spacer + "" + new_typ + ": " + str(base_check))
                 log[ome][typ] = base_check
             else:
-                print(spacer + "\t\t" + new_typ + ": ERROR", flush=True)
+                logger.debug(spacer + "" + new_typ + ": ERROR")
                 log[ome][typ] = "error"
                 if typ in {"gff3", "fna"}:
                     log_editor(
@@ -257,7 +261,7 @@ def main(
         ome_col = "portal"
         name_col = "name"
     else:
-        print(spacer + "ERROR: invalid MycoCosm tsv headers", flush=True)
+        logger.debug(spacer + "invalid MycoCosm tsv headers")
         sys.exit(3)
 
     toDel = []
@@ -281,7 +285,7 @@ def main(
             jgi_df = jgi_df.drop(failed)
         jgi_df = jgi_df.reset_index()
 
-    print(spacer + "Redundancy check", flush=True)
+    logger.debug(spacer + "Redundancy check")
     if isinstance(ref_db, pd.DataFrame):
         ref_db["index"] = ref_db["assembly_acc"].copy()
         ref_db = ref_db.set_index("index")
@@ -298,17 +302,17 @@ def main(
         else:
             updates.to_csv(f"{output}/jgiUpdates.tsv", sep="\t")
         #        update_check = {i[-1]: i[0:3] for i in updates if i[0]}
-        print(spacer + "\t" + str(len(jgi_df)) + " genomes to assimilate", flush=True)
+        logger.debug(spacer + "" + str(len(jgi_df)) + " genomes to assimilate")
     else:
         new_ref_db, updates = None, {}
 
-    print(spacer + "Logging into JGI", flush=True)
+    logger.debug(spacer + "Logging into JGI")
     jgi_login(user, pwd)
 
-    if not os.path.exists(output + "/xml"):
-        os.mkdir(output + "/xml")
+    if not Path(output + "/xml").exists():
+        Path(output + "/xml").mkdir()
 
-    print(spacer + "Retrieving `xml` directories", flush=True)
+    logger.debug(spacer + "Retrieving `xml` directories")
     ome_set, failed, count = set(), [], 0
     for i, row in jgi_df.iterrows():
         error_check, attempt = True, 0
@@ -323,7 +327,7 @@ def main(
             elif error_check != -1:
                 time.sleep(0.3)
         if error_check != -1:
-            eprint(f"{spacer}\t{row[ome_col]} failed to retrieve XML", flush=True)
+            logger.info(f"{spacer}\t{row[ome_col]} failed to retrieve XML")
             ome_set.add(row[ome_col])
 
     log_path = output + "/jgi2db.log"
@@ -339,7 +343,7 @@ def main(
                 jgi_df = jgi_df.drop(drop_index)
                 ome_set.add(ome)
 
-    print(spacer + "Downloading JGI data", flush=True)
+    logger.debug(spacer + "Downloading JGI data")
     dwnlds = []
     if assembly:
         dwnlds.append("fna")
@@ -349,14 +353,14 @@ def main(
         dwnlds.append("faa")
 
     for typ in dwnlds:
-        if not os.path.isdir(output + "/" + typ):
-            os.mkdir(output + "/" + typ)
+        if not Path(output + "/" + typ).is_dir():
+            Path(output + "/" + typ).mkdir()
         if typ == "gff3":
-            if not os.path.isdir(output + "/gff3"):
-                os.mkdir(output + "/gff3")
+            if not Path(output + "/gff3").is_dir():
+                Path(output + "/gff3").mkdir()
 
     if all(x in log for x in list(jgi_df[ome_col])) and not rerun:
-        print(spacer + "\tAll downloaded, rerun off", flush=True)
+        logger.debug(spacer + "All downloaded, rerun off")
         jgi_df = jgi_df.set_index(ome_col)
         jgi_df = log2df(jgi_df, log, output)
         jgi_df = jgi_df.reset_index()
@@ -384,10 +388,10 @@ def main(
                 spacer,
             )
 
-    if os.path.exists("cookies"):
-        os.remove("cookies")
-    if os.path.exists(os.path.expanduser("~/.nullJGIdwnld")):
-        os.remove(os.path.expanduser("~/.nullJGIdwnld"))
+    if Path("cookies").exists():
+        Path("cookies").unlink()
+    if Path(str(Path("~/.nullJGIdwnld").expanduser())).exists():
+        Path(str(Path("~/.nullJGIdwnld").expanduser())).unlink()
 
     jgi_df = jgi_df.rename(
         columns={
@@ -486,6 +490,7 @@ def cli():
     )
 
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     args_dict = {
         "Preexisting db": args.database,
@@ -501,8 +506,8 @@ def cli():
         output = os.path.abspath(args.output)
     else:
         output = start_time.strftime("%Y%m%d") + "_jgi2db"
-    if not os.path.isdir(output):
-        os.mkdir(output)
+    if not Path(output).is_dir():
+        Path(output).mkdir()
 
     if args.login:
         with open(args.login, "r") as raw:
@@ -520,12 +525,10 @@ def cli():
     jgi_df = main(args.mycocosm, refdb, output)
 
     df2db(jgi_df, output + "/new.db")
-    print(
-        "\nSuccess! "
-        + str(len(jgi_df), flush=True)
+    logger.debug("Success! "
+        + str(len(jgi_df))
         + " added to database\n \
-            Run updateDB to confirm and finish update."
-    )
+            Run updateDB to confirm and finish update.")
 
     outro(start_time)
 

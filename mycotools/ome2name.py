@@ -1,10 +1,13 @@
 #! /usr/bin/env python3
 
-import os
 import re
 import sys
-from mycotools.lib.kontools import format_path, sys_start, eprint
+import logging
+from mycotools.lib.kontools import format_path, sys_start, setup_logging
 from mycotools.lib.dbtools import primaryDB, mtdb
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def parse_args(args):
@@ -32,7 +35,7 @@ def parse_args(args):
         if tax:
             rank = arg.lower()
             if rank not in valid_ranks:
-                eprint("\nERROR: --taxonomy not in " + str(valid_ranks), flush=True)
+                logger.error("--taxonomy not in " + str(valid_ranks))
                 sys.exit(10)
             tax = False
         elif "-" in arg:
@@ -40,11 +43,11 @@ def parse_args(args):
                 tax = True
                 continue
             else:
-                eprint("\nERROR: invalid argument `-`", flush=True)
+                logger.error("invalid argument `-`")
                 sys.exit(11)
-        elif os.path.isfile(format_path(arg)):
+        elif Path(format_path(arg)).is_file():
             if not go_on:
-                eprint("\nERROR: multiple files", flush=True)
+                logger.error("multiple files")
             db = mtdb(arg)
             go_on = False
             continue
@@ -157,6 +160,7 @@ def main(
 
 def cli():
     """Command line entry point"""
+    setup_logging()
     usage = (
         "USAGE: ome2name <INPUTFILE> | ome2name.py <INPUTFILE>"
         + " [.mtdb] asvg*&\nDEFAULTS: master db, see script for default"

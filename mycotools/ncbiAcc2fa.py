@@ -1,11 +1,14 @@
 #! /usr/bin/env python3
 
-import os
 import sys
 import time
+import logging
 import getpass
 from Bio import Entrez
-from mycotools.lib.kontools import file2list, eprint, sys_start
+from mycotools.lib.kontools import file2list, sys_start, setup_logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def entrez_login():
@@ -19,7 +22,7 @@ def entrez_login():
             Entrez.api_key = api
             limit = 10
 
-    eprint(flush=True)
+    print(flush=True)
     return limit
 
 
@@ -32,7 +35,7 @@ def grab_accs(accs, limit):
         if count >= limit:
             count = 0
             time.sleep(1)
-        eprint(acc, flush=True)
+        logger.info(acc)
 
         # iteratively query until successful
         attempt = 0
@@ -62,11 +65,12 @@ def cli():
     )
 
     # parse the arguments
+    setup_logging()
     args = sys_start(sys.argv, usage, 2)
 
     if len(args) <= 3:
         # import a file of accessions
-        if os.path.isfile(args[1]):
+        if Path(args[1]).is_file():
             if len(args) == 3:
                 accs = file2list(args[1], sep="\t", col=args[2])
             else:
@@ -78,7 +82,7 @@ def cli():
     limit = entrez_login()
     out_str = grab_accs(accs, limit)
 
-    eprint(flush=True)
+    print(flush=True)
     with open(args + ".retr.fa", "w") as out:
         out.write(out_str)
 

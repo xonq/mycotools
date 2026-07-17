@@ -10,10 +10,15 @@ Calculates basic genome statistics.
 import os
 import sys
 import copy
+import logging
 import multiprocessing as mp
 from mycotools.lib.dbtools import mtdb
 from mycotools.lib.biotools import fa2dict
-from mycotools.lib.kontools import format_path, eprint
+from mycotools.lib.kontools import format_path, setup_logging
+from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 def calcMask(contig_list):
@@ -141,7 +146,7 @@ def main(in_path, log_path=None, cpus=1, db=None):
         # parse the output file if it currently exists to avoid redundant runs
         prev_omes = {}
         if log_path:
-            if not os.path.isfile(log_path):
+            if not Path(log_path).is_file():
                 with open(log_path, "w") as log_open:
                     log_open.write(head)
             else:
@@ -176,7 +181,7 @@ def main(in_path, log_path=None, cpus=1, db=None):
             if res[1]:
                 calcs[res[0]] = "\t".join([str(x[1]) for x in res[1]])
             else:
-                eprint("\t\tERROR:\t" + ome, flush=True)
+                logger.error(ome)
 
         # sort the results by the ome code alphabetically
         calcs = {
@@ -202,9 +207,9 @@ def main(in_path, log_path=None, cpus=1, db=None):
         sortedContigs = sortContigs(in_path)
         calculations = n50l50(sortedContigs)
         if calculations:
-            stats[os.path.basename(os.path.abspath(in_path))] = n50l50(sortedContigs)
+            stats[Path(os.path.abspath(in_path)).name] = n50l50(sortedContigs)
         else:
-            eprint("\tERROR:\t" + in_path, flush=True)
+            logger.error(in_path)
 
         # print the stats to standard out, depending on if there are contigs
         # less than 1000 bp
@@ -223,6 +228,7 @@ def main(in_path, log_path=None, cpus=1, db=None):
 
 
 def cli():
+    setup_logging()
     usage = "\nUSAGE: assembly statistics\nAssembly `fasta` or mycotoolsDB, optional output file if using database\n"
     if {"-h", "--help"}.intersection(set(sys.argv)):
         print(usage, flush=True)

@@ -2,9 +2,13 @@
 
 import os
 import sys
+import logging
 import argparse
 from mycotools.lib.dbtools import loginCheck, primaryDB, mtdb, encrypt_pw
-from mycotools.lib.kontools import format_path, read_json, collect_files
+from mycotools.lib.kontools import format_path, read_json, collect_files, setup_logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def rm_outdated(omes, yes=False):
@@ -13,19 +17,19 @@ def rm_outdated(omes, yes=False):
     biofiles, to_del = [], []
     # compile the files
     biofiles.extend(
-        [f"{os.environ['MYCOGFF3']}/{x}" for x in os.listdir(os.environ["MYCOGFF3"])]
+        [f"{os.environ['MYCOGFF3']}/{x}" for x in [p.name for p in Path(os.environ["MYCOGFF3"]).iterdir()]]
     )
     biofiles.extend(
-        [f"{os.environ['MYCOFAA']}/{x}" for x in os.listdir(os.environ["MYCOFAA"])]
+        [f"{os.environ['MYCOFAA']}/{x}" for x in [p.name for p in Path(os.environ["MYCOFAA"]).iterdir()]]
     )
     biofiles.extend(
-        [f"{os.environ['MYCOFNA']}/{x}" for x in os.listdir(os.environ["MYCOFNA"])]
+        [f"{os.environ['MYCOFNA']}/{x}" for x in [p.name for p in Path(os.environ["MYCOFNA"]).iterdir()]]
     )
 
     # remove each biofile
     for i in biofiles:
         ome = None
-        ome_prep = os.path.basename(i)
+        ome_prep = Path(i).name
         if ome_prep.endswith(".gff3"):
             ome = ome_prep[:-5]
         elif ome_prep.endswith(".faa"):
@@ -44,7 +48,7 @@ def rm_outdated(omes, yes=False):
             data = input(f"\n{len(to_del)} omes to be deleted.\n" + "Continue [y/N]? ")
         if data.lower() in {"yes", "y"}:
             for i in to_del:
-                os.remove(i)
+                Path(i).unlink()
         else:
             raise KeyError("cache removal stopped")
 
@@ -65,7 +69,7 @@ def restrictions(
     for r, s, reason in restr_list:
         if s.lower() in {"ncbi", "jgi"} and r not in accs:
             restricted.append([r, s.lower(), str(reason)])
-            print(r, s, flush=True)
+            logger.info("%s %s", r, s)
 
     in_db = [x[0] for x in restricted if x[0] in db]
     while in_db:
@@ -101,6 +105,7 @@ def cli():
     )
     parser.add_argument("-y", "--yes", help="Answer yes", action="store_true")
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     db = mtdb(primaryDB()).set_index("assembly_acc")
 

@@ -1,9 +1,12 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
-from mycotools.lib.kontools import eprint, file2list
+from mycotools.lib.kontools import file2list
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def grabAccs(db_str):
@@ -35,10 +38,7 @@ def hmmExtract(accession, db_str):
             r"HMMER\d\/f \[.*?\]\nNAME +" + accession + r"[\s\S]*?\/\/", db_str
         )
         if not hmm_search:
-            eprint(
-                "\nERROR: " + accession + " does not exist or unexpected error\n",
-                flush=True,
-            )
+            logger.error("" + accession + " does not exist or unexpected error\n")
             sys.exit(2)
 
     hmm = hmm_search[0] + "\n"
@@ -49,7 +49,7 @@ def hmmExtract(accession, db_str):
 def main(hmm_db, accessions=False):
 
     if accessions:
-        if os.path.isfile(accessions):
+        if Path(accessions).is_file():
             accessions = file2list(accessions)
             hmm_str = ""
             for accession in accessions:
@@ -80,22 +80,22 @@ def cli():
         print(usage, flush=True)
         sys.exit(1)
 
-    if not os.path.isfile(sys.argv[1]):
-        eprint("\nERROR: Invalid `.hmm` database path", flush=True)
+    if not Path(sys.argv[1]).is_file():
+        logger.error("Invalid `.hmm` database path")
         sys.exit(2)
 
-    print("\nReading hmm database ...", flush=True)
+    logger.info("Reading hmm database ...")
     with open(sys.argv[1], "r") as raw_hmm_db:
         hmm_db = raw_hmm_db.read()
 
     if len(sys.argv) > 2:
         hmm_str = main(hmm_db, accessions=sys.argv[2])
-        print("\nWriting abstracted hmms ...", flush=True)
+        logger.info("Writing abstracted hmms ...")
         with open(sys.argv[2] + ".hmm", "w") as out:
             out.write(hmm_str)
     else:
-        if not os.path.isdir("hmm"):
-            os.mkdir("hmm")
+        if not Path("hmm").is_dir():
+            Path("hmm").mkdir()
         hmm_strs = main(hmm_db)
         for accession in hmm_strs:
             with open("hmm/" + accession + ".hmm", "w") as out:

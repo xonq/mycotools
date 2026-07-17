@@ -6,118 +6,21 @@
 import os
 import re
 import sys
-import copy
-import random
+import logging
 import argparse
-from collections import defaultdict
 from mycotools.lib.kontools import (
     file2list,
     intro,
     outro,
     format_path,
-    eprint,
+    setup_logging,
     mkOutput,
 )
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.db2files import mtdb_main as gen_full_mtdb
+from pathlib import Path
 
-# NEED to fix when same lineage multiple ranks, e.g. Tremellales sp. will be listed
-# as an order and as a genus
-
-
-def infer_rank(db, lineage):
-    """Identify the taxonomic rank associated with an inputted lineage of
-    interest"""
-    linlow, rank = lineage.lower(), None
-    for ome, row in db.items():
-        if linlow in set([x.lower() for x in row["taxonomy"].values()]):
-            rev_dict = {
-                k.lower(): v
-                for k, v in zip(row["taxonomy"].values(), row["taxonomy"].keys())
-            }
-            rank = rev_dict[lineage]
-
-    if not rank:
-        raise KeyError(f"no entry for {lineage}")
-
-    return rank
-
-
-def extract_unique(db, allowed=1, rank="species"):
-    """Extract unique rank from an MTDB"""
-    keys = copy.deepcopy(list(db.keys()))
-    random.shuffle(keys)
-    prep_db0 = {x: db[x] for x in keys}
-    prep_db1 = mtdb().set_index("ome")
-    if rank == "strain":
-        found = set()
-        for ome, row in prep_db0.items():
-            name = row["taxonomy"]["species"] + " " + row["strain"]
-            if name not in found:
-                prep_db1[ome] = row
-            found_prep = list(found)
-            found_prep.append(name)
-            found = set(found_prep)
-    else:
-        found = defaultdict(int)
-        for ome, row in prep_db0.items():
-            name = row["taxonomy"][rank]
-            found[name] += 1
-            if found[name] <= allowed:
-                prep_db1[ome] = row
-
-    return prep_db1
-
-
-def extract_tax(db, lineages):
-    """Extract specific taxonomic lineages of interest based on their rank"""
-    if isinstance(lineages, str):
-        lineages = [lineages]
-    lineages = set(x.lower() for x in lineages)
-    rank_dict = {k: infer_rank(db, k) for k in list(lineages)}
-    ranks = list(set(rank_dict.values()))
-
-    new_db = mtdb().set_index()
-    for ome in db:
-        for rank in ranks:
-            try:
-                if db[ome]["taxonomy"][rank].lower() in lineages:
-                    new_db[ome] = db[ome]
-            except KeyError:  # invalid rank key for row
-                pass  # probably should standardize tax jsons period
-
-    return new_db
-
-
-def extract_ome(db, omes, column="ome"):
-    """Extract a list of genome codes (omes) of interest"""
-    new_db = mtdb().set_index(column)
-    db = db.set_index(column)
-    for i in db:
-        if i in list(omes):
-            new_db[i] = db[i]
-    return new_db.set_index()
-
-
-def extract_source(db, source):
-    """Extract an MTDB with genomes from a particular source"""
-    return mtdb(
-        {
-            ome: row
-            for ome, row in db.items()
-            if row["source"].lower() == source.lower()
-        },
-        index="ome",
-    )
-
-
-def extract_pub(db):
-    """Extract only published and usable genomes"""
-    new_db = mtdb().set_index()
-    for ome, row in db.items():
-        if row["published"]:
-            new_db[ome] = row
-    return new_db
+logger = logging.getLogger(__name__)
 
 
 def main(
@@ -136,27 +39,27 @@ def main(
 
     db = db.set_index("ome")
     if x_number > 0:
-        db = extract_unique(db, x_number, rank=rank)
+        db = db.extract_unique(x_number, rank=rank)
 
     # extract each taxonomic entry based on the classification specified
     if lineage_list:
-        new_db = extract_tax(db, lineage_list)
+        new_db = db.extract_tax(lineage_list)
     # if an ome list is specified then open it, store each entry in a list and pull each ome
     elif omes_set:
-        new_db = extract_ome(db, omes_set)
+        new_db = db.extract_ome(omes_set)
     elif aa_set:
-        new_db = extract_ome(db, aa_set, "assembly_acc")
+        new_db = db.extract_ome(aa_set, "assembly_acc")
     # if none of these are specified then create a `new_db` variable to work for later
     else:
         new_db = db
 
     # if there is a source specified, extract it or the opposite
     if source:
-        new_db = extract_source(new_db, source)
+        new_db = new_db.extract_source(source)
 
     # if you want publisheds, then just pull those out
     if not nonpublished:
-        new_db = extract_pub(new_db)
+        new_db = new_db.extract_pub()
 
     if inverse:
         new_omes = set(new_db.keys())
@@ -171,9 +74,9 @@ def main(
         dbs = {}
         for lineage in lineages:
             if lineage:
-                dbs[lineage.lower()] = extract_tax(new_db, [lineage]).reset_index()
+                dbs[lineage.lower()] = new_db.extract_tax([lineage]).reset_index()
             else:
-                dbs["unclassified"] = extract_tax(new_db, [""]).reset_index()
+                dbs["unclassified"] = new_db.extract_tax([""]).reset_index()
         return dbs
     else:
         return new_db.reset_index()
@@ -238,27 +141,28 @@ def cli():
     out_opt.add_argument("-o", "--output")
 
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
     db_path = format_path(args.mtdb)
 
     if args.lineage or args.lineages:
-        eprint(
-            "\nWARNING: extracting taxonomy is subject to "
-            + "errors in NCBI's hierarchy\n"
+        logger.warning(
+            "extracting taxonomy is subject to "
+            + "errors in NCBI's hierarchy"
         )
 
     # these arguments require one another
     if args.by_rank and not args.rank:
-        eprint("\nERROR: --by_rank requires --rank", flush=True)
+        logger.error("--by_rank requires --rank")
         sys.exit(10)
     elif args.allowed_rank and not args.rank:
-        eprint("\nERROR: --allowed_rank requres --rank", flush=True)
+        logger.error("--allowed_rank requres --rank")
         sys.exit(11)
     elif args.rank and not args.allowed_rank and not args.by_rank:
-        eprint("\nERROR: --rank requires --allowed_rank or --by_rank", flush=True)
+        logger.error("--rank requires --allowed_rank or --by_rank")
     elif args.rank:
         args.rank = args.rank.lower()
         if args.rank not in set(ranks):
-            eprint(f"\nERROR: --rank not in {ranks}", flush=True)
+            logger.error(f"--rank not in {ranks}")
             sys.exit(12)
 
     args.lineage = args.lineage.replace('"', "").replace("'", "")
@@ -277,7 +181,7 @@ def cli():
                 tag += args.source.lower()
             if not args.nonpublished:
                 tag += "_pub"
-            output += "/" + os.path.basename(db_path) + tag
+            output += "/" + Path(db_path).name + tag
 
     if args.mtdb == "-":
         data = ""
@@ -325,7 +229,7 @@ def cli():
             new_db.df2db(output, paths=args.paths)
         else:
             out_dir = mkOutput(output, "extract_mtdb")
-            prefix = re.sub(r"\.mtdb$", "", os.path.basename(db_path))
+            prefix = re.sub(r"\.mtdb$", "", Path(db_path).name)
             for lineage, db in new_db.items():
                 out_f = f"{out_dir}{prefix}.{lineage}.mtdb"
                 db.df2db(out_f)

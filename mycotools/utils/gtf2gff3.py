@@ -4,7 +4,7 @@
 # NEED to arrive at a consensus for protein IDs
 # NEED to name tRNAs, pseudogenes, etc. similar to curGFF.py
 
-import os
+import logging
 import re
 import sys
 import copy
@@ -20,9 +20,12 @@ from mycotools.lib.biotools import (
     gff3Comps,
     gff2Comps,
 )
-from mycotools.lib.kontools import collect_files, eprint, format_path
+from mycotools.lib.kontools import collect_files, format_path, setup_logging
 from mycotools.gff2seq import aamain as gff2proteome
 from mycotools.utils.curGFF3 import rename_and_organize
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def grabOutput(output_pref):
@@ -34,16 +37,16 @@ def grabOutput(output_pref):
     both.
     """
 
-    output_path, pref = os.path.dirname(output_pref), os.path.basename(output_pref)
+    output_path, pref = str(Path(output_pref).parent), Path(output_pref).name
     output_files = collect_files(output_path, "*")
-    hits = [x for x in output_files if os.path.basename(x).startswith(pref)]
+    hits = [x for x in output_files if Path(x).name.startswith(pref)]
     proteome = [x for x in hits if x.endswith(".results.aa.fasta")]
     gtf = [x for x in hits if x.endswith(".results.gtf")]
     if len(gtf) != 1 or len(proteome) != 1:
         if len(gtf) < 1 or len(proteome) < 1:
-            print("\nERROR: complete output files not detected", flush=True)
+            logger.error("complete output files not detected")
         else:
-            print("\nERROR: multiple eligible complete output detected", flush=True)
+            logger.error("multiple eligible complete output detected")
         sys.exit(3)
 
     return gff2list(gtf[0]), fa2dict(proteome[0])
@@ -357,7 +360,7 @@ def conservativeRemoval(gene_dict_prep):
                         ]
                 flagged.append(gene)
         except IndexError:
-            eprint(gene + " cannot create gene coordinates", flush=True)
+            logger.info(gene + " cannot create gene coordinates")
             continue
 
         gene_dict[gene] = temp
@@ -789,11 +792,12 @@ def cli():
     #    parser.add_argument('--fail', default = True, action = 'store_false',
     #        help = 'Fail genes without start or stop codons.')
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.output:
         output = format_path(args.output)
-        if not os.path.isdir(output):
-            os.mkdir(output)
+        if not Path(output).is_dir():
+            Path(output).mkdir()
             output += "/"
         output += args.prefix
     else:
@@ -810,7 +814,7 @@ def cli():
 
     if args.prefix:
         if "_" in args.prefix:
-            eprint('\nERROR: "_" not allowed in prefix\n', flush=True)
+            logger.error('\nERROR: "_" not allowed in prefix\n')
             sys.exit(1)
 
     gff, trans_str, failed, flagged = main(
@@ -827,11 +831,11 @@ def cli():
     with open(output + ".transitions", "w") as out:
         out.write(trans_str)
     if failed:
-        print("\n" + str(len(failed)) + " failures\n", flush=True)
+        logger.debug("" + str(len(failed)) + " failures\n")
         with open(output + ".failed", "w") as out:
             out.write("\n".join(["\t".join(x) for x in failed]))
     if flagged:
-        print("\n" + str(len(flagged)) + " flagged\n", flush=True)
+        logger.debug("" + str(len(flagged)) + " flagged\n")
         with open(output + ".flagged", "w") as out:
             out.write("\n".join(flagged))
 

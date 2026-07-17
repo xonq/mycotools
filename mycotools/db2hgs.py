@@ -3,6 +3,7 @@
 import os
 import sys
 import shutil
+import logging
 import argparse
 import subprocess
 import multiprocessing as mp
@@ -12,7 +13,11 @@ from mycotools.acc2fa import dbmain as acc2fa
 from mycotools.db2files import soft_main as symlink_files
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, dict2fa, fa2dict_accs
-from mycotools.lib.kontools import format_path, eprint, mkOutput, findExecs
+from mycotools.lib.kontools import format_path, mkOutput, findExecs, setup_logging
+from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 def mk_db2hg_output(out_dir, nscg=False):
@@ -22,14 +27,14 @@ def mk_db2hg_output(out_dir, nscg=False):
     nscg_dir = out_dir + "near_single_copy_genes/"
     hg_seq_dir = out_dir + "hgs/"
 
-    if not os.path.isdir(wrk_dir):
-        os.mkdir(wrk_dir)
-    if not os.path.isdir(scg_dir):
-        os.mkdir(scg_dir)
-    if not os.path.isdir(nscg_dir) and nscg:
-        os.mkdir(nscg_dir)
-    if not os.path.isdir(hg_seq_dir):
-        os.mkdir(hg_seq_dir)
+    if not Path(wrk_dir).is_dir():
+        Path(wrk_dir).mkdir()
+    if not Path(scg_dir).is_dir():
+        Path(scg_dir).mkdir()
+    if not Path(nscg_dir).is_dir() and nscg:
+        Path(nscg_dir).mkdir()
+    if not Path(hg_seq_dir).is_dir():
+        Path(hg_seq_dir).mkdir()
 
     return wrk_dir, scg_dir, nscg_dir, hg_seq_dir
 
@@ -46,12 +51,12 @@ def run_mmseqs(
     """Run MMseqs clustering by sym linking MTDB proteomes"""
     symlink_files(["faa"], db, wrk_dir, verbose=False)  # symlink proteomes
     cluster_res_file = wrk_dir + "raw_hgs.tsv"
-    if not os.path.isfile(cluster_res_file):  # NEED to add to log removal
+    if not Path(cluster_res_file).is_file():  # NEED to add to log removal
         # be cautious about shell injection because we need to glob
         int(cpus)
         float(min_id)
         float(min_cov)
-        if not os.path.isdir(wrk_dir):
+        if not Path(wrk_dir).is_dir():
             raise OSError("invalid working directory")
         elif not algorithm in {"mmseqs easy-linclust", "mmseqs easy-cluster"}:
             raise OSError("invalid mmseqs binary")
@@ -82,18 +87,18 @@ def run_mmseqs(
         )
         #                                      stderr = subprocess.DEVNULL)
         shutil.move(wrk_dir + "cluster_cluster.tsv", cluster_res_file)
-    elif os.path.getsize(cluster_res_file):
+    elif Path(cluster_res_file).stat().st_size:
         mmseqs_cmd = 0
     else:
         mmseqs_cmd = 1
     if mmseqs_cmd:
-        eprint("\tERROR: cluster failed")
+        logger.error("cluster failed")
         sys.exit(1)
-    if os.path.isfile(wrk_dir + "cluster_all_seqs.fasta"):
-        os.remove(wrk_dir + "cluster_all_seqs.fasta")
-    if os.path.isfile(wrk_dir + "cluster_rep_seq.fasta"):
-        os.remove(wrk_dir + "cluster_rep_seq.fasta")
-    if os.path.isdir(wrk_dir + "tmp/"):
+    if Path(wrk_dir + "cluster_all_seqs.fasta").is_file():
+        Path(wrk_dir + "cluster_all_seqs.fasta").unlink()
+    if Path(wrk_dir + "cluster_rep_seq.fasta").is_file():
+        Path(wrk_dir + "cluster_rep_seq.fasta").unlink()
+    if Path(wrk_dir + "tmp/").is_dir():
         shutil.rmtree(wrk_dir + "tmp/")
     return cluster_res_file
 
@@ -239,7 +244,7 @@ def write_hgs(hg, genes, wrk_dir, write_dir):
 
     with open(f"{write_dir}{hg}.faa.tmp", "w") as out:
         out.write(dict2fa(fa_dict))
-    os.rename(f"{write_dir}{hg}.faa.tmp", f"{write_dir}{hg}.faa")
+    Path(f"{write_dir}{hg}.faa.tmp").rename(f"{write_dir}{hg}.faa")
 
 
 def align_hg(hg_fa, out_fa, cpus=1):
@@ -248,7 +253,7 @@ def align_hg(hg_fa, out_fa, cpus=1):
         cmd = subprocess.call(
             ["mafft", "--auto", "--thread", f"-{cpus}", hg_fa], stdout=out
         )  # , stderr = subprocess.PIPE)
-    os.rename(out_fa + ".tmp", out_fa)
+    Path(out_fa + ".tmp").rename(out_fa)
     return cmd
 
 
@@ -259,7 +264,7 @@ def hmmbuild_hg(msa_fa, out_hmm, cpus=1):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    os.rename(out_hmm + ".tmp", out_hmm)
+    Path(out_hmm + ".tmp").rename(out_hmm)
     return cmd
 
 
@@ -350,16 +355,16 @@ def main(
     aln_file = out_dir + "accessory_alignment.phy"
     wrk_dir, scg_dir, nscg_dir, hg_seq_dir = mk_db2hg_output(out_dir, nscg)
 
-    print("\nClustering protein sequences", flush=True)
+    logger.info("Clustering protein sequences")
     raw_hg_file = run_mmseqs(db, wrk_dir, algorithm, min_id, min_cov, sensitivity, cpus)
 
     useable_omes = set(db.keys())
-    print("\nCompiling homology groups (HGs)", flush=True)
+    logger.info("Compiling homology groups (HGs)")
     ome_num, gene2hg, i2ome, hg2gene = compile_homolog_groups(
         raw_hg_file, hg_output, useable_omes
     )
 
-    print("\nIdentifying single-copy HGs", flush=True)
+    logger.info("Identifying single-copy HGs")
     schgs, nschgs, hg2stats, full_hgs, hg2d_omes = id_near_schgs(
         hg2gene,
         set(i2ome),
@@ -370,7 +375,7 @@ def main(
         min_genomes=min_genomes,
     )
 
-    print("\nWriting output", flush=True)
+    logger.info("Writing output")
     ome2pan = pangenome_output(pan_file, aln_file, hg2gene, hg2d_omes, max_mis_ome=0)
 
     with open(hg2missing_genome_file, "w") as out:
@@ -385,28 +390,28 @@ def main(
         {k: hg2stats[k] for k in list(full_hgs)}, full_hg_stats_file, sort=True
     )
     if nscg:
-        print(f"\t{len(nschgs)} near single-copy HGs", flush=True)
+        logger.info(f"{len(nschgs)} near single-copy HGs")
         with mp.Pool(processes=cpus) as pool:
             pool.starmap(
                 write_hgs,
                 (
                     (hg, hg2gene[hg], wrk_dir, nscg_dir)
                     for hg in nschgs
-                    if not os.path.isfile(f"{nscg_dir}{hg}.faa")
+                    if not Path(f"{nscg_dir}{hg}.faa").is_file()
                 ),
             )
     #        for hg in nschgs:
     #           if not os.path.isfile(f'{nscg_dir}{hg}.faa'):
     #              write_hgs(db, hg, hg2gene[hg], wrk_dir, nscg_dir)
     if schgs:
-        print(f"\t{len(schgs)} single-copy HGs", flush=True)
+        logger.info(f"{len(schgs)} single-copy HGs")
         with mp.Pool(processes=cpus) as pool:
             pool.starmap(
                 write_hgs,
                 (
                     (hg, hg2gene[hg], wrk_dir, scg_dir)
                     for hg in schgs
-                    if not os.path.isfile(f"{scg_dir}{hg}.faa")
+                    if not Path(f"{scg_dir}{hg}.faa").is_file()
                 ),
             )
     #        for hg in schgs:
@@ -419,7 +424,7 @@ def main(
                 (
                     (hg, genes, wrk_dir, hg_seq_dir)
                     for hg, genes in hg2genes.items()
-                    if not os.path.isfile(f"{hg_seq_dir}{hg}.faa")
+                    if not Path(f"{hg_seq_dir}{hg}.faa").is_file()
                 ),
             )
 
@@ -428,12 +433,12 @@ def main(
     #              write_hgs(db, hg, genes, wrk_dir, hg_seq_dir)
 
     if hmm:
-        print("\nAligning and building HMMs", flush=True)
+        logger.info("Aligning and building HMMs")
         msa_dir = out_dir + "msa/"
         hmm_dir = out_dir + "hmm/"
         for d in [msa_dir, hmm_dir]:
-            if not os.path.isdir(d):
-                os.mkdir(d)
+            if not Path(d).is_dir():
+                Path(d).mkdir()
         if nscg:
             srch_hgs = nschgs
             hg_dir = nscg_dir
@@ -441,11 +446,11 @@ def main(
             srch_hgs = schgs
             hg_dir = scg_dir
         for hg in srch_hgs:
-            if not os.path.isfile(f"{msa_dir}{hg}.mafft.faa"):
+            if not Path(f"{msa_dir}{hg}.mafft.faa").is_file():
                 mafft_code = align_hg(
                     f"{nscg_dir}{hg}.faa", f"{msa_dir}{hg}.mafft.faa", cpus=cpus
                 )
-            if not os.path.isfile(f"{hmm_dir}{hg}.hmm"):
+            if not Path(f"{hmm_dir}{hg}.hmm").is_file():
                 hmm_code = hmmbuild_hg(
                     f"{msa_dir}{hg}.mafft.faa", f"{hmm_dir}{hg}.hmm", cpus=cpus
                 )
@@ -492,17 +497,18 @@ def cli():
     parser.add_argument("-o", "--out_dir", help="WARNING: will not overwrite")
     parser.add_argument("-c", "--cpus", type=int, default=mp.cpu_count())
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.min_genomes > 1 or args.min_genomes < 0:
-        eprint("\nERROR: --min_genomes must be between 0 and 1", flush=True)
+        logger.error("--min_genomes must be between 0 and 1")
         sys.exit(143)
 
     db = mtdb(format_path(args.mtdb))
 
     if args.out_dir:
         out_dir = format_path(args.out_dir)
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
+        if not Path(out_dir).is_dir():
+            Path(out_dir).mkdir()
             out_dir += "/"
     else:
         out_dir = mkOutput(args.out_dir, "db2hgs")

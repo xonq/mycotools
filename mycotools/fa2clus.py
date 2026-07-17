@@ -5,7 +5,7 @@
 # NEED to try MCL using the binary
 # NEED to make rerunning aggclus not use old data
 
-import os
+import logging
 import re
 import sys
 import copy
@@ -22,14 +22,16 @@ from mycotools.lib.kontools import (
     multisub,
     findExecs,
     format_path,
-    eprint,
-    vprint,
     read_json,
     write_json,
     mkOutput,
     fmt_float,
+    setup_logging,
 )
 from mycotools.lib.biotools import fa2dict, dict2fa
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 sys.setrecursionlimit(1000000)
 
@@ -53,7 +55,7 @@ def run_mmseqs(
     verbose=False,
 ):
     res_path = res_base + "_cluster.tsv"
-    tmp_dir = os.path.dirname(res_path) + "/tmp/"
+    tmp_dir = str(Path(res_path).parent) + "/tmp/"
     if verbose:
         stdout, stderr = None, None
     else:
@@ -91,11 +93,11 @@ def run_mmseqs(
         raise ClusteringError(
             "Clustering failed: " + str(mmseqs_exit) + " " + " ".join(mmseqs_cmd)
         )
-    if os.path.isfile(res_base + "_all_seqs.fasta"):
-        os.remove(res_base + "_all_seqs.fasta")
-    if os.path.isfile(res_base + "_rep_seq.fasta"):
-        os.remove(res_base + "_rep_seq.fasta")
-    if os.path.isdir(tmp_dir):
+    if Path(res_base + "_all_seqs.fasta").is_file():
+        Path(res_base + "_all_seqs.fasta").unlink()
+    if Path(res_base + "_rep_seq.fasta").is_file():
+        Path(res_base + "_rep_seq.fasta").unlink()
+    if Path(tmp_dir).is_dir():
         shutil.rmtree(tmp_dir)
     return res_path
 
@@ -125,7 +127,7 @@ def parse_mmseqs_clus(res_path):
 def makeDmndDB(diamond, queryFile, output_dir, cpus=1):
     """create a diamond database:
     diamond: binary path, queryFile: query_path"""
-    outputDB = output_dir + re.sub(r"\.[^\.]+$", "", os.path.basename(queryFile))
+    outputDB = output_dir + re.sub(r"\.[^\.]+$", "", Path(queryFile).name)
     cmd = [
         diamond,
         "makedb",
@@ -395,7 +397,7 @@ def dmnd_main(fa_path, minVal, output_dir, distFile, pid=True, verbose=False, cp
 
 
 def usrch_main(fasta, min_id, output, cpus=1, verbose=False):
-    vprint("\nusearch aligning", flush=True, v=verbose)
+    logger.debug("usearch aligning")
     runUsearch(fasta, output + ".dist", str(1 - min_id), cpus, verbose)
     distance_matrix = rd_usrch_distmtx(output + ".dist")
     return distance_matrix
@@ -415,8 +417,8 @@ def readLog(log_path, newLog):
         for i in newLog["successes"]:
             i["cluster"] = tuple(i["cluster"])
     elif newLog["distance_matrix"]:
-        if os.path.isfile(newLog["distance_matrix"]):
-            os.remove(newLog["distance_matrix"])
+        if Path(newLog["distance_matrix"]).is_file():
+            Path(newLog["distance_matrix"]).unlink()
     return newLog
 
 
@@ -470,7 +472,7 @@ def cluster_iter_mmseqs(
         )
         res_info = res_base + name
         res_path = res_info + "_cluster.tsv"
-        if not os.path.isfile(res_path):
+        if not Path(res_path).is_file():
             run_mmseqs(
                 params["fa"],
                 res_info,
@@ -485,17 +487,13 @@ def cluster_iter_mmseqs(
         cluster = cluster_dict[clusters[focal_gene]]
         focal_len = len(cluster)
 
-        vprint(
-            "\nITERATION "
+        logger.debug("ITERATION "
             + str(attempt)
             + ": "
             + focal_gene
             + " cluster size: "
-            + str(focal_len),
-            flush=True,
-            v=verbose,
-        )
-        vprint("Cluster parameter: " + str(clus_var), flush=True, v=verbose)
+            + str(focal_len))
+        logger.debug("Cluster parameter: " + str(clus_var))
         iteration_dict = {
             "size": focal_len,
             "cluster_variable": clus_var,
@@ -506,7 +504,7 @@ def cluster_iter_mmseqs(
         if focal_len >= min_seq:  # if greater than minimum sequences
             if max_seq:  # if there is a max set of sequences
                 if focal_len <= max_seq:  # if less than max sequences
-                    vprint(spacer + "\tSUCCESS!", flush=True, v=verbose)
+                    logger.debug(spacer + "SUCCESS!")
                     exit_code = 0
                     direction = -1
                     log_dict["successes"].append(iteration_dict)
@@ -514,7 +512,7 @@ def cluster_iter_mmseqs(
                 else:  # descend
                     direction = 1
             else:  # no max sequences, minimum is met, this was successful
-                vprint(spacer + "\tSUCCESS!", flush=True, v=verbose)
+                logger.debug(spacer + "SUCCESS!")
                 exit_code = 0
                 log_dict["successes"].append(iteration_dict)
                 log_dict["successes"] = sort_iterations(log_dict["successes"])
@@ -536,12 +534,9 @@ def cluster_iter_mmseqs(
                     exit_code = 0
                     break
                 else:
-                    eprint(
-                        spacer
-                        + "WARNING: Overshot - "
-                        + "could not find parameters using current interval",
-                        flush=True,
-                    )
+                    logger.warning(spacer
+                        + "Overshot - "
+                        + "could not find parameters using current interval")
                     iteration = extract_closest_cluster(
                         log_dict["iterations"], min_seq, max_seq
                     )
@@ -626,17 +621,13 @@ def cluster_iter_aggclus(
             cluster = None
             newick = ""
 
-        vprint(
-            "\nITERATION "
+        logger.debug("ITERATION "
             + str(attempt)
             + ": "
             + focal_gene
             + " cluster size: "
-            + str(focal_len),
-            flush=True,
-            v=verbose,
-        )
-        vprint("Cluster parameter: " + str(clus_var), flush=True, v=verbose)
+            + str(focal_len))
+        logger.debug("Cluster parameter: " + str(clus_var))
         iteration_dict = {
             "size": focal_len,
             "cluster_variable": clus_var,
@@ -648,7 +639,7 @@ def cluster_iter_aggclus(
         if focal_len >= min_seq:  # if greater than minimum sequences
             if max_seq:  # if there is a max set of sequences
                 if focal_len <= max_seq:  # if less than max sequences
-                    vprint(spacer + "\tSUCCESS!", flush=True, v=verbose)
+                    logger.debug(spacer + "SUCCESS!")
                     exit_code = 0
                     direction = -1
                     log_dict["successes"].append(iteration_dict)
@@ -656,7 +647,7 @@ def cluster_iter_aggclus(
                 else:  # descend
                     direction = 1
             else:  # no max sequences, minimum is met, this was successful
-                vprint(spacer + "\tSUCCESS!", flush=True, v=verbose)
+                logger.debug(spacer + "SUCCESS!")
                 exit_code = 0
                 log_dict["successes"].append(iteration_dict)
                 log_dict["successes"] = sort_iterations(log_dict["successes"])
@@ -673,12 +664,9 @@ def cluster_iter_aggclus(
                     newick = log_dict["successes"][0]["tree"]
                     exit_code = 0
                 else:
-                    eprint(
-                        spacer
-                        + "WARNING: Overshot - "
-                        + "could not find parameters using current interval",
-                        flush=True,
-                    )
+                    logger.warning(spacer
+                        + "Overshot - "
+                        + "could not find parameters using current interval")
                     iteration = extract_closest_cluster(
                         log_dict["iterations"], min_seq, max_seq
                     )
@@ -730,8 +718,8 @@ def main(
     max_var=1,
 ):
 
-    if not os.path.isdir(os.path.dirname(output) + "/working/"):
-        os.mkdir(os.path.dirname(output) + "/working/")
+    if not Path(str(Path(output).parent) + "/working/").is_dir():
+        Path(str(Path(output).parent) + "/working/").mkdir()
 
     if search_program in {"usearch", "diamond"}:
         algorithm = "hierarchical"
@@ -756,7 +744,7 @@ def main(
         "successes": [],
     }
     if log_path:
-        if os.path.isfile(log_path):
+        if Path(log_path).is_file():
             log_dict = readLog(log_path, log_dict)
         write_json(log_dict, log_path)
 
@@ -769,9 +757,9 @@ def main(
         param_dict = {
             "dist": None,
             "link": linkage,
-            "dir": os.path.dirname(output) + "/",
+            "dir": str(Path(output).parent) + "/",
         }
-        if os.path.isfile(log_dict["distance_matrix"]):
+        if Path(log_dict["distance_matrix"]).is_file():
             if search_program == "usearch":
                 param_dict["dist"] = rd_usrch_distmtx(log_dict["distance_matrix"])
             else:
@@ -781,7 +769,7 @@ def main(
         else:
             if search_program == "diamond":  # elif if above lines not highlighted
                 if not dmnd_dir:
-                    dmnd_dir = os.path.dirname(log_dict["distance_matrix"]) + "/"
+                    dmnd_dir = str(Path(log_dict["distance_matrix"]).parent) + "/"
                 param_dict["dist"] = dmnd_main(
                     fa_path,
                     clus_const,
@@ -800,11 +788,11 @@ def main(
             "fa": fa_path,
             "bin": search_program,
             "clus_const": clus_const,
-            "dir": os.path.dirname(output) + "/",
+            "dir": str(Path(output).parent) + "/",
         }
 
     if focal_gene:
-        vprint("\nClustering", flush=True, v=verbose)
+        logger.debug("Clustering")
         if algorithm == "hierarchical":
             cluster, newick, log_dict, error = cluster_iter_aggclus(
                 param_dict,
@@ -854,7 +842,7 @@ def main(
             res_base = param_dict["dir"] + focal_gene
         else:
             res_base = param_dict["dir"] + re.sub(
-                r"\.[^\.]+$", "", os.path.basename(fa_path)
+                r"\.[^\.]+$", "", Path(fa_path).name
             )
         if algorithm == "hierarchical":
             clusters, tree = scipyaggd(
@@ -970,6 +958,7 @@ def cli():
     parser.add_argument("-c", "--cpus", default=1, type=int)
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     #    if args.refine and not args.max_seq:
     #       eprint('\nERROR: --max_seq required for refinement', flush = True)
@@ -981,10 +970,10 @@ def cli():
             "centroid",
             "single",
         }:
-            eprint("\nERROR: Invalid linkage criterium", flush=True)
+            logger.error("Invalid linkage criterium")
             sys.exit(1)
         elif args.distance_type not in {"identity", "bitscore"}:
-            eprint("\nERROR: Invalid distance type", flush=True)
+            logger.error("Invalid distance type")
             sys.exit(3)
         if args.distance_type == "identity":
             pid = True
@@ -1007,13 +996,13 @@ def cli():
         if not args.cluster_variable:
             args.cluster_variable = 0.3
     else:
-        eprint("\nERROR: Invalid alignment software", flush=True)
+        logger.error("Invalid alignment software")
         sys.exit(2)
 
     findExecs([args.alignment.split()[0]], exit=set(args.alignment.split()[0]))
     interval = args.interval
     if args.interval < 0 or args.interval > 1:
-        eprint("\nERROR: --interval must be between 0 and 1", flush=True)
+        logger.error("--interval must be between 0 and 1")
 
     #    if args.iterative and args.alignment in {'diamond', 'usearch'}:
     #       clus_var = 1 - args.cluster_constant
@@ -1021,10 +1010,7 @@ def cli():
         1 - args.cluster_variable <= args.cluster_constant
         and args.alignment != "mmseqs"
     ):
-        eprint(
-            "\nWARNING: 1 - maximum distance exceeds minimum connection, clustering is ineffective",
-            flush=True,
-        )
+        logger.warning("1 - maximum distance exceeds minimum connection, clustering is ineffective")
         sys.exit(3)
     else:
         clus_var = args.cluster_variable
@@ -1035,20 +1021,20 @@ def cli():
     fa = fa2dict(fa_path)
     if args.iterative:
         if len(fa) < args.min_seq:
-            eprint("\nERROR: minimum sequences is greater than fasta input", flush=True)
+            logger.error("minimum sequences is greater than fasta input")
             sys.exit(5)
         elif args.iterative not in fa:
-            eprint("\nERROR: " + args.iterative + " not in " + fa_path, flush=True)
+            logger.error("" + args.iterative + " not in " + fa_path)
             sys.exit(6)
 
     if args.output:
-        if not os.path.isdir(format_path(args.output)):
-            os.mkdir(format_path(args.output))
+        if not Path(format_path(args.output)).is_dir():
+            Path(format_path(args.output)).mkdir()
         dmnd_dir = format_path(args.output)
-        output = dmnd_dir + re.sub(r"\.[^\.]+$", "", os.path.basename(fa_path))
+        output = dmnd_dir + re.sub(r"\.[^\.]+$", "", Path(fa_path).name)
     else:
-        dmnd_dir = mkOutput(os.getcwd() + "/", "fa2clus")
-        output = dmnd_dir + re.sub(r"\.[^\.]+$", "", os.path.basename(fa_path))
+        dmnd_dir = mkOutput(str(Path.cwd()) + "/", "fa2clus")
+        output = dmnd_dir + re.sub(r"\.[^\.]+$", "", Path(fa_path).name)
 
     cluster, tree, overshot, log_dict = main(
         fa_path,
@@ -1062,7 +1048,7 @@ def cli():
         focal_gene=args.iterative,
         interval=interval,
         output=output,
-        log_path=dmnd_dir + "." + os.path.basename(fa_path) + ".fa2clus.json",
+        log_path=dmnd_dir + "." + Path(fa_path).name + ".fa2clus.json",
         pid=pid,
         dmnd_dir=dmnd_dir,
         cpus=args.cpus,
@@ -1077,7 +1063,7 @@ def cli():
         try:
             output_fa = {x: input_fa[x] for x in cluster}
         except TypeError:
-            eprint("\nERROR: empty cluster", flush=True)
+            logger.error("empty cluster")
             sys.exit(10)
         with open(output + ".fa", "w") as out:
             out.write(dict2fa(output_fa))

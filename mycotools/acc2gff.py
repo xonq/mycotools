@@ -1,13 +1,16 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
 import argparse
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff
 from mycotools.lib.dbtools import mtdb, primaryDB
-from mycotools.lib.kontools import format_path, stdin2str
+from mycotools.lib.kontools import format_path, stdin2str, setup_logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def grab_gff_acc(gff_list, acc, term="Alias="):
@@ -107,6 +110,7 @@ def cli():
     )
     parser.add_argument("--cpu", type=int, default=mp.cpu_count())
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     # if there is an input file, extract the accessions from that
     if args.input:
@@ -151,13 +155,13 @@ def cli():
         print(list2gff(gff_lists[list(gff_lists.keys())[0]]).rstrip(), flush=True)
     # if it is specified output, open a folder for it
     elif args.ome:
-        output = mkOutput(os.getcwd() + "/", "acc2gff")
+        output = mkOutput(str(Path.cwd()) + "/", "acc2gff")
         for ome in gff_strs:
             if gff_lists[ome]:
                 with open(output + ome + ".accs.gff3", "w") as out:
                     out.write(list2gff(gff_lists[ome]))
             else:
-                eprint("ERROR: " + ome + " failed, no accessions retrieved", flush=True)
+                logger.error("" + ome + " failed, no accessions retrieved")
     # print to stdout each gff_list
     else:
         out_str = ""
@@ -165,7 +169,7 @@ def cli():
             if gff_lists[ome]:
                 out_str += list2gff(gff_lists[ome]) + "\n"
             else:
-                eprint("ERROR: " + ome + " does not have accession", flush=True)
+                logger.error("" + ome + " does not have accession")
         print(out_str)
 
     sys.exit(0)

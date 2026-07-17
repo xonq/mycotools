@@ -1,14 +1,18 @@
 #! /usr/bin/env python3
 
-import os
 import re
 import sys
-from mycotools.lib.kontools import sys_start, format_path, fmt_float
+import logging
+from mycotools.lib.kontools import sys_start, format_path, fmt_float, setup_logging
 from mycotools.lib.biotools import fa2dict, calc_weight
+
+
+logger = logging.getLogger(__name__)
 
 
 def cli():
 
+    setup_logging()
     usage = "USAGE: Inputs amino acid fasta outputs linear protein weights"
     args = sys_start(sys.argv, usage, 1)
 

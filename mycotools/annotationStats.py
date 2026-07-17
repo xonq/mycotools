@@ -5,10 +5,15 @@
 import os
 import re
 import sys
+import logging
 from itertools import chain
 from collections import defaultdict
 from mycotools.lib.biotools import gff2list, gff3Comps
-from mycotools.lib.kontools import format_path, eprint
+from mycotools.lib.kontools import format_path, setup_logging
+from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 def compile_alia(gff_path, output, ome=None):
@@ -250,7 +255,7 @@ def main(in_path, log_path=None, cpus=1, db=None):
             db = mtdb(in_path).set_index()
 
         prevOmes = {}
-        if log_path and os.path.isfile(log_path):
+        if log_path and Path(log_path).is_file():
             with open(log_path, "r") as raw:
                 for line in raw:
                     if not line.startswith("#"):
@@ -299,6 +304,7 @@ def main(in_path, log_path=None, cpus=1, db=None):
 
 def cli():
 
+    setup_logging()
     output = False
     usage = "\nUSAGE: `gff`/`gtf`/`gff3` OR mycotoolsDB, optional output file\n"
     if "-h " in sys.argv or "--help" in sys.argv or "-h" == sys.argv[-1]:
@@ -307,7 +313,7 @@ def cli():
     elif len(sys.argv) < 2:
         print(usage, flush=True)
         sys.exit(1)
-    elif not os.path.isfile(format_path(sys.argv[1])):
+    elif not Path(format_path(sys.argv[1])).is_file():
         print(usage, flush=True)
         sys.exit(1)
     elif len(sys.argv) > 2:

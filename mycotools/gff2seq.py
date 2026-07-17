@@ -1,12 +1,15 @@
 #! /usr/bin/env python3
 
+import logging
 import re
 import sys
 import argparse
 from Bio.Seq import Seq
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps, dict2fa
-from mycotools.lib.kontools import format_path, sys_start, eprint, stdin2str
+from mycotools.lib.kontools import format_path, sys_start, stdin2str, setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def sortGene(sorting_group):
@@ -98,9 +101,7 @@ def grabCDS(gff_dicts, spacer="\t"):
                 genes.extend(alias.split("|"))
             except TypeError:
                 if not warning and ome:
-                    eprint(
-                        spacer + "WARNING: " + str(ome) + " missing aliases", flush=True
-                    )
+                    logger.warning(spacer + "" + str(ome) + " missing aliases")
                     warning = True
                 raise TypeError(str(entry))
 
@@ -659,6 +660,7 @@ def cli():
         "-af", "--all_flanks", action="store_true", help="-n and -nc only"
     )
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.gff == "-":
         data = stdin2str()
@@ -680,9 +682,7 @@ def cli():
                     assembly_dicts[ome] = fa2dict(db[ome]["fna"])
                 gff_dicts[ome].append(line)
         except IndexError:
-            eprint(
-                "\nERROR: " + args.gff + " is incompatible with MycotoolsDB", flush=True
-            )
+            logger.error("" + args.gff + " is incompatible with MycotoolsDB")
             sys.exit(1)
 
     if args.protein:

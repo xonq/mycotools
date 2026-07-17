@@ -1,16 +1,18 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
 import argparse
 import multiprocessing as mp
 from itertools import chain
 from collections import defaultdict
-from mycotools.lib.kontools import eprint, format_path, stdin2str
+from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps
 from mycotools.acc2gff import db_main as acc2gff
+
+logger = logging.getLogger(__name__)
 
 
 def col_CDS(
@@ -28,7 +30,7 @@ def col_CDS(
             try:
                 alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
             except TypeError:
-                eprint("\n\tERROR: could not extract Alias ID from " + gff, flush=True)
+                logger.error("could not extract Alias ID from " + gff)
                 continue
             aliases = alias.split("|")  # to address alternate splicing in gene
             # aliases
@@ -535,6 +537,7 @@ def cli():
     parser.add_argument("-d", "--mtdb", help="DEFAULT: master", default=primaryDB())
     parser.add_argument("-c", "--cpu", type=int, default=1)
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     # gather accessions from various input styles and split into a list
     if args.input:
@@ -566,7 +569,7 @@ def cli():
     # only full genomes for args.full, no accessions
     if args.full:
         if any("_" in x for x in accs):  # _ is forbidden from ome codes
-            eprint("\nERROR: -f requires omes, not accessions", flush=True)
+            logger.error("-f requires omes, not accessions")
             sys.exit(3)
 
     # create a default regular expression for the product name

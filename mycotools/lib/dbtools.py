@@ -2,11 +2,14 @@
 
 # NEED to make login check more intuitive and easier for NCBI only
 
+from __future__ import annotations
+
 import os
 import re
 import sys
 import copy
 import json
+import logging
 import time
 import base64
 import urllib
@@ -14,17 +17,21 @@ import getpass
 import zipfile
 import datetime
 import subprocess
+import random
 from tqdm import tqdm
 from Bio import Entrez
 from io import StringIO
+from typing import Any, Dict, Iterable, Mapping, Optional, Union
 from collections import defaultdict
 from mycotools.lib.kontools import (
     collect_files,
-    eprint,
     format_path,
     read_json,
     write_json,
 )
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class mtdb(dict):
@@ -50,24 +57,28 @@ class mtdb(dict):
         "gff3",
     ]
 
-    # NEED a detect index feature for adding dicts in with alternative indices
-    def __init__(self, db=None, index=None, add_paths=True):
-        self.columns = [
-            "ome",
+    #: columns that may serve as the MTDB index (unique, hashable keys)
+    _index_columns = frozenset({"assembly_acc", "ome"})
+    #: taxonomic ranks excluded when assimilating taxonomy dictionaries
+    _forbidden_tax_ranks = frozenset(
+        {
+            "no rank",
+            "subkingdom",
             "genus",
             "species",
-            "strain",
-            "taxonomy",
-            "version",
-            "source",
-            "biosample",
-            "assembly_acc",
-            "acquisition_date",
-            "published",
-            "fna",
-            "faa",
-            "gff3",
-        ]
+            "species group",
+            "varietas",
+            "forma",
+        }
+    )
+
+    # NEED a detect index feature for adding dicts in with alternative indices
+    def __init__(
+        self,
+        db: Union[str, Mapping[str, Any], "mtdb", None] = None,
+        index: Optional[str] = None,
+        add_paths: bool = True,
+    ):
         if not db:
             if not index:
                 super().__init__({x: [] for x in self.columns})
@@ -90,17 +101,18 @@ class mtdb(dict):
                     ):
                         super().__init__(db)
         else:
-            super().__init__(mtdb.db2df(self, db, add_paths=add_paths))
+            super().__init__(self.db2df(db, add_paths=add_paths))
         self.index = index
 
-    def mtdb2pd(self):
+    def mtdb2pd(self) -> "pd.DataFrame":
         import pandas as pd
 
         copy_mtdb = copy.deepcopy(self)
         copy_mtdb = copy_mtdb.reset_index()
         return pd.DataFrame(copy_mtdb)  # assume pd is imported
 
-    def pd2mtdb(df):  # legacy integration
+    @staticmethod
+    def pd2mtdb(df: "pd.DataFrame") -> "mtdb":  # legacy integration
         df = df.fillna("")
         for i, row in df.iterrows():
             if not row["gff3"]:
@@ -112,9 +124,9 @@ class mtdb(dict):
         db = mtdb({x: list(df[x]) for x in mtdb.columns})
         return db
 
-    def db2df(self, db_path, add_paths=True):
+    def db2df(self, db_path: str, add_paths: bool = True) -> Dict[str, list]:
         df = defaultdict(list)
-        if os.stat(db_path).st_size == 0:
+        if Path(db_path).stat().st_size == 0:
             return {x: [] for x in mtdb.columns}
         with open(format_path(db_path), "r") as raw:
             data = [
@@ -129,9 +141,9 @@ class mtdb(dict):
             for i, d in enumerate(entry):
                 df[columns[i]][-1] = d
             try:
-                df["taxonomy"][-1] = read_tax(df["taxonomy"][-1])
+                df["taxonomy"][-1] = self.read_tax(df["taxonomy"][-1])
             except json.decoder.JSONDecodeError:
-                print(df["taxonomy"][-1])
+                logger.error("malformed taxonomy: %s", df["taxonomy"][-1])
                 sys.exit()
             df["taxonomy"][-1]["genus"] = df["genus"][-1]
             df["taxonomy"][-1]["species"] = df["genus"][-1] + " " + df["species"][-1]
@@ -164,14 +176,16 @@ class mtdb(dict):
                     df["faa"][i] = os.environ["MYCOFAA"] + ome + ".faa"
                     df["gff3"][i] = os.environ["MYCOGFF3"] + ome + ".gff3"
         except KeyError:
-            eprint(
-                "ERROR: MycotoolsDB not in path, cannot delineate biofile paths",
-                flush=True,
-            )
+            logger.error("MycotoolsDB not in path, cannot delineate biofile paths")
 
         return df
 
-    def df2db(self, db_path=None, headers=False, paths=False):
+    def df2db(
+        self,
+        db_path: Optional[str] = None,
+        headers: bool = False,
+        paths: bool = False,
+    ) -> None:
         df = copy.copy(self)
         df = df.reset_index()
         output = mtdb(
@@ -237,7 +251,7 @@ class mtdb(dict):
                     flush=True,
                 )
 
-    def set_index(self, column="ome", inplace=False):
+    def set_index(self, column: Optional[str] = "ome", inplace: bool = False) -> "mtdb":
         data, retry, error, df, columns = (
             {},
             bool(column),
@@ -247,7 +261,7 @@ class mtdb(dict):
         )
         if not column:
             return df.reset_index()
-        elif column not in {"assembly_acc", "ome"}:
+        elif column not in self._index_columns:
             raise KeyError(f'MTDB index must be "assembly_acc"/"ome"')
         elif df.index and not df.keys():  # empty df
             return mtdb({}, index=column)
@@ -288,7 +302,7 @@ class mtdb(dict):
                             data[v][-1][head] = df[head][i]
                         except KeyError:  # if an index exists
                             if error:
-                                eprint("\nERROR: invalid column", flush=True)
+                                logger.error("invalid column")
                                 return self
                             df = df.reset_index()
                             error = True
@@ -297,7 +311,7 @@ class mtdb(dict):
             retry = False
         return mtdb(data, column)
 
-    def reset_index(self):
+    def reset_index(self) -> "mtdb":
         df = copy.copy(self)
         if df.index:
             data = {x: [] for x in mtdb().columns}
@@ -315,9 +329,11 @@ class mtdb(dict):
         else:
             return df
 
-    def append(self, info={}):
+    def append(self, info: Optional[Mapping[str, Any]] = None) -> "mtdb":
         #        if any(x not in set(self.columns) for x in info):
         #           raise KeyError('Invalid keys: ' + str(set(info.keys()).difference(set(self.columns))))
+        if info is None:
+            info = {}
         index = self.index
         df = copy.copy(self)
         df = df.reset_index()
@@ -328,6 +344,179 @@ class mtdb(dict):
         for key in self.columns:
             df[key].append(info[key])
         return df.set_index(index)
+
+    @staticmethod
+    def read_tax(
+        taxonomy_string: Union[str, Mapping[str, Any], None]
+    ) -> Dict[str, Any]:
+        """Read taxonomy from an MTDB by converting the string into a dictionary"""
+        tax_strs = [
+            "superkingdom",
+            "kingdom",
+            "phylum",
+            "subphylum",
+            "class",
+            "order",
+            "family",
+            "subfamily",
+        ]
+        if taxonomy_string:
+            if isinstance(taxonomy_string, str):
+                dict_string = taxonomy_string.replace("'", '"')
+                try:
+                    tax_dict = json.loads(dict_string)
+                except TypeError:
+                    tax_dict = {}
+            else:
+                tax_dict = taxonomy_string
+            try:
+                tax_dict = {**tax_dict, **{x: "" for x in tax_strs if x not in tax_dict}}
+            except TypeError:  # inappropriate tax_dict in the column
+                tax_dict = {x: "" for x in tax_strs}
+            return tax_dict
+        else:
+            return {}
+
+    @staticmethod
+    def _reconcile_tax_dicts(
+        genera: Iterable[str],
+        tax_dicts: Mapping[str, Mapping[str, Any]],
+        forbid: Iterable[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        """Drop empty/forbidden taxonomy entries and backfill missing genera"""
+        forbid = set(forbid)
+        tax_dicts = {x: tax_dicts[x] for x in tax_dicts if tax_dicts[x]}
+        for genus in tax_dicts:
+            tax_dicts[genus] = {
+                rank: name for rank, name in tax_dicts[genus].items() if rank not in forbid
+            }
+        for miss in set(genera).difference(tax_dicts.keys()):
+            tax_dicts[miss] = {}
+        return tax_dicts
+
+    def prepare_tax_dicts(
+        self, tax_dicts: Optional[Dict[str, Any]] = None
+    ) -> "tuple[set, Dict[str, Any]]":
+        """Identify the genera that do not have higher taxonomy ascribed to them"""
+        if tax_dicts is None:
+            tax_dicts = {}
+        need_tax = set()
+        for ome, entry in self.set_index("ome").items():
+            if entry["genus"] in tax_dicts:
+                continue
+            tax_json = self.read_tax(entry["taxonomy"])
+            if any(
+                name
+                for rank, name in tax_json.items()
+                if rank not in {"genus", "species", "strain"}
+            ):
+                tax_dicts[entry["genus"]] = tax_json
+            else:
+                need_tax.add(entry["genus"])
+        need_tax = need_tax.difference(tax_dicts.keys())
+        return need_tax, tax_dicts
+
+    def assimilate_tax(
+        self,
+        tax_dicts: Mapping[str, Mapping[str, Any]],
+        forbid: Optional[Iterable[str]] = None,
+    ) -> "tuple[mtdb, Dict[str, Any]]":
+        """Assign the resolved taxonomy dictionaries to this MTDB's taxonomy column"""
+        if forbid is None:
+            forbid = self._forbidden_tax_ranks
+        tax_dicts = self._reconcile_tax_dicts(set(self["genus"]), tax_dicts, forbid)
+        for i, genus in enumerate(self["genus"]):
+            self["taxonomy"][i] = tax_dicts[genus]
+        return mtdb(self), tax_dicts
+
+    def infer_rank(self, lineage: str) -> str:
+        """Identify the taxonomic rank associated with an inputted lineage of
+        interest"""
+        linlow, rank = lineage.lower(), None
+        for ome, row in self.items():
+            if linlow in set([x.lower() for x in row["taxonomy"].values()]):
+                rev_dict = {
+                    k.lower(): v
+                    for k, v in zip(row["taxonomy"].values(), row["taxonomy"].keys())
+                }
+                rank = rev_dict[lineage]
+
+        if not rank:
+            raise KeyError(f"no entry for {lineage}")
+
+        return rank
+
+    def extract_unique(self, allowed: int = 1, rank: str = "species") -> "mtdb":
+        """Extract unique rank from an MTDB"""
+        keys = copy.deepcopy(list(self.keys()))
+        random.shuffle(keys)
+        prep_db0 = {x: self[x] for x in keys}
+        prep_db1 = mtdb().set_index("ome")
+        if rank == "strain":
+            found = set()
+            for ome, row in prep_db0.items():
+                name = row["taxonomy"]["species"] + " " + row["strain"]
+                if name not in found:
+                    prep_db1[ome] = row
+                found_prep = list(found)
+                found_prep.append(name)
+                found = set(found_prep)
+        else:
+            found = defaultdict(int)
+            for ome, row in prep_db0.items():
+                name = row["taxonomy"][rank]
+                found[name] += 1
+                if found[name] <= allowed:
+                    prep_db1[ome] = row
+
+        return prep_db1
+
+    def extract_tax(self, lineages: Union[str, Iterable[str]]) -> "mtdb":
+        """Extract specific taxonomic lineages of interest based on their rank"""
+        if isinstance(lineages, str):
+            lineages = [lineages]
+        lineages = set(x.lower() for x in lineages)
+        rank_dict = {k: self.infer_rank(k) for k in list(lineages)}
+        ranks = list(set(rank_dict.values()))
+
+        new_db = mtdb().set_index()
+        for ome in self:
+            for rank in ranks:
+                try:
+                    if self[ome]["taxonomy"][rank].lower() in lineages:
+                        new_db[ome] = self[ome]
+                except KeyError:  # invalid rank key for row
+                    pass  # probably should standardize tax jsons period
+
+        return new_db
+
+    def extract_ome(self, omes: Iterable[str], column: str = "ome") -> "mtdb":
+        """Extract a list of genome codes (omes) of interest"""
+        new_db = mtdb().set_index(column)
+        db = self.set_index(column)
+        for i in db:
+            if i in list(omes):
+                new_db[i] = db[i]
+        return new_db.set_index()
+
+    def extract_source(self, source: str) -> "mtdb":
+        """Extract an MTDB with genomes from a particular source"""
+        return mtdb(
+            {
+                ome: row
+                for ome, row in self.items()
+                if row["source"].lower() == source.lower()
+            },
+            index="ome",
+        )
+
+    def extract_pub(self) -> "mtdb":
+        """Extract only published and usable genomes"""
+        new_db = mtdb().set_index()
+        for ome, row in self.items():
+            if row["published"]:
+                new_db[ome] = row
+        return new_db
 
 
 def getLogin(ncbi, jgi):
@@ -368,7 +557,7 @@ def encrypt_pw(
     hash_pwd, hash_check = True, False
     while hash_pwd != hash_check:
         if hash_pwd != True:
-            eprint("ERROR: passwords do not match", flush=True)
+            logger.error("passwords do not match")
         hash_pwd = getpass.getpass(prompt="New MycotoolsDB login password: ")
         hash_check = getpass.getpass(prompt="Confirm password: ")
 
@@ -383,7 +572,7 @@ def encrypt_pw(
 def loginCheck(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=False):
     salt = b"D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118"
     # NEED to make this store a password
-    if os.path.isfile(format_path(info_path)):
+    if Path(format_path(info_path)).is_file():
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.backends import default_backend
@@ -409,9 +598,7 @@ def loginCheck(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=F
         decrypted = fernet.decrypt(data)
         data = decrypted.decode("UTF-8").split()
         if len(data) != 4:
-            eprint(
-                "BAD PASSWORD FILE. Delete ~/.mycotools/mtdb_key to reset.", flush=True
-            )
+            logger.error("BAD PASSWORD FILE. Delete ~/.mycotools/mtdb_key to reset.")
             sys.exit(8)
         ncbi_email = data[0].rstrip()
         ncbi_api = data[1].rstrip()
@@ -478,7 +665,7 @@ def primaryDB(path="$MYCODB", verbose=True):
         return None
 
     files = collect_files(full_path, "mtdb")
-    basenames = [os.path.basename(x) for x in files]
+    basenames = [Path(x).name for x in files]
     dates = [x.replace(".mtdb", "") for x in basenames if re.search(r"^\d+\.mtdb$", x)]
     primary = "19991231"  # arbitrary primary for sorting
     for date in dates:
@@ -488,7 +675,7 @@ def primaryDB(path="$MYCODB", verbose=True):
             primary = date
     if primary == "19991231":  # if it is the arbitrary start
         if verbose:
-            eprint("\nWARNING: Primary MTDB not found in " + full_path, flush=True)
+            logger.warning("Primary MTDB not found in " + full_path)
         return None
     primary_path = format_path("$" + path + "/" + primary + ".mtdb")
 
@@ -560,9 +747,9 @@ def df2db(df, db_path, header=False, overwrite=False, std_col=True, rescue=True)
         db_path = format_path(db_path)
     elif overwrite:
         number = 0
-        while os.path.exists(db_path):
+        while Path(db_path).exists():
             number += 1
-            db_path = os.path.normpath(db_path) + "_" + str(number)
+            db_path = str(Path(db_path)) + "_" + str(number)
 
     if std_col:
         df = df2std(df)
@@ -573,18 +760,15 @@ def df2db(df, db_path, header=False, overwrite=False, std_col=True, rescue=True)
             break
         except FileNotFoundError:
             if rescue:
-                eprint(
-                    "\nOutput directory does not exist. Attempting to save in home folder.",
-                    flush=True,
+                logger.warning(
+                    "Output directory does not exist. Attempting to save in home folder."
                 )
-                db_path = "~/" + os.path.basename(os.path.normpath(db_path))
+                db_path = "~/" + Path(str(Path(db_path))).name
                 df.to_csv(db_path, sep="\t", index=None)
                 raise FileNotFoundError
                 break
             else:
-                eprint(
-                    "\nOutput directory does not exist. Rescue not enabled.", flush=True
-                )
+                logger.error("Output directory does not exist. Rescue not enabled.")
                 raise FileNotFoundError
                 break
 
@@ -608,7 +792,7 @@ def hit2taxonomy(
         except urllib.error.HTTPError as goon:
             count += 1
             if count == 5 and skip:
-                print("\n5 failed HTTP queries. Is NCBI down?", flush=True)
+                logger.error("5 failed HTTP queries. Is NCBI down?")
                 sys.exit(100)
             if 500 <= goon.code <= 599:
                 time.sleep(1)
@@ -623,10 +807,10 @@ def hit2taxonomy(
             time.sleep(1)
             count += 1
             if count == 5:
-                eprint("\nERROR: 5 failed taxonomy queries. " + str(taxid), flush=True)
-                eprint(tax_handle, flush=True)
+                logger.error("5 failed taxonomy queries. " + str(taxid))
+                logger.debug("%s", tax_handle)
                 for line in tax_handle:
-                    print(line, flush=True)
+                    logger.debug(line)
                 if skip:
                     sys.exit(1)
                 records = False
@@ -635,9 +819,9 @@ def hit2taxonomy(
             if "latin-1" in str(tax_handle):
                 count = 0
 
-                eprint("\tERROR: latin-1 encoding", flush=True)
+                logger.error("latin-1 encoding")
                 for line in tax_handle:
-                    print(line, flush=True)
+                    logger.debug(line)
                 time.sleep(30)
                 Entrez.email = email
                 Entrez.api_key = api
@@ -656,40 +840,34 @@ def hit2taxonomy(
     return tax_dict, sleep
 
 
-def prepare_tax_dicts(df, tax_dicts={}):
-    """Identify the genera that do not have higher taxonomy ascribed to them"""
+def prepare_tax_dicts(df, tax_dicts=None):
+    """Identify the genera that do not have higher taxonomy ascribed to them.
 
-    need_tax = set()
+    Backwards-compatible dispatcher: MTDBs (and MTDB-shaped dicts) use
+    ``mtdb.prepare_tax_dicts``; a deprecated pandas DataFrame uses the path
+    below."""
+    if tax_dicts is None:
+        tax_dicts = {}
     # is the df of mtdb class or have a taxonomy column as a list?
-    if isinstance(df, mtdb) or isinstance(df["taxonomy"], list):
-        df = df.set_index("ome")
-        for k, v in df.items():
-            if v["genus"] in tax_dicts:
-                continue
-            tax_json = read_tax(v["taxonomy"])
-            if any(
-                v
-                for k, v in tax_json.items()
-                if k not in {"genus", "species", "strain"}
-            ):
-                tax_dicts[v["genus"]] = tax_json
-            else:
-                need_tax.add(v["genus"])
+    if isinstance(df, mtdb):
+        return df.prepare_tax_dicts(tax_dicts)
+    if isinstance(df["taxonomy"], list):
+        return mtdb(df).prepare_tax_dicts(tax_dicts)
     # otherwise it is a pandas dataframe
-    else:
-        df["taxonomy"] = df["taxonomy"].fillna({})
-        for k, v in df.iterrows():
-            if v["genus"] in tax_dicts:
-                continue
-            tax_json = read_tax(v["taxonomy"])
-            if any(
-                v
-                for k, v in tax_json.items()
-                if k not in {"genus", "species", "strain"}
-            ):
-                tax_dicts[v["genus"]] = tax_json
-            else:
-                need_tax.add(v["genus"])
+    need_tax = set()
+    df["taxonomy"] = df["taxonomy"].fillna({})
+    for k, v in df.iterrows():
+        if v["genus"] in tax_dicts:
+            continue
+        tax_json = read_tax(v["taxonomy"])
+        if any(
+            name
+            for rank, name in tax_json.items()
+            if rank not in {"genus", "species", "strain"}
+        ):
+            tax_dicts[v["genus"]] = tax_json
+        else:
+            need_tax.add(v["genus"])
     need_tax = set(need_tax).difference(set(tax_dicts.keys()))
     return need_tax, tax_dicts
 
@@ -712,7 +890,7 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count=0):
 
     count += 1
     if not ids:
-        eprint(f"\t\t{genus} TaxID acquisition failed", flush=True)
+        logger.warning(f"{genus} TaxID acquisition failed")
         return None, count
 
     # for each taxID acquired, fetch the actual taxonomy information
@@ -752,14 +930,14 @@ def query_ncbi4taxonomy(genus, api_key, king, rank, count=0):
                 if lineage["ScientificName"].lower() == king.lower():
                     taxid = tax
                     if len(ids) > 1:
-                        print("\t\tMultiple Tax IDs: " + str(ids), flush=True)
+                        logger.warning("Multiple Tax IDs: " + str(ids))
                     break
     else:
         for lineage in lineages:
             taxid = tax
 
     if taxid == 0:
-        eprint(f"\t\t{genus} not recovered in {king}", flush=True)
+        logger.warning(f"{genus} not recovered in {king}")
         return None, count
 
     # for each taxonomic classification, add it to the taxonomy dictionary string
@@ -797,7 +975,7 @@ def gather_taxonomy(
         with open(output_path + ".tmp", "w") as out:
             for genus, tax_dict in tax_dicts.items():
                 out.write(f"{genus}\t{json.dumps(tax_dict)}\n")
-        os.rename(f"{output_path}.tmp", output_path)
+        Path(f"{output_path}.tmp").rename(output_path)
     return tax_dicts
 
 
@@ -824,7 +1002,7 @@ def gather_taxonomy_dataset(
     with open(tax_accs_file, "w") as out:
         out.write("\n".join(sorted(need_tax)))
 
-    cwd = os.getcwd()
+    cwd = str(Path.cwd())
     os.chdir(output_path)
     cmd_scaf = [
         "datasets",
@@ -852,12 +1030,12 @@ def gather_taxonomy_dataset(
         except zipfile.BadZipFile:
             count += 1
             if count == 3:
-                eprint("ERROR: taxonomy acquisition failed", flush=True)
+                logger.error("taxonomy acquisition failed")
                 sys.exit(130)
             continue
         break
 
-    os.remove(dataset_path)
+    Path(dataset_path).unlink()
     unzip_path = output_path + "ncbi_dataset/"
 
     tax_dicts = parse_dataset_taxonomy(
@@ -901,81 +1079,33 @@ def parse_dataset_taxonomy(tax_json, tax_dicts, tax_head, rank_head):
     return tax_dicts
 
 
-def read_tax(taxonomy_string):
-    """Read taxonomy from an MTDB by converting the string into a dictionary"""
-    tax_strs = [
-        "superkingdom",
-        "kingdom",
-        "phylum",
-        "subphylum",
-        "class",
-        "order",
-        "family",
-        "subfamily",
-    ]
-    if taxonomy_string:
-        if isinstance(taxonomy_string, str):
-            dict_string = taxonomy_string.replace("'", '"')
-            try:
-                tax_dict = json.loads(dict_string)
-            except TypeError:
-                tax_dict = {}
-        else:
-            tax_dict = taxonomy_string
-        try:
-            tax_dict = {**tax_dict, **{x: "" for x in tax_strs if x not in tax_dict}}
-        except TypeError:  # inappropriate tax_dict in the column
-            tax_dict = {x: "" for x in tax_strs}
-        return tax_dict
-    else:
-        return {}
+# read_tax is defined as mtdb.read_tax; expose it at module scope for the
+# historical ``from mycotools.lib.dbtools import read_tax`` import.
+read_tax = mtdb.read_tax
 
 
 # assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database
 # forbid a list of taxonomic classifications you are not interested in and return a new database
-def assimilate_tax(
-    db,
-    tax_dicts,
-    ome_index="ome",
-    forbid={
-        "no rank",
-        "subkingdom",
-        "genus",
-        "species",
-        "species group",
-        "varietas",
-        "forma",
-    },
-):
-
-    genera = set(db["genus"])
-    tax_dicts = {x: tax_dicts[x] for x in tax_dicts if tax_dicts[x]}
-    for genus in tax_dicts:
-        tax_dicts[genus] = {
-            x: tax_dicts[genus][x] for x in tax_dicts[genus] if x not in forbid
-        }
-    missing = list(genera.difference(set(tax_dicts.keys())))
-
-    for miss in missing:
-        tax_dicts[miss] = {}
+def assimilate_tax(db, tax_dicts, ome_index="ome", forbid=None):
+    """Backwards-compatible dispatcher for ``mtdb.assimilate_tax``; retains the
+    deprecated pandas DataFrame path."""
+    if forbid is None:
+        forbid = mtdb._forbidden_tax_ranks
     if isinstance(db, mtdb):
-        for i, genus in enumerate(db["genus"]):
-            db["taxonomy"][i] = tax_dicts[genus]
-        return mtdb(db), tax_dicts
-    else:
-        for i, row in db.iterrows():
-            db.at[i, "taxonomy"] = tax_dicts[row["genus"]]
-
+        return db.assimilate_tax(tax_dicts, forbid=forbid)
+    tax_dicts = mtdb._reconcile_tax_dicts(set(db["genus"]), tax_dicts, forbid)
+    for i, row in db.iterrows():
+        db.at[i, "taxonomy"] = tax_dicts[row["genus"]]
     return db, tax_dicts
 
 
 def parse_user_config(mtdb_config_file=format_path("~/.mycotools/config.json")):
     config_dir = format_path("~/.mycotools/")
-    if not os.path.isdir(config_dir):
-        os.mkdir(config_dir)
+    if not Path(config_dir).is_dir():
+        Path(config_dir).mkdir()
         config_dir += "/"
 
-    if os.path.isfile(mtdb_config_file):
+    if Path(mtdb_config_file).is_file():
         config = read_json(mtdb_config_file)
     else:
         config = {"log": {}}
@@ -1008,9 +1138,9 @@ def mtdb_initialize(
 
     mtdb_config = read_json(mycodb_loc + "config/mtdb.json")
     dbtype = mtdb_config["branch"]
-    eprint("Establishing " + dbtype + " connection", flush=True)
+    logger.info("Establishing " + dbtype + " connection")
 
-    if not os.path.isdir(mycodb_loc + "mtdb/") and not init:
+    if not Path(mycodb_loc + "mtdb/").is_dir() and not init:
         raise FileNotFoundError("invalid MycotoolsDB path")
     dPath = mycodb_loc + "data/"
     user_config[mycodb_loc] = {
@@ -1031,7 +1161,7 @@ def mtdb_initialize(
 
 
 interface = format_path("~/.mycotools/config.json")
-if os.path.isfile(interface):
+if Path(interface).is_file():
     envs_info = read_json(interface)
     if envs_info["active"]:
         for var, env in envs_info[envs_info["active"]].items():

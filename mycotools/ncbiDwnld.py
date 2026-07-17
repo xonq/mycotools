@@ -12,6 +12,7 @@ import json
 import time
 import shutil
 import urllib
+import logging
 import zipfile
 import argparse
 import subprocess
@@ -27,13 +28,15 @@ from mycotools.lib.kontools import (
     format_path,
     prep_output,
     mkOutput,
-    eprint,
-    vprint,
     findExecs,
     read_json,
     split_input,
+    setup_logging,
 )
 from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 pd.options.mode.chained_assignment = None
 
@@ -63,20 +66,20 @@ def prepare_folders(output_path, gff, prot, assem, transcript):
 
     file_types = []
     if assem:
-        if not os.path.exists(output_path + "fna"):
-            os.mkdir(output_path + "fna")
+        if not Path(output_path + "fna").exists():
+            Path(output_path + "fna").mkdir()
         file_types.append("fna")
     if gff:
-        if not os.path.exists(output_path + "gff3"):
-            os.mkdir(output_path + "gff3")
+        if not Path(output_path + "gff3").exists():
+            Path(output_path + "gff3").mkdir()
         file_types.append("gff3")
     if prot:
-        if not os.path.exists(output_path + "faa"):
-            os.mkdir(output_path + "faa")
+        if not Path(output_path + "faa").exists():
+            Path(output_path + "faa").mkdir()
         file_types.append("faa")
     if transcript:
-        if not os.path.exists(output_path + "transcript"):
-            os.mkdir(output_path + "transcript")
+        if not Path(output_path + "transcript").exists():
+            Path(output_path + "transcript").mkdir()
         file_types.append("transcript")
 
     return file_types
@@ -85,7 +88,7 @@ def prepare_folders(output_path, gff, prot, assem, transcript):
 def compile_log(output_path):
 
     acc2log = {}
-    if not os.path.isfile(output_path):
+    if not Path(output_path).is_file():
         with open(output_path, "w") as out:
             out.write("#acc\tassembly_acc\n")
     else:
@@ -120,7 +123,7 @@ def esearch_ncbi(accession, column, database="assembly"):
             time.sleep(1)
             esc_count += 1
     else:
-        print("\tERROR:", accession, "failed to search NCBI")
+        logger.error(f"{accession} failed to search NCBI")
         return None
     return genome_ids
 
@@ -214,7 +217,7 @@ def collect_assembly_accs(
         if not genome_id:  # No IDs retrieved
             if "ome" in row.keys():
                 accession = row["ome"]
-            eprint(spacer + "\t" + accession + " failed to find genome ID", flush=True)
+            logger.error(spacer + "\t" + accession + " failed to find genome ID")
             try:
                 failed.append([accession, datetime.strftime(row["version"], "%Y%m%d")])
             except TypeError:  # if the row can't be formatted as a date
@@ -276,7 +279,7 @@ def run_datasets(include, accs_file, output_path, annotated, api=None, verbose=F
     if annotated:
         dataset_scaf.append("--annotated")
 
-    cwd = os.getcwd()
+    cwd = str(Path.cwd())
     os.chdir(output_path)
     if verbose:
         v = None
@@ -352,7 +355,7 @@ def parse_datasets(datasets_path, unzip_base, req_files, spacer="\t"):
             zip_ref.extractall(unzip_base)
     except zipfile.BadZipFile:
         return False, False, False
-    os.remove(datasets_path)
+    Path(datasets_path).unlink()
     unzip_path = unzip_base + "ncbi_dataset/"
 
     type2ncbi = {
@@ -376,8 +379,8 @@ def parse_datasets(datasets_path, unzip_base, req_files, spacer="\t"):
             if req_files.difference(set(files.keys())):
                 failed.append(data["accession"])
                 for t, f_ in files.items():
-                    if os.path.isfile(f_):
-                        os.remove(f_)
+                    if Path(f_).is_file():
+                        Path(f_).unlink()
             else:
                 acc2data[data["accession"]] = files
 
@@ -394,7 +397,7 @@ def main(
     transcript=False,
     ncbi_df=False,
     remove=False,
-    output_path=os.getcwd(),
+    output_path=str(Path.cwd()),
     verbose=False,
     column="assembly_acc",
     ncbi_column="Assembly",
@@ -408,7 +411,7 @@ def main(
     #                                assembly, transcript)
 
     # check if ncbi_df is a dataframe, and import if not
-    if not isinstance(ncbi_df, pd.DataFrame) and os.path.isfile(ncbi_df):
+    if not isinstance(ncbi_df, pd.DataFrame) and Path(ncbi_df).is_file():
         ncbi_df = ncbidb2df(ncbi_df)
     if len(ncbi_df.index) == 0:
         ncbi_df = pd.DataFrame({i: [v] for i, v in enumerate(list(ncbi_df.keys()))})
@@ -425,7 +428,7 @@ def main(
 
     ## CHANGE TO ACCOMODATE BIOSAMPLE/OTHER NCBICOLUMNS
     if ncbi_column.lower() != "assembly":
-        vprint(f"{spacer}Assembling NCBI ftp directories", v=verbose, flush=True)
+        logger.debug(f"{spacer}Assembling NCBI ftp directories")
         acc2log = compile_log(output_path + "ncbiDwnld.log")
         acc2log, failed, ncbi_df = collect_assembly_accs(
             ncbi_df,
@@ -474,11 +477,11 @@ def main(
     count = 0
     while count < 3:
         if not count:
-            vprint(f"{spacer}Downloading data", v=verbose, flush=True)
+            logger.debug(f"{spacer}Downloading data")
             count += 1
         else:
             count += 1
-            vprint(f"{spacer}\tAttempt {count}", v=verbose, flush=True)
+            logger.debug(f"{spacer}\tAttempt {count}")
 
         run_datasets(
             include,
@@ -499,9 +502,9 @@ def main(
             break
 
     if acc2files == False and acc2org == False and failed == False:
-        eprint(f"{spacer}ERROR: ncbiDwnld failed {count} attempts", flush=True)
+        logger.error(f"{spacer}ncbiDwnld failed {count} attempts")
         # maybe add a fallback to the old methodology here
-        eprint(f"{spacer}Consider --fallback", flush=True)
+        logger.error(f"{spacer}Consider --fallback")
         sys.exit(10)
 
     failed.extend(
@@ -510,11 +513,7 @@ def main(
 
     # Attempt RefSeq accessions
     if failed:
-        vprint(
-            f"{spacer}Attempting alternative repository for failed downloads",
-            v=verbose,
-            flush=True,
-        )
+        logger.debug(f"{spacer}Attempting alternative repository for failed downloads")
         reattempt_acc = []
         for acc in failed:
             if acc.upper().startswith("GCA"):
@@ -563,7 +562,7 @@ def main(
                     ncbi_df.at[acc, tax] = name
                 new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
             except AttributeError:  # multiple entries
-                eprint(f"{spacer}WARNING: {acc} is redundant", flush=True)
+                logger.warning(f"{spacer}{acc} is redundant")
                 for acc1, row1 in ncbi_df.loc[acc].iterrows():
                     for file_t, file_p in acc2files[acc].items():
                         row1[file_t] = file_p
@@ -579,12 +578,7 @@ def main(
                     ncbi_df.at[acc, tax] = name
                 new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
             except AttributeError:  # multiple entries
-                vprint(
-                    f"{spacer}\tWARNING: {check_acc} is redundant",
-                    v=verbose,
-                    e=True,
-                    flush=True,
-                )
+                logger.debug(f"{spacer}\t{check_acc} is redundant")
                 for acc1, row1 in ncbi_df.loc[acc].iterrows():
                     for file_t, file_p in acc2files[check_acc].items():
                         row1[file_t] = file_p
@@ -609,7 +603,7 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
         records = Entrez.read(handle, validate=False)
         for record in records:
             srr = re.search(r'Run acc="(S\w+\d+)"', record["Runs"])[1]
-            print("\t\t" + srr, flush=True)
+            logger.info("\t\t" + srr)
             cmd, count = 1, 0
             if pe:
                 while cmd and count < 3:
@@ -625,7 +619,7 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                     cmd = subprocess.call(
                         [fastqdump, "--split-3", "--gzip", srr], stdout=subprocess.PIPE
                     )
-                    if os.path.isfile(f"{srr}_1.fastq.gz"):
+                    if Path(f"{srr}_1.fastq.gz").is_file():
                         #                  if os.path.isfile(srr + '_1.fastq'):
                         #                        cmd = subprocess.call(['gzip', f'{srr}_1.fastq'])
                         #                       cmd = subprocess.call(['gzip', f'{srr}_2.fastq'])
@@ -637,9 +631,7 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                         )
                     else:
                         #                        cmd = subprocess.call(['gzip', f'{srr}.fastq'])
-                        print(
-                            "\t\t\tWARNING: file failed or not paired-end", flush=True
-                        )
+                        logger.warning("file failed or not paired-end")
             else:
                 while cmd and count < 3:
                     count += 1
@@ -655,24 +647,24 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                     if cmd:
                         continue
                     #                    cmd = subprocess.call(['gzip', f'{srr}.fastq'])
-                    if os.path.isfile(f"{srr}.fastq.gz"):
+                    if Path(f"{srr}.fastq.gz").is_file():
                         shutil.move(f"{srr}.fastq.gz", f"{assembly_acc}_{srr}.fq.gz")
                     else:
-                        print("\t\t\tERROR: file failed", flush=True)
+                        logger.error("file failed")
 
 
-def goSRA(df, output=os.getcwd() + "/", pe=True, column="sra"):
+def goSRA(df, output=str(Path.cwd()) + "/", pe=True, column="sra"):
 
     print()
     sra_dir = output + "sra/"
-    if not os.path.isdir(sra_dir):
-        os.mkdir(sra_dir)
+    if not Path(sra_dir).is_dir():
+        Path(sra_dir).mkdir()
     os.chdir(sra_dir)
     fastqdump = findExecs("fastq-dump", exit={"fastq-dump"})
     count = 0
 
     for i, row in df.iterrows():
-        print("\t" + row[column], flush=True)
+        logger.info("\t" + row[column])
         get_SRA(row[column], fastqdump[0])
         count += 1
         if count >= 10:
@@ -719,6 +711,7 @@ def cli():
         "--fallback", action="store_true", help="Fallback mode if datasets fails"
     )
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.email:
         ncbi_email = args.email
@@ -753,7 +746,7 @@ def cli():
 
     start_time = intro("Download NCBI files", args_dict)
     if args.sra:
-        if os.path.isfile(format_path(args.input)):
+        if Path(format_path(args.input)).is_file():
             if not args.column:
                 goSRA(
                     pd.read_csv(format_path(args.input), sep="\t", names=["sra"]),
@@ -776,7 +769,7 @@ def cli():
                 column="sra",
             )
     else:
-        if os.path.isfile(format_path(args.input)):
+        if Path(format_path(args.input)).is_file():
             ncbi_df = pd.read_csv(args.input, sep="\t", header=None)
             if not args.column:
                 if "assembly_acc" in ncbi_df.keys():
@@ -853,7 +846,7 @@ def cli():
 
         new_df.to_csv(output + "ncbiDwnld.predb", sep="\t", index=None)
         if failed:
-            eprint("ERROR: " + ",".join([str(x[0]) for x in failed]), flush=True)
+            logger.error(",".join([str(x[0]) for x in failed]))
 
     outro(start_time)
 

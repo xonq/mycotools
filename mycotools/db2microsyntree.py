@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import logging
 import os
 import sys
 import shutil
@@ -18,10 +19,13 @@ from mycotools.lib.kontools import (
     findExecs,
     intro,
     outro,
-    eprint,
+    setup_logging,
 )
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import gff2list
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def run_mmseqs(
@@ -35,12 +39,12 @@ def run_mmseqs(
 ):
     symlink_files(["faa"], db, wrk_dir, verbose=False)  # symlink proteomes
     cluster_res_file = wrk_dir + "homolog_groups.tsv"
-    if not os.path.isfile(cluster_res_file):  # NEED to add to log removal
+    if not Path(cluster_res_file).is_file():  # NEED to add to log removal
         # be cautious about shell injection because we need to glob
         int(cpus)
         float(min_id)
         float(min_cov)
-        if not os.path.isdir(wrk_dir):
+        if not Path(wrk_dir).is_dir():
             raise OSError("invalid working directory")
         elif not algorithm in {"mmseqs easy-linclust", "mmseqs easy-cluster"}:
             raise OSError("invalid mmseqs binary")
@@ -71,18 +75,18 @@ def run_mmseqs(
         )
         #                                      stderr = subprocess.DEVNULL)
         shutil.move(wrk_dir + "cluster_cluster.tsv", cluster_res_file)
-    elif os.path.getsize(cluster_res_file):
+    elif Path(cluster_res_file).stat().st_size:
         mmseqs_cmd = 0
     else:
         mmseqs_cmd = 1
     if mmseqs_cmd:
-        eprint("\tERROR: cluster failed")
+        logger.error("cluster failed")
         sys.exit(1)
-    if os.path.isfile(wrk_dir + "cluster_all_seqs.fasta"):
-        os.remove(wrk_dir + "cluster_all_seqs.fasta")
-    if os.path.isfile(wrk_dir + "cluster_rep_seq.fasta"):
-        os.remove(wrk_dir + "cluster_rep_seq.fasta")
-    if os.path.isdir(wrk_dir + "tmp/"):
+    if Path(wrk_dir + "cluster_all_seqs.fasta").is_file():
+        Path(wrk_dir + "cluster_all_seqs.fasta").unlink()
+    if Path(wrk_dir + "cluster_rep_seq.fasta").is_file():
+        Path(wrk_dir + "cluster_rep_seq.fasta").unlink()
+    if Path(wrk_dir + "tmp/").is_dir():
         shutil.rmtree(wrk_dir + "tmp/")
     return cluster_res_file
 
@@ -198,12 +202,9 @@ def compile_cds(gff_list, ome, gene2hg):
             elif not prot:  # if there isn't a valid accession it may mean the
                 # mycotools curation did not work or the user did not curate
                 # correctly
-                print(entry["attributes"], prot_prep_i0, prot_prep_i1)
+                logger.debug("%s %s %s", entry["attributes"], prot_prep_i0, prot_prep_i1)
                 if not fail:
-                    print(
-                        "\tWARNING: " + ome + " has proteins in gff with no Alias",
-                        flush=True,
-                    )
+                    logger.debug("" + ome + " has proteins in gff with no Alias")
                 fail = True
                 continue
             cds_dict[entry["seqid"]][prot].extend(
@@ -234,7 +235,7 @@ def parse_loci(gff_path, ome, gene2hg, window=6):
 
     gff_list = gff2list(gff_path)  # open here to improve pickling
     hg_dict = compile_cds(
-        gff_list, os.path.basename(gff_path).replace(".gff3", ""), gene2hg
+        gff_list, Path(gff_path).name.replace(".gff3", ""), gene2hg
     )
     pairs = []
     for scaf, hgs in hg_dict.items():  # for each contig
@@ -342,26 +343,20 @@ def align_microsynt_np(m_arr, i2ome, hg2gene, hgpair2i, wrk_dir, nschgs=None):
         )
         if len(schgs) > 9:
             nschgs = schgs
-            print(f"\t\t{len(schgs)} HGs in single copy extracted", flush=True)
+            logger.debug(f"{len(schgs)} HGs in single copy extracted")
         elif len(nschgs) < 10:
             nschgs = []
         if nschgs:
-            print(
-                f"\t\t{len(nschgs)} HGs with <= {max_median} median copy "
-                + f"number and <= {max_stdev} standard deviation extracted",
-                flush=True,
-            )
+            logger.debug(f"{len(nschgs)} HGs with <= {max_median} median copy "
+                + f"number and <= {max_stdev} standard deviation extracted")
         max_stdev += 0.2
         if max_stdev > 2:
             max_stdev = 0.1
             max_median += 1
     if not nschgs:
-        eprint(
-            "\nERROR: could not detect 10 genes present in all genomes "
+        logger.error("could not detect 10 genes present in all genomes "
             + "with median 2 copy number and less than 2 copy number "
-            + "standard deviation. Manually input focal homology groups.",
-            flush=True,
-        )
+            + "standard deviation. Manually input focal homology groups.")
         sys.exit(35)
 
     pre_arr = extract_nschg_pairs(nschgs, hgpair2i, m_arr)
@@ -395,8 +390,8 @@ def run_tree(
 ):
 
     tree_dir = wrk_dir + "tree/"
-    if not os.path.isdir(tree_dir):
-        os.mkdir(tree_dir)
+    if not Path(tree_dir).is_dir():
+        Path(tree_dir).mkdir()
 
     prefix = tree_dir + "microsynt"
     tree_cmd = [iqtree, "-s", alignment, "-m", model, "--prefix", prefix]
@@ -437,10 +432,10 @@ def main(
 
     # obtain useable omes
     useableOmes, dbOmes = set(), set(db.keys())
-    print("\nI. Inputting data", flush=True)
+    logger.info("I. Inputting data")
     if n50thresh:  # optional n50 threshold via mycotoolsDB
         assemblyPath = format_path("$MYCODB/../data/assemblyStats.tsv")
-        if os.path.isfile(assemblyPath):
+        if Path(assemblyPath).is_file():
             with open(assemblyPath, "r") as raw:
                 for line in raw:
                     d = line.rstrip().split("\t")
@@ -455,9 +450,9 @@ def main(
         useableOmes = dbOmes
 
     # initialize orthogroup data structures
-    if not hg_file and not os.path.isfile(wrk_dir + "homology_groups.tsv"):
+    if not hg_file and not Path(wrk_dir + "homology_groups.tsv").is_file():
         hg_file = run_mmseqs(db, wrk_dir, algorithm=algorithm, min_id=min_id, cpus=cpus)
-    print("\tParsing homology groups (HGs)", flush=True)
+    logger.info("Parsing homology groups (HGs)")
     ome2i, gene2hg, i2ome, hg2gene = compile_homolog_groups(
         hg_file, wrk_dir, useableOmes
     )
@@ -468,9 +463,9 @@ def main(
 
     # remove genomes that are not in the db
     missing_from_db = set(ome2i.keys()).difference(set(db.keys()))
-    print("\t\tOmes:", len(ome2i), flush=True)
+    logger.info("%s %s", "\t\tOmes:", len(ome2i))
     if missing_from_db:
-        print(f"\t\t\t{len(missing_from_db)} omes in HGs but not mtdb")
+        logger.debug(f"{len(missing_from_db)} omes in HGs but not mtdb")
         for ome in list(missing_from_db):
             del ome2i[ome]
         todel = []
@@ -489,32 +484,32 @@ def main(
         with open(wrk_dir + "ome2i.tsv", "w") as out:
             out.write("\n".join([k + "\t" + str(v) for k, v in ome2i.items()]))
 
-    print("\t\tHGs:", len(hg2gene), flush=True)
-    print("\t\tGenes:", len(gene2hg), flush=True)
+    logger.info("%s %s", "\t\tHGs:", len(hg2gene))
+    logger.info("%s %s", "\t\tGenes:", len(gene2hg))
 
     # compile cooccuring pairs of homogroups in each genome
-    print("\tCompiling all loci", flush=True)
+    logger.info("Compiling all loci")
     cc_arr_path = wrk_dir + "microsynt"
     ome2pairs = compile_loci(db, ome2i, gene2hg, plusminus * 2 + 1, cpus=cpus)
 
     cooccur_dict = None
     #    if not os.path.isfile(out_dir + 'hgps.tsv.gz'):
     # assimilate cooccurrences across omes
-    print("\tIdentifying cooccurences", flush=True)
+    logger.info("Identifying cooccurences")
 
     seed_len = sum([len(ome2pairs[x]) for x in ome2pairs])
-    print("\t\t" + str(seed_len) + " initial HG-pairs", flush=True)
+    logger.debug("" + str(seed_len) + " initial HG-pairs")
     cooccur_array, cooccur_dict, hgpair2i, i2hgpair = form_cooccur_structures(
         ome2pairs, 2, ome2i, cc_arr_path
     )
     max_omes = max([len(cooccur_dict[x]) for x in cooccur_dict])
-    print("\t\t" + str(max_omes) + " maximum organisms with HG-pair", flush=True)
+    logger.debug("" + str(max_omes) + " maximum organisms with HG-pair")
     cooccur_array[cooccur_array > 0] = 1
     cooccur_array.astype(np.uint8)
-    print("\t\t" + str(sys.getsizeof(cooccur_array) / 1000000) + " MB", flush=True)
+    logger.debug("" + str(sys.getsizeof(cooccur_array) / 1000000) + " MB")
     cooccur_array, del_omes = remove_nulls(cooccur_array)
     for i in del_omes:
-        print(f"\t\t\t{i2ome[i]} removed for lacking overlap")
+        logger.debug(f"{i2ome[i]} removed for lacking overlap")
         del i2ome[i]
 
     ome2i = {v: i for i, v in enumerate(i2ome)}
@@ -533,8 +528,8 @@ def main(
 
     ome2pairs = {ome2i[ome]: v for ome, v in ome2pairs.items() if ome in ome2i}
     microsynt_dict = {}
-    print("\nII. Microsynteny tree", flush=True)
-    if not os.path.isfile(tree_path):
+    logger.info("II. Microsynteny tree")
+    if not Path(tree_path).is_file():
         nschgs = []
         if near_single_copy_genes:
             try:
@@ -550,11 +545,11 @@ def main(
                     }
                 )
         # create microsynteny distance matrix and make tree
-        print("\tPreparing microsynteny alignment", flush=True)
+        logger.info("Preparing microsynteny alignment")
         align_file = align_microsynt_np(
             cooccur_array, i2ome, hg2gene, hgpair2i, wrk_dir, nschgs
         )
-        print("\tBuilding microsynteny tree", flush=True)
+        logger.info("Building microsynteny tree")
         run_tree(
             align_file,
             wrk_dir,
@@ -565,8 +560,8 @@ def main(
             cpus=cpus,
         )
         # too bulky to justify keeping
-        if os.path.isfile(cc_arr_path + ".npy"):
-            os.remove(cc_arr_path + ".npy")
+        if Path(cc_arr_path + ".npy").is_file():
+            Path(cc_arr_path + ".npy").unlink()
 
     return ome2i, gene2hg, i2ome, hg2gene, ome2pairs, cooccur_dict
 
@@ -612,17 +607,18 @@ def cli():
     parser.add_argument("-c", "--cpus", default=1, type=int)
     parser.add_argument("-o", "--output")
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     execs = ["iqtree"]
     if args.orthofinder:
         of_out = format_path(args.orthofinder)
-        if os.path.isdir(of_out):
+        if Path(of_out).is_dir():
             homogroups = of_out + "/Orthogroups/Orthogroups.txt"
             hg_dir = of_out + "/Orthogroup_Sequences/"
         else:
             homogroups = of_out
-            hg_dir = os.path.dirname(of_out) + "../Orthogroup_Sequences/"
-        if not os.path.isfile(hg_dir + "OG0000000.fa"):
+            hg_dir = str(Path(of_out).parent) + "../Orthogroup_Sequences/"
+        if not Path(hg_dir + "OG0000000.fa").is_file():
             hg_dir = None
         method = "orthofinder"
     elif args.input:
@@ -642,7 +638,7 @@ def cli():
     findExecs(execs, exit=set(execs))
 
     if not args.output:
-        out_dir = mkOutput(os.getcwd() + "/", "db2microsyntree")
+        out_dir = mkOutput(str(Path.cwd()) + "/", "db2microsyntree")
     else:
         out_dir = mkOutput(format_path(args.output), "db2microsyntree")
 
@@ -658,8 +654,8 @@ def cli():
     intro("db2microsyntree", args_dict, "Zachary Konkel")
 
     wrk_dir = out_dir + "working/"
-    if not os.path.isdir(wrk_dir):
-        os.mkdir(wrk_dir)
+    if not Path(wrk_dir).is_dir():
+        Path(wrk_dir).mkdir()
 
     if args.focal_genes:
         with open(format_path(args.focal_genes), "r") as raw:

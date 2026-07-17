@@ -1,20 +1,23 @@
 #! /usr/bin/env python3
 
-import os
+import logging
 import re
 import sys
 import argparse
 from itertools import chain
 from cogent3 import PhyloNode, load_tree
-from mycotools.lib.kontools import format_path, split_input, eprint, vprint
+from mycotools.lib.kontools import format_path, split_input, setup_logging
 from mycotools.lib.dbtools import mtdb
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def compile_tree(tree_path, root=[], verbose=False):
     """Compile a phylogeny from a path and conver the tip names to an index"""
     phylo = load_tree(tree_path)
     tips = set(phylo.get_tip_names())
-    vprint(f"{len(tips)} tips on input", v=verbose, e=True)
+    logger.debug(f"{len(tips)} tips on input")
 
     if len(root) == 1:
         phylo = phylo.rooted_with_tip(root[0])
@@ -27,9 +30,7 @@ def compile_tree(tree_path, root=[], verbose=False):
         mrca_tip_len = min([v[1] for v in list(nodes.values())])
         mrca_edge = [k for k, v in nodes.items() if v[1] == mrca_tip_len]
         if mrca_edge[0] == "root":
-            eprint(
-                f"WARNING: rooting with {root} does not change current tree", flush=True
-            )
+            logger.warning(f"rooting with {root} does not change current tree")
         phylo = phylo.rooted_at(mrca_edge[0])
 
     return phylo
@@ -39,7 +40,7 @@ def prune_to_new(phylo, tips=[], spacer=""):
     """Prune missing tips from a rooted phylogeny"""
     missing = set(phylo.get_tip_names()).difference(tips)
     if missing:
-        eprint(f"{spacer}Removing {len(missing)} tips", flush=True)
+        logger.info(f"{spacer}Removing {len(missing)} tips")
         todel = []
         for n in phylo.tips():
             if n.name in missing:
@@ -97,13 +98,14 @@ def cli():
         help="Omit support values",
     )
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     root = split_input(args.root)
 
     if args.tips:
         tips_path = format_path(args.tips)
-        if os.path.isfile(tips_path):
-            eprint("\nDetecting path input", flush=True)
+        if Path(tips_path).is_file():
+            logger.info("Detecting path input")
             with open(tips_path, "r") as raw:
                 tips = list(chain(*[line.rstrip().split() for line in raw]))
         else:
@@ -114,8 +116,8 @@ def cli():
     convert = {}
     if args.convert:
         convert_path = format_path(args.convert)
-        if os.path.isfile(convert_path):
-            eprint("\nDetecting path input", flush=True)
+        if Path(convert_path).is_file():
+            logger.info("Detecting path input")
             with open(convert_path, "r") as raw:
                 for line in raw:
                     data = line.rstrip()
@@ -123,7 +125,7 @@ def cli():
                         k2v = data.split()
                         convert[k2v[0]] = k2v[1]
         else:
-            eprint("\nERROR: --convert must be a valid reference file", flush=True)
+            logger.error("--convert must be a valid reference file")
 
     if args.mtdb:
         db = mtdb(format_path(args.mtdb))
@@ -136,7 +138,7 @@ def cli():
         format_path(args.input), db, tips, trim=args.prune, root=root, convert=convert
     )
 
-    eprint(f"{len(phylo.get_tip_names())} tips on output", flush=True)
+    logger.info(f"{len(phylo.get_tip_names())} tips on output")
     p_str = phylo.get_newick(with_distances=True)
     if args.support:
         print(p_str, flush=True)

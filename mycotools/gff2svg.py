@@ -3,14 +3,24 @@
 # NEED TO PARSE FOR IN GENE COORDINATES AND ANNOTATIONS
 # NEED to create a single file output option for multiple inputs
 
-import os
 import re
 import sys
 import random
+import logging
 import argparse
-from mycotools.lib.kontools import sys_start, format_path, file2list, getColors
+from mycotools.lib.kontools import (
+    sys_start,
+    format_path,
+    file2list,
+    getColors,
+    setup_logging,
+)
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from mycotools.lib.biotools import gff2list, gff3Comps
+from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 def compileProducts(gff, prod_comp, types={"tRNA", "mRNA", "rRNA"}):
@@ -61,7 +71,7 @@ def gff2svg(
                 elif not gen_new_colors:
                     product = null
                 elif product not in product_dict:
-                    print(product)
+                    logger.debug(product)
                     try:  # try to use the next color
                         product_dict[product] = colors[count]
                         count += 1
@@ -207,6 +217,7 @@ def cli():
     )
     parser.add_argument("-o", "--output", help="Optional output directory")
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if not args.regex:
         regex = gff3Comps()["product"]
@@ -230,13 +241,13 @@ def cli():
         if args.output:
             out_dir = format_path(args.output)
         else:
-            out_dir = format_path(os.path.dirname(args.input))
+            out_dir = format_path(str(Path(args.input).parent))
         gffs = file2list(args.input)
         for entry in gffs:
             if entry.endswith("/"):
                 entry = re.sub(r"/+$", "", entry)
-        svg_path = os.path.dirname(gffs[0]) + re.sub(
-            r"\.gf[^\.]+$", ".svg", os.path.basename(gffs[0])
+        svg_path = str(Path(gffs[0]).parent) + re.sub(
+            r"\.gf[^\.]+$", ".svg", Path(gffs[0]).name
         )
         product_dict = main(
             gff2list(gffs[0]),
@@ -248,8 +259,8 @@ def cli():
             shuffle=args.shuffle,
         )
         for gff in gffs[1:]:
-            svg_path = os.path.dirname(gff) + re.sub(
-                r"\.gf[^\.]+$", ".svg", os.path.basename(gff)
+            svg_path = str(Path(gff).parent) + re.sub(
+                r"\.gf[^\.]+$", ".svg", Path(gff).name
             )
             product_dict = main(
                 gff2list(gff),
@@ -267,11 +278,11 @@ def cli():
             args.gff = re.sub(r"/+$", "", args.gff)
         if args.output:
             svg_path = format_path(args.output) + re.sub(
-                r"\.gf[^\.]+$", ".svg", os.path.basename(args.gff)
+                r"\.gf[^\.]+$", ".svg", Path(args.gff).name
             )
         else:
-            svg_path = os.path.dirname(args.gff) + re.sub(
-                r"\.gf[^\.]+$", ".svg", os.path.basename(args.gff)
+            svg_path = str(Path(args.gff).parent) + re.sub(
+                r"\.gf[^\.]+$", ".svg", Path(args.gff).name
             )
         main(
             gff2list(args.gff),

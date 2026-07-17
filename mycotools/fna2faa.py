@@ -1,12 +1,17 @@
 #! /usr/bin/env python3
 
 import sys
+import logging
 from Bio.Seq import Seq
-from mycotools.lib.kontools import format_path, stdin2str, sys_start
+from mycotools.lib.kontools import format_path, stdin2str, sys_start, setup_logging
 from mycotools.lib.biotools import fa2dict, dict2fa
 
 
+logger = logging.getLogger(__name__)
+
+
 def cli():
+    setup_logging()
     usage = 'Input nucleotide fasta ("-" for stdin), translate to protein fasta'
     args = sys_start(sys.argv[1:], usage, 1)
     if args[0] == "-":
