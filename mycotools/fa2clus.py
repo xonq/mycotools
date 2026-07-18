@@ -245,68 +245,6 @@ def rd_dmnd_distmtx(outputFile, minVal, pid=True):
     return distance_matrix  # , outMatrix
 
 
-def runUsearch(fasta, output, clus_var, cpus=1, verbose=False):
-
-    if verbose:
-        subprocess.call(
-            [
-                "usearch",
-                "-calc_distmx",
-                fasta,
-                "-tabbedout",
-                output,
-                "-clus_var",
-                clus_var,
-                "-threads",
-                str(cpus),
-            ]  # stdout = subprocess.PIPE,
-            # stderr = subprocess.PIPE
-        )
-    else:
-        subprocess.call(
-            [
-                "usearch",
-                "-calc_distmx",
-                fasta,
-                "-tabbedout",
-                output,
-                "-clus_var",
-                clus_var,
-                "-threads",
-                str(cpus),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-
-def rd_usrch_distmtx(dis_path, sep="\t"):
-    """Imports a distance matrix with each line formatted as `organism $SEP organism $SEP distance`.
-    - this is equivalent to the `-tabbedout` argument in `usearch -calc_distmx`. The function
-    compiles a dictionary with the information and reciprocal information for each organism in each
-    line, then converts this dictionary of dictionaries into a pandas dataframe. As a distance matrix,
-    NA values are converted to maximum distance (1)."""
-
-    distance_matrix = pd.DataFrame()
-    with open(dis_path, "r") as raw:
-        data = raw.read()
-    prepData = [x.rstrip() for x in data.split("\n") if x != ""]
-
-    dist_dict = {}
-    for line in prepData:
-        vals = line.split(sep)
-        if vals[0] not in dist_dict:
-            dist_dict[vals[0]] = {}
-        if vals[1] not in dist_dict:
-            dist_dict[vals[1]] = {}
-        dist_dict[vals[0]][vals[1]] = float(vals[2])
-        dist_dict[vals[1]][vals[0]] = float(vals[2])
-
-    distance_matrix = pd.DataFrame(dist_dict).sort_index(0).sort_index(1)
-
-    return distance_matrix.fillna(1.0)
-
-
 def scikitaggd(distance_matrix, maxDist=0.6, linkage="single"):
     """Performs agglomerative clustering and extracts the cluster labels, then sorts according to
     cluster number. In the future, this will also extract a Newick tree."""
