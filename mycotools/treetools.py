@@ -5,7 +5,7 @@ import re
 import sys
 import argparse
 from itertools import chain
-from cogent3 import PhyloNode, load_tree
+from cogent3 import load_tree
 from mycotools.lib.kontools import format_path, split_input, setup_logging
 from mycotools.lib.dbtools import mtdb
 from pathlib import Path

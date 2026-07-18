@@ -21,7 +21,7 @@ from mycotools.lib.biotools import (
     gff2Comps,
     gtfComps,
 )
-from mycotools.lib.dbtools import mtdb, primaryDB, loginCheck
+from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.utils.gtf2gff3 import main as gtf2gff3
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
@@ -449,7 +449,6 @@ def cur_fna(cur_raw_fna_path, uncur_raw_fna_path, ome):
         ver_num = ome_ver[2]
     else:
         less_ome = ome
-        ver_num = 0
     with open(cur_raw_fna_path + ".tmp", "w") as out:
         with open(uncur_raw_fna_path, "r") as in_:
             for line in in_:
@@ -627,7 +626,6 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
     ver_search = re.search(r"(.{6}\d+)\.(\d+)", ome)
     if ver_search is not None:
         less_ome = ver_search[1]
-        ome_ver = ver_search[2]
     else:
         less_ome = ome
     for line in gff:

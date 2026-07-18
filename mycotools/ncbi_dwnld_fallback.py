@@ -8,7 +8,6 @@ import logging
 import os
 import re
 import sys
-import gzip
 import time
 import shutil
 import urllib
@@ -16,9 +15,7 @@ import urllib.request
 import requests
 import argparse
 import subprocess
-import numpy as np
 import pandas as pd
-from contextlib import closing
 from tqdm import tqdm
 from Bio import Entrez
 from datetime import datetime
@@ -30,16 +27,15 @@ from mycotools.lib.kontools import (
     findExecs,
     setup_logging,
 )
-from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
+from mycotools.lib.dbtools import log_editor, loginCheck, mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 def ncbidb2df(data, stdin=False):
-    import pandas as pd, pandas
+    import pandas as pd
 
-    columns = mtdb.columns
     if isinstance(data, mtdb):
         db_df = pd.DataFrame(data.reset_index())
     elif not stdin:
@@ -279,7 +275,6 @@ def collect_ftps(
 
             strain = ""  # populate a fallback strain
             record_info = record["DocumentSummarySet"]["DocumentSummary"][0]
-            assemblyID = record_info["AssemblyAccession"]
             org = record_info["SpeciesName"].split()
             genus = org[0]
             if len(org) > 2:
@@ -317,7 +312,6 @@ def collect_ftps(
                     failed.append([accession, str(row["version"])])
                 continue
 
-            esc_count = 0
             ass_md5, gff_md5, trans_md5, prot_md5, md5s = "", "", "", "", {}
             basename = Path(ftp_path).name
 

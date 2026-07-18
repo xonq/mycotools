@@ -9,7 +9,6 @@ Calculates basic genome statistics.
 
 import os
 import sys
-import copy
 import logging
 import multiprocessing as mp
 from mycotools.lib.dbtools import mtdb

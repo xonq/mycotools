@@ -5,12 +5,11 @@
 import logging
 import re
 import sys
-import copy
 import argparse
 from collections import defaultdict
 from mycotools.lib.biotools import gff2list, list2gff, gff2Comps, gff3Comps
 from mycotools.lib.kontools import format_path, setup_logging
-from mycotools.utils.gtf2gff3 import add_genes, remove_start_stop
+from mycotools.utils.gtf2gff3 import add_genes
 from mycotools.utils.curGFF3 import rename_and_organize
 
 logger = logging.getLogger(__name__)

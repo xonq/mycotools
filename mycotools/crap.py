@@ -29,7 +29,7 @@ from itertools import chain
 from collections import Counter, defaultdict
 
 try:
-    from ete3 import Tree, faces, TreeStyle, NodeStyle, AttrFace
+    from ete3 import Tree, faces, TreeStyle, NodeStyle
     from ete3.parser.newick import NewickError
 except ImportError:
     raise ImportError(
@@ -350,7 +350,6 @@ def outgroup_mngr(
     fa2clus_log = read_json(log_path)
     algorithm = fa2clus_log["algorithm"]  # use previous search algorithm
     successes = fa2clus_log["successes"]
-    iterations = fa2clus_log["iterations"]
     prev_size = len(fa2dict(clus_dir + "../" + str(focal_gene) + ".fa"))
 
     max_success = successes[0]
@@ -972,7 +971,6 @@ def parse_log(log_path, new_log, out_dir):
     except FileNotFoundError:
         old_log = None
 
-    rereun_search = False
     if old_log:
         try:
             with open(old_log["db_path"], "rb") as raw:
@@ -1527,7 +1525,6 @@ def hg_main(
                     interval=interval,
                     verbose=False,
                 )
-            out_query = query + ".outgroup"
             query_hits = all_keys
             out_keys = list(set(all_keys).difference(in_keys))
             logger.debug("" + str(len(in_keys)) + " gene ingroup")
@@ -1739,7 +1736,6 @@ def search_main(
         logger.debug("Running clustering on " + str(len(fas4clus)) + " fastas")
 
     logger.info("CRAP")
-    ome2genes = {}
     fas4trees = {k: v for k, v in sorted(fas4trees.items(), key=lambda x: len(x[1]))}
     for query, query_fa in fas4trees.items():
         out_keys = None
@@ -1840,7 +1836,6 @@ def search_main(
                     verbose=False,
                 )
             query_hits = all_keys
-            out_query = query + ".outgroup"
             out_keys = list(set(all_keys).difference(set(in_keys)))
             logger.debug("" + str(len(in_keys)) + " gene ingroup")
             if out_keys:
@@ -2079,7 +2074,6 @@ def cli():
         )
 
     db = mtdb(args.mtdb)
-    gene0 = input_genes[0]
     ome = input_genes[0][: input_genes[0].find("_")]
     if not ome in set(db["ome"]):
         if Path(args.query).is_file():

@@ -12,7 +12,7 @@ import re
 import sys
 import argparse
 from collections import defaultdict
-from mycotools.lib.kontools import sys_start, format_path, mkOutput, setup_logging
+from mycotools.lib.kontools import format_path, mkOutput, setup_logging
 from mycotools.lib.biotools import gff2list, list2gff, gff3Comps, gff2Comps, gtfComps
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.utils.curGFF3 import rename_and_organize

@@ -5,8 +5,6 @@ import re
 import sys
 import gzip
 import argparse
-from Bio import SeqIO
-from collections import defaultdict
 
 # from mycotools.lib.biotools import dict2fq
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging

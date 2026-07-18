@@ -12,7 +12,6 @@ import re
 import sys
 import time
 import logging
-import getpass
 import argparse
 import subprocess
 import pandas as pd

@@ -305,7 +305,6 @@ def main(in_path, log_path=None, cpus=1, db=None):
 def cli():
 
     setup_logging()
-    output = False
     usage = "\nUSAGE: `gff`/`gtf`/`gff3` OR mycotoolsDB, optional output file\n"
     if "-h " in sys.argv or "--help" in sys.argv or "-h" == sys.argv[-1]:
         print(usage, flush=True)

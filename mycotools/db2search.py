@@ -12,18 +12,13 @@
 # NEED nhmmer option
 # NEED to .tmp and move files
 
-import os
 import re
 import sys
-import copy
 import logging
-import datetime
 import argparse
 import subprocess
 import multiprocessing as mp
-from io import StringIO
 from collections import defaultdict
-from mycotools.db2files import soft_main as db2files
 from mycotools.lib.kontools import (
     intro,
     outro,
@@ -44,7 +39,7 @@ from mycotools.lib.biotools import dict2fa, fa2dict, fa2dict_str
 # from mycotools.extractHmmsearch import main as exHmm
 from mycotools.acc2fa import dbmain as acc2fa_db, famain as acc2fa_fa
 from mycotools.utils.extractHmmsearch import main as exHmm
-from mycotools.utils.extractHmmAcc import grabAccs, main as absHmm
+from mycotools.utils.extractHmmAcc import grabAccs
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -199,7 +194,6 @@ def compile_hmmalign_cmds(output, accessions):
         hmm = output + "/hmms/" + acc + ".hmm"
         align = output + "/aligns/" + acc + ".stockholm"
         conv = output + "/aligns/" + acc + ".phylip"
-        trim = output + "/trimmed/" + acc + ".clipkit.fa"
         if Path(conv).is_file():
             with open(conv, "r") as raw:
                 data = raw.read()
@@ -641,7 +635,6 @@ def compileResults(res_dict, skip=[]):
         for hit in res_dict[i]:
             query = hit[0]
             subject = hit[1]
-            pident = hit[2]
             start = hit[-4]
             end = hit[-3]
             if query not in output_res:
@@ -1134,7 +1127,6 @@ def parseDBout(db, file_, bitscore=0, pident=0, ppos=0, max_hits=None):
                 ome_results[ome].append(data)
 
     x_omes = set(db["ome"])
-    omes_results = {x: ome_results[x] for x in ome_results if x in x_omes}
 
     if max_hits:
         out_results = {}
@@ -1244,7 +1236,6 @@ def blast_main(
         seq_type = "prot"
         biotype = "faa"
     elif blast in {"blastx", "blastn"}:
-        seq_type = "nucl"
         biotype = "fna"
     else:
         logger.error("invalid search binary: " + blast)

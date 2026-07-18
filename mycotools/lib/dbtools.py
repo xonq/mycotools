@@ -545,7 +545,6 @@ def encrypt_pw(
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    from cryptography.hazmat.backends import default_backend
 
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -575,7 +574,6 @@ def loginCheck(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=F
     if Path(format_path(info_path)).is_file():
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-        from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives import hashes
 
         kdf = PBKDF2HMAC(
@@ -686,7 +684,7 @@ def primaryDB(path="$MYCODB", verbose=True):
 # returns database dataframe
 def db2df(data, stdin=False):
     """Deprecated legacy Pandas implementation of MTDB import"""
-    import pandas as pd, pandas
+    import pandas as pd
 
     columns = mtdb.columns
     if isinstance(data, mtdb):
@@ -737,7 +735,7 @@ def df2std(df):
 # if rescue is set to 0, do not output database if output dir does not exit
 def df2db(df, db_path, header=False, overwrite=False, std_col=True, rescue=True):
     """Deprecated output pandas MTDB implementation to file"""
-    import pandas as pd, pandas
+    import pandas as pd
 
     df = df.set_index("ome")
     df = df.sort_index()

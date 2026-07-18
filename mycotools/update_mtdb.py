@@ -16,12 +16,8 @@ import logging
 import os
 import re
 import sys
-import time
 import json
-import base64
 import shutil
-import getpass
-import hashlib
 import zipfile
 import requests
 import argparse
@@ -69,8 +65,6 @@ from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
 from mycotools.predb2mtdb import main as predb2mtdb
 from mycotools.predb2mtdb import predb_headers, read_predb, gen_omes
-from mycotools.assemblyStats import main as assStats
-from mycotools.annotationStats import main as annStats
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -852,7 +846,6 @@ def ref_update(
     # run JGI
     if jgi and len(jgi_df) > 0:
         logger.info("Assimilating MycoCosm")
-        jgi_db_path = update_path + date + ".jgi.mtdb"
         jgi_predb_path = update_path + date + ".jgi.predb2.mtdb"
 
         if not Path(jgi_predb_path).is_file():
@@ -1012,7 +1005,6 @@ def ref_update(
             tax_dicts=tax_dicts,
         )
         new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts)
-        dupFiles = {"fna": {}, "faa": {}, "gff3": {}}
 
         for ome, row in update_mtdb.items():
             if row["genus"] in genus_dicts:
@@ -1293,7 +1285,6 @@ def rogue_update(
     else:
         jgi_mtdb = None
         new_db = db
-        new_dups = duplicates
 
     logger.info("Assimilating NCBI (10 download/second w/API key, 3 w/o)")
     new_db["version"] = new_db["version"].astype(str)
@@ -1386,7 +1377,6 @@ def rogue_update(
         output_path=tax_path,
     )
     new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts)
-    dupFiles = {"fna": {}, "faa": {}, "gff3": {}}
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb(

@@ -12,7 +12,6 @@ import shutil
 import argparse
 import subprocess
 import contextlib
-import multiprocessing as mp
 from collections import defaultdict
 from mycotools.lib.kontools import (
     collect_files,
@@ -143,7 +142,6 @@ def run_clipkit(
         ]
     else:
         cmd = ["clipkit", mafft_name, "--output", clipkit_out_name]
-        mode = "smart-gap"
         gappy = None
 
     # execute immediately
@@ -226,7 +224,6 @@ def run_mf(
     """Run ModelFinder on its own in preparation for multigene phylogeny
     reconstruction"""
     # set the CPUs for each ModelFinder run arbitrarily
-    cpus_per_cmd = 3
     # determine the concurrent ModelFinder runs that are possible
     concurrent_cmds = round((cpus - 1) / 4 - 0.5)  # round down
     if not concurrent_cmds:

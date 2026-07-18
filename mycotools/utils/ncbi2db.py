@@ -10,17 +10,9 @@
 import logging
 import os
 import re
-import sys
 import copy
-import argparse
-import subprocess
-import numpy as np
-import pandas as pd
 from datetime import datetime
-from mycotools.lib.kontools import intro, outro
-from mycotools.lib.dbtools import db2df, df2db, primaryDB
 from mycotools.ncbiDwnld import main as ncbi_dwnld
-from mycotools.predb2mtdb import main as predb2mtdb
 
 logger = logging.getLogger(__name__)
 

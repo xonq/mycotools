@@ -10,11 +10,7 @@ import re
 import sys
 import copy
 import shutil
-import string
-import random
-import tempfile
 import argparse
-import itertools
 import subprocess
 import pandas as pd
 from collections import defaultdict

@@ -7,7 +7,7 @@ import argparse
 from Bio.Seq import Seq
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps, dict2fa
-from mycotools.lib.kontools import format_path, sys_start, stdin2str, setup_logging
+from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,6 @@ def grabCoords(cdss):
                 pos_dict[seqid][gene] = []
             pos_dict[seqid][gene].append([int(entry["start"]) - 1, int(entry["end"])])
         elif entry["strand"].rstrip() == "-":
-            negseq = seqid
             if seqid not in neg_dict:
                 neg_dict[seqid], neg_dict[seqid][gene] = {}, []
             elif gene not in neg_dict[seqid]:

@@ -4,7 +4,6 @@
 
 import logging
 import sys
-import argparse
 from Bio.Seq import Seq
 from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa

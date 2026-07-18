@@ -2,7 +2,6 @@
 
 import logging
 import os
-import re
 import sys
 import argparse
 from datetime import datetime
@@ -126,16 +125,6 @@ def cli():
     db_path = format_path(args.mtdb)
     args.output = format_path(args.output, force_dir=True)
     output_path = prep_output(args.output, cd=False)
-    args_dict = {
-        "DATABASE": db_path,
-        "OUTPUT": output_path,
-        "ASSEMBLY": args.assembly,
-        "PROTEOME": args.proteome,
-        "GFF3": args.gff,
-        "Print links": args.print,
-        "Hard copy": args.hard,
-        "New MTDB": args.new_mtdb,
-    }
 
     filetypes = []
     if args.proteome:

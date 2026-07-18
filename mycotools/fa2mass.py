@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-import re
 import sys
 import logging
 from mycotools.lib.kontools import sys_start, format_path, fmt_float, setup_logging

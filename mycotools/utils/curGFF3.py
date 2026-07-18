@@ -349,7 +349,6 @@ def add_missing(gff_list, intron, comps, ome):
                     continue
 
     if introns:
-        exons = {}
         for gene, intronList in introns.items():
             if out_genes[gene]["exon"]:
                 continue

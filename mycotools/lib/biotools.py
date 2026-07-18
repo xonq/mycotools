@@ -3,7 +3,6 @@
 # NEED to convert gff list to appropriate types
 
 import re
-import sys
 from collections import defaultdict
 from itertools import chain
 

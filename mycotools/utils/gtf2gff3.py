@@ -590,7 +590,6 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
                 entry["attributes"] += f";Alias={alias_dict[trans]}"
             exon_check[trans] += 1
         elif entry["type"] == "CDS":
-            alias = alias_dict[trans]
             trans = tran_comp.search(entry["attributes"])[1]
             cds = cds_check[trans] + 1
             entry["attributes"] = f"ID={trans}.cds{cds};Parent="

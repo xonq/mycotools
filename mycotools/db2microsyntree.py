@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-import os
 import sys
 import shutil
 import argparse
@@ -10,7 +9,7 @@ import numpy as np
 import multiprocessing as mp
 from tqdm import tqdm
 from itertools import combinations
-from collections import defaultdict, Counter
+from collections import defaultdict
 from mycotools.db2files import soft_main as symlink_files
 from mycotools.db2hgs import id_near_schgs
 from mycotools.lib.kontools import (
@@ -527,7 +526,6 @@ def main(
     #       cooccur_array = np.load(cc_arr_path + '.npy')
 
     ome2pairs = {ome2i[ome]: v for ome, v in ome2pairs.items() if ome in ome2i}
-    microsynt_dict = {}
     logger.info("II. Microsynteny tree")
     if not Path(tree_path).is_file():
         nschgs = []

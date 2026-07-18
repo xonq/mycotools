@@ -4,7 +4,6 @@ import logging
 import re
 import sys
 import argparse
-import multiprocessing as mp
 from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
@@ -91,7 +90,6 @@ def contig2gbk(
         + "+"
     )
     name = ome + "_" + contig
-    relative_end = seq_coords[-1][1] - seq_coords[0][0]
     gbk = (
         "LOCUS       "
         + name
@@ -379,8 +377,6 @@ def gen_gbk(
                 if count0:
                     if v1[0] - v0[1] > break_contigs:
                         breaks.add(k0)
-                k0 = k1
-                v0 = v1
                 count0 += 1
 
             count1 = 0

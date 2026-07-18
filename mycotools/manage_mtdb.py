@@ -5,7 +5,7 @@ import sys
 import logging
 import argparse
 from mycotools.lib.dbtools import loginCheck, primaryDB, mtdb, encrypt_pw
-from mycotools.lib.kontools import format_path, read_json, collect_files, setup_logging
+from mycotools.lib.kontools import format_path, read_json, setup_logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

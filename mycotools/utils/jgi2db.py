@@ -2,18 +2,13 @@
 
 import logging
 import os
-import re
 import sys
 import copy
 import time
-import getpass
 import datetime
 import argparse
-import subprocess
 import pandas as pd
 import numpy as np
-from io import StringIO
-from mycotools.predb2mtdb import main as predb2mtdb
 from mycotools.lib.kontools import intro, outro, setup_logging
 from mycotools.lib.dbtools import db2df, df2db, readLog, log_editor
 from mycotools.jgiDwnld import jgi_login as jgi_login
@@ -259,7 +254,6 @@ def main(
         ome_col = "assembly_acc"
     elif "portal" in jgi_df.columns:
         ome_col = "portal"
-        name_col = "name"
     else:
         logger.debug(spacer + "invalid MycoCosm tsv headers")
         sys.exit(3)
@@ -513,9 +507,6 @@ def cli():
         with open(args.login, "r") as raw:
             prep = raw.read()
         data = [x.split("\t") for x in prep.split("\n")]
-        user = data[0][0]
-        pwd = data[0][1]
-        email = data[1][0]
         apikey = None
         if len(data[1]) > 1:
             if data[1][1] != "":

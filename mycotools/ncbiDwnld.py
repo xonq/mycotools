@@ -7,7 +7,6 @@
 import os
 import re
 import sys
-import gzip
 import json
 import time
 import shutil
@@ -16,9 +15,7 @@ import logging
 import zipfile
 import argparse
 import subprocess
-import numpy as np
 import pandas as pd
-from contextlib import closing
 from tqdm import tqdm
 from Bio import Entrez
 from datetime import datetime
@@ -33,7 +30,7 @@ from mycotools.lib.kontools import (
     split_input,
     setup_logging,
 )
-from mycotools.lib.dbtools import log_editor, loginCheck, mtdb, read_tax
+from mycotools.lib.dbtools import log_editor, loginCheck, mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -42,9 +39,8 @@ pd.options.mode.chained_assignment = None
 
 
 def ncbidb2df(data, stdin=False):
-    import pandas as pd, pandas
+    import pandas as pd
 
-    columns = mtdb.columns
     if isinstance(data, mtdb):
         db_df = pd.DataFrame(data.reset_index())
     elif not stdin:
@@ -244,7 +240,6 @@ def collect_assembly_accs(
             record_info = record["DocumentSummarySet"]["DocumentSummary"][0]
             assemblyID = record_info["AssemblyAccession"]
 
-            esc_count = 0
             log_editor(
                 output_path + "ncbiDwnld.log",
                 str(new_acc),
