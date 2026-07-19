@@ -4,7 +4,14 @@ import os
 import sys
 import logging
 import argparse
-from mycotools.lib.dbtools import loginCheck, primaryDB, mtdb, encrypt_pw
+from mycotools.lib.dbtools import (
+    loginCheck,
+    primaryDB,
+    mtdb,
+    encrypt_pw,
+    getLogin,
+    store_login,
+)
 from mycotools.lib.kontools import format_path, read_json, setup_logging
 from pathlib import Path
 
@@ -98,6 +105,12 @@ def cli():
         help="Encrypt NCBI/JGI passwords to expedite access",
     )
     parser.add_argument(
+        "-s",
+        "--store",
+        action="store_true",
+        help="Store NCBI/JGI credentials WITHOUT a password (unencrypted, chmod 600)",
+    )
+    parser.add_argument(
         "-r",
         "--restrict",
         help="Restrict assembly accessions file, formatted: "
@@ -109,9 +122,15 @@ def cli():
 
     db = mtdb(primaryDB()).set_index("assembly_acc")
 
+    if args.password and args.store:
+        logger.error("--password and --store are mutually exclusive")
+        sys.exit(1)
     if args.password:
         ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck()
         encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd)
+    if args.store:
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi=True, jgi=True)
+        store_login(ncbi_email, ncbi_api, jgi_email, jgi_pwd)
     if args.restrict:
         restrict_path = format_path(args.restrict)
         with open(restrict_path, "r") as raw:

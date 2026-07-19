@@ -534,6 +534,65 @@ def getLogin(ncbi, jgi):
     return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
 
+# Path to the UNENCRYPTED credential store (see store_login). Kept separate from
+# the password-encrypted key (`~/.mycotools/mtdb_key`) so the two never collide.
+PLAIN_LOGIN_PATH = "~/.mycotools/mtdb_credentials.json"
+
+
+def store_login(
+    ncbi_email,
+    ncbi_api,
+    jgi_email,
+    jgi_pwd,
+    info_path=PLAIN_LOGIN_PATH,
+    encrypted_path="~/.mycotools/mtdb_key",
+):
+    """Store NCBI/JGI credentials WITHOUT a MycotoolsDB password.
+
+    Credentials are written as JSON with owner-only (0600) permissions. Unlike
+    `encrypt_pw`, no password is set or required to read them back - trading
+    encryption for convenience. Anyone able to read the file can read the JGI
+    password in the clear, so the file permissions are its only protection.
+    """
+    info_path = format_path(info_path)
+    Path(info_path).parent.mkdir(parents=True, exist_ok=True)
+    data = {
+        "ncbi_email": ncbi_email or "",
+        "ncbi_api": ncbi_api or "",
+        "jgi_email": jgi_email or "",
+        "jgi_pwd": jgi_pwd or "",
+    }
+    # create the file with restrictive permissions *before* writing the secret,
+    # so the password is never briefly exposed with a broader umask
+    fd = os.open(info_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as out:
+        json.dump(data, out)
+    os.chmod(info_path, 0o600)
+    logger.warning(
+        "Stored credentials UNENCRYPTED at %s (permissions 600). Anyone able to "
+        "read this file can read your JGI password.", info_path
+    )
+    # a password-encrypted key would otherwise take precedence in loginCheck;
+    # remove it so the no-password store is the one that is actually used
+    enc = Path(format_path(encrypted_path))
+    if enc.is_file():
+        enc.unlink()
+        logger.info("Removed prior password-encrypted key %s", str(enc))
+
+
+def read_plain_login(info_path=PLAIN_LOGIN_PATH):
+    """Return (ncbi_email, ncbi_api, jgi_email, jgi_pwd) from the unencrypted
+    store written by `store_login`. Missing fields come back as empty strings."""
+    with open(format_path(info_path), "r") as raw:
+        data = json.load(raw)
+    return (
+        data.get("ncbi_email", ""),
+        data.get("ncbi_api", ""),
+        data.get("jgi_email", ""),
+        data.get("jgi_pwd", ""),
+    )
+
+
 def encrypt_pw(
     ncbi_email,
     ncbi_api,
@@ -566,11 +625,19 @@ def encrypt_pw(
     encrypt_data = fernet.encrypt(out_data.encode("utf-8"))
     with open(format_path(info_path), "wb") as out:
         out.write(encrypt_data)
+    # keep credentials in exactly one place: drop any unencrypted store
+    plain = Path(format_path(PLAIN_LOGIN_PATH))
+    if plain.is_file():
+        plain.unlink()
+        logger.info("Removed unencrypted credential store %s", str(plain))
 
 
 def loginCheck(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=False):
     salt = b"D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118"
-    # NEED to make this store a password
+    # Credential source precedence:
+    #   1. password-encrypted key   (encrypt_pw)      - prompts for a password
+    #   2. unencrypted store        (store_login)     - no password required
+    #   3. interactive prompt       (getLogin)        - not persisted
     if Path(format_path(info_path)).is_file():
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -602,12 +669,14 @@ def loginCheck(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=F
         ncbi_api = data[1].rstrip()
         jgi_email = data[2].rstrip()
         jgi_pwd = data[3].rstrip()
+        return ncbi_email, ncbi_api, jgi_email, jgi_pwd
+    elif Path(format_path(PLAIN_LOGIN_PATH)).is_file():
+        # unencrypted store written by store_login - no password required
+        return read_plain_login(PLAIN_LOGIN_PATH)
     else:
         ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi, jgi)
         # CURRENTLY THE REST DOESNT WORK, SO SKIP FOR NOW
         return ncbi_email, ncbi_api, jgi_email, jgi_pwd
-    #
-    return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
 
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit`
