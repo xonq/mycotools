@@ -861,17 +861,24 @@ def ref_update(
 
             logger.info("Curating MycoCosm data")
             jgi_premtdb = jgi_predb.fillna("").to_dict(orient="list")
-            jgi_mtdb, jgi_failed1 = predb2mtdb(
-                jgi_premtdb,
-                mtdb(),
-                update_path,
-                #                                            forbidden = forbid_omes,
-                cpus=cpus,
-                remove=remove,
-                spacer="\t\t",
-            )
             jgi_failed = list(jgi_failed)
-            jgi_failed.extend(jgi_failed1)
+            # a downloaded assembly path is required to curate; if no JGI genome
+            # was successfully retrieved (e.g. all portals failed) skip curation
+            # rather than raising a KeyError and aborting the whole run
+            if "assemblyPath" in jgi_premtdb:
+                jgi_mtdb, jgi_failed1 = predb2mtdb(
+                    jgi_premtdb,
+                    mtdb(),
+                    update_path,
+                    #                                            forbidden = forbid_omes,
+                    cpus=cpus,
+                    remove=remove,
+                    spacer="\t\t",
+                )
+                jgi_failed.extend(jgi_failed1)
+            else:
+                logger.warning("No JGI assemblies downloaded; skipping MycoCosm curation")
+                jgi_mtdb = mtdb()
             jgi_mtdb.df2db(jgi_predb_path)
             for failure in jgi_failed:
                 add_failed(
