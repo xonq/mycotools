@@ -1,27 +1,53 @@
 #! /usr/bin/env python3
 """
-PLEASE respect JGI's ping time limits. I've tuned it to respect their
-unannounced limit.
+Download MycoCosm (JGI fungal) genome data.
 
+JGI retired its legacy ``get-directory`` XML download endpoint. Downloads now go
+through the JGI Data Portal API (https://files.jgi.doe.gov), which this module
+drives directly (no Globus):
 
-NEED to remove gff v gff3 option
+    1. authenticate at signon.jgi.doe.gov (the ``jgi_session`` cookie value is
+       the session token);
+    2. list an organism's files via the ``mycocosm_file_list`` search endpoint;
+    3. restore any archived (PURGED, on-tape) files via ``request_archived_files``;
+    4. download immediately-available (RESTORED) files as a single zip stream via
+       the ``download_files`` endpoint, authorized with
+       ``Authorization: Bearer <session token>``.
+
+The file-selection hierarchy mirrors ``parse_xml`` (retained below as the
+canonical reference and for backwards-compatible imports). In particular the
+GFF3 hierarchy selects the *filtered* gene models only - JGI ``jat_label``
+``genes_filtered`` (i.e. the GeneCatalog / FilteredModels ``.gff``) - never the
+unfiltered ``genes_all`` models, exactly as the XML parser did.
+
+PLEASE respect JGI's rate limits.
 """
 
 import os
 import re
 import sys
 import time
+import shutil
+import zipfile
 import logging
 import argparse
 import subprocess
+import requests
 import pandas as pd
 import xml.etree.ElementTree as ET
 from tqdm import tqdm
+from urllib.parse import unquote
 from mycotools.lib.kontools import format_path, outro, intro, setup_logging
 from mycotools.lib.dbtools import loginCheck
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# JGI Data Portal API endpoints (non-Globus)
+SIGNON_URL = "https://signon.jgi.doe.gov/signon/create"
+SEARCH_URL = "https://files.jgi.doe.gov/mycocosm_file_list/"
+RESTORE_URL = "https://files.jgi.doe.gov/request_archived_files/"
+DOWNLOAD_URL = "https://files-download.jgi.doe.gov/download_files/"
 
 
 def jgi_login(user, pwd):
@@ -75,38 +101,61 @@ def dwnld_xml(output, ome, max_tempts=2):
         return xml_cmd
 
 
+def is_directory_xml(xml_data):
+    """Return whether `xml_data` is a well-formed JGI organism-directory XML
+    document rather than an HTML error/redirect page.
+
+    JGI has, at times, served 302 redirect pages or error HTML (e.g. when an
+    endpoint is deprecated) in place of the directory XML. Those must be caught
+    here so they never reach the XML parser, which would otherwise raise an
+    unhandled ParseError and abort the entire download run."""
+    if not xml_data or not xml_data.strip():
+        return False
+    head = xml_data.lstrip().lower()
+    if head.startswith("<!doctype html") or head.startswith("<html"):
+        return False
+    try:
+        ET.fromstring(xml_data)
+    except ET.ParseError:
+        return False
+    return True
+
+
 def retrieve_xml(ome, output):
     """Retrieve JGI xml file tree. First check if it already exists, if not then
     download it using JGI's prescribed method. Then open the xml and check for
-    the common 'Portal does not exist' error. If so, report."""
+    the common 'Portal does not exist' error, and validate that the response is
+    actually XML (not an HTML error/redirect page). Report failures so the ome
+    is skipped rather than crashing the parser."""
 
-    if Path(output + "/" + str(ome) + ".xml").exists():
-        with open(output + "/" + str(ome) + ".xml", "r") as xml_raw:
-            xml_data = xml_raw.read()
-        if xml_data == "Portal does not exist":
-            logger.error("\t`" + ome + " not in JGIs `organism` database")
-            xml_cmd = 1
-            Path(output + "/" + ome + ".xml").unlink()
-        elif not xml_data:
-            xml_cmd = None
-            Path(f"{output}/{ome}.xml").unlink()
-        else:
-            xml_cmd = -1
-    else:
-        xml_cmd = dwnld_xml(output, ome)
+    xml_path = f"{output}/{ome}.xml"
 
-    if xml_cmd == 0:
-        with open(output + "/" + ome + ".xml", "r") as xml_raw:
-            xml_data = xml_raw.read()
-        if xml_data == "Portal does not exist":
-            logger.error("\t`" + ome + " not in JGIs `organism` database")
-            xml_cmd = 1
-            Path(output + "/" + ome + ".xml").unlink()
-        elif not xml_data:
-            xml_cmd = None
-            Path(f"{output}/{ome}.xml").unlink()
+    if not Path(xml_path).exists():
+        dwnld_xml(output, ome)
+    if not Path(xml_path).exists():
+        return None  # curl produced no file; caller will retry
 
-    return xml_cmd
+    with open(xml_path, "r") as xml_raw:
+        xml_data = xml_raw.read()
+
+    if xml_data == "Portal does not exist":
+        logger.error("\t`" + ome + " not in JGIs `organism` database")
+        Path(xml_path).unlink()
+        return 1
+    if not xml_data:
+        Path(xml_path).unlink()
+        return None
+    if not is_directory_xml(xml_data):
+        # non-XML response (e.g. an HTML error/redirect page from a deprecated
+        # JGI endpoint); discard so it never reaches parse_xml
+        logger.error(
+            f"\t`{ome}` returned a non-XML directory response "
+            "(the JGI download API may have changed); skipping"
+        )
+        Path(xml_path).unlink()
+        return 1
+
+    return -1
 
 
 def parse_xml(ft, xml_file, masked=False, forbidden={}, filtered=True):
@@ -165,8 +214,13 @@ def parse_xml(ft, xml_file, masked=False, forbidden={}, filtered=True):
 
     url, md5, filename = None, False, None
 
-    # parse the XML file
-    tree = ET.parse(xml_file)
+    # parse the XML file; a malformed/non-XML file (e.g. an HTML error page that
+    # slipped through) must not abort the whole run
+    try:
+        tree = ET.parse(xml_file)
+    except ET.ParseError as parse_error:
+        logger.error(f"\tmalformed JGI directory XML {xml_file}: {parse_error}")
+        return None, None, False, None
     root = tree.getroot()
     flip = True
     org_name = None
@@ -564,6 +618,344 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
     return check, preexisting, file_type, ran_dwnld, org_name
 
 
+# ===========================================================================
+# JGI Data Portal API - non-Globus download implementation (see module docstring)
+# ===========================================================================
+
+# Ordered, most-preferred-first jat_labels and acceptable (un-gzipped) file
+# formats per download type. This encodes the same hierarchy as parse_xml's
+# ft2xt/ft2fh/ft2fn/ft2fe hashes above - most importantly, "gff3" resolves only
+# to the filtered gene models (genes_filtered), never genes_all.
+_TYPE_LABELS = {
+    "gff3": (["genes_filtered"], {"gff", "gff3"}),
+    "faa": (["proteins_filtered"], {"fasta", "fa", "aa"}),
+    "transcript": (["transcripts_filtered"], {"fasta", "fa", "fna", "fsa", "nt"}),
+    "est": (["ests", "est_clusters"], {"fasta", "fa", "fna", "fsa"}),
+}
+
+
+def _file_format(f):
+    """Return a file's lowercase format from its metadata, falling back to the
+    filename extension (ignoring a trailing .gz)."""
+    fmt = ((f.get("metadata") or {}).get("file_format") or "").lower()
+    if fmt:
+        return fmt
+    name = re.sub(r"\.gz$", "", f.get("file_name", ""), flags=re.IGNORECASE)
+    ext = re.search(r"\.([^.]+)$", name)
+    return ext[1].lower() if ext else ""
+
+
+def _jat_label(f):
+    """Return a file's lowercase JGI Analysis Task label (the canonical file
+    role, e.g. assembly_masked, genes_filtered)."""
+    return ((f.get("metadata") or {}).get("jat_label") or "").lower()
+
+
+def _is_restored(f):
+    """Whether a file is immediately downloadable (on disk) rather than PURGED
+    to tape."""
+    return str(f.get("file_status", "")).upper() == "RESTORED"
+
+
+def select_file(files, ftype, masked=True):
+    """Choose the single best file record for `ftype` from an organism's file
+    list, mirroring parse_xml's selection hierarchy.
+
+    Preference, in order:
+      1. immediately-available (RESTORED) files over archived (PURGED) ones -
+         matching the legacy parser's avoidance of on-tape ``get_tape_file``
+         URLs (and its masked->unmasked flip when the preferred assembly was on
+         tape);
+      2. the type's own label preference (e.g. masked assembly before unmasked
+         when ``masked`` is set).
+
+    Returns the chosen file dict, or None if the organism has no matching file.
+    """
+    if ftype == "fna":
+        labels = (["assembly_masked", "assembly_unmasked"] if masked
+                  else ["assembly_unmasked", "assembly_masked"])
+        formats = {"fasta", "fa", "fna", "fsa"}
+        name_ok = lambda n: True
+    elif ftype in _TYPE_LABELS:
+        labels, formats = _TYPE_LABELS[ftype]
+        if ftype == "faa":
+            # proteins_filtered also tags the .tab annotation and promoter files;
+            # keep only the actual proteome fasta
+            name_ok = lambda n: bool(re.search(r"\.aa\.fa(sta)?(\.gz)?$", n, re.IGNORECASE))
+        else:
+            name_ok = lambda n: True
+    else:
+        return None
+
+    candidates = []
+    for f in files:
+        label = _jat_label(f)
+        if label not in labels:
+            continue
+        if _file_format(f) not in formats:
+            continue
+        if not name_ok(f.get("file_name", "")):
+            continue
+        status_rank = 0 if _is_restored(f) else 1
+        candidates.append((status_rank, labels.index(label), f))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda t: (t[0], t[1]))
+    return candidates[0][2]
+
+
+def parse_org_name(name):
+    """Split a JGI organism name (e.g. "Acaromyces ingoldii MCA 4198 v1.0") into
+    (genus, species, strain), dropping a trailing version token. Mirrors the
+    legacy label parse (strain is the remaining words concatenated)."""
+    parts = str(name).split()
+    if not parts:
+        return "", "", ""
+    genus = parts[0]
+    species = parts[1] if len(parts) > 1 else "sp."
+    rest = parts[2:]
+    if rest and re.fullmatch(r"[vV]?\d+(\.\d+)*", rest[-1]):
+        rest = rest[:-1]
+    return genus, species, "".join(rest)
+
+
+def _fill_if_empty(df, i, col, value):
+    """Set df.at[i, col] = value only when there is no existing non-empty value,
+    so curated reference genus/species/strain are preserved while bare-accession
+    input is populated from JGI metadata."""
+    if not value:
+        return
+    cur = df.at[i, col] if col in df.columns else None
+    if cur is None or (isinstance(cur, float) and pd.isna(cur)) or str(cur).strip() == "":
+        df.at[i, col] = value
+
+
+def jgi_api_login(user, pwd, max_attempts=5, spacer="\t"):
+    """Authenticate against JGI's signon service and return (session, token).
+    The session token (the jgi_session cookie value) authorizes the search,
+    restore, and download endpoints. Exits (100) after repeated failures, as the
+    legacy login did."""
+    session = requests.Session()
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = session.post(
+                SIGNON_URL, data={"login": user, "password": pwd}, timeout=120
+            )
+        except requests.RequestException as error:
+            logger.warning(f"{spacer}\tJGI login error (attempt {attempt}): {error}")
+            time.sleep(5)
+            continue
+        token = session.cookies.get("jgi_session")
+        if resp.status_code == 200 and token:
+            return session, unquote(token)
+        logger.warning(
+            f"{spacer}\tJGI login failed (attempt {attempt}, status {resp.status_code})"
+        )
+        time.sleep(5)
+    logger.error(f"{spacer}Failed {max_attempts} JGI login attempts.")
+    sys.exit(100)
+
+
+def search_organism(session, portal_id, spacer="\t", max_attempts=3):
+    """Return (organism_record, files) for a MycoCosm portal id (e.g. "Acain1")
+    from the JGI Data Portal search endpoint, paginating to gather every file.
+    Returns (None, []) if the organism is absent or the query fails."""
+    org, files, page = None, [], 1
+    while True:
+        params = {"organism": portal_id, "api_version": "2", "x": "50", "p": str(page)}
+        data = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = session.get(
+                    SEARCH_URL, params=params,
+                    headers={"accept": "application/json"}, timeout=120,
+                )
+            except requests.RequestException as error:
+                logger.warning(f"{spacer}\t{portal_id} search error (attempt {attempt}): {error}")
+                time.sleep(2)
+                continue
+            if resp.status_code != 200:
+                logger.warning(f"{spacer}\t{portal_id} search HTTP {resp.status_code}")
+                time.sleep(2)
+                continue
+            try:
+                data = resp.json()
+            except ValueError:
+                logger.warning(f"{spacer}\t{portal_id} search returned non-JSON")
+                time.sleep(2)
+                continue
+            break
+        if data is None:
+            return None, []
+        organisms = data.get("organisms") or []
+        if not organisms:
+            break
+        if org is None:
+            org = organisms[0]
+        files.extend(organisms[0].get("files") or [])
+        total = data.get("file_total") or len(files)
+        if len(files) >= total or not data.get("next_page"):
+            break
+        page += 1
+    return org, files
+
+
+def _mycocosm_ids(org_id, top_hit, portal_id, file_ids):
+    """Build the request_archived_files / download_files ``ids`` payload for a
+    MycoCosm organism."""
+    entry = {"file_ids": list(file_ids)}
+    if top_hit:
+        entry["top_hit"] = top_hit
+    if portal_id:
+        entry["mycocosm_portal_id"] = portal_id
+    return {org_id: entry}
+
+
+def request_restore(session, token, ids_payload, spacer="\t"):
+    """Request that archived (PURGED) files be restored to disk. Returns the
+    restore request's status URL, or None on failure."""
+    body = {"ids": ids_payload, "send_mail": False, "api_version": "2"}
+    try:
+        resp = session.post(
+            RESTORE_URL, json=body,
+            headers={"accept": "application/json", "content-type": "application/json",
+                     "Authorization": "Bearer " + token}, timeout=120,
+        )
+    except requests.RequestException as error:
+        logger.warning(f"{spacer}\trestore request error: {error}")
+        return None
+    if resp.status_code != 200:
+        logger.warning(f"{spacer}\trestore request failed (HTTP {resp.status_code})")
+        return None
+    try:
+        return resp.json().get("request_status_url")
+    except ValueError:
+        return None
+
+
+def _fmt_elapsed(seconds):
+    """Human-friendly mm:ss / h:mm elapsed string."""
+    seconds = int(seconds)
+    if seconds < 3600:
+        return f"{seconds // 60}m{seconds % 60:02d}s"
+    return f"{seconds // 3600}h{(seconds % 3600) // 60:02d}m"
+
+# what each JGI restore status means for a tape->disk transfer, surfaced to users
+_RESTORE_STATUS_MSG = {
+    "new": "request queued",
+    "pending": "retrieving from tape",
+    "staging": "staging to disk",
+    "ready": "staged to disk",
+    "expired": "restore expired",
+}
+
+
+def poll_restore(session, status_url, timeout=60, interval=30, spacer="\t",
+                 label="", heartbeat=60):
+    """Poll a tape-restore request until its files are READY (returns True) or
+    the timeout / expiry is reached (returns False).
+
+    Progress is logged so the user can see the tape->disk transfer advance:
+    every status transition (queued -> retrieving -> staging -> ready) is
+    reported, plus a heartbeat every `heartbeat` seconds while a stage lingers."""
+    if not status_url:
+        return False
+    tag = f"{label}: " if label else ""
+    waited = 0
+    last_status = None
+    last_heartbeat = 0
+    while waited <= timeout:
+        status = ""
+        try:
+            resp = session.get(status_url, headers={"accept": "application/json"}, timeout=60)
+            status = (resp.json().get("status") or "").lower()
+        except (requests.RequestException, ValueError):
+            pass
+        if status == "ready":
+            logger.info(
+                f"{spacer}\t{tag}tape restore complete - files staged to disk "
+                f"(waited {_fmt_elapsed(waited)})"
+            )
+            return True
+        if status == "expired":
+            logger.warning(f"{spacer}\t{tag}tape restore expired; a new request is needed")
+            return False
+        # surface the transfer's progress: log each stage change, then a
+        # periodic heartbeat so a long-running stage does not look hung
+        detail = _RESTORE_STATUS_MSG.get(status, status or "waiting")
+        if status != last_status:
+            logger.info(
+                f"{spacer}\t{tag}tape restore: {detail} "
+                f"(elapsed {_fmt_elapsed(waited)}; disk restores usually take "
+                "<1 h, up to a night)"
+            )
+            last_status = status
+            last_heartbeat = waited
+        elif heartbeat and waited - last_heartbeat >= heartbeat:
+            logger.info(
+                f"{spacer}\t{tag}tape restore still in progress: {detail} "
+                f"(elapsed {_fmt_elapsed(waited)})"
+            )
+            last_heartbeat = waited
+        time.sleep(interval)
+        waited += interval
+    logger.warning(
+        f"{spacer}\t{tag}tape restore did not complete within {_fmt_elapsed(timeout)}"
+    )
+    return False
+
+
+def download_zip(session, token, ids_payload, dest_zip, spacer="\t", max_attempts=3):
+    """Download the given RESTORED files as a single zip stream. Returns True on
+    success (dest_zip written), False otherwise."""
+    body = {"ids": ids_payload, "api_version": "2"}
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = session.post(
+                DOWNLOAD_URL, json=body,
+                headers={"accept": "application/json", "content-type": "application/json",
+                         "Authorization": "Bearer " + token}, timeout=1800, stream=True,
+            )
+        except requests.RequestException as error:
+            logger.warning(f"{spacer}\tdownload error (attempt {attempt}): {error}")
+            time.sleep(5)
+            continue
+        ctype = resp.headers.get("content-type", "")
+        if resp.status_code == 200 and "zip" in ctype.lower():
+            with open(dest_zip, "wb") as out:
+                for chunk in resp.iter_content(chunk_size=1 << 20):
+                    if chunk:
+                        out.write(chunk)
+            resp.close()
+            return True
+        resp.close()
+        logger.warning(
+            f"{spacer}\tdownload attempt {attempt} failed (HTTP {resp.status_code}, {ctype})"
+        )
+        time.sleep(5)
+    return False
+
+
+def extract_zip(zip_path, wanted, spacer="\t"):
+    """Extract files from a JGI download archive. `wanted` maps a member's
+    basename -> destination path. Returns the set of basenames extracted."""
+    extracted = set()
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            members = {Path(m).name: m for m in archive.namelist()}
+            for basename, dest in wanted.items():
+                member = members.get(basename)
+                if member is None:
+                    continue
+                Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(member) as src, open(dest, "wb") as out:
+                    shutil.copyfileobj(src, out)
+                extracted.add(basename)
+    except zipfile.BadZipFile:
+        logger.error(f"{spacer}\tcorrupt JGI download archive {zip_path}")
+    return extracted
+
+
 def main(
     df,
     output,
@@ -576,54 +968,25 @@ def main(
     est=False,
     masked=True,
     spacer="\t",
+    restore_timeout=60,
+    poll_interval=30,
+    request_delay=3,
 ):
-    #    pd.options.mode.chained_assignment = None  # default='warn'
-    if not "assembly_acc" in df.columns:
-        if len(df.columns) != 1:
-            logger.error(
-                "Invalid input. No assembly_acc column and more than one column."
-            )
-        else:
-            ome_col = list(df.columns)[0]
-    else:
+    """Download MycoCosm data for the JGI portal ids in `df` via the JGI Data
+    Portal API (non-Globus), preserving the legacy contract: `df` gains
+    ``<type>_path`` columns (e.g. fna_path, gff3_path) plus genus/species/strain,
+    and the function returns (df, failed_portal_ids).
+
+    Archived (PURGED) files are restored from tape before download; if a restore
+    does not finish within `restore_timeout` the portal id is deferred (added to
+    the returned failure set) so a later rerun can pick it up once ready."""
+    if "assembly_acc" in df.columns:
         ome_col = "assembly_acc"
-
-    logger.info(spacer + "Logging into JGI")
-    login_attempt = 0
-    while jgi_login(user, pwd) != 0 and login_attempt < 5:
-        logger.warning(
-            spacer + "\tJGI Login Failed. Attempt: " + str(login_attempt)
-        )
-        time.sleep(5)
-        login_attempt += 1
-        if login_attempt == 3:
-            logger.error(spacer + "\tFailed 3 login attempts.")
-            sys.exit(100)
-
-    if not Path(output + "/xml").exists():
-        Path(output + "/xml").mkdir()
-    # perhaps add a counter here, but one that checks if it is actually querying jgi
-    logger.info("Retrieving `xml` directories")
-    ome_set, count = set(), 0
-    for i, row in tqdm(df.iterrows(), total=len(df)):
-        error_check, attempt = True, 0
-        while error_check != -1 and attempt < 3:
-            attempt += 1
-            error_check = retrieve_xml(row[ome_col], output + "/xml")
-            if error_check is None:
-                time.sleep(1)
-                continue
-            #            elif error_check > 0:
-            #               ome_set.add(row[ome_col])
-            elif error_check != -1:
-                time.sleep(0.3)
-        if error_check != -1:
-            logger.warning(f"{spacer}\t{row[ome_col]} failed to retrieve XML")
-            ome_set.add(row[ome_col])
-
-    logger.info(
-        f"{spacer}Downloading {len(df)} JGI files\n\t" + "Maximum rate: 1 file/min"
-    )
+    elif len(df.columns) == 1:
+        ome_col = list(df.columns)[0]
+    else:
+        logger.error("Invalid input. No assembly_acc column and more than one column.")
+        return df, set()
 
     dwnlds = []
     if assembly:
@@ -634,69 +997,123 @@ def main(
         dwnlds.append("gff3")
     if transcript:
         dwnlds.append("transcript")
-    #        dwnlds.append( 'AllTranscript' )
     if est:
         dwnlds.append("est")
 
+    output = str(output).rstrip("/")
     for typ in dwnlds:
-        if not Path(output + "/" + typ).is_dir():
-            Path(output + "/" + typ).mkdir()
+        Path(os.path.join(output, typ)).mkdir(parents=True, exist_ok=True)
+    tmp_dir = os.path.join(output, "jgi_zip")
+    Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
-    preexisting, ran_dwnld = True, False
-    for i, row in df.iterrows():
-        ome = row[ome_col]
-        if ran_dwnld:
-            time.sleep(60)
-        if ome not in ome_set:
-            jgi_login(user, pwd)
-            if "ome" in row.keys():
-                logger.info(spacer + row["ome"] + "\t" + ome)
+    logger.info(spacer + "Logging into JGI")
+    session, token = jgi_api_login(user, pwd, spacer=spacer)
+
+    logger.info(f"{spacer}Downloading {len(df)} JGI organism(s) via the JGI Data Portal API")
+    ome_set = set()
+    for i, row in tqdm(df.iterrows(), total=len(df)):
+        portal_id = row[ome_col]
+
+        org, files = search_organism(session, portal_id, spacer=spacer)
+        if not org:
+            logger.warning(f"{spacer}\t{portal_id} not found in JGI MycoCosm")
+            ome_set.add(portal_id)
+            continue
+
+        org_id = org.get("id")
+        top_hit = (org.get("top_hit") or {}).get("_id")
+        portal = org.get("mycocosm_portal_id") or portal_id
+
+        selected = {}
+        for typ in dwnlds:
+            chosen = select_file(files, typ, masked=masked)
+            if chosen is not None:
+                selected[typ] = chosen
+        if not selected:
+            logger.warning(f"{spacer}\t{portal_id}: no target files available")
+            ome_set.add(portal_id)
+            continue
+
+        # JGI keeps most files in tape archive (file_status PURGED); those must
+        # be transferred to disk (RESTORED) before they can be downloaded. Report
+        # which files are on tape vs already on disk, then request the restore.
+        on_disk = [f for f in selected.values() if _is_restored(f)]
+        on_tape = [f for f in selected.values() if not _is_restored(f)]
+        if on_disk:
+            logger.info(
+                f"{spacer}\t{portal_id}: {len(on_disk)} file(s) already on disk: "
+                + ", ".join(f.get("file_name", f["_id"]) for f in on_disk)
+            )
+        if on_tape:
+            logger.warning(
+                f"{spacer}\t{portal_id}: {len(on_tape)} file(s) are archived on TAPE and "
+                "must be restored to disk before download - "
+                + ", ".join(f.get("file_name", f["_id"]) for f in on_tape)
+            )
+            status_url = request_restore(
+                session, token,
+                _mycocosm_ids(org_id, top_hit, portal, [f["_id"] for f in on_tape]),
+                spacer=spacer,
+            )
+            if not poll_restore(
+                session, status_url, timeout=restore_timeout, interval=poll_interval,
+                spacer=spacer, label=portal_id,
+            ):
+                logger.warning(
+                    f"{spacer}\t{portal_id}: tape restore still pending; deferring this "
+                    "genome (rerun later to resume once JGI has staged it to disk)"
+                )
+                ome_set.add(portal_id)
+                continue
+
+        file_ids = [f["_id"] for f in selected.values()]
+        dest_zip = os.path.join(tmp_dir, f"{portal_id}.zip")
+        if not download_zip(
+            session, token, _mycocosm_ids(org_id, top_hit, portal, file_ids), dest_zip, spacer=spacer
+        ):
+            logger.warning(f"{spacer}\t{portal_id}: download failed")
+            ome_set.add(portal_id)
+            continue
+
+        wanted, type_dest = {}, {}
+        for typ, f in selected.items():
+            name = f["file_name"]
+            dest = os.path.join(output, typ, name)
+            wanted[name] = dest
+            type_dest[typ] = (name, dest)
+        extracted = extract_zip(dest_zip, wanted, spacer=spacer)
+        if Path(dest_zip).is_file():
+            Path(dest_zip).unlink()
+
+        essential_failed = False
+        for typ, (name, dest) in type_dest.items():
+            if name in extracted and Path(dest).is_file():
+                df.at[i, typ + "_path"] = dest
+                logger.info(f"{spacer}\t{portal_id} {typ}: {name}")
             else:
-                logger.info(spacer + ome)
-            for typ in dwnlds:
-                check, preexisting, new_typ, ran_dwnld, org_name = jgi_dwnld(
-                    ome, typ, output, masked=masked, spacer=spacer
-                )
-                if type(check) != int:
-                    df.at[i, new_typ + "_path"] = (
-                        output + "/" + new_typ + "/" + Path(check).name
-                    )
-                    check = Path(os.path.abspath(check)).name
-                    if org_name:
-                        org_d = org_name.split()
-                        genus = org_d[0]
-                        if len(org_d) > 1:
-                            sp = org_d[1]
-                        else:
-                            sp = "sp."
-                        if len(org_d) > 2:
-                            strain = "".join(org_d[2:])
-                        else:
-                            strain = ""
-                    else:
-                        genus, sp, strain = "", "", ""
-                    df.at[i, "genus"] = genus
-                    df.at[i, "species"] = sp
-                    df.at[i, "strain"] = strain
-                elif type(check) == int:
-                    ome_set.add(row[ome_col])
-                logger.info(
-                    spacer + "\t" + new_typ + ": exit status " + str(check)
-                )
-        else:
-            logger.warning(spacer + ome + " failed.")
+                logger.warning(f"{spacer}\t{portal_id}: {typ} missing from archive")
+                if typ in ("fna", "gff3"):
+                    essential_failed = True
 
-    if Path("cookies").exists():
-        Path("cookies").unlink()
-    if Path(str(Path("~/.null").expanduser())).exists():
-        Path(str(Path("~/.null").expanduser())).unlink()
+        genus, species, strain = parse_org_name(org.get("name") or "")
+        _fill_if_empty(df, i, "genus", genus)
+        _fill_if_empty(df, i, "species", species)
+        _fill_if_empty(df, i, "strain", strain)
 
-    if "gff3" in df.columns:
-        del df["gff3"]
-    if "faa" in df.columns:
-        del df["faa"]
-    if "fna" in df.columns:
-        del df["fna"]
+        if essential_failed:
+            ome_set.add(portal_id)
+        if request_delay:
+            time.sleep(request_delay)
+
+    # tidy the scratch zip dir if empty
+    try:
+        Path(tmp_dir).rmdir()
+    except OSError:
+        pass
+
+    for col in ("gff3", "faa", "fna"):
+        if col in df.columns:
+            del df[col]
 
     return df, ome_set
 
@@ -704,9 +1121,9 @@ def main(
 def cli():
 
     parser = argparse.ArgumentParser(
-        description="Imports table/database with JGI `assembly_acc` column and downloads assembly, proteome, gff, "
-        + "and/or gff3. This script supports rerunning/continuing previous runs in the same directory. "
-        + "JGI has stringent, nondefined ping limits, so file downloads are limited to 1 per minute."
+        description="Imports table/database with a JGI `assembly_acc` column (MycoCosm "
+        + "portal ids) and downloads assembly, proteome, and/or gff3 via the JGI Data "
+        + "Portal API. Supports rerunning/continuing previous runs in the same directory."
     )
     parser.add_argument(
         "-i",
@@ -728,8 +1145,6 @@ def cli():
         action="store_true",
         help="Download proteome fastas",
     )
-    #    parser.add_argument( '-g', '--gff', default = False, action = 'store_true', \
-    #       help = 'Download gffs.' )
     parser.add_argument(
         "-g", "--gff", default=False, action="store_true", help="Download gff3s"
     )
@@ -766,8 +1181,6 @@ def cli():
         logger.error("You must choose at least one download option.")
 
     ncbi_email, ncbi_api, user, pwd = loginCheck(ncbi=False)
-    #    user = input( 'JGI username: ' )
-    #   pwd = getpass.getpass( prompt='JGI Login Password: ' )
 
     args_dict = {
         "JGI Table": args.input,
