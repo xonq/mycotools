@@ -49,7 +49,7 @@ from mycotools.lib.kontools import (
     setup_logging,
 )
 from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Comps
-from mycotools.acc2fa import dbmain as acc2fa
+from mycotools.mtdb.acc2.fa import dbmain as acc2fa
 from mycotools.fa2clus import (
     write_data,
     ClusteringError,
@@ -58,7 +58,7 @@ from mycotools.fa2clus import (
     sort_iterations,
 )
 from mycotools.fa2tree import main as fa2tree, PhyloError
-from mycotools.acc2locus import main as acc2locus
+from mycotools.mtdb.acc2.locus import main as acc2locus
 from mycotools.gff2svg import main as gff2svg
 from mycotools.db2search import blast_main as db2search
 from mycotools.ome2name import main as ome2name

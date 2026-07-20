@@ -231,11 +231,11 @@ assimilation in our dataset.
 
 First, we need to identify homologs of this gene across our database. We will
 do this by implementing a BLAST search of the protein sequence. We obtain the
-protein sequence using a handy command, `acc2fa`.
+protein sequence using a handy command, `mtdb accession fa`.
 
 ```bash
 # extract the protein accession of interest
-acc2fa -a ustbro1_1795 > ustbro1_1795.faa
+mtdb accession fa -a ustbro1_1795 > ustbro1_1795.faa
 
 # run a blast search on this gene against the primary MTDB
 db2search -a blastp -q ustbro1_1795.faa -e 2
@@ -276,7 +276,7 @@ locus, then inputting it into the CRAP pipeline:
 
 ```bash
 # extract a locus of interest, and store in a file
-acc2locus -a ustbro1_1795 -p 1 > nitrate_cluster.txt
+mtdb accession locus -a ustbro1_1795 -p 1 > nitrate_cluster.txt
 
 # run the CRAP analysis
 crap -q nitrate_cluster.txt -s blastp
@@ -311,7 +311,7 @@ mkdir clinker_<YYYYmmdd>
 Then generate GenBanks of each locus file using some basic BASH scripting:
 
 ```bash
-for i in crap_<YYYYmmdd>/loci/*txt; do o=$(basename ${i} .txt); acc2gbk -i ${i}
+for i in crap_<YYYYmmdd>/loci/*txt; do o=$(basename ${i} .txt); mtdb accession gbk -i ${i}
 > clinker_<YYYYmmdd>/${o}.gbk; done
 ```
 

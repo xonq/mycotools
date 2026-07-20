@@ -33,10 +33,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # Kept in sync with pyproject by test_entry_point_modules_match_pyproject below.
 ENTRY_POINT_MODULES = [
     "mtdb",
-    "acc2fa",
-    "acc2gbk",
-    "acc2gff",
-    "acc2locus",
     "add2gff",
     "annotationStats",
     "assemblyStats",
@@ -47,7 +43,6 @@ ENTRY_POINT_MODULES = [
     "db2hgs",
     "db2microsyntree",
     "db2search",
-    "extract_mtdb",
     "fa2clus",
     "fa2hmmer2fa",
     "fa2mass",
@@ -56,18 +51,28 @@ ENTRY_POINT_MODULES = [
     "gff2seq",
     "gff2svg",
     "jgiDwnld",
-    "manage_mtdb",
     "ncbiAcc2fa",
     "ncbiDwnld",
     "ome2name",
-    "predb2mtdb",
     "s2subs",
-    "update_mtdb",
 ]
 
 # Modules that ship a cli()/main() but are NOT registered as entry points.
+# The mtdb.* subcommand modules are dispatched in-process by `mtdb` (see
+# mycotools/mtdb/__init__.py) rather than exposed as standalone console scripts,
+# but each is still directly importable and `python -m`-invocable. The
+# mtdb.acc2.* modules are the per-format retrievers dispatched by
+# `mtdb accession <FORMAT>` (mycotools/mtdb/acc2/__init__.py).
 EXTRA_CLI_MODULES = [
     "acc2fq",
+    "mtdb.extract",
+    "mtdb.update",
+    "mtdb.predb",
+    "mtdb.manage",
+    "mtdb.acc2.fa",
+    "mtdb.acc2.gff",
+    "mtdb.acc2.gbk",
+    "mtdb.acc2.locus",
     "ncbi_dwnld_fallback",
     "treetools",
 ]

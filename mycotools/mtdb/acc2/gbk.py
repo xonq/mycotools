@@ -9,7 +9,7 @@ from collections import defaultdict
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps
-from mycotools.acc2gff import db_main as acc2gff
+from mycotools.mtdb.acc2.gff import db_main as acc2gff
 
 logger = logging.getLogger(__name__)
 

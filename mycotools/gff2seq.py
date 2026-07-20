@@ -646,7 +646,7 @@ def cli():
     parser = argparse.ArgumentParser(
         description="Inputs MycoDB compatible gff3, assembly (optional), "
         + "and outputs nucleotides/proteins. Use an abstracted gene gff "
-        + "(acc2gff.py) to only output a smaller set of gene(s)."
+        + "(`mtdb accession gff`) to only output a smaller set of gene(s)."
     )
     parser.add_argument("-g", "--gff", help='"-" for stdin', required=True)
     parser.add_argument("-n", "--nucleotide", action="store_true")

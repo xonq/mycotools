@@ -37,7 +37,7 @@ from mycotools.lib.dbtools import primaryDB, mtdb
 from mycotools.lib.biotools import dict2fa, fa2dict, fa2dict_str
 
 # from mycotools.extractHmmsearch import main as exHmm
-from mycotools.acc2fa import dbmain as acc2fa_db, famain as acc2fa_fa
+from mycotools.mtdb.acc2.fa import dbmain as acc2fa_db, famain as acc2fa_fa
 from mycotools.utils.extractHmmsearch import main as exHmm
 from mycotools.utils.extractHmmAcc import grabAccs
 from pathlib import Path

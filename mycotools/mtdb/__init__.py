@@ -5,7 +5,6 @@
 # list update dates
 # report storage information
 # report taxonomy data
-# NEED to remove standalone scripts from PATH and just reference mtdb (legacy)
 # NEED to add option to export NCBI/JGI credentials
 # NEED to pay attention to old ome versions
 
@@ -13,7 +12,7 @@ import re
 import sys
 import logging
 import argparse
-import subprocess
+import importlib
 from pathlib import Path
 from mycotools.lib.kontools import format_path, setup_logging
 from mycotools.lib.dbtools import (
@@ -26,27 +25,31 @@ from mycotools.lib.dbtools import (
 
 logger = logging.getLogger(__name__)
 
-# subcommand name/alias -> delegated standalone console script
+# subcommand name/alias -> submodule within this package (mycotools.mtdb.<module>).
+# `accession`/`a` targets the acc2 subpackage, which further dispatches by format.
 SUBCOMMANDS = {
-    "extract": "extract_mtdb",
-    "e": "extract_mtdb",
-    "update": "update_mtdb",
-    "u": "update_mtdb",
-    "predb2mtdb": "predb2mtdb",
-    "p": "predb2mtdb",
-    "manage": "manage_mtdb",
-    "m": "manage_mtdb",
+    "extract": "extract",
+    "e": "extract",
+    "update": "update",
+    "u": "update",
+    "predb2mtdb": "predb",
+    "p": "predb",
+    "manage": "manage",
+    "m": "manage",
+    "accession": "acc2",
+    "a": "acc2",
 }
 
 DESCRIPTION = """MycotoolsDB (MTDB) utility
 
 Run without arguments to print the primary MTDB path.
 
-Subcommands (all following arguments are forwarded to the standalone tool):
+Subcommands (all following arguments are forwarded to the subcommand):
   extract     (e)   extract a sub-.mtdb file
   update      (u)   update / initialize the primary MTDB
   predb2mtdb  (p)   add local genomes to the primary MTDB
   manage      (m)   MTDB management utility
+  accession   (a)   retrieve data for accession(s) by format (fa/gff/gbk/locus)
 
 Ome lookup:
   mtdb <OME>[.gff3|.fna|.faa]   print an ome's row, or a specific file path"""
@@ -64,7 +67,7 @@ def build_parser():
 
     Subcommands and ome-lookup share one positional (`target`) followed by a
     REMAINDER: this lets subcommand arguments pass through verbatim to their
-    standalone tool (native argparse subparsers cannot, as they intercept
+    subcommand module (native argparse subparsers cannot, as they intercept
     forwarded flags and reject arbitrary ome positionals)."""
     parser = argparse.ArgumentParser(
         prog="mtdb",
@@ -95,10 +98,26 @@ def build_parser():
     return parser
 
 
-def delegate(script, args):
-    """Forward a subcommand to its standalone console script; return its exit
-    code."""
-    return subprocess.call([script] + args)
+def delegate(module_name, args):
+    """Run a subcommand's CLI in-process and return its exit code.
+
+    The subcommand modules live in this package (`mycotools.mtdb.<module>`) and
+    parse `sys.argv` themselves, so their argv is swapped in for the call and the
+    `SystemExit` they raise (argparse errors, explicit exits) is translated back
+    to an exit code. Imports are deferred so a bare `mtdb` invocation stays light
+    - `update` in particular pulls in the JGI/NCBI download stack."""
+    module = importlib.import_module(f"mycotools.mtdb.{module_name}")
+    saved_argv = sys.argv
+    sys.argv = [f"mtdb {module_name}"] + list(args)
+    try:
+        module.cli()
+        return 0
+    except SystemExit as exc:
+        if exc.code is None:
+            return 0
+        return exc.code if isinstance(exc.code, int) else 1
+    finally:
+        sys.argv = saved_argv
 
 
 def link_mtdb(path):

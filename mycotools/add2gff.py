@@ -262,7 +262,7 @@ def main(toadd_gff, addto_gff=[], ome=None, replace=False):
 
 
 def prep_mtdb_update(new_gff, ome, db):
-    from mycotools.predb2mtdb import main as predb2mtdb
+    from mycotools.mtdb.predb import main as predb2mtdb
     from mycotools.lib.dbtools import mtdb, primaryDB
 
     out_dir = mkOutput(format_path(str(Path.cwd())), "add2gff")

@@ -63,8 +63,8 @@ from mycotools.ncbiDwnld import (
 from mycotools.jgiDwnld import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
-from mycotools.predb2mtdb import main as predb2mtdb
-from mycotools.predb2mtdb import predb_headers, read_predb, gen_omes
+from mycotools.mtdb.predb import main as predb2mtdb
+from mycotools.mtdb.predb import predb_headers, read_predb, gen_omes
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -1573,7 +1573,7 @@ def db2primary(addDB, refDB, save=False, combined=False):
     if refOmes.intersection(addOmes) and not combined:
         logger.info(refOmes.intersection(addOmes))
         raise KeyError(
-            "ERROR: ome codes exist in database. Rerun predb2mtdb or remove manually"
+            "ERROR: ome codes exist in database. Rerun `mtdb predb2mtdb` or remove manually"
         )
     for i, ome in enumerate(addDB["ome"]):
         base_ome = re.search(r"^[^\d]+\d+", ome)[0]
