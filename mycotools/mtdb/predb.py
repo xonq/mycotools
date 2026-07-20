@@ -116,7 +116,7 @@ def gen_predb():
         separate each column by a tab. The predb can be filled in \
         via spreadsheet software and exported as a tab delimited `.tsv`. \
         ASSEMBLY ACCESSIONS and PREVIOUS_OME fields must be unique to the \
-        genome; otherwise predb2mtdb will update the corresponding database entry. \
+        genome; otherwise predb will update the corresponding database entry. \
         Novel data must be filled in as "new" for the genomeSource column.'
     )
     outputStr = "#" + "\t".join(predb_headers)
@@ -730,10 +730,10 @@ def main(
 
 def cli():
     usage = (
-        "Generate a predb file:\nmtdb predb2mtdb\n\nCreate a mycotoolsdb "
-        + "from a predb file:\nmtdb predb2mtdb <PREDBFILE>\n\nCreate a mycotoolsdb "
-        + "referencing an alternative master database:\nmtdb predb2mtdb <PREDBFILE> "
-        + "<REFERENCEDB>\nSkip failing genomes:\nmtdb predb2mtdb <PREDBFILE> -s"
+        "Generate a predb file:\nmtdb predb\n\nCreate a mycotoolsdb "
+        + "from a predb file:\nmtdb predb <PREDBFILE>\n\nCreate a mycotoolsdb "
+        + "referencing an alternative master database:\nmtdb predb <PREDBFILE> "
+        + "<REFERENCEDB>\nSkip failing genomes:\nmtdb predb <PREDBFILE> -s"
     )
 
     if any(x in {"-h", "--help", "-help"} for x in sys.argv):

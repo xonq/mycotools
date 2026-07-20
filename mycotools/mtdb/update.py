@@ -1585,7 +1585,7 @@ def db2primary(addDB, refDB, save=False, combined=False):
     if refOmes.intersection(addOmes) and not combined:
         logger.info(refOmes.intersection(addOmes))
         raise KeyError(
-            "ERROR: ome codes exist in database. Rerun `mtdb predb2mtdb` or remove manually"
+            "ERROR: ome codes exist in database. Rerun `mtdb predb` or remove manually"
         )
     for i, ome in enumerate(addDB["ome"]):
         base_ome = re.search(r"^[^\d]+\d+", ome)[0]

@@ -32,7 +32,7 @@ SUBCOMMANDS = {
     "e": "extract",
     "update": "update",
     "u": "update",
-    "predb2mtdb": "predb",
+    "predb": "predb",
     "p": "predb",
     "manage": "manage",
     "m": "manage",
@@ -49,7 +49,7 @@ Run without arguments to print the primary MTDB path.
 Subcommands (all following arguments are forwarded to the subcommand):
   extract     (e)   extract a sub-.mtdb file
   update      (u)   update / initialize the primary MTDB
-  predb2mtdb  (p)   add local genomes to the primary MTDB
+  predb       (p)   add local genomes to the primary MTDB
   manage      (m)   MTDB management utility
   accession   (a)   retrieve data for accession(s) by format (fa/gff/gbk/locus)
   files       (f)   symlink/copy selected files from the database
