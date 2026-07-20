@@ -12,18 +12,18 @@ from mycotools.lib.kontools import (
     sys_start,
     format_path,
     file2list,
-    getColors,
+    get_colors,
     setup_logging,
 )
 from dna_features_viewer import GraphicFeature, GraphicRecord
-from mycotools.lib.biotools import gff2list, gff3Comps
+from mycotools.lib.biotools import gff2list, gff3_comps
 from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
 
 
-def compileProducts(gff, prod_comp, types={"tRNA", "mRNA", "rRNA"}):
+def compile_products(gff, prod_comp, types={"tRNA", "mRNA", "rRNA"}):
     # find all the product attributes for color pallette selection
     products = []
     for entry in gff:
@@ -41,7 +41,7 @@ def gff2svg(
     svg_path,
     product_dict,
     colors,
-    prod_comp=gff3Comps()["product"],
+    prod_comp=gff3_comps()["product"],
     width=10,
     null="hypothetical protein",
     types={"tRNA", "mRNA", "rRNA"},
@@ -131,7 +131,7 @@ def main(
     svg_path,
     product_dict={},
     width=10,
-    prod_comp=gff3Comps()["product"],
+    prod_comp=gff3_comps()["product"],
     null="hypothetical protein",
     types={"tRNA", "mRNA", "rRNA"},
     labels=True,
@@ -144,16 +144,16 @@ def main(
     if not wheel and not product_dict:
         if not set(product_dict.keys()).difference({null}):
             # if no keys or null is the only product key
-            products = compileProducts(gff_list, prod_comp, types=types)
+            products = compile_products(gff_list, prod_comp, types=types)
         else:
             products = list(product_dict.keys())
-        colors = getColors(len(products))
+        colors = get_colors(len(products))
     elif wheel == 1:  # spoof function to get wheel
-        colors = getColors(1)
+        colors = get_colors(1)
     elif wheel == 2:
-        colors = getColors(17)
+        colors = get_colors(17)
     elif wheel == 3:
-        colors = getColors(28)
+        colors = get_colors(28)
     else:
         colors = None
 
@@ -220,7 +220,7 @@ def cli():
     setup_logging(verbose=getattr(args, "verbose", False))
 
     if not args.regex:
-        regex = gff3Comps()["product"]
+        regex = gff3_comps()["product"]
     else:
         regex = r""
         if args.regex.startswith(("'", '"')):

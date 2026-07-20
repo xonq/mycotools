@@ -33,8 +33,8 @@ from mycotools.lib.dbtools import (
     df2db,
     gather_taxonomy,
     assimilate_tax,
-    primaryDB,
-    loginCheck,
+    primary_db,
+    login_check,
     log_editor,
     mtdb,
     mtdb_initialize,
@@ -48,7 +48,7 @@ from mycotools.lib.kontools import (
     read_json,
     write_json,
     split_input,
-    findExecs,
+    find_execs,
     setup_logging,
     atomic_write,
 )
@@ -164,7 +164,7 @@ def add_vars(init_dir, dbtype):
     mtdb_initialize(init_dir, dbtype, init=True)
 
 
-def initDB(
+def init_db(
     init_dir,
     branch,
     envs,
@@ -226,7 +226,7 @@ def initDB(
         else:
             logger.info("mycotoolsdb directory already exists")
         # NEED TO ADD GITIGNORE TO GIT
-        if not primaryDB():
+        if not primary_db():
             logger.error("no YYYYmmdd.mtdb in " + format_path(envs["MYCODB"]))
             sys.exit(3)
     else:
@@ -356,7 +356,7 @@ def dwnld_mycocosm(
     """Download the MycoCosm genome data spreadsheet, format to UTF-8 and
     return a Pandas dataframe of the data"""
 
-    check_curl = findExecs(["curl"], verbose=False)
+    check_curl = find_execs(["curl"], verbose=False)
 
     if not Path(out_file).is_file():
         for attempt in range(3):
@@ -1751,14 +1751,14 @@ def control_flow(
         nonpublished = False
 
     #    branch = 'stable'
-    db_path = primaryDB()
+    db_path = primary_db()
     if not resume or add:
         date = datetime.now().strftime("%Y%m%d")
     else:
         date = str(resume)
 
     if not ncbi_email:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck()
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check()
     Entrez.email = ncbi_email
     if ncbi_api:
         Entrez.api_key = ncbi_api
@@ -1777,7 +1777,7 @@ def control_flow(
             "MYCODB": init_dir + "mtdb/",
         }
         os.environ["MYCODB"] = init_dir + "mtdb/"
-        output, config = initDB(
+        output, config = init_db(
             init_dir,
             dbtype,
             envs,
@@ -1823,10 +1823,10 @@ def control_flow(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            new_db = db2df(primaryDB())
+            new_db = db2df(primary_db())
             orig_db = pd.concat([old_db, new_db.loc[~new_db["ome"].isin(old_db.index)]])
         else:
-            orig_db = db2df(primaryDB())
+            orig_db = db2df(primary_db())
 
     orig_db = orig_db.dropna(subset=["ome"])
 
@@ -1907,11 +1907,11 @@ def control_flow(
 
         addDB["aquisition_date"] = [date for x in addDB["ome"]]
         # make date the acquisition time
-        orig_mtdb = mtdb(primaryDB())
+        orig_mtdb = mtdb(primary_db())
         update_path = format_path("$MYCODB/../" + "log/" + date + "/")
         if not Path(update_path).is_dir():
             Path(update_path).mkdir()
-        shutil.copy(primaryDB(), update_path)
+        shutil.copy(primary_db(), update_path)
 
         tax_path = f"{update_path}../taxonomy.tsv"
         tax_dicts = read_prev_tax(tax_path)
@@ -2018,7 +2018,7 @@ def control_flow(
         )
         full_mtdb.df2db(new_path + ".tmp")
         try:
-            shutil.move(primaryDB(), update_path + Path(primaryDB()).name)
+            shutil.move(primary_db(), update_path + Path(primary_db()).name)
             # move master database to log if it exists
         except FileNotFoundError:
             pass
@@ -2037,7 +2037,7 @@ def control_flow(
         )
         # output new database and new list of omes
 
-    return primaryDB()
+    return primary_db()
 
 
 def main():
@@ -2140,7 +2140,7 @@ def main():
     setup_logging(verbose=getattr(args, "verbose", False))
 
     args_dict = {
-        "Primary MTDB": primaryDB(verbose=False),
+        "Primary MTDB": primary_db(verbose=False),
         "Update": args.update,
         "Initialize": args.init,
         "Add": format_path(args.add),  #'Rogue': rogue_bool,
@@ -2151,7 +2151,7 @@ def main():
         "Save raw data": args.save,
     }
 
-    findExecs(["datasets"], exit={"datasets"})
+    find_execs(["datasets"], exit={"datasets"})
     start_time = intro("Update MycotoolsDB", args_dict)
 
     control_flow(

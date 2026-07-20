@@ -14,9 +14,9 @@ from mycotools.lib.kontools import (
     outro,
     format_path,
     setup_logging,
-    mkOutput,
+    mk_output,
 )
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.mtdb.files import mtdb_main as gen_full_mtdb
 from pathlib import Path
 
@@ -137,7 +137,7 @@ def cli():
     )
     out_opt.add_argument("-p", "--paths", help="Output with paths", action="store_true")
     out_opt.add_argument("--headers", action="store_true")
-    out_opt.add_argument("-d", "--mtdb", help="- for stdin", default=primaryDB())
+    out_opt.add_argument("-d", "--mtdb", help="- for stdin", default=primary_db())
     out_opt.add_argument("-o", "--output")
 
     args = parser.parse_args()
@@ -227,7 +227,7 @@ def cli():
         if isinstance(new_db, mtdb):
             new_db.df2db(output, paths=args.paths)
         else:
-            out_dir = mkOutput(output, "extract_mtdb")
+            out_dir = mk_output(output, "extract_mtdb")
             prefix = re.sub(r"\.mtdb$", "", Path(db_path).name)
             for lineage, db in new_db.items():
                 out_f = f"{out_dir}{prefix}.{lineage}.mtdb"

@@ -51,7 +51,7 @@ ENTRY_POINT_MODULES = [
     "gff2seq",
     "gff2svg",
     "jgiDwnld",
-    "ncbiAcc2fa",
+    "ncbi_acc2fa",
     "ncbiDwnld",
     "ome2name",
     "s2subs",

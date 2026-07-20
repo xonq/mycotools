@@ -16,19 +16,19 @@ from mycotools.lib.biotools import (
     list2gff,
     fa2dict,
     dict2fa,
-    gtfComps,
-    gff3Comps,
-    gff2Comps,
+    gtf_comps,
+    gff3_comps,
+    gff2_comps,
 )
 from mycotools.lib.kontools import collect_files, format_path, setup_logging
 from mycotools.seq.gff import aamain as gff2proteome
-from mycotools.utils.curGFF3 import rename_and_organize
+from mycotools.utils.cur_gff3 import rename_and_organize
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
-def grabOutput(output_pref):
+def grab_output(output_pref):
     """
     Inputs: orthofiller `output_path` for results
     Outputs: gff_dict and fasta_dict of results
@@ -74,7 +74,7 @@ def intron2exon(gff, gene_comp=re.compile(r"gene_id \"(.*?)\"")):
     to the `new_gff`. Then add genes with new exons.
     """
 
-    comps = gtfComps()
+    comps = gtf_comps()
     gff1, gene_info = [], {}
     for entry in gff:
         try:
@@ -87,7 +87,7 @@ def intron2exon(gff, gene_comp=re.compile(r"gene_id \"(.*?)\"")):
                 continue
             gene_comp = re.compile(r"name \"(.*?)\"")
             gene = gene_comp.search(entry["attributes"])[1]
-            comps = gff2Comps()
+            comps = gff2_comps()
         if int(entry["start"]) > int(entry["end"]):
             start, end = copy.deepcopy(entry["start"]), copy.deepcopy(entry["end"])
             entry["start"], entry["end"] = end, start
@@ -212,7 +212,7 @@ def intron2exon(gff, gene_comp=re.compile(r"gene_id \"(.*?)\"")):
     return gff2, comps
 
 
-def curCDS(gff, gene_compile=re.compile(r"gene_id \"(.*?)\"")):
+def cur_cds(gff, gene_compile=re.compile(r"gene_id \"(.*?)\"")):
 
     new_gff, info_dict = [], {}
     for entry in gff:
@@ -267,7 +267,7 @@ def curCDS(gff, gene_compile=re.compile(r"gene_id \"(.*?)\"")):
     return new_gff
 
 
-def liberalRemoval(gene_dict_prep, contigs):
+def liberal_removal(gene_dict_prep, contigs):
 
     check_contigs, failed, gene_dict = {}, [], {}
     for i in contigs:
@@ -325,7 +325,7 @@ def liberalRemoval(gene_dict_prep, contigs):
     return gene_dict, failed
 
 
-def conservativeRemoval(gene_dict_prep):
+def conservative_removal(gene_dict_prep):
 
     gene_dict, flagged, failed = {}, [], []
     for gene, temp in gene_dict_prep.items():
@@ -383,7 +383,7 @@ def fill_transcripts(gene_dict_prep):
     return gene_dict_prep
 
 
-def add_genes(gtf, safe=True, comps=gtfComps(), gene_prefix="gene_id"):
+def add_genes(gtf, safe=True, comps=gtf_comps(), gene_prefix="gene_id"):
 
     contigs = defaultdict(dict)
     tran_compile = re.compile(comps["transcript"])
@@ -424,7 +424,7 @@ def add_genes(gtf, safe=True, comps=gtfComps(), gene_prefix="gene_id"):
             gene_dict_prep[gene]["rna"][tran] = gtf[i]
 
     gene_dict_prep = fill_transcripts(gene_dict_prep)
-    gene_dict, flagged, failed = conservativeRemoval(gene_dict_prep)
+    gene_dict, flagged, failed = conservative_removal(gene_dict_prep)
 
     check, insert_list = set(), []
     for index, entry in enumerate(gtf):
@@ -511,7 +511,7 @@ def remove_start_stop(gtf):
     return [x for x in gtf if x["type"] not in {"start_codon", "stop_codon"}]
 
 
-def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
+def curate(gff, prefix=None, failed=set(), comps=gtf_comps()):
 
     failed = set(failed)
     gene_comp = re.compile(comps["id"])
@@ -529,7 +529,7 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
             try:
                 gene_id = gene_comp.search(line["attributes"])[1]
             except TypeError:
-                gene_id = re.search(gtfComps()["id"], line["attributes"])[1]
+                gene_id = re.search(gtf_comps()["id"], line["attributes"])[1]
             try:
                 tran_id = tran_comp.search(line["attributes"])[1]
             except TypeError:
@@ -564,7 +564,7 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
                     alias_dict[trans] = prefix + "_" + str(count)
                 count += 1
 
-    crudesortGff = preSortGFF(gff, gene_comp)
+    crudesortGff = pre_sort_gff(gff, gene_comp)
 
     newGff, exon_check, cds_check = [], defaultdict(int), defaultdict(int)
     for entry in crudesortGff:
@@ -613,7 +613,7 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
     return newGff, translation_str
 
 
-def sortGene(sorting_group):
+def sort_gene(sorting_group):
 
     out_group = []
     for entryType in ["gene", "mrna", "trna", "rrna", "exon", "cds"]:
@@ -631,7 +631,7 @@ def sortGene(sorting_group):
     return out_group
 
 
-def sortContig(contigData):
+def sort_contig(contigData):
 
     coordinates = {}
     for gene in contigData:
@@ -649,7 +649,7 @@ def sortContig(contigData):
     return outContig
 
 
-def preSortGFF(unsorted_gff, idComp):
+def pre_sort_gff(unsorted_gff, idComp):
 
     sorting_groups, oldGene = {}, None
     for i, entry in enumerate(unsorted_gff):
@@ -666,13 +666,13 @@ def preSortGFF(unsorted_gff, idComp):
     for seqid in sorting_groups:
         contigData = {}
         for gene in sorting_groups[seqid]:
-            contigData[gene] = sortGene(sorting_groups[seqid][gene])
-        sortedGff.extend(sortContig(contigData))
+            contigData[gene] = sort_gene(sorting_groups[seqid][gene])
+        sortedGff.extend(sort_contig(contigData))
 
     return sortedGff
 
 
-def sortGFF(unsorted_gff, idComp):
+def sort_gff(unsorted_gff, idComp):
 
     sorting_groups, oldGene = {}, None
     for i, entry in enumerate(unsorted_gff):
@@ -702,13 +702,13 @@ def sortGFF(unsorted_gff, idComp):
     for seqid in sorting_groups:
         contigData = {}
         for gene in sorting_groups[seqid]:
-            contigData[gene] = sortGene(sorting_groups[seqid][gene])
-        sortedGff.extend(sortContig(contigData))
+            contigData[gene] = sort_gene(sorting_groups[seqid][gene])
+        sortedGff.extend(sort_contig(contigData))
 
     return sortedGff
 
 
-def addExons(gff):
+def add_exons(gff):
 
     exon_check = {}
     for i in range(len(gff)):
@@ -740,15 +740,15 @@ def main(gff_path, prefix, fail=True):
         gff = gff_path
 
     exonGtf, comps = intron2exon(gff)
-    exonGtfCur = curCDS(exonGtf, re.compile(comps["id"]))
+    exonGtfCur = cur_cds(exonGtf, re.compile(comps["id"]))
     exonGtfCurGenes, failed, flagged = add_genes(exonGtfCur, safe=fail, comps=comps)
 
     preGff = remove_start_stop(exonGtfCurGenes)
     unsortedGff, trans_str = curate(preGff, prefix, failed, comps)
-    #    unsortedGff = addExons(gffUncur)
+    #    unsortedGff = add_exons(gffUncur)
 
     if prefix:
-        out_gff = sortGFF(unsortedGff, re.compile(gff3Comps()["Alias"]))
+        out_gff = sort_gff(unsortedGff, re.compile(gff3_comps()["Alias"]))
         for i, entry in enumerate(out_gff):
             entry["start"] = int(entry["start"])
             entry["end"] = int(entry["end"])
@@ -759,14 +759,14 @@ def main(gff_path, prefix, fail=True):
     return gff, trans_str, failed, flagged
 
 
-def sortMain(gff, prefix):
+def sort_main(gff, prefix):
 
-    id_comp = re.compile(gff3Comps()["id"])
+    id_comp = re.compile(gff3_comps()["id"])
     crude_sort = sorted(
         gff,
         key=lambda x: int(re.search(r"ID=" + prefix + r"_(\d+)", x["attributes"])[1]),
     )
-    gff = preSortGFF(crude_sort, id_comp)
+    gff = pre_sort_gff(crude_sort, id_comp)
 
     return gff
 
@@ -803,7 +803,7 @@ def cli():
         output = args.prefix
 
     if args.sort:
-        gff = sortMain(gff2list(format_path(args.gff)), args.prefix)
+        gff = sort_main(gff2list(format_path(args.gff)), args.prefix)
         with open(output + ".gff3", "w") as out:
             out.write(list2gff(gff) + "\n")
         sys.exit(0)

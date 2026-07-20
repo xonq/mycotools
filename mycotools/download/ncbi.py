@@ -24,13 +24,13 @@ from mycotools.lib.kontools import (
     outro,
     format_path,
     prep_output,
-    mkOutput,
-    findExecs,
+    mk_output,
+    find_execs,
     read_json,
     split_input,
     setup_logging,
 )
-from mycotools.lib.dbtools import log_editor, loginCheck, mtdb
+from mycotools.lib.dbtools import log_editor, login_check, mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -589,7 +589,7 @@ def main(
     return new_df, rep_failed
 
 
-def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
+def get_sra(assembly_acc, fastqdump="fastq-dump", pe=True):
 
     handle = Entrez.esearch(db="SRA", term=assembly_acc)
     ids = Entrez.read(handle)["IdList"]
@@ -648,19 +648,19 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                         logger.error("file failed")
 
 
-def goSRA(df, output=str(Path.cwd()) + "/", pe=True, column="sra"):
+def go_sra(df, output=str(Path.cwd()) + "/", pe=True, column="sra"):
 
     print()
     sra_dir = output + "sra/"
     if not Path(sra_dir).is_dir():
         Path(sra_dir).mkdir()
     os.chdir(sra_dir)
-    fastqdump = findExecs("fastq-dump", exit={"fastq-dump"})
+    fastqdump = find_execs("fastq-dump", exit={"fastq-dump"})
     count = 0
 
     for i, row in df.iterrows():
         logger.info("\t" + row[column])
-        get_SRA(row[column], fastqdump[0])
+        get_sra(row[column], fastqdump[0])
         count += 1
         if count >= 10:
             time.sleep(1)
@@ -717,17 +717,17 @@ def cli():
         else:
             ncbi_api = None
     else:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi=False)
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check(jgi=False)
         Entrez.email = ncbi_email
         if ncbi_api:
             Entrez.api_key = ncbi_api
 
     if not args.output:
-        output = mkOutput(None, "ncbiDwnld")
+        output = mk_output(None, "ncbiDwnld")
     else:
         output = format_path(args.output)
 
-    findExecs("datasets", exit={"datasets"})
+    find_execs("datasets", exit={"datasets"})
 
     args_dict = {
         "NCBI Table": args.input,
@@ -743,21 +743,21 @@ def cli():
     if args.sra:
         if Path(format_path(args.input)).is_file():
             if not args.column:
-                goSRA(
+                go_sra(
                     pd.read_csv(format_path(args.input), sep="\t", names=["sra"]),
                     output,
                     pe=args.paired,
                     column="sra",
                 )
             else:
-                goSRA(
+                go_sra(
                     pd.read_csv(format_path(args.input), sep="\t"),
                     output,
                     pe=args.paired,
                     column=args.column,
                 )
         else:
-            goSRA(
+            go_sra(
                 pd.DataFrame({"sra": split_input(args.input)}),
                 output,
                 pe=args.paired,

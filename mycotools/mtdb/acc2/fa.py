@@ -6,7 +6,7 @@ import sys
 import argparse
 from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ def extract_mtdb_accs(fa_dict, accs, spacer=""):
     return out_fa
 
 
-def extractHeaders(fasta_file, accessions, ome=None):
+def extract_headers(fasta_file, accessions, ome=None):
     """searches headers for "[]", which indicate coordinate-based extraction.
     otherwise, just retrieves the accession from the fasta dictionary"""
 
@@ -156,7 +156,7 @@ def famain(accs, fa, ome=None):
     """takes in accessions, fasta, and retrieves accessions"""
 
     fa_dict = {}
-    fa_dict = {**fa_dict, **extractHeaders(fa, accs, ome)}
+    fa_dict = {**fa_dict, **extract_headers(fa, accs, ome)}
 
     return fa_dict
 
@@ -183,7 +183,7 @@ def cli():
         "-s", "--start", help="Start index column (1 indexed)", type=int
     )
     parser.add_argument("-e", "--end", help="End index column (1 indexed)", type=int)
-    parser.add_argument("-d", "--mtdb", default=primaryDB())
+    parser.add_argument("-d", "--mtdb", default=primary_db())
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 

@@ -6,7 +6,7 @@ import sys
 import argparse
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 from pathlib import Path
 
@@ -106,7 +106,7 @@ def cli():
         "-o", "--ome", action="store_true", help="Output files by ome code"
     )
     parser.add_argument(
-        "-d", "--mtdb", default=primaryDB(), help="mycodb DEFAULT: master"
+        "-d", "--mtdb", default=primary_db(), help="mycodb DEFAULT: master"
     )
     parser.add_argument("--cpu", type=int, default=mp.cpu_count())
     args = parser.parse_args()
@@ -155,7 +155,7 @@ def cli():
         print(list2gff(gff_lists[list(gff_lists.keys())[0]]).rstrip(), flush=True)
     # if it is specified output, open a folder for it
     elif args.ome:
-        output = mkOutput(str(Path.cwd()) + "/", "acc2gff")
+        output = mk_output(str(Path.cwd()) + "/", "acc2gff")
         for ome in gff_strs:
             if gff_lists[ome]:
                 with open(output + ome + ".accs.gff3", "w") as out:

@@ -8,7 +8,7 @@ import sys
 import logging
 from itertools import chain
 from collections import defaultdict
-from mycotools.lib.biotools import gff2list, gff3Comps
+from mycotools.lib.biotools import gff2list, gff3_comps
 from mycotools.lib.kontools import format_path, setup_logging
 from pathlib import Path
 
@@ -42,7 +42,7 @@ def compile_alia(gff_path, output, ome=None):
     for entry in gff:
         try:
             # extract the alias from the attributes field
-            alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+            alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
         except TypeError:
             raise TypeError(f"entry without MTDB alias: {entry}")
         if entry["type"].lower() == "gene":

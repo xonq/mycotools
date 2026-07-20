@@ -38,7 +38,7 @@ import xml.etree.ElementTree as ET
 from tqdm import tqdm
 from urllib.parse import unquote
 from mycotools.lib.kontools import format_path, outro, intro, setup_logging
-from mycotools.lib.dbtools import loginCheck
+from mycotools.lib.dbtools import login_check
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -1212,7 +1212,7 @@ def cli():
     ):
         logger.error("You must choose at least one download option.")
 
-    ncbi_email, ncbi_api, user, pwd = loginCheck(ncbi=False)
+    ncbi_email, ncbi_api, user, pwd = login_check(ncbi=False)
 
     args_dict = {
         "JGI Table": args.input,

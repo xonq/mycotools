@@ -9,9 +9,9 @@ import multiprocessing as mp
 from statistics import stdev, StatisticsError
 from collections import defaultdict, Counter
 from mycotools.mtdb.files import soft_main as symlink_files
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.lib.biotools import dict2fa, fa2dict_accs
-from mycotools.lib.kontools import format_path, mkOutput, findExecs, setup_logging
+from mycotools.lib.kontools import format_path, mk_output, find_execs, setup_logging
 from pathlib import Path
 
 
@@ -457,7 +457,7 @@ def cli():
     parser = argparse.ArgumentParser(
         description="Circumscribe protein sequences into homology groups"
     )
-    parser.add_argument("-d", "--mtdb", default=primaryDB())
+    parser.add_argument("-d", "--mtdb", default=primary_db())
     parser.add_argument(
         "-m",
         "--mean",
@@ -508,12 +508,12 @@ def cli():
             Path(out_dir).mkdir()
             out_dir += "/"
     else:
-        out_dir = mkOutput(args.out_dir, "db2hgs")
+        out_dir = mk_output(args.out_dir, "db2hgs")
 
     execs = ["mmseqs"]
     if args.hmm:
         execs.extend(["hmmbuild", "mafft"])
-    findExecs(execs, set(execs))
+    find_execs(execs, set(execs))
 
     main(
         db,

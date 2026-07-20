@@ -11,21 +11,21 @@ import shutil
 import multiprocessing as mp
 from tqdm import tqdm
 from collections import Counter, defaultdict
-from mycotools.lib.kontools import gunzip, mkOutput, format_path
+from mycotools.lib.kontools import gunzip, mk_output, format_path
 from mycotools.lib.biotools import (
     gff2list,
     list2gff,
     fa2dict,
     dict2fa,
-    gff3Comps,
-    gff2Comps,
-    gtfComps,
+    gff3_comps,
+    gff2_comps,
+    gtf_comps,
 )
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.utils.gtf2gff3 import main as gtf2gff3
-from mycotools.utils.curGFF3 import main as curGFF3
+from mycotools.utils.cur_gff3 import main as cur_gff3
 from mycotools.utils.gff2gff3 import main as gff2gff3
-from mycotools.utils.curGFF3 import rename_and_organize as rename_and_organize
+from mycotools.utils.cur_gff3 import rename_and_organize as rename_and_organize
 from mycotools.seq.gff import aamain as gff2seq
 from pathlib import Path
 
@@ -58,7 +58,7 @@ def acq_forbid_omes(file_path):
 
 
 def prep_output(base_dir):
-    out_dir = mkOutput(base_dir, "predb2mtdb")
+    out_dir = mk_output(base_dir, "predb2mtdb")
     wrk_dir = out_dir + "working/"
     dirs = [out_dir, wrk_dir, wrk_dir + "gff3/", wrk_dir + "fna/", wrk_dir + "faa/"]
     for dir_ in dirs:
@@ -590,9 +590,9 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
 
     gffVer, alias = None, False
     for entry in gff:
-        if re.search(gff3Comps()["id"], entry["attributes"]):
+        if re.search(gff3_comps()["id"], entry["attributes"]):
             gffVer = 3
-            alias = re.search(gff3Comps()["Alias"], entry["attributes"])
+            alias = re.search(gff3_comps()["Alias"], entry["attributes"])
             if alias is not None:
                 #                if entry['seqid'].startswith(ome + '_'):
                 alias = True
@@ -602,10 +602,10 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
                 #                              entry['attributes'])
             else:
                 break
-        elif re.search(gtfComps()["id"], entry["attributes"]):
+        elif re.search(gtf_comps()["id"], entry["attributes"]):
             gffVer = 2.5
             break
-        elif re.search(gff2Comps()["id"], entry["attributes"]):
+        elif re.search(gff2_comps()["id"], entry["attributes"]):
             gffVer = 2
             break
 
@@ -614,25 +614,27 @@ def gff_mngr(ome, gff, cur_path, source, assembly_accession):
         if alias:  # already curated
             try:
                 new_gff = copy.deepcopy(gff)
-                old_ome_p = re.search(gff3Comps()["Alias"], new_gff[0]["attributes"])[1]
+                old_ome_p = re.search(gff3_comps()["Alias"], new_gff[0]["attributes"])[
+                    1
+                ]
                 old_ome = old_ome_p[: old_ome_p.find("_")]
                 for entry in new_gff:
-                    #                    alias0 = re.search(gff3Comps()['Alias'], entry['attributes'])[1]
+                    #                    alias0 = re.search(gff3_comps()['Alias'], entry['attributes'])[1]
                     #                   alias_num = alias0[alias0.find('_') + 1:]
                     #                    new_alias = ome + '_' + alias_num
                     #                   entry['attributes'] = re.sub(
-                    #                      gff3Comps()['Alias'], 'Alias='+ new_alias,
+                    #                      gff3_comps()['Alias'], 'Alias='+ new_alias,
                     #                     entry['attributes']
                     #                    )
                     entry["attributes"] = entry["attributes"].replace(old_ome, ome)
                 new_gff = rename_and_organize(new_gff)
                 gff = new_gff
             except:
-                gff = curGFF3(gff, ome, cur_seqids=True)
+                gff = cur_gff3(gff, ome, cur_seqids=True)
         #        else:
-        #           gff = curGFF3(gff, ome)
+        #           gff = cur_gff3(gff, ome)
         else:
-            gff = curGFF3(gff, ome, cur_seqids=True)
+            gff = cur_gff3(gff, ome, cur_seqids=True)
     elif gffVer == 2.5:
         gff, trans_str, failed, flagged = gtf2gff3(gff, ome)
     else:
@@ -746,9 +748,9 @@ def cli():
         elif len(sys.argv) > 3:
             refDB = mtdb(format_path(sys.argv[3]))
         else:
-            refDB = mtdb(primaryDB())
+            refDB = mtdb(primary_db())
     else:
-        refDB = mtdb(primaryDB())
+        refDB = mtdb(primary_db())
 
     if set(sys.argv).intersection({"-s", "--skip"}):
         exit = False
@@ -756,7 +758,7 @@ def cli():
         exit = True
 
     #   from Bio import Entrez
-    #    ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi = False)
+    #    ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check(jgi = False)
     #  Entrez.email = ncbi_email
     # if ncbi_api:
     #    Entrez.api_key = ncbi_api

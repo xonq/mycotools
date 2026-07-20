@@ -24,22 +24,22 @@ from mycotools.lib.kontools import (
     outro,
     collect_files,
     multisub,
-    findExecs,
+    find_execs,
     untardir,
     format_path,
-    mkOutput,
+    mk_output,
     tardir,
     inject_args,
     stdin2str,
     setup_logging,
 )
-from mycotools.lib.dbtools import primaryDB, mtdb
+from mycotools.lib.dbtools import primary_db, mtdb
 from mycotools.lib.biotools import dict2fa, fa2dict, fa2dict_str
 
-# from mycotools.extractHmmsearch import main as exHmm
+# from mycotools.extract_hmmsearch import main as ex_hmm
 from mycotools.mtdb.acc2.fa import dbmain as acc2fa_db, famain as acc2fa_fa
-from mycotools.utils.extractHmmsearch import main as exHmm
-from mycotools.utils.extractHmmAcc import grabAccs
+from mycotools.utils.extract_hmmsearch import main as ex_hmm
+from mycotools.utils.extract_hmm_acc import grab_accs
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ def compile_hmm_cmd(db, hmm_path, output, ome_set=set(), cpu=1):
     return cmd_tuples
 
 
-def compileextractHmmCmd(db, args, output):
+def compile_extract_hmm_cmd(db, args, output):
     """
     Inputs: mycotools db, argparse arguments, and output path
     Outputs: tuples of arguments for `run_ex_hmm`
@@ -108,7 +108,7 @@ def run_ex_hmm(args, hmmsearch_out, output):
         logger.warning("\t" + ome + " failed")
         return ome, False
     if len(data) > 100:  # check for data # check for data
-        hmm_data = exHmm(
+        hmm_data = ex_hmm(
             data, args[0], args[1], args[2], args[3], args[4], header=False
         )
         out_dict = {}
@@ -248,7 +248,7 @@ def compile_hmm_queries(hmm_paths, hmm_out):
     for hmm_path in hmm_paths:
         with open(hmm_path, "r") as hmm_raw:
             hmm_data = hmm_raw.read()
-            queries.extend(grabAccs(hmm_data))
+            queries.extend(grab_accs(hmm_data))
             complete_hmm += hmm_data + "\n"
     with open(hmm_out, "w") as hmm_oh:
         hmm_oh.write(complete_hmm.rstrip())
@@ -322,7 +322,7 @@ def hmmer_main(
         # extract results
         logger.info("Extracting hmmsearch output")
         exHmm_args = [accessions, max_hits, query_cov, evalue, bitscore]
-        exHmm_tuples = compileextractHmmCmd(db, exHmm_args, ome_dir)
+        exHmm_tuples = compile_extract_hmm_cmd(db, exHmm_args, ome_dir)
         with mp.get_context("spawn").Pool(processes=cpu) as pool:
             hmmAligns = pool.starmap(run_ex_hmm, exHmm_tuples)
 
@@ -344,7 +344,7 @@ def hmmer_main(
         return fa_dicts
 
 
-def compileBlastCmd(ome, biofile, out_dir, blast_scaf):
+def compile_blast_cmd(ome, biofile, out_dir, blast_scaf):
     return blast_scaf + ["-out", out_dir + ome + ".tsv", "-subject", biofile]
 
 
@@ -381,12 +381,14 @@ def comp_blast_tups(
     for i, ome in enumerate(seq_db["ome"]):
         if seq_db[biotype][i]:
             blast_cmds.append(
-                " ".join(compileBlastCmd(ome, seq_db[biotype][i], out_dir, blast_scaf))
+                " ".join(
+                    compile_blast_cmd(ome, seq_db[biotype][i], out_dir, blast_scaf)
+                )
             )
     return blast_cmds
 
 
-def compileDiamondCmd(ome, dmnd_db, out_dir, blast_scaf):
+def compile_diamond_cmd(ome, dmnd_db, out_dir, blast_scaf):
     return blast_scaf + ["--out", out_dir + ome + ".tsv", "--subject", dmnd_db]
 
 
@@ -452,7 +454,7 @@ def comp_diamond_tups(
                 ]
             )
             blast_cmds.append(
-                compileDiamondCmd(ome, out_dir + "dmnd/" + ome, out_dir, blast_scaf)
+                compile_diamond_cmd(ome, out_dir + "dmnd/" + ome, out_dir, blast_scaf)
             )
     return db_cmds, blast_cmds
 
@@ -560,7 +562,7 @@ def run_mmseq(
         )
 
 
-def parseOutput(
+def parse_output(
     algorithm,
     ome,
     file_,
@@ -595,7 +597,7 @@ def parseOutput(
     return ome_results
 
 
-def parseOutput_mmseqs(
+def parse_output_mmseqs(
     algorithm, ome, file_, bitscore=0, pident=0, evalue=0, max_hits=None, ppos=None
 ):
 
@@ -621,7 +623,7 @@ def parseOutput_mmseqs(
     return ome_results
 
 
-def compileResults(res_dict, skip=[]):
+def compile_results(res_dict, skip=[]):
 
     output_res = {}
     for i in res_dict:
@@ -708,7 +710,7 @@ def comp_blast_acc2fa(db, biotype, output_res, coords=False, skip=None):
     return acc2fa_cmds
 
 
-def prepOutput(out_dir):
+def prep_output(out_dir):
 
     out_dir = format_path(out_dir)
     if not out_dir.endswith("/"):
@@ -735,7 +737,7 @@ def run_denovo(report_dir, log_list0, log_name):
     return log_list0, report_dir
 
 
-def db2searchLog(
+def db2search_log(
     report_dir, blast, query, max_hits, evalue, bit, pident, coverage, out_dir, ppos
 ):
     log_list0 = [
@@ -790,7 +792,7 @@ def prepare_search_run(
     prev, finished, rundb = False, set(), db
     if isinstance(query, list):
         query = ",".join(query)
-    log_list0, log_list1, prev, reparse = db2searchLog(
+    log_list0, log_list1, prev, reparse = db2search_log(
         report_dir, blast, query, max_hits, evalue, bit, pident, coverage, out_dir, ppos
     )
     report_dir = log_list0[0]
@@ -856,7 +858,7 @@ def comp_mmseq_res(rundb, report_dir, queries, convert=False):
             Path(todel_file).unlink()
 
 
-def ObyOsearch(
+def o_by_o_search(
     db,
     rundb,
     blast,
@@ -936,7 +938,7 @@ def ObyOsearch(
 
     logger.info("Parsing reports")
     with mp.get_context("spawn").Pool(processes=cpus) as pool:
-        results = pool.starmap(parseOutput, tuple(parse_tups))
+        results = pool.starmap(parse_output, tuple(parse_tups))
     results_dict = {x[0]: x[1] for x in results}
 
     return results_dict
@@ -992,15 +994,15 @@ def mmseqs_mngr(
             )
 
     with mp.get_context("spawn").Pool(processes=cpus) as pool:
-        results = pool.starmap(parseOutput_mmseqs, tuple(parse_tups))
+        results = pool.starmap(parse_output_mmseqs, tuple(parse_tups))
     results_dict = {x[0]: x[1] for x in results}
 
     return results_dict
 
 
-def checkSearchDB(binary="blast"):
+def check_search_db(binary="blast"):
 
-    db_date = Path(primaryDB()).name
+    db_date = Path(primary_db()).name
     if "blast" in binary:
         search_db = format_path("$MYCOFAA/blastdb/" + db_date + ".00.psd")
         if Path(search_db).is_file():
@@ -1101,7 +1103,7 @@ def dbmmseq(db_path, query, evalue, cpus, report_dir, mmseqs="mmseqs", mem=None)
     return cmd_call, out_file
 
 
-def parseDBout(db, file_, bitscore=0, pident=0, ppos=0, max_hits=None):
+def parse_db_out(db, file_, bitscore=0, pident=0, ppos=0, max_hits=None):
 
     ome_results = {}
     with open(file_, "r") as raw:
@@ -1151,7 +1153,7 @@ def mmseqs_main(
     iterations=3,
 ):
 
-    report_dir = prepOutput(out_dir)
+    report_dir = prep_output(out_dir)
     if isinstance(query, str):
         query = [query]
     elif isinstance(query, dict):
@@ -1190,7 +1192,7 @@ def mmseqs_main(
     )
 
     logger.info("Compiling fastas")
-    output_res = compileResults(results_dict, skip)
+    output_res = compile_results(results_dict, skip)
     output_fas = {}
     acc2fa_cmds = comp_mmseq_acc2fa(
         db, biotype, output_res, coords=coordinate, skip=None
@@ -1234,7 +1236,7 @@ def blast_main(
     #    if blastdb:
     # insert function to make blastdb
 
-    report_dir = prepOutput(out_dir)
+    report_dir = prep_output(out_dir)
     if isinstance(query, str):
         query = [query]
     elif isinstance(query, dict):
@@ -1257,7 +1259,7 @@ def blast_main(
         if search_exit:
             logger.error("search failed: " + str(search_exit))
             sys.exit(10)
-        results_dict = parseDBout(
+        results_dict = parse_db_out(
             db,
             search_output,
             bitscore=bitscore,
@@ -1279,7 +1281,7 @@ def blast_main(
             coverage,
             ppos,
         )
-        results_dict = ObyOsearch(
+        results_dict = o_by_o_search(
             db,
             rundb,
             blast,
@@ -1301,7 +1303,7 @@ def blast_main(
         )
 
     logger.info("Compiling fastas")
-    output_res = compileResults(results_dict, skip)
+    output_res = compile_results(results_dict, skip)
     output_fas = {}
     acc2fa_cmds = comp_blast_acc2fa(
         db, biotype, output_res, coords=coordinate, skip=None
@@ -1334,7 +1336,7 @@ def cli():
     )
 
     i_arg = parser.add_argument_group("Inputs")
-    i_arg.add_argument("-d", "--mtdb", default=primaryDB())
+    i_arg.add_argument("-d", "--mtdb", default=primary_db())
     i_arg.add_argument(
         "-q", "--query", help='Profile database, sequence, or "-" for stdin fasta'
     )
@@ -1478,7 +1480,7 @@ def cli():
     # queries = sorted(query_set)
     else:
         biotype = None
-    findExecs(deps, exit=set(deps))
+    find_execs(deps, exit=set(deps))
 
     # identity
     if args.identity:
@@ -1488,13 +1490,13 @@ def cli():
 
     if not args.output:
         base = str(Path.cwd()) + "/"
-        output = mkOutput(base, "db2search")
+        output = mk_output(base, "db2search")
     else:
         base = format_path(args.output, force_dir=True)
         output = base
         if not Path(output).is_dir():
             Path(output).mkdir()
-    #            output = mkOutput(base, 'db2search')
+    #            output = mk_output(base, 'db2search')
 
     if args.cpu and args.cpu < mp.cpu_count():
         cpu = args.cpu

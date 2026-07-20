@@ -16,11 +16,11 @@ import pandas as pd
 from collections import defaultdict
 from mycotools.lib.kontools import (
     multisub,
-    findExecs,
+    find_execs,
     format_path,
     read_json,
     write_json,
-    mkOutput,
+    mk_output,
     fmt_float,
     setup_logging,
 )
@@ -120,7 +120,7 @@ def parse_mmseqs_clus(res_path):
     return hg2gene, gene2hg
 
 
-def makeDmndDB(diamond, queryFile, output_dir, cpus=1):
+def make_dmnd_db(diamond, queryFile, output_dir, cpus=1):
     """create a diamond database:
     diamond: binary path, queryFile: query_path"""
     outputDB = output_dir + re.sub(r"\.[^\.]+$", "", Path(queryFile).name)
@@ -140,7 +140,7 @@ def makeDmndDB(diamond, queryFile, output_dir, cpus=1):
     return outputDB, dmndDBcode
 
 
-def runDmnd(
+def run_dmnd(
     diamond,
     queryFile,
     queryDB,
@@ -259,7 +259,7 @@ def scikitaggd(distance_matrix, maxDist=0.6, linkage="single"):
     return clusters
 
 
-def getNewick(node, newick, parentdist, leaf_names):
+def get_newick(node, newick, parentdist, leaf_names):
     """Code from https://stackoverflow.com/questions/28222179/save-dendrogram-to-newick-format
     adopted from @jfn"""
     if node.is_leaf():
@@ -269,13 +269,13 @@ def getNewick(node, newick, parentdist, leaf_names):
             newick = "):%.2f%s" % (parentdist - node.dist, newick)
         else:
             newick = ");"
-        newick = getNewick(node.get_left(), newick, node.dist, leaf_names)
-        newick = getNewick(node.get_right(), ",%s" % (newick), node.dist, leaf_names)
+        newick = get_newick(node.get_left(), newick, node.dist, leaf_names)
+        newick = get_newick(node.get_right(), ",%s" % (newick), node.dist, leaf_names)
         newick = "(%s" % (newick)
         return newick
 
 
-def getClusterLabels(labels, clusters):
+def get_cluster_labels(labels, clusters):
 
     i = iter(labels)
     protoclusters = {next(i): x for x in clusters}
@@ -286,7 +286,7 @@ def getClusterLabels(labels, clusters):
     return clusters
 
 
-def runMCL(distMat, inflation):
+def run_mcl(distMat, inflation):
 
     key2gene = {i: v for i, v in enumerate(list(distMat.keys()))}
     npMat = distMat.to_numpy()
@@ -308,14 +308,14 @@ def scipyaggd(distMat, maxDist, method="single"):
     linkage_matrix = hierarchy.linkage(squareform_matrix, method)
     tree = hierarchy.to_tree(linkage_matrix)
     fcluster = hierarchy.fcluster(linkage_matrix, maxDist, criterion="distance")
-    clusters = getClusterLabels(distMat.index, fcluster)
+    clusters = get_cluster_labels(distMat.index, fcluster)
 
     return clusters, tree
 
 
 def dmnd_main(fa_path, minVal, output_dir, distFile, pid=True, verbose=False, cpus=1):
-    queryDB, makeDBcode = makeDmndDB("diamond", fa_path, output_dir, cpus=cpus)
-    dmndOut, dmndCode = runDmnd(
+    queryDB, makeDBcode = make_dmnd_db("diamond", fa_path, output_dir, cpus=cpus)
+    dmndOut, dmndCode = run_dmnd(
         "diamond",
         fa_path,
         queryDB,
@@ -337,7 +337,7 @@ def usrch_main(fasta, min_id, output, cpus=1, verbose=False):
     return distance_matrix
 
 
-def readLog(log_path, newLog):
+def read_log(log_path, newLog):
     oldLog = read_json(log_path)
     if (
         oldLog["fasta"] == newLog["fasta"]
@@ -541,12 +541,12 @@ def cluster_iter_aggclus(
         clusters, tree = scipyaggd(
             params["dist"], float(clus_var), params["link"]
         )  # cluster
-        newick = getNewick(tree, "", tree.dist, list(params["dist"].index))
+        newick = get_newick(tree, "", tree.dist, list(params["dist"].index))
         write_data(newick, clusters, res_base + name)
 
         cluster_dict = defaultdict(
             list
-        )  # could be more efficient by grabbing in getClusterLabels
+        )  # could be more efficient by grabbing in get_cluster_labels
         for gene, index in clusters.items():  # create a dictionary clusID:
             # [genes]
             cluster_dict[index].append(gene)
@@ -687,7 +687,7 @@ def main(
     }
     if log_path:
         if Path(log_path).is_file():
-            log_dict = readLog(log_path, log_dict)
+            log_dict = read_log(log_path, log_dict)
         write_json(log_dict, log_path)
 
     if algorithm == "hierarchical":
@@ -788,7 +788,7 @@ def main(
             clusters, tree = scipyaggd(
                 param_dict["dist"], float(clus_var), param_dict["link"]
             )  # cluster
-            newick = getNewick(tree, "", tree.dist, list(param_dict["dist"].index))
+            newick = get_newick(tree, "", tree.dist, list(param_dict["dist"].index))
             write_data(newick, clusters, res_base)
             return clusters, None, None, log_dict
         else:
@@ -939,7 +939,7 @@ def cli():
         logger.error("Invalid alignment software")
         sys.exit(2)
 
-    findExecs([args.alignment.split()[0]], exit=set(args.alignment.split()[0]))
+    find_execs([args.alignment.split()[0]], exit=set(args.alignment.split()[0]))
     interval = args.interval
     if args.interval < 0 or args.interval > 1:
         logger.error("--interval must be between 0 and 1")
@@ -975,7 +975,7 @@ def cli():
         dmnd_dir = format_path(args.output)
         output = dmnd_dir + re.sub(r"\.[^\.]+$", "", Path(fa_path).name)
     else:
-        dmnd_dir = mkOutput(str(Path.cwd()) + "/", "fa2clus")
+        dmnd_dir = mk_output(str(Path.cwd()) + "/", "fa2clus")
         output = dmnd_dir + re.sub(r"\.[^\.]+$", "", Path(fa_path).name)
 
     cluster, tree, overshot, log_dict = main(

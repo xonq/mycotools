@@ -10,7 +10,7 @@ import argparse
 import pandas as pd
 import numpy as np
 from mycotools.lib.kontools import intro, outro, setup_logging
-from mycotools.lib.dbtools import db2df, df2db, readLog, log_editor
+from mycotools.lib.dbtools import db2df, df2db, read_log, log_editor
 from mycotools.download.jgi import jgi_login as jgi_login
 from mycotools.download.jgi import retrieve_xml as retrieve_xml
 from mycotools.download.jgi import jgi_dwnld as jgi_dwnld
@@ -19,14 +19,14 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def compileLog(log_path):
+def compile_log(log_path):
 
     log = {}
     if not Path(log_path).is_file():
         with open(log_path, "w") as out:
             out.write("#assembly_acc\tfna\tgff3\tfaa")
     else:
-        log = readLog(log_path)
+        log = read_log(log_path)
 
     return log
 
@@ -325,7 +325,7 @@ def main(
             ome_set.add(row[ome_col])
 
     log_path = output + "/jgi2db.log"
-    log = compileLog(log_path)
+    log = compile_log(log_path)
     if not rerun:
         prev_omes = set(jgi_df[ome_col])
         for ome in log:

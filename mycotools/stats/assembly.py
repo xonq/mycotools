@@ -20,7 +20,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def calcMask(contig_list):
+def calc_mask(contig_list):
     """Calculate the percent of the sequence that is masked (lower-cased)"""
     seq = "".join([x["sequence"] for x in contig_list])
     mask = seq.count("a")
@@ -31,7 +31,7 @@ def calcMask(contig_list):
     return mask
 
 
-def sortContigs(assembly_path):
+def sort_contigs(assembly_path):
     """Imports fasta, creates a list of dicts for each contig length and its name.
     Sorts the list in descending order by length"""
 
@@ -116,8 +116,8 @@ def n50l50(sortedContigs):
         if "n50-1000bp" not in out:
             out["n50-1000bp"] = "na"
             out["l50-1000bp"] = "na"
-        maskCount = calcMask(sortedContigs)
-        maskCount1000 = calcMask(pass_fa)
+        maskCount = calc_mask(sortedContigs)
+        maskCount1000 = calc_mask(pass_fa)
         out["mask%"] = maskCount / int(total) * 100
         out["mask%-1000bp"] = maskCount1000 / int(total1000) * 100
     except KeyError:  # no stats acquired ??
@@ -127,7 +127,7 @@ def n50l50(sortedContigs):
 
 
 def mngr(assembly_path, ome):
-    sortedContigs = sortContigs(assembly_path)
+    sortedContigs = sort_contigs(assembly_path)
     calcs = n50l50(sortedContigs)
     return ome, tuple([(x, calcs[x]) for x in calcs])
 
@@ -203,7 +203,7 @@ def main(in_path, log_path=None, cpus=1, db=None):
 
     # if there is not a database then run for the input file
     else:
-        sortedContigs = sortContigs(in_path)
+        sortedContigs = sort_contigs(in_path)
         calculations = n50l50(sortedContigs)
         if calculations:
             stats[Path(os.path.abspath(in_path)).name] = n50l50(sortedContigs)

@@ -35,20 +35,20 @@ except ImportError:
     raise ImportError(
         "Install ete3 into your conda environment via `conda install ete3`"
     )
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.lib.kontools import (
     format_path,
-    findExecs,
+    find_execs,
     intro,
     outro,
     read_json,
     write_json,
     stdin2str,
-    getColors,
+    get_colors,
     collect_files,
     setup_logging,
 )
-from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3Comps
+from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3_comps
 from mycotools.mtdb.acc2.fa import dbmain as acc2fa
 from mycotools.cluster.fasta import (
     write_data,
@@ -832,7 +832,7 @@ def merge_color_palette(merges, query2color):
 def extend_color_palette(hgs, color_dict):
     hgs = [str(x) for x in hgs]
     new_hgs = set(hgs).difference(set(color_dict.keys()))
-    colors = getColors(len(hgs))
+    colors = get_colors(len(hgs))
     new_colors = list(set(colors).difference(set(color_dict.values())))
     cor_i = 0
     for i, v in enumerate(list(new_hgs)):
@@ -1626,13 +1626,13 @@ def search_main(
     if query_gff:
         logger.info("Cleaning input GFF")
         par_dict, prot_hits, RNA, query_gff = prep_gff(
-            query_gff, set(input_genes), gff3Comps()
+            query_gff, set(input_genes), gff3_comps()
         )
         count = 0
         while par_dict and count < 4:
             count += 1
             par_dict, prot_hits, RNA, query_gff = prep_gff(
-                query_gff, set(input_genes), gff3Comps(), prot_hits, par_dict
+                query_gff, set(input_genes), gff3_comps(), prot_hits, par_dict
             )
         if par_dict:
             logger.info("Incorrectly formatted GFF")
@@ -1897,7 +1897,7 @@ def cli():
                 "-" for stdin',
         required=True,
     )
-    i_opt.add_argument("-d", "--mtdb", default=primaryDB())
+    i_opt.add_argument("-d", "--mtdb", default=primary_db())
     i_opt.add_argument(
         "-g",
         "--gff",
@@ -2048,7 +2048,7 @@ def cli():
         else:
             execs.append(args.search)
             args.homologs = None
-    findExecs(execs, exit=set(execs))
+    find_execs(execs, exit=set(execs))
 
     if args.out_format.lower() not in {"svg", "pdf", "png"}:
         logger.error("invalid -of")

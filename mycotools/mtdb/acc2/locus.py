@@ -8,8 +8,8 @@ import multiprocessing as mp
 from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import format_path, file2list, stdin2str, setup_logging
-from mycotools.lib.dbtools import primaryDB, mtdb
-from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3Comps
+from mycotools.lib.dbtools import primary_db, mtdb
+from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3_comps
 from mycotools.mtdb.acc2.gff import grab_gff_acc
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ def compile_alias_coords(gff_list, accs_list=[]):
     dictionary that is accessed through the sequence ID, followed by the
     alias of each sequence"""
     accs_set = set(accs_list)
-    alias_comp = re.compile(gff3Comps()["Alias"])
+    alias_comp = re.compile(gff3_comps()["Alias"])
 
     # gather the coordinates for each RNA and genes without RNAs
     coord_dict = defaultdict(lambda: defaultdict(list))
@@ -95,7 +95,7 @@ def compile_alias_coords(gff_list, accs_list=[]):
     return coord_dict, acc2seqid
 
 
-def prep_outputXgene(coords_dict, acc, plusminus):
+def prep_output_xgene(coords_dict, acc, plusminus):
     """Prep the output for each gene accession using the coordinates
     dictionary as a sorting mechanism, and return the list of accession names"""
     alias_list = list(coords_dict.keys())
@@ -110,7 +110,7 @@ def prep_outputXgene(coords_dict, acc, plusminus):
     return out_index
 
 
-def prep_outputXbase(coords_dict, acc, plusminus):
+def prep_output_xbase(coords_dict, acc, plusminus):
     """Prep the output based on the coordinates of a list of accessions if they
     are within the range of the bases alotted, provided by plusminus"""
     alias_list = list(coords_dict.keys())
@@ -166,10 +166,10 @@ def main(
         out_indices[accs[0]] = grab_between(coords_dict[seqid], accs)
     elif nt:  # if looking for accessions that are +/- a number of nucleotides
         for acc, seqid in acc2seqid.items():
-            out_indices[acc] = prep_outputXbase(coords_dict[seqid], acc, plusminus)
+            out_indices[acc] = prep_output_xbase(coords_dict[seqid], acc, plusminus)
     else:  # if looking for accessions that are +/- a number of accessions
         for acc, seqid in acc2seqid.items():
-            out_indices[acc] = prep_outputXgene(coords_dict[seqid], acc, plusminus)
+            out_indices[acc] = prep_output_xgene(coords_dict[seqid], acc, plusminus)
 
     out_indices = {k: v for k, v in out_indices.items() if v}
     if geneGff:  # if a gff of the RNA entries is desired
@@ -179,7 +179,7 @@ def main(
         for entry in gff_list:
             if "RNA" in entry["type"]:
                 try:
-                    gene = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                    gene = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
                     for acc, genes in gene_sets.items():
                         if gene in genes:
                             geneGffs_prep[acc][gene] = entry
@@ -188,7 +188,7 @@ def main(
                     pass
             elif "gene" in entry["type"]:
                 try:
-                    gene = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                    gene = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
                     for acc, genes in gene_sets.items():
                         if gene in genes:
                             alt_geneGffs_prep[acc][gene] = entry
@@ -260,7 +260,7 @@ def cli():
     parser.add_argument("-f", "--faa", help="Input protein fasta file")
     parser.add_argument("-s", "--sep", help="Separator for input file.", default="\n")
     parser.add_argument(
-        "-d", "--mtdb", default=primaryDB(), help="MTDB; DEFAULT: primary"
+        "-d", "--mtdb", default=primary_db(), help="MTDB; DEFAULT: primary"
     )
     parser.add_argument("--cpu", type=int, default=1)
     args = parser.parse_args()

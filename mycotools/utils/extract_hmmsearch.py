@@ -9,7 +9,7 @@ from mycotools.lib.kontools import (
     outro,
     file2list,
     format_path,
-    mkOutput,
+    mk_output,
     setup_logging,
 )
 from pathlib import Path
@@ -208,7 +208,7 @@ def grab_hits(
     return hit_str, aln_str
 
 
-def synthesizeHits(out_dict):
+def synthesize_hits(out_dict):
 
     check = []
     for hit in out_dict:
@@ -339,7 +339,7 @@ def cli():
     # initialize output file structure
     output = format_path(args.output)
     if not args.output:
-        output = mkOutput(str(Path.cwd()) + "/", "extractHmmsearch")
+        output = mk_output(str(Path.cwd()) + "/", "extract_hmmsearch")
     elif not Path(output).is_dir():
         Path(args.output).mkdir()
 
@@ -406,7 +406,7 @@ def cli():
                 query=args.query,
             )
             out_dict = {**out_dict, **temp_out_dict}
-        out_dict = synthesizeHits(out_dict)
+        out_dict = synthesize_hits(out_dict)
 
     for name in out_dict:
         with open(output + "/" + name + ".hits.tsv", "w") as out:

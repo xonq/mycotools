@@ -5,14 +5,14 @@ import re
 import sys
 import argparse
 from Bio.Seq import Seq
-from mycotools.lib.dbtools import mtdb, primaryDB
-from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps, dict2fa
+from mycotools.lib.dbtools import mtdb, primary_db
+from mycotools.lib.biotools import fa2dict, gff2list, gff3_comps, dict2fa
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 
 logger = logging.getLogger(__name__)
 
 
-def sortGene(sorting_group):
+def sort_gene(sorting_group):
 
     out_group = []
     for entryType in ["gene", "mrna", "trna", "rrna", "exon", "cds"]:
@@ -30,7 +30,7 @@ def sortGene(sorting_group):
     return out_group
 
 
-def sortContig(contigData):
+def sort_contig(contigData):
 
     coordinates = {}
     for gene in contigData:
@@ -48,7 +48,7 @@ def sortContig(contigData):
     return outContig
 
 
-def sortGFF(unsorted_gff, idComp):
+def sort_gff(unsorted_gff, idComp):
 
     sorting_groups, oldGene = {}, None
     for i, entry in enumerate(unsorted_gff):
@@ -65,23 +65,23 @@ def sortGFF(unsorted_gff, idComp):
     for seqid in sorting_groups:
         contigData = {}
         for gene in sorting_groups[seqid]:
-            contigData[gene] = sortGene(sorting_groups[seqid][gene])
-        sortedGff.extend(sortContig(contigData))
+            contigData[gene] = sort_gene(sorting_groups[seqid][gene])
+        sortedGff.extend(sort_contig(contigData))
 
     return sortedGff
 
 
-def sortMain(gff):
+def sort_main(gff):
 
-    id_comp = re.compile(gff3Comps()["id"])
+    id_comp = re.compile(gff3_comps()["id"])
     #    crude_sort = sorted( gff, key = lambda x: \
     #       int( re.search(r'ID=([^;]+)', x['attributes'])[1] ))
-    gff = sortGFF(gff, id_comp)
+    gff = sort_gff(gff, id_comp)
 
     return gff
 
 
-def grabCDS(gff_dicts, spacer="\t"):
+def grab_cds(gff_dicts, spacer="\t"):
     """Grab CDSs that are associated with genes. gff_dicts is a
     mycotools.lib.biotools gff2list() list"""
 
@@ -89,7 +89,7 @@ def grabCDS(gff_dicts, spacer="\t"):
     for entry in gff_dicts:
         if entry["type"] == "mRNA":
             try:
-                alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
                 if not ome:
                     ome = alias[: alias.find("_")]
             except TypeError:
@@ -97,7 +97,7 @@ def grabCDS(gff_dicts, spacer="\t"):
             mrnas.extend(alias.split("|"))  # account for posttranslational mods
         elif "gene" in entry["type"]:
             try:
-                alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
                 genes.extend(alias.split("|"))
             except TypeError:
                 if not warning and ome:
@@ -109,7 +109,7 @@ def grabCDS(gff_dicts, spacer="\t"):
     out_cds = []
     for entry in gff_dicts:
         if entry["type"] == "CDS":
-            alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+            alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
             if alias in mrna_set:
                 out_cds.append(entry)
 
@@ -129,11 +129,11 @@ def order_neg_dict(neg_dict):
     return neg_dict
 
 
-def grabCoords(cdss):
+def grab_coords(cdss):
 
     pos_dict, neg_dict = {}, {}
     for entry in cdss:
-        gene = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+        gene = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
         seqid = entry["seqid"]
         if entry["strand"].rstrip() == "+":
             if seqid not in pos_dict:
@@ -151,7 +151,7 @@ def grabCoords(cdss):
     return pos_dict, order_neg_dict(neg_dict)
 
 
-def translatePos(contig_seq, postig_dict):
+def translate_pos(contig_seq, postig_dict):
 
     genes_fa_dict = {}
     for gene in postig_dict:
@@ -164,7 +164,7 @@ def translatePos(contig_seq, postig_dict):
     return genes_fa_dict
 
 
-def translateNeg(rev_seq, negtig_dict):
+def translate_neg(rev_seq, negtig_dict):
 
     genes_fa_dict = {}
     seqlen = len(rev_seq.rstrip())
@@ -180,7 +180,7 @@ def translateNeg(rev_seq, negtig_dict):
     return genes_fa_dict
 
 
-def ntPos(contig_seq, postig_dict):
+def nt_pos(contig_seq, postig_dict):
 
     genes_fa_dict = {}
     for gene in postig_dict:
@@ -192,7 +192,7 @@ def ntPos(contig_seq, postig_dict):
     return genes_fa_dict
 
 
-def posPlusMinusCode(genePostig_dict, plusminus, contig_seq, plus=True, minus=True):
+def pos_plus_minus_code(genePostig_dict, plusminus, contig_seq, plus=True, minus=True):
     geneDict = {"sequence": "", "description": ""}
     minimumList = []
     for x in genePostig_dict:
@@ -219,7 +219,7 @@ def posPlusMinusCode(genePostig_dict, plusminus, contig_seq, plus=True, minus=Tr
     return geneDict
 
 
-def posPlusMinus(genePostig_dict, plusminus, contig_seq, plus=True, minus=True):
+def pos_plus_minus(genePostig_dict, plusminus, contig_seq, plus=True, minus=True):
     minimumList = []
     for x in genePostig_dict:
         minimumList.extend(x)
@@ -250,13 +250,15 @@ def posPlusMinus(genePostig_dict, plusminus, contig_seq, plus=True, minus=True):
     return geneDict
 
 
-def ntPosNoncode(contig_seq, postig_dict, plusminus=0):
+def nt_pos_noncode(contig_seq, postig_dict, plusminus=0):
 
     genes_fa_dict = {}
     for i, gene in enumerate(list(postig_dict.keys())):
         genes_fa_dict[gene] = {"sequence": "", "description": ""}
         if plusminus:
-            genes_fa_dict[gene] = posPlusMinus(postig_dict[gene], plusminus, contig_seq)
+            genes_fa_dict[gene] = pos_plus_minus(
+                postig_dict[gene], plusminus, contig_seq
+            )
         else:
             minimumList = []
             for x in postig_dict[gene]:
@@ -269,7 +271,7 @@ def ntPosNoncode(contig_seq, postig_dict, plusminus=0):
     return genes_fa_dict
 
 
-def negPlusMinusCode(
+def neg_plus_minus_code(
     geneNegtig_dict, seqlen, plusminus, rev_seq, plus=True, minus=True
 ):
     minimumList, geneDict = [], {"sequence": "", "description": ""}
@@ -300,7 +302,7 @@ def negPlusMinusCode(
     return geneDict
 
 
-def negPlusMinus(neg_gene, seqlen, plusminus, rev_seq, plus=True, minus=True):
+def neg_plus_minus(neg_gene, seqlen, plusminus, rev_seq, plus=True, minus=True):
     minimumList = []
     for x in neg_gene:
         minimumList.extend(x)
@@ -337,7 +339,7 @@ def negPlusMinus(neg_gene, seqlen, plusminus, rev_seq, plus=True, minus=True):
     return geneDict
 
 
-def ntNeg(rev_seq, negtig_dict, plusminus=0):
+def nt_neg(rev_seq, negtig_dict, plusminus=0):
 
     genes_fa_dict = {}
     seqlen = len(rev_seq.rstrip())
@@ -352,13 +354,13 @@ def ntNeg(rev_seq, negtig_dict, plusminus=0):
     return genes_fa_dict
 
 
-def ntNegNoncode(rev_seq, negtig_dict, plusminus=0):
+def nt_neg_noncode(rev_seq, negtig_dict, plusminus=0):
 
     genes_fa_dict = {}
     seqlen = len(rev_seq.rstrip())
     for gene in negtig_dict:
         if plusminus:
-            genes_fa_dict[gene] = negPlusMinus(
+            genes_fa_dict[gene] = neg_plus_minus(
                 negtig_dict[gene], plusminus, seqlen, rev_seq
             )
         else:
@@ -389,31 +391,33 @@ def ntmain(
     if fullRegion:
         flanks, coding = True, False
     contig_dict, contig_info, genes_fa_dict, geneOrder = {}, {}, {}, {}
-    cdss = grabCDS(sortMain(gff_dicts), spacer=spacer)
+    cdss = grab_cds(sort_main(gff_dicts), spacer=spacer)
     for cds in cdss:
         seqid = cds["seqid"]
         if seqid not in contig_dict:
             contig_dict[seqid] = []
             geneOrder[seqid] = []
         contig_dict[seqid].append(cds)
-        gene = re.search(gff3Comps()["Alias"], cds["attributes"])[1]
+        gene = re.search(gff3_comps()["Alias"], cds["attributes"])[1]
         if gene not in set(geneOrder[seqid]):
             geneOrder[seqid].append(gene)
     for seqid in contig_dict:
         contig_info[seqid] = [
             (
-                re.search(gff3Comps()["Alias"], contig_dict[seqid][0]["attributes"])[1],
+                re.search(gff3_comps()["Alias"], contig_dict[seqid][0]["attributes"])[
+                    1
+                ],
                 contig_dict[seqid][0]["strand"],
             ),
             (
-                re.search(gff3Comps()["Alias"], contig_dict[seqid][-1]["attributes"])[
+                re.search(gff3_comps()["Alias"], contig_dict[seqid][-1]["attributes"])[
                     1
                 ],
                 contig_dict[seqid][-1]["strand"],
             ),
         ]
 
-    pos_dict, neg_dict = grabCoords(cdss)
+    pos_dict, neg_dict = grab_coords(cdss)
 
     contig_fa_dict, startFlanks, endFlanks = (
         {seqid: {} for seqid in contig_info},
@@ -430,7 +434,7 @@ def ntmain(
                 endGene, endStrand = contig_info[seqid][1][0], contig_info[seqid][1][1]
                 if startGene == endGene:
                     if startStrand == "+":
-                        startFlanks[seqid] = posPlusMinusCode(
+                        startFlanks[seqid] = pos_plus_minus_code(
                             pos_dict[seqid][startGene],
                             plusminus,
                             assem_dict[seqid]["sequence"],
@@ -440,7 +444,7 @@ def ntmain(
                         rev_comp = str(
                             Seq(assem_dict[seqid]["sequence"]).reverse_complement()
                         )
-                        startFlanks[seqid] = negPlusMinusCode(
+                        startFlanks[seqid] = neg_plus_minus_code(
                             neg_dict[seqid][startGene],
                             len(rev_comp),
                             plusminus,
@@ -449,7 +453,7 @@ def ntmain(
                         del neg_dict[seqid][startGene]
                     continue
                 if startStrand == "+":
-                    startFlanks[seqid] = posPlusMinusCode(
+                    startFlanks[seqid] = pos_plus_minus_code(
                         pos_dict[seqid][startGene],
                         plusminus,
                         assem_dict[seqid]["sequence"],
@@ -460,7 +464,7 @@ def ntmain(
                     rev_comp = str(
                         Seq(assem_dict[seqid]["sequence"]).reverse_complement()
                     )
-                    startFlanks[seqid] = negPlusMinusCode(
+                    startFlanks[seqid] = neg_plus_minus_code(
                         neg_dict[seqid][startGene],
                         len(rev_comp),
                         plusminus,
@@ -469,7 +473,7 @@ def ntmain(
                     )
                     del neg_dict[seqid][startGene]
                 if endStrand == "+":
-                    endFlanks[seqid] = posPlusMinusCode(
+                    endFlanks[seqid] = pos_plus_minus_code(
                         pos_dict[seqid][endGene],
                         plusminus,
                         assem_dict[seqid]["sequence"],
@@ -480,7 +484,7 @@ def ntmain(
                     rev_comp = str(
                         Seq(assem_dict[seqid]["sequence"]).reverse_complement()
                     )
-                    endFlanks[seqid] = negPlusMinusCode(
+                    endFlanks[seqid] = neg_plus_minus_code(
                         neg_dict[seqid][endGene],
                         len(rev_comp),
                         plusminus,
@@ -498,7 +502,7 @@ def ntmain(
 
                 if startGene == endGene:
                     if startStrand == "+":
-                        startFlanks[seqid] = posPlusMinus(
+                        startFlanks[seqid] = pos_plus_minus(
                             pos_dict[seqid][startGene],
                             plusminus,
                             assem_dict[seqid]["sequence"],
@@ -508,7 +512,7 @@ def ntmain(
                         rev_comp = str(
                             Seq(assem_dict[seqid]["sequence"]).reverse_complement()
                         )
-                        startFlanks[seqid] = negPlusMinus(
+                        startFlanks[seqid] = neg_plus_minus(
                             neg_dict[seqid][startGene],
                             len(rev_comp),
                             plusminus,
@@ -528,18 +532,18 @@ def ntmain(
                     else:
                         region.append(max(neg_dict[seqid][endGene]))
                     name = startGene + "-" + endGene
-                    genes_fa_dict[name + "_sense"] = posPlusMinus(
+                    genes_fa_dict[name + "_sense"] = pos_plus_minus(
                         region, plusminus, assem_dict[seqid]["sequence"]
                     )
                     rev_comp = str(
                         Seq(assem_dict[seqid]["sequence"]).reverse_complement()
                     )
-                    genes_fa_dict[name + "_antisense"] = negPlusMinus(
+                    genes_fa_dict[name + "_antisense"] = neg_plus_minus(
                         region, len(rev_comp), plusminus, rev_comp
                     )
 
                 if startStrand == "+":
-                    startFlanks[seqid] = posPlusMinus(
+                    startFlanks[seqid] = pos_plus_minus(
                         pos_dict[seqid][startGene],
                         plusminus,
                         assem_dict[seqid]["sequence"],
@@ -550,7 +554,7 @@ def ntmain(
                     rev_comp = str(
                         Seq(assem_dict[contig]["sequence"]).reverse_complement()
                     )
-                    startFlanks[seqid] = negPlusMinus(
+                    startFlanks[seqid] = neg_plus_minus(
                         neg_dict[seqid][startGene],
                         len(rev_comp),
                         plusminus,
@@ -559,7 +563,7 @@ def ntmain(
                     )
                     del neg_dict[seqid][startGene]
                 if endStrand == "+":
-                    endFlanks[seqid] = posPlusMinus(
+                    endFlanks[seqid] = pos_plus_minus(
                         pos_dict[seqid][endGene],
                         plusminus,
                         assem_dict[seqid]["sequence"],
@@ -570,7 +574,7 @@ def ntmain(
                     rev_comp = str(
                         Seq(assem_dict[seqid]["sequence"]).reverse_complement()
                     )
-                    endFlanks[seqid] = negPlusMinus(
+                    endFlanks[seqid] = neg_plus_minus(
                         neg_dict[seqid][endGene],
                         len(rev_comp),
                         plusminus,
@@ -583,7 +587,7 @@ def ntmain(
             for contig in contig_fa_dict:
                 if contig in pos_dict:
                     contig_fa_dict[contig] = {
-                        **ntPos(assem_dict[contig]["sequence"], pos_dict[contig]),
+                        **nt_pos(assem_dict[contig]["sequence"], pos_dict[contig]),
                         **contig_fa_dict[contig],
                     }
                 if contig in neg_dict:
@@ -591,14 +595,14 @@ def ntmain(
                         Seq(assem_dict[contig]["sequence"]).reverse_complement()
                     )
                     contig_fa_dict[contig] = {
-                        **ntNeg(rev_comp, neg_dict[contig]),
+                        **nt_neg(rev_comp, neg_dict[contig]),
                         **contig_fa_dict[contig],
                     }
         elif not fullRegion:
             for contig in contig_fa_dict:
                 if contig in pos_dict:
                     contig_fa_dict[contig] = {
-                        **ntPosNoncode(
+                        **nt_pos_noncode(
                             assem_dict[contig]["sequence"], pos_dict[contig]
                         ),
                         **contig_fa_dict[contig],
@@ -608,7 +612,7 @@ def ntmain(
                         Seq(assem_dict[contig]["sequence"]).reverse_complement()
                     )
                     contig_fa_dict[contig] = {
-                        **ntNegNoncode(rev_comp, neg_dict[contig]),
+                        **nt_neg_noncode(rev_comp, neg_dict[contig]),
                         **contig_fa_dict[contig],
                     }
     if not fullRegion:
@@ -625,18 +629,18 @@ def ntmain(
 
 def aamain(gff_dicts, assem_dict, spacer="\t"):
 
-    cdss = grabCDS(gff_dicts, spacer)
-    pos_dict, neg_dict = grabCoords(cdss)
+    cdss = grab_cds(gff_dicts, spacer)
+    pos_dict, neg_dict = grab_coords(cdss)
 
     genes_fa_dict = {}
     for contig in pos_dict:
         genes_fa_dict = {
-            **translatePos(assem_dict[contig]["sequence"], pos_dict[contig]),
+            **translate_pos(assem_dict[contig]["sequence"], pos_dict[contig]),
             **genes_fa_dict,
         }
     for contig in neg_dict:
         rev_comp = str(Seq(assem_dict[contig]["sequence"]).reverse_complement())
-        genes_fa_dict = {**translateNeg(rev_comp, neg_dict[contig]), **genes_fa_dict}
+        genes_fa_dict = {**translate_neg(rev_comp, neg_dict[contig]), **genes_fa_dict}
 
     return genes_fa_dict
 
@@ -670,11 +674,11 @@ def cli():
         assembly_dicts = {"input": fa2dict(format_path(args.assembly))}
         gff_dicts = {"input": input_gff}
     else:
-        db = mtdb(primaryDB()).set_index("ome")
+        db = mtdb(primary_db()).set_index("ome")
         gff_dicts, assembly_dicts = {}, {}
         try:
             for line in input_gff:
-                gene = re.search(gff3Comps()["Alias"], line["attributes"])[1]
+                gene = re.search(gff3_comps()["Alias"], line["attributes"])[1]
                 ome = re.search(r"(.*?)_", gene)[1]
                 if ome not in gff_dicts:
                     gff_dicts[ome] = []

@@ -14,13 +14,13 @@ from mycotools.mtdb.files import soft_main as symlink_files
 from mycotools.cluster.db import id_near_schgs
 from mycotools.lib.kontools import (
     format_path,
-    mkOutput,
-    findExecs,
+    mk_output,
+    find_execs,
     intro,
     outro,
     setup_logging,
 )
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.lib.biotools import gff2list
 from pathlib import Path
 
@@ -575,7 +575,7 @@ def cli():
         + "loci."
     )
     parser.add_argument(
-        "-d", "--db", default=primaryDB(), help="MycotoolsDB. DEFAULT: masterdb"
+        "-d", "--db", default=primary_db(), help="MycotoolsDB. DEFAULT: masterdb"
     )
     parser.add_argument(
         "-f",
@@ -637,12 +637,12 @@ def cli():
         hg_dir = None
         homogroups = None
         execs.append("mmseqs")
-    findExecs(execs, exit=set(execs))
+    find_execs(execs, exit=set(execs))
 
     if not args.output:
-        out_dir = mkOutput(str(Path.cwd()) + "/", "db2microsyntree")
+        out_dir = mk_output(str(Path.cwd()) + "/", "db2microsyntree")
     else:
-        out_dir = mkOutput(format_path(args.output), "db2microsyntree")
+        out_dir = mk_output(format_path(args.output), "db2microsyntree")
 
     args_dict = {
         "Database": args.db,

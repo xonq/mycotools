@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-"""Tests for the no-password credential store (dbtools.store_login / loginCheck).
+"""Tests for the no-password credential store (dbtools.store_login / login_check).
 
 All tests use temp paths and monkeypatch ``dbtools.PLAIN_LOGIN_PATH`` so the real
 ``~/.mycotools`` credential files are never read or written.
@@ -99,7 +99,7 @@ def test_logincheck_prefers_encrypted_key_over_plain(monkeypatch, paths):
     monkeypatch.setattr(dbtools.getpass, "getpass", lambda prompt="": "pw")
     monkeypatch.setattr("sys.stdin", io.StringIO("pw\n"))
     with pytest.raises(Exception):
-        dbtools.loginCheck(info_path=paths["enc"])
+        dbtools.login_check(info_path=paths["enc"])
 
 
 def test_logincheck_uses_plain_store_when_no_encrypted_key(
@@ -115,7 +115,7 @@ def test_logincheck_uses_plain_store_when_no_encrypted_key(
     )
     monkeypatch.setattr(dbtools, "PLAIN_LOGIN_PATH", paths["plain"])
     missing_key = str(tmp_path / "no_such_key")
-    assert dbtools.loginCheck(info_path=missing_key) == (
+    assert dbtools.login_check(info_path=missing_key) == (
         "me@ncbi.org",
         "APIKEY",
         "me@jgi.org",
@@ -131,8 +131,8 @@ def test_logincheck_prompts_when_no_store(monkeypatch, tmp_path):
         calls["args"] = (ncbi, jgi)
         return ("p@q.r", "K", "j@j.j", "pp")
 
-    monkeypatch.setattr(dbtools, "getLogin", fake_getLogin)
-    result = dbtools.loginCheck(
+    monkeypatch.setattr(dbtools, "get_login", fake_getLogin)
+    result = dbtools.login_check(
         info_path=str(tmp_path / "no_key"), ncbi=True, jgi=False
     )
     assert result == ("p@q.r", "K", "j@j.j", "pp")

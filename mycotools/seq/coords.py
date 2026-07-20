@@ -13,7 +13,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def extractCoords(fa_dict, seqid, coord_start=0, coord_end=-1, sense="+", fa_name=""):
+def extract_coords(fa_dict, seqid, coord_start=0, coord_end=-1, sense="+", fa_name=""):
     """Extract the coordinates of a fasta based on input parameters"""
 
     new_fa, error = {}, ""
@@ -82,7 +82,7 @@ def cli():
             args.extend([0, -1, "+"])
         elif len(args) < 6:
             args.append("+")
-        out_fa, error = extractCoords(
+        out_fa, error = extract_coords(
             fa,
             args[1],
             min([int(args[2]), int(args[3])]),
@@ -146,7 +146,9 @@ def cli():
                 sorted_rows = sorted(rows, key=lambda x: x[1], reverse=True)
             if concat_id is None:
                 for x in sorted_rows:
-                    new_fa, error_t = extractCoords(fa, x[0], x[1], x[2], x[3], fa_name)
+                    new_fa, error_t = extract_coords(
+                        fa, x[0], x[1], x[2], x[3], fa_name
+                    )
                     error += error_t
                     out_fa = {
                         **out_fa,
@@ -161,7 +163,9 @@ def cli():
                     )
                 toadd_fa = {"description": "", "sequence": ""}
                 for x in sorted_rows:
-                    new_fa, error_t = extractCoords(fa, x[0], x[1], x[2], x[3], fa_name)
+                    new_fa, error_t = extract_coords(
+                        fa, x[0], x[1], x[2], x[3], fa_name
+                    )
                     error += error_t
                     for seq, seq_info in new_fa.items():
                         toadd_fa["sequence"] += seq_info["sequence"]

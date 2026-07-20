@@ -524,7 +524,7 @@ class mtdb(dict):
         return new_db
 
 
-def getLogin(ncbi, jgi):
+def get_login(ncbi, jgi):
 
     ncbi_email, ncbi_api, jgi_email, jgi_pwd = None, None, None, None
     print(flush=True)
@@ -578,7 +578,7 @@ def store_login(
         "read this file can read your JGI password.",
         info_path,
     )
-    # a password-encrypted key would otherwise take precedence in loginCheck;
+    # a password-encrypted key would otherwise take precedence in login_check;
     # remove it so the no-password store is the one that is actually used
     enc = Path(format_path(encrypted_path))
     if enc.is_file():
@@ -638,12 +638,12 @@ def encrypt_pw(
         logger.info("Removed unencrypted credential store %s", str(plain))
 
 
-def loginCheck(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=False):
+def login_check(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=False):
     salt = b"D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118"
     # Credential source precedence:
     #   1. password-encrypted key   (encrypt_pw)      - prompts for a password
     #   2. unencrypted store        (store_login)     - no password required
-    #   3. interactive prompt       (getLogin)        - not persisted
+    #   3. interactive prompt       (get_login)        - not persisted
     if Path(format_path(info_path)).is_file():
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -680,7 +680,7 @@ def loginCheck(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=F
         # unencrypted store written by store_login - no password required
         return read_plain_login(PLAIN_LOGIN_PATH)
     else:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi, jgi)
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = get_login(ncbi, jgi)
         # CURRENTLY THE REST DOESNT WORK, SO SKIP FOR NOW
         return ncbi_email, ncbi_api, jgi_email, jgi_pwd
 
@@ -705,7 +705,7 @@ def log_editor(log, ome, edit):
         towrite.write(new_data)
 
 
-def readLog(log, columns="", sep="\t"):
+def read_log(log, columns="", sep="\t"):
 
     log_dict = {}
     with open(log, "r") as raw:
@@ -727,7 +727,7 @@ def readLog(log, columns="", sep="\t"):
     return log_dict
 
 
-def primaryDB(path="$MYCODB", verbose=True):
+def primary_db(path="$MYCODB", verbose=True):
     """Acquire the path of the primary database by searching $MYCODB for a file
     with a basename that starts with a date string %Y%m%d."""
 
@@ -1240,5 +1240,5 @@ if Path(interface).is_file():
         for var, env in envs_info[envs_info["active"]].items():
             os.environ[var] = env
 
-# if not primaryDB():
+# if not primary_db():
 #    eprint('WARNING: Primary MycotoolsDB not connected; setup using `mtdb u/-i/-p/-f`', flush = True)

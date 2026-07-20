@@ -63,7 +63,7 @@ def setup_logging(verbose=False, level=None):
     return logging.getLogger("mycotools")
 
 
-class kon_log:
+class KonLog:
     """A print class designed to enable swift string formatting while moving
     between scripts"""
 
@@ -200,7 +200,7 @@ def hex2rgb(hexCode):
     return tuple(int(hexCode.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
 
 
-def getColors(size, ignore=[], rgb=False):
+def get_colors(size, ignore=[], rgb=False):
     if size < 16:
         colors = [
             "#000000",
@@ -516,7 +516,7 @@ def fmt_float(val, sig_dig=None):
     return val_str
 
 
-def findExecs(deps, exit=set(), verbose=True):
+def find_execs(deps, exit=set(), verbose=True):
     """
     Inputs list of dependencies, `dep`, to check path.
     If dependency is in exit and dependency is not in path,
@@ -542,7 +542,7 @@ def findExecs(deps, exit=set(), verbose=True):
     return checks
 
 
-def findEnvs(envs, exit=set(), verbose=True):
+def find_envs(envs, exit=set(), verbose=True):
     """
     Inputs list of paths, `envs`, to check path.
     If env is not in path and it is in exit, exit.
@@ -632,7 +632,7 @@ def collect_dirs(input_glob, recursive=False):
     return [dir_ for dir_ in in_dirs if Path(dir_).is_dir()]
 
 
-def dictSplit(Dict, factor):
+def dict_split(Dict, factor):
     """
     Inputs: a dictionary `Dict`, and an integer `factor` to split by
     Outputs: a list of split dictionaries `list_dict`
@@ -788,7 +788,7 @@ def prep_output(output, mkdir=True, require_newdir=False, cd=False):
     return output
 
 
-def mkOutput(base_dir, program, reuse=True, suffix=datetime.now().strftime("%Y%m%d")):
+def mk_output(base_dir, program, reuse=True, suffix=datetime.now().strftime("%Y%m%d")):
     if not base_dir:
         base_dir = str(Path.cwd()) + "/"
     if not Path(format_path(base_dir)).is_dir():
@@ -811,7 +811,7 @@ def mkOutput(base_dir, program, reuse=True, suffix=datetime.now().strftime("%Y%m
         return out_dir + "/"
 
 
-def checkDep(dep_list=[], var_list=[], exempt=set()):
+def check_dep(dep_list=[], var_list=[], exempt=set()):
     """Checks all dependencies in path from list, optional exemption set"""
 
     failedVars = []

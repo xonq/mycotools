@@ -5,11 +5,11 @@ import sys
 import logging
 import argparse
 from mycotools.lib.dbtools import (
-    loginCheck,
-    primaryDB,
+    login_check,
+    primary_db,
     mtdb,
     encrypt_pw,
-    getLogin,
+    get_login,
     store_login,
 )
 from mycotools.lib.kontools import format_path, read_json, setup_logging
@@ -129,16 +129,16 @@ def cli():
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 
-    db = mtdb(primaryDB()).set_index("assembly_acc")
+    db = mtdb(primary_db()).set_index("assembly_acc")
 
     if args.password and args.store:
         logger.error("--password and --store are mutually exclusive")
         sys.exit(1)
     if args.password:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck()
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check()
         encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd)
     if args.store:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = getLogin(ncbi=True, jgi=True)
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = get_login(ncbi=True, jgi=True)
         store_login(ncbi_email, ncbi_api, jgi_email, jgi_pwd)
     if args.restrict:
         restrict_path = format_path(args.restrict)
@@ -149,7 +149,7 @@ def cli():
                 v = v + [None]
         restrictions(db, restricted, yes=args.yes)
     if args.clear_cache:
-        rm_outdated(mtdb(primaryDB())["ome"], args.yes)
+        rm_outdated(mtdb(primary_db())["ome"], args.yes)
 
     sys.exit(0)
 

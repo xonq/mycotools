@@ -12,10 +12,10 @@ import re
 import sys
 import argparse
 from collections import defaultdict
-from mycotools.lib.kontools import format_path, mkOutput, setup_logging
-from mycotools.lib.biotools import gff2list, list2gff, gff3Comps, gff2Comps, gtfComps
-from mycotools.lib.dbtools import mtdb, primaryDB
-from mycotools.utils.curGFF3 import rename_and_organize
+from mycotools.lib.kontools import format_path, mk_output, setup_logging
+from mycotools.lib.biotools import gff2list, list2gff, gff3_comps, gff2_comps, gtf_comps
+from mycotools.lib.dbtools import mtdb, primary_db
+from mycotools.utils.cur_gff3 import rename_and_organize
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -25,22 +25,22 @@ def determine_version(toadd_gff, ome=None):
     """determine gff version for regex compilations"""
     for entry in toadd_gff:
         if entry["type"] == "gene":
-            if re.search(gff3Comps()["id"], entry["attributes"]):
-                return toadd_gff, gff3Comps()
-            elif re.search(gtfComps()["id"], entry["attributes"]):
-                return toadd_gff, gtfComps()
-            elif re.search(gff2Comps()["id"], entry["attributes"]):
-                return toadd_gff, gff2Comps()
+            if re.search(gff3_comps()["id"], entry["attributes"]):
+                return toadd_gff, gff3_comps()
+            elif re.search(gtf_comps()["id"], entry["attributes"]):
+                return toadd_gff, gtf_comps()
+            elif re.search(gff2_comps()["id"], entry["attributes"]):
+                return toadd_gff, gff2_comps()
         elif entry["type"] == "start_codon":  # get this shit out
-            from mycotools.utils.gtf2gff3 import main as curAnn
+            from mycotools.utils.gtf2gff3 import main as cur_ann
 
             if not ome:
                 logger.info("Ome required for gtf input")
                 sys.exit(1)
-            new_gff = curAnn(toadd_gff, ome)[0]
-            return new_gff, gff3Comps()
+            new_gff = cur_ann(toadd_gff, ome)[0]
+            return new_gff, gff3_comps()
     else:  # finished the for loop and no version detected, assume gff3
-        return toadd_gff, gff3Comps()
+        return toadd_gff, gff3_comps()
 
 
 #        eprint('\nCould not determine gff version', flush = True)
@@ -53,7 +53,7 @@ def id_mtdb_accs(gff):
     mtdb_accs = []
     for entry in gff:
         try:
-            mtdb_acc = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+            mtdb_acc = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
         except TypeError:  # no alias
             continue
         if "_manual" in mtdb_acc:  # mtdb accession explicit
@@ -200,7 +200,7 @@ def compile_mtdb_scaf(scafs, gff):
     for entry in gff:
         if entry["type"] == "gene":
             if entry["seqid"] in scafs:
-                mtdb_acc = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                mtdb_acc = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
                 coord_tup = tuple(sorted([entry["start"], entry["end"]]))
                 old_coords[entry["seqid"]][mtdb_acc] = sorted(
                     [entry["start"], entry["end"]]
@@ -221,7 +221,7 @@ def add_to_mtdb_gff(curadd_gff, addto_gff, ome, replace=False):
             if entry["type"] == "gene":
                 start, stop = entry["start"], entry["end"]
                 seqid = entry["seqid"]
-                new_acc = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                new_acc = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
                 if seqid in ref_coords:
                     for ref_coord, ref_acc in ref_coords[seqid].items():
                         ref_start, ref_stop = ref_coord
@@ -237,7 +237,7 @@ def add_to_mtdb_gff(curadd_gff, addto_gff, ome, replace=False):
         out_gff = []
         for entry in addto_gff:
             if entry["seqid"] in update:
-                mtdb_acc = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                mtdb_acc = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
                 if mtdb_acc in update[entry["seqid"]]:
                     continue
             out_gff.append(entry)
@@ -263,9 +263,9 @@ def main(toadd_gff, addto_gff=[], ome=None, replace=False):
 
 def prep_mtdb_update(new_gff, ome, db):
     from mycotools.mtdb.predb import main as predb2mtdb
-    from mycotools.lib.dbtools import mtdb, primaryDB
+    from mycotools.lib.dbtools import mtdb, primary_db
 
-    out_dir = mkOutput(format_path(str(Path.cwd())), "add2gff")
+    out_dir = mk_output(format_path(str(Path.cwd())), "add2gff")
     wrk_dir = out_dir + "working/"
     if not Path(wrk_dir).is_dir():
         Path(out_dir + "working/").mkdir()
@@ -335,7 +335,7 @@ def cli():
         action="store_true",
         help="[-a] Prepare output for mtdb update",
     )
-    parser.add_argument("-d", "--mtdb", default=primaryDB())
+    parser.add_argument("-d", "--mtdb", default=primary_db())
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 

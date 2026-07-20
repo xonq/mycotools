@@ -10,18 +10,18 @@ import argparse
 import datetime
 import subprocess
 import multiprocessing as mp
-from mycotools.utils.extractHmmsearch import main as exHmm, grab_names as grabNames
-from mycotools.utils.extractHmmAcc import main as extr_hmm
+from mycotools.utils.extract_hmmsearch import main as ex_hmm, grab_names
+from mycotools.utils.extract_hmm_acc import main as extr_hmm
 from mycotools.homology.db import comp_hmm_acc2fa, hmm_acc2fa
-from mycotools.lib.kontools import intro, outro, findExecs, format_path, setup_logging
-from mycotools.lib.dbtools import mtdb, primaryDB
+from mycotools.lib.kontools import intro, outro, find_execs, format_path, setup_logging
+from mycotools.lib.dbtools import mtdb, primary_db
 from mycotools.lib.biotools import dict2fa
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
-def runextractHmmAcc(hmm, accession, output):
+def run_extract_hmm_acc(hmm, accession, output):
 
     with open(hmm, "r") as raw:
         hmm_data = raw.read()
@@ -32,7 +32,7 @@ def runextractHmmAcc(hmm, accession, output):
     return output
 
 
-def runHmmer(fasta, hmm, output, cpu=1, binary="hmmsearch"):
+def run_hmmer(fasta, hmm, output, cpu=1, binary="hmmsearch"):
 
     hmm_status = subprocess.call(
         [binary, "-o", output, "--cpu", str(cpu), hmm, fasta],
@@ -47,11 +47,11 @@ def run_extract_hmm(hmm_out, top_hits, cov_threshold, evalue, query=True, acc=No
 
     with open(hmm_out, "r") as raw:
         data = raw.read()
-    accs = grabNames(data, query=query)
+    accs = grab_names(data, query=query)
     if len(accs) > 1:
-        hmm_data = exHmm(data, True, top_hits, cov_threshold, evalue, query=query)
+        hmm_data = ex_hmm(data, True, top_hits, cov_threshold, evalue, query=query)
     else:
-        hmm_data = exHmm(
+        hmm_data = ex_hmm(
             data, list(accs)[0], top_hits, cov_threshold, evalue, query=query
         )
 
@@ -92,7 +92,7 @@ def run_acc2fa(db, biotype, output_res, subhit=True, cpu=1):
     return {query: dict2fa(fa_dict) for query, fa_dict in fa_info}
 
 
-def outputFas(output_fas, output_dir, fastaname):
+def output_fas(output_fas, output_dir, fastaname):
 
     for query in output_fas:
         with open(output_dir + fastaname + "_" + query + ".fa", "w") as out:
@@ -121,7 +121,9 @@ def main(
 
     if accession:
         logger.debug("Extracting " + accession)
-        hmm_path = runextractHmmAcc(hmm_path, accession, out_dir + accession + ".hmm")
+        hmm_path = run_extract_hmm_acc(
+            hmm_path, accession, out_dir + accession + ".hmm"
+        )
         if Path(accession).is_file():
             accession = []
     else:
@@ -136,7 +138,7 @@ def main(
         hmm_cpu = cpu
     hmmer_out = out_dir + "hmmer.out"
     logger.debug("Running " + binary)
-    if runHmmer(fasta_path, hmm_path, hmmer_out, cpu=hmm_cpu, binary=binary):
+    if run_hmmer(fasta_path, hmm_path, hmmer_out, cpu=hmm_cpu, binary=binary):
         logger.error("" + binary + " failed")
         sys.exit(2)
 
@@ -161,7 +163,7 @@ def cli():
     parser.add_argument("--hmm", required=True, help="Input .hmm")
     parser.add_argument("-b", "--binary", required=True, help="{'hmmsearch', 'nhmmer'}")
     parser.add_argument(
-        "-d", "--mtdb", default=primaryDB(), help="MycoDB. DEFAULT: master"
+        "-d", "--mtdb", default=primary_db(), help="MycoDB. DEFAULT: master"
     )
     parser.add_argument(
         "-q", "--query", help="Query [acc if -a] from .hmm, or new line delimited file"
@@ -189,7 +191,7 @@ def cli():
     if args.binary not in {"hmmsearch", "nhmmer"}:
         logger.error("invalid --binary")
         sys.exit(1)
-    findExecs([args.binary], exit={args.binary})
+    find_execs([args.binary], exit={args.binary})
 
     if args.output:
         out_dir = args.output
@@ -240,7 +242,7 @@ def cli():
         subhit=not args.whole,
     )
     fastaname = re.sub(r"\.fa[^\.]*$", "", Path(os.path.abspath(args.fasta)).name)
-    outputFas(output_fas, out_dir, fastaname)
+    output_fas(output_fas, out_dir, fastaname)
 
     outro(start_time)
 

@@ -4,7 +4,7 @@ import re
 import sys
 import logging
 from mycotools.lib.kontools import format_path, sys_start, setup_logging
-from mycotools.lib.dbtools import primaryDB, mtdb
+from mycotools.lib.dbtools import primary_db, mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ def parse_args(args):
 
     # import primary MTDB
     if go_on:
-        db = mtdb(primaryDB())
+        db = mtdb(primary_db())
 
     # read input data
     with open(args[1], "r") as raw_input:

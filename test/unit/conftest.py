@@ -21,7 +21,7 @@ REPO_ROOT = TEST_DIR.parent
 def offline_env(monkeypatch):
     """Force the login-free code paths for every test.
 
-    * Dropping ``MYCODB`` makes ``dbtools.primaryDB()`` return ``None`` instead
+    * Dropping ``MYCODB`` makes ``dbtools.primary_db()`` return ``None`` instead
       of resolving a real, linked database.
     * ``MYCOFNA``/``MYCOFAA``/``MYCOGFF3`` are only string-concatenated by the
       pandas MTDB helpers, so dummy prefixes satisfy them without touching disk.

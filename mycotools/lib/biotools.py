@@ -518,7 +518,7 @@ def list2gff(gff_list, ver=3):
     return gff_str.rstrip()
 
 
-def gff3Comps(source=None):
+def gff3_comps(source=None):
 
     comps = {}
     comps["par"] = "(?:^|(?<=;))" + r'Parent=["\']?([^;\'"]+)'
@@ -543,7 +543,7 @@ def gff3Comps(source=None):
     return comps
 
 
-def gff2Comps():
+def gff2_comps():
 
     comps = {}
     comps["id"] = r'name "([^"]+)"'
@@ -557,7 +557,7 @@ def gff2Comps():
     return comps
 
 
-def gtfComps():
+def gtf_comps():
 
     comps = {}
     comps["id"] = r'gene_id "?([^"]+)"?'
@@ -568,7 +568,7 @@ def gtfComps():
     return comps
 
 
-def compileExon(gff):
+def compile_exon(gff):
 
     exon_dict = {}
 

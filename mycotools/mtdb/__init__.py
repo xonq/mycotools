@@ -16,7 +16,7 @@ import importlib
 from pathlib import Path
 from mycotools.lib.kontools import format_path, setup_logging
 from mycotools.lib.dbtools import (
-    primaryDB,
+    primary_db,
     mtdb_disconnect,
     mtdb_initialize,
     mtdb,
@@ -140,7 +140,7 @@ def list_links(config):
 
 def lookup_omes(omes):
     """Print the database row, or a specific file path, for ome code(s)."""
-    db = mtdb(primaryDB()).set_index()
+    db = mtdb(primary_db()).set_index()
     for ome_prep in omes:
         if ome_prep in db:
             print(ome_prep + "\t" + "\t".join(str(v) for v in db[ome_prep].values()))
@@ -164,7 +164,7 @@ def lookup_omes(omes):
 
 def print_primary():
     """Print the primary MTDB path; return an exit code."""
-    path = primaryDB()
+    path = primary_db()
     if path:
         print(path, flush=True)
         return 0

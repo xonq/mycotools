@@ -9,7 +9,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def grabAccs(db_str):
+def grab_accs(db_str):
 
     accessions = []
     hmm_search = re.compile(r"HMMER\d\/f \[.*?\]\nNAME(.*?)\nACC +(.*?)\n[^\/]*?\/\/")
@@ -26,7 +26,7 @@ def grabAccs(db_str):
     return accessions
 
 
-def hmmExtract(accession, db_str):
+def hmm_extract(accession, db_str):
 
     hmm_search = re.search(
         r"HMMER\d\/f \[.*?\].*?\n^NAME.*?\n^ACC   " + accession + r"[\s\S]*?^\/\/",
@@ -53,19 +53,19 @@ def main(hmm_db, accessions=False):
             accessions = file2list(accessions)
             hmm_str = ""
             for accession in accessions:
-                hmm_str += hmmExtract(accession, hmm_db)
+                hmm_str += hmm_extract(accession, hmm_db)
         else:
-            hmm_str = hmmExtract(accessions, hmm_db)
+            hmm_str = hmm_extract(accessions, hmm_db)
 
     else:
-        accessions = grabAccs(hmm_db)
+        accessions = grab_accs(hmm_db)
         hmm_str = {}
         if len(accessions[0]) == 3:
             accessions = [x[2] for x in accessions]
         elif len(accessions[0]) == 2:
             accessions = [x[1] for x in accessions]
         for accession in accessions:
-            hmm_str[accession] = hmmExtract(accession, hmm_db)
+            hmm_str[accession] = hmm_extract(accession, hmm_db)
 
     return hmm_str
 

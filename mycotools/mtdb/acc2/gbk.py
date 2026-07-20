@@ -7,14 +7,14 @@ import argparse
 from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
-from mycotools.lib.dbtools import mtdb, primaryDB
-from mycotools.lib.biotools import fa2dict, gff2list, gff3Comps
+from mycotools.lib.dbtools import mtdb, primary_db
+from mycotools.lib.biotools import fa2dict, gff2list, gff3_comps
 from mycotools.mtdb.acc2.gff import db_main as acc2gff
 
 logger = logging.getLogger(__name__)
 
 
-def col_CDS(
+def col_cds(
     gff_list, types={"gene", "CDS", "exon", "mRNA", "tRNA", "rRNA", "RNA", "pseudogene"}
 ):
     """Collect all CDS entries from a `gff` and store them into cds_dict.
@@ -27,7 +27,7 @@ def col_CDS(
         if entry["type"] in types:
             contig = entry["seqid"]
             try:
-                alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+                alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
             except TypeError:
                 logger.error("could not extract Alias ID from " + gff)
                 continue
@@ -146,14 +146,14 @@ def contig2gbk(
 
         # for each gene, let it be the parent entry
         for entry in entries["gene"]:
-            alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+            alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
             #            eprint(alias)
             if "|" in alias:  # alternately spliced gene
                 if alias in used_aliases:
                     continue
                 else:
                     used_aliases.add(alias)
-            id_ = re.search(gff3Comps()["id"], entry["attributes"])[1]
+            id_ = re.search(gff3_comps()["id"], entry["attributes"])[1]
 
             products = {}
             # try to acquire the product name
@@ -204,8 +204,8 @@ def contig2gbk(
                     products[prod_id] = product
                 except TypeError:  # no product
                     pass
-            alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
-            id_ = re.search(gff3Comps()["par"], entry["attributes"])[1]
+            alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
+            id_ = re.search(gff3_comps()["par"], entry["attributes"])[1]
 
             # append to the final gene coordinates
             if final_coords:
@@ -279,8 +279,8 @@ def contig2gbk(
                 final_coords += "\n                     " + cds_coords_list[-1]
             if len(cds_coords_list) > 1:
                 final_coords = "join(" + final_coords + ")"
-            alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
-            id_ = re.search(gff3Comps()["id"], entry["attributes"])[1]
+            alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
+            id_ = re.search(gff3_comps()["id"], entry["attributes"])[1]
 
             products = {}
             for prod_id, product_search in product_searches.items():
@@ -449,7 +449,7 @@ def ome_main(
     faa, fna = fa2dict(row["faa"]), fa2dict(row["fna"])
     for key, gffs in gff_lists.items():
         for gff_list in gffs:
-            cds_dict = col_CDS(
+            cds_dict = col_cds(
                 gff_list,
                 types={
                     "gene",
@@ -478,7 +478,7 @@ def main(
     break_contigs=False,
 ):
     """Generate a genbank for each inputed gff, its associated fna, and ome"""
-    cds_dict = col_CDS(
+    cds_dict = col_cds(
         gff_list,
         types={"gene", "CDS", "exon", "mRNA", "tRNA", "rRNA", "RNA", "pseudogene"},
     )
@@ -530,7 +530,7 @@ def cli():
         type=int,
         help="Base pairs to split long breaks between genes",
     )
-    parser.add_argument("-d", "--mtdb", help="DEFAULT: master", default=primaryDB())
+    parser.add_argument("-d", "--mtdb", help="DEFAULT: master", default=primary_db())
     parser.add_argument("-c", "--cpu", type=int, default=1)
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))

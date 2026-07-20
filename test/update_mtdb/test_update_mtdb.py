@@ -11,7 +11,7 @@ cover the layers a user actually drives through command-line arguments, which
 run before any login/network is touched:
 
   * ``control_flow`` argument validation (the mutually-exclusive / required-flag
-    guards that ``sys.exit`` with distinct codes). ``loginCheck`` is guarded by
+    guards that ``sys.exit`` with distinct codes). ``login_check`` is guarded by
     ``if not ncbi_email`` and every validation guard fires *before* that line,
     so passing a dummy ``ncbi_email`` keeps these tests fully offline.
   * The argparse CLI surface (``python -m mycotools.mtdb.update``): help,
@@ -53,7 +53,7 @@ UST_MTDB = REPO_ROOT / "test" / "ust.mtdb"
 def offline_env(monkeypatch):
     """Force the login-free branches for every test.
 
-    * Removing ``MYCODB`` makes ``primaryDB()`` return ``None`` and keeps
+    * Removing ``MYCODB`` makes ``primary_db()`` return ``None`` and keeps
       ``control_flow`` out of the "already initialized" config path.
     * ``MYCOFNA``/``MYCOFAA``/``MYCOGFF3`` are only ever string-concatenated by
       the pandas MTDB machinery (``pd2mtdb``/``db2df``); dummy prefixes satisfy
@@ -95,7 +95,7 @@ _CF_DEFAULTS = dict(
     resume=None,
     no_md5=False,
     cpu=1,
-    # dummy credential -> skips loginCheck() entirely
+    # dummy credential -> skips login_check() entirely
     ncbi_email="tester@example.com",
 )
 

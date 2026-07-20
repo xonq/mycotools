@@ -24,10 +24,10 @@ from mycotools.lib.kontools import (
     outro,
     format_path,
     prep_output,
-    findExecs,
+    find_execs,
     setup_logging,
 )
-from mycotools.lib.dbtools import log_editor, loginCheck, mtdb
+from mycotools.lib.dbtools import log_editor, login_check, mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -582,7 +582,7 @@ def dwnld_mngr(ncbi_df, data, acc, file_types, output_path, count, remove, api, 
     return fail, count
 
 
-def dwnld_mngr_no_MD5(
+def dwnld_mngr_no_md5(
     ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
 ):
     run, fail = False, []
@@ -730,7 +730,7 @@ def main(
         # efficient by avoiding conditional expressions
         for acc, data in acc2log.items():
             logger.info(spacer + "" + str(acc))
-            fail, count = dwnld_mngr_no_MD5(
+            fail, count = dwnld_mngr_no_md5(
                 ncbi_df, data, acc, file_types, output_path, count, remove, api, spacer
             )
             if fail:
@@ -750,7 +750,7 @@ def main(
     return new_df, failed
 
 
-def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
+def get_sra(assembly_acc, fastqdump="fastq-dump", pe=True):
 
     handle = Entrez.esearch(db="SRA", term=assembly_acc)
     ids = Entrez.read(handle)["IdList"]
@@ -811,14 +811,14 @@ def get_SRA(assembly_acc, fastqdump="fastq-dump", pe=True):
                         logger.error("file failed")
 
 
-def goSRA(df, output=str(Path.cwd()) + "/", pe=True):
+def go_sra(df, output=str(Path.cwd()) + "/", pe=True):
 
     print()
     sra_dir = output + "sra/"
     if not Path(sra_dir).is_dir():
         Path(sra_dir).mkdir()
     os.chdir(sra_dir)
-    fastqdump = findExecs("fastq-dump", exit=set("fastq-dump"))
+    fastqdump = find_execs("fastq-dump", exit=set("fastq-dump"))
     count = 0
 
     if "sra" in df.keys():
@@ -828,7 +828,7 @@ def goSRA(df, output=str(Path.cwd()) + "/", pe=True):
 
     for i, row in df.iterrows():
         logger.debug("" + row[row_key])
-        get_SRA(row[row_key], fastqdump[0])
+        get_sra(row[row_key], fastqdump[0])
         count += 1
         if count >= 10:
             time.sleep(1)
@@ -882,7 +882,7 @@ def cli():
         else:
             ncbi_api = None
     else:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = loginCheck(jgi=False)
+        ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check(jgi=False)
         Entrez.email = ncbi_email
         if ncbi_api:
             Entrez.api_key = ncbi_api
@@ -909,11 +909,11 @@ def cli():
 
     if args.sra:
         if Path(format_path(args.input)).is_file():
-            goSRA(
+            go_sra(
                 pd.read_csv(format_path(args.input), sep="\t"), output, pe=args.paired
             )
         else:
-            goSRA(pd.DataFrame({"sra": [args.input.rstrip()]}), output, pe=args.paired)
+            go_sra(pd.DataFrame({"sra": [args.input.rstrip()]}), output, pe=args.paired)
     else:
         if Path(format_path(args.input)).is_file():
             ncbi_df = pd.read_csv(args.input, sep="\t", header=None)

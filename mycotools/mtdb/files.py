@@ -6,7 +6,7 @@ import sys
 import argparse
 from datetime import datetime
 from shutil import copy as cp
-from mycotools.lib.dbtools import primaryDB, mtdb
+from mycotools.lib.dbtools import primary_db, mtdb
 from mycotools.lib.kontools import format_path, prep_output, setup_logging
 from pathlib import Path
 
@@ -102,7 +102,9 @@ def cli():
     parser = argparse.ArgumentParser(
         description="Symlinks/copies selected files from database"
     )
-    parser.add_argument("-d", "--mtdb", default=primaryDB(), help="DEFAULT: primaryDB")
+    parser.add_argument(
+        "-d", "--mtdb", default=primary_db(), help="DEFAULT: primary_db"
+    )
     parser.add_argument("-a", "--assembly", action="store_true", help="Grab assemblies")
     parser.add_argument("-p", "--proteome", action="store_true", help="Grab proteomes")
     parser.add_argument("-g", "--gff", action="store_true", help="Grab gff`s")
