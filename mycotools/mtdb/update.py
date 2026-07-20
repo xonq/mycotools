@@ -53,14 +53,14 @@ from mycotools.lib.kontools import (
     atomic_write,
 )
 from mycotools.lib.biotools import fa2dict, gff2list, dict2fa, list2gff
-from mycotools.ncbiDwnld import (
+from mycotools.download.ncbi import (
     esearch_ncbi,
     esummary_ncbi,
     run_datasets,
     compile_organism_names,
     main as ncbiDwnld,
 )
-from mycotools.jgiDwnld import main as jgiDwnld
+from mycotools.download.jgi import main as jgiDwnld
 from mycotools.utils.ncbi2db import main as ncbi2db
 from mycotools.utils.jgi2db import main as jgi2db
 from mycotools.mtdb.predb import main as predb2mtdb

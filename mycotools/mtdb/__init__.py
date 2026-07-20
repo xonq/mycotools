@@ -38,6 +38,7 @@ SUBCOMMANDS = {
     "m": "manage",
     "accession": "acc2",
     "a": "acc2",
+    "util": "util",
 }
 
 DESCRIPTION = """MycotoolsDB (MTDB) utility
@@ -50,6 +51,7 @@ Subcommands (all following arguments are forwarded to the subcommand):
   predb2mtdb  (p)   add local genomes to the primary MTDB
   manage      (m)   MTDB management utility
   accession   (a)   retrieve data for accession(s) by format (fa/gff/gbk/locus)
+  util              database-access helpers (files/name)
 
 Ome lookup:
   mtdb <OME>[.gff3|.fna|.faa]   print an ome's row, or a specific file path"""

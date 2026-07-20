@@ -21,7 +21,7 @@ from mycotools.lib.biotools import (
     gff2Comps,
 )
 from mycotools.lib.kontools import collect_files, format_path, setup_logging
-from mycotools.gff2seq import aamain as gff2proteome
+from mycotools.seq.gff import aamain as gff2proteome
 from mycotools.utils.curGFF3 import rename_and_organize
 from pathlib import Path
 

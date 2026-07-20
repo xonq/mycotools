@@ -26,7 +26,7 @@ from mycotools.utils.gtf2gff3 import main as gtf2gff3
 from mycotools.utils.curGFF3 import main as curGFF3
 from mycotools.utils.gff2gff3 import main as gff2gff3
 from mycotools.utils.curGFF3 import rename_and_organize as rename_and_organize
-from mycotools.gff2seq import aamain as gff2seq
+from mycotools.seq.gff import aamain as gff2seq
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

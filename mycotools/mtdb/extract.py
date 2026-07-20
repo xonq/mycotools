@@ -17,7 +17,7 @@ from mycotools.lib.kontools import (
     mkOutput,
 )
 from mycotools.lib.dbtools import mtdb, primaryDB
-from mycotools.db2files import mtdb_main as gen_full_mtdb
+from mycotools.mtdb.util.files import mtdb_main as gen_full_mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

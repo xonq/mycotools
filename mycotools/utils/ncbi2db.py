@@ -12,7 +12,7 @@ import os
 import re
 import copy
 from datetime import datetime
-from mycotools.ncbiDwnld import main as ncbi_dwnld
+from mycotools.download.ncbi import main as ncbi_dwnld
 
 logger = logging.getLogger(__name__)
 

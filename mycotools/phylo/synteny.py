@@ -10,8 +10,8 @@ import multiprocessing as mp
 from tqdm import tqdm
 from itertools import combinations
 from collections import defaultdict
-from mycotools.db2files import soft_main as symlink_files
-from mycotools.db2hgs import id_near_schgs
+from mycotools.mtdb.util.files import soft_main as symlink_files
+from mycotools.cluster.homology import id_near_schgs
 from mycotools.lib.kontools import (
     format_path,
     mkOutput,

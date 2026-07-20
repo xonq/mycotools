@@ -8,7 +8,7 @@ import subprocess
 import multiprocessing as mp
 from statistics import stdev, StatisticsError
 from collections import defaultdict, Counter
-from mycotools.db2files import soft_main as symlink_files
+from mycotools.mtdb.util.files import soft_main as symlink_files
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import dict2fa, fa2dict_accs
 from mycotools.lib.kontools import format_path, mkOutput, findExecs, setup_logging

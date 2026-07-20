@@ -12,7 +12,7 @@ import subprocess
 import multiprocessing as mp
 from mycotools.utils.extractHmmsearch import main as exHmm, grab_names as grabNames
 from mycotools.utils.extractHmmAcc import main as extr_hmm
-from mycotools.db2search import compAcc2fa
+from mycotools.search import compAcc2fa
 from mycotools.mtdb.acc2.fa import famain as acc2fa
 from mycotools.lib.kontools import intro, outro, findExecs, format_path, setup_logging
 from mycotools.lib.dbtools import mtdb, primaryDB

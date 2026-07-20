@@ -11,9 +11,9 @@ import pandas as pd
 import numpy as np
 from mycotools.lib.kontools import intro, outro, setup_logging
 from mycotools.lib.dbtools import db2df, df2db, readLog, log_editor
-from mycotools.jgiDwnld import jgi_login as jgi_login
-from mycotools.jgiDwnld import retrieve_xml as retrieve_xml
-from mycotools.jgiDwnld import jgi_dwnld as jgi_dwnld
+from mycotools.download.jgi import jgi_login as jgi_login
+from mycotools.download.jgi import retrieve_xml as retrieve_xml
+from mycotools.download.jgi import jgi_dwnld as jgi_dwnld
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
