@@ -84,11 +84,11 @@ jgiDwnld -i Ustbr1 -a -g
 
 This script will output a `predb` file that is ready for assimilating into the
 database. If you wanted to add your own genomes, you would fill out one of
-these files manually by generating a blank copy via `mtdb predb2mtdb > predb.tsv`,
+these files manually by generating a blank copy via `mtdb predb > predb.tsv`,
 then running the following commands as we will here:
 
 ```bash
-# curate the data via predb2mtdb
+# curate the data via predb
 mtdb p Ustbr1.predb.tsv
 
 # add the curated data to the primary MTDB
