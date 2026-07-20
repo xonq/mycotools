@@ -516,10 +516,12 @@ def cli():
     jgi_df = main(args.mycocosm, refdb, output)
 
     df2db(jgi_df, output + "/new.db")
-    logger.debug("Success! "
+    logger.debug(
+        "Success! "
         + str(len(jgi_df))
         + " added to database\n \
-            Run updateDB to confirm and finish update.")
+            Run updateDB to confirm and finish update."
+    )
 
     outro(start_time)
 

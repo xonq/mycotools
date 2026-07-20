@@ -15,7 +15,7 @@ def sample_fasta(tmp_path):
     fa.write_text(
         ">seq1 a description here\n"
         "ACGTACGT\n"
-        "AAAA\n"          # multi-line sequence should be concatenated
+        "AAAA\n"  # multi-line sequence should be concatenated
         ">seq2\n"
         "TTTT\n"
     )
@@ -25,10 +25,10 @@ def sample_fasta(tmp_path):
 def test_fa2dict_parses_headers_and_sequences(sample_fasta):
     parsed = fa2dict(str(sample_fasta))
     assert set(parsed) == {"seq1", "seq2"}
-    assert parsed["seq1"]["sequence"] == "ACGTACGTAAAA"   # wrapped lines joined
+    assert parsed["seq1"]["sequence"] == "ACGTACGTAAAA"  # wrapped lines joined
     assert parsed["seq1"]["description"] == "a description here"
     assert parsed["seq2"]["sequence"] == "TTTT"
-    assert parsed["seq2"]["description"] == ""             # no description
+    assert parsed["seq2"]["description"] == ""  # no description
 
 
 def test_dict2fa_emits_expected_format(sample_fasta):
@@ -50,5 +50,4 @@ def test_fa2dict_dict2fa_round_trip(sample_fasta, tmp_path):
 # TODO(scaffold): extend coverage of the other pure biotools parsers.
 # --------------------------------------------------------------------------- #
 @pytest.mark.skip(reason="TODO: scaffold - add gff2list / list2gff round-trip tests")
-def test_gff2list_list2gff_round_trip():
-    ...
+def test_gff2list_list2gff_round_trip(): ...

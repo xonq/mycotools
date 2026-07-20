@@ -535,8 +535,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                 # the download may have failed, so prepare to retry
                 elif md5 != dwnld_md5 and attempt == 1:
                     logger.error(
-                        f"{spacer}\tmd5 does not match JGI. "
-                        + f"Attempt {attempt}"
+                        f"{spacer}\tmd5 does not match JGI. " + f"Attempt {attempt}"
                     )
                     curl_cmd = -1
                     check = 2
@@ -561,9 +560,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                                 if t_org_name:
                                     org_name = t_org_name
                                 if t_url == url:
-                                    logger.warning(
-                                        spacer + "\t\tNo valid alternative"
-                                    )
+                                    logger.warning(spacer + "\t\tNo valid alternative")
                                     attempt = 4
                                     break
                             break
@@ -576,9 +573,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                         time.sleep(60)
                 # if there are two fails, attempt a new URL
                 elif md5 != dwnld_md5 and attempt == 2:
-                    logger.error(
-                        f"{spacer}\tmd5 does not match JGI. Attempt {attempt}"
-                    )
+                    logger.error(f"{spacer}\tmd5 does not match JGI. Attempt {attempt}")
                     curl_cmd = -1
                     filename, n_url, dwnld_md5, t_org_name = parse_xml(
                         file_type, xml_file, masked=masked, forbidden=f_urls
@@ -594,9 +589,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
                     time.sleep(60)
                     check = 2
                 elif md5 != dwnld_md5:
-                    logger.error(
-                        f"{spacer}\tmd5 does not match JGI. Attempt {attempt}"
-                    )
+                    logger.error(f"{spacer}\tmd5 does not match JGI. Attempt {attempt}")
                     check = 2
             else:
                 logger.error(
@@ -608,9 +601,7 @@ def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
         # three strikes and the file is out
         if attempt == 3:
             if md5 != dwnld_md5:
-                logger.warning(
-                    spacer + "\tExcluding from database - potential failure"
-                )
+                logger.warning(spacer + "\tExcluding from database - potential failure")
                 curl_cmd = 0
             if curl_cmd != 0:
                 logger.error(spacer + "\tFile failed to download")
@@ -672,8 +663,11 @@ def select_file(files, ftype, masked=True):
     Returns the chosen file dict, or None if the organism has no matching file.
     """
     if ftype == "fna":
-        labels = (["assembly_masked", "assembly_unmasked"] if masked
-                  else ["assembly_unmasked", "assembly_masked"])
+        labels = (
+            ["assembly_masked", "assembly_unmasked"]
+            if masked
+            else ["assembly_unmasked", "assembly_masked"]
+        )
         formats = {"fasta", "fa", "fna", "fsa"}
         name_ok = lambda n: True
     elif ftype in _TYPE_LABELS:
@@ -681,7 +675,9 @@ def select_file(files, ftype, masked=True):
         if ftype == "faa":
             # proteins_filtered also tags the .tab annotation and promoter files;
             # keep only the actual proteome fasta
-            name_ok = lambda n: bool(re.search(r"\.aa\.fa(sta)?(\.gz)?$", n, re.IGNORECASE))
+            name_ok = lambda n: bool(
+                re.search(r"\.aa\.fa(sta)?(\.gz)?$", n, re.IGNORECASE)
+            )
         else:
             name_ok = lambda n: True
     else:
@@ -726,7 +722,11 @@ def _fill_if_empty(df, i, col, value):
     if not value:
         return
     cur = df.at[i, col] if col in df.columns else None
-    if cur is None or (isinstance(cur, float) and pd.isna(cur)) or str(cur).strip() == "":
+    if (
+        cur is None
+        or (isinstance(cur, float) and pd.isna(cur))
+        or str(cur).strip() == ""
+    ):
         df.at[i, col] = value
 
 
@@ -767,11 +767,15 @@ def search_organism(session, portal_id, spacer="\t", max_attempts=3):
         for attempt in range(1, max_attempts + 1):
             try:
                 resp = session.get(
-                    SEARCH_URL, params=params,
-                    headers={"accept": "application/json"}, timeout=120,
+                    SEARCH_URL,
+                    params=params,
+                    headers={"accept": "application/json"},
+                    timeout=120,
                 )
             except requests.RequestException as error:
-                logger.warning(f"{spacer}\t{portal_id} search error (attempt {attempt}): {error}")
+                logger.warning(
+                    f"{spacer}\t{portal_id} search error (attempt {attempt}): {error}"
+                )
                 time.sleep(2)
                 continue
             if resp.status_code != 200:
@@ -817,9 +821,14 @@ def request_restore(session, token, ids_payload, spacer="\t"):
     body = {"ids": ids_payload, "send_mail": False, "api_version": "2"}
     try:
         resp = session.post(
-            RESTORE_URL, json=body,
-            headers={"accept": "application/json", "content-type": "application/json",
-                     "Authorization": "Bearer " + token}, timeout=120,
+            RESTORE_URL,
+            json=body,
+            headers={
+                "accept": "application/json",
+                "content-type": "application/json",
+                "Authorization": "Bearer " + token,
+            },
+            timeout=120,
         )
     except requests.RequestException as error:
         logger.warning(f"{spacer}\trestore request error: {error}")
@@ -840,6 +849,7 @@ def _fmt_elapsed(seconds):
         return f"{seconds // 60}m{seconds % 60:02d}s"
     return f"{seconds // 3600}h{(seconds % 3600) // 60:02d}m"
 
+
 # what each JGI restore status means for a tape->disk transfer, surfaced to users
 _RESTORE_STATUS_MSG = {
     "new": "request queued",
@@ -850,8 +860,9 @@ _RESTORE_STATUS_MSG = {
 }
 
 
-def poll_restore(session, status_url, timeout=60, interval=30, spacer="\t",
-                 label="", heartbeat=60):
+def poll_restore(
+    session, status_url, timeout=60, interval=30, spacer="\t", label="", heartbeat=60
+):
     """Poll a tape-restore request until its files are READY (returns True) or
     the timeout / expiry is reached (returns False).
 
@@ -867,7 +878,9 @@ def poll_restore(session, status_url, timeout=60, interval=30, spacer="\t",
     while waited <= timeout:
         status = ""
         try:
-            resp = session.get(status_url, headers={"accept": "application/json"}, timeout=60)
+            resp = session.get(
+                status_url, headers={"accept": "application/json"}, timeout=60
+            )
             status = (resp.json().get("status") or "").lower()
         except (requests.RequestException, ValueError):
             pass
@@ -878,7 +891,9 @@ def poll_restore(session, status_url, timeout=60, interval=30, spacer="\t",
             )
             return True
         if status == "expired":
-            logger.warning(f"{spacer}\t{tag}tape restore expired; a new request is needed")
+            logger.warning(
+                f"{spacer}\t{tag}tape restore expired; a new request is needed"
+            )
             return False
         # surface the transfer's progress: log each stage change, then a
         # periodic heartbeat so a long-running stage does not look hung
@@ -912,9 +927,15 @@ def download_zip(session, token, ids_payload, dest_zip, spacer="\t", max_attempt
     for attempt in range(1, max_attempts + 1):
         try:
             resp = session.post(
-                DOWNLOAD_URL, json=body,
-                headers={"accept": "application/json", "content-type": "application/json",
-                         "Authorization": "Bearer " + token}, timeout=1800, stream=True,
+                DOWNLOAD_URL,
+                json=body,
+                headers={
+                    "accept": "application/json",
+                    "content-type": "application/json",
+                    "Authorization": "Bearer " + token,
+                },
+                timeout=1800,
+                stream=True,
             )
         except requests.RequestException as error:
             logger.warning(f"{spacer}\tdownload error (attempt {attempt}): {error}")
@@ -1009,7 +1030,9 @@ def main(
     logger.info(spacer + "Logging into JGI")
     session, token = jgi_api_login(user, pwd, spacer=spacer)
 
-    logger.info(f"{spacer}Downloading {len(df)} JGI organism(s) via the JGI Data Portal API")
+    logger.info(
+        f"{spacer}Downloading {len(df)} JGI organism(s) via the JGI Data Portal API"
+    )
     ome_set = set()
     for i, row in tqdm(df.iterrows(), total=len(df)):
         portal_id = row[ome_col]
@@ -1051,13 +1074,18 @@ def main(
                 + ", ".join(f.get("file_name", f["_id"]) for f in on_tape)
             )
             status_url = request_restore(
-                session, token,
+                session,
+                token,
                 _mycocosm_ids(org_id, top_hit, portal, [f["_id"] for f in on_tape]),
                 spacer=spacer,
             )
             if not poll_restore(
-                session, status_url, timeout=restore_timeout, interval=poll_interval,
-                spacer=spacer, label=portal_id,
+                session,
+                status_url,
+                timeout=restore_timeout,
+                interval=poll_interval,
+                spacer=spacer,
+                label=portal_id,
             ):
                 logger.warning(
                     f"{spacer}\t{portal_id}: tape restore still pending; deferring this "
@@ -1069,7 +1097,11 @@ def main(
         file_ids = [f["_id"] for f in selected.values()]
         dest_zip = os.path.join(tmp_dir, f"{portal_id}.zip")
         if not download_zip(
-            session, token, _mycocosm_ids(org_id, top_hit, portal, file_ids), dest_zip, spacer=spacer
+            session,
+            token,
+            _mycocosm_ids(org_id, top_hit, portal, file_ids),
+            dest_zip,
+            spacer=spacer,
         ):
             logger.warning(f"{spacer}\t{portal_id}: download failed")
             ome_set.add(portal_id)

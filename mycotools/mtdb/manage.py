@@ -24,13 +24,22 @@ def rm_outdated(omes, yes=False):
     biofiles, to_del = [], []
     # compile the files
     biofiles.extend(
-        [f"{os.environ['MYCOGFF3']}/{x}" for x in [p.name for p in Path(os.environ["MYCOGFF3"]).iterdir()]]
+        [
+            f"{os.environ['MYCOGFF3']}/{x}"
+            for x in [p.name for p in Path(os.environ["MYCOGFF3"]).iterdir()]
+        ]
     )
     biofiles.extend(
-        [f"{os.environ['MYCOFAA']}/{x}" for x in [p.name for p in Path(os.environ["MYCOFAA"]).iterdir()]]
+        [
+            f"{os.environ['MYCOFAA']}/{x}"
+            for x in [p.name for p in Path(os.environ["MYCOFAA"]).iterdir()]
+        ]
     )
     biofiles.extend(
-        [f"{os.environ['MYCOFNA']}/{x}" for x in [p.name for p in Path(os.environ["MYCOFNA"]).iterdir()]]
+        [
+            f"{os.environ['MYCOFNA']}/{x}"
+            for x in [p.name for p in Path(os.environ["MYCOFNA"]).iterdir()]
+        ]
     )
 
     # remove each biofile

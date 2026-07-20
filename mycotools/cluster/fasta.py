@@ -421,12 +421,14 @@ def cluster_iter_mmseqs(
         cluster = cluster_dict[clusters[focal_gene]]
         focal_len = len(cluster)
 
-        logger.debug("ITERATION "
+        logger.debug(
+            "ITERATION "
             + str(attempt)
             + ": "
             + focal_gene
             + " cluster size: "
-            + str(focal_len))
+            + str(focal_len)
+        )
         logger.debug("Cluster parameter: " + str(clus_var))
         iteration_dict = {
             "size": focal_len,
@@ -468,9 +470,11 @@ def cluster_iter_mmseqs(
                     exit_code = 0
                     break
                 else:
-                    logger.warning(spacer
+                    logger.warning(
+                        spacer
                         + "Overshot - "
-                        + "could not find parameters using current interval")
+                        + "could not find parameters using current interval"
+                    )
                     iteration = extract_closest_cluster(
                         log_dict["iterations"], min_seq, max_seq
                     )
@@ -555,12 +559,14 @@ def cluster_iter_aggclus(
             cluster = None
             newick = ""
 
-        logger.debug("ITERATION "
+        logger.debug(
+            "ITERATION "
             + str(attempt)
             + ": "
             + focal_gene
             + " cluster size: "
-            + str(focal_len))
+            + str(focal_len)
+        )
         logger.debug("Cluster parameter: " + str(clus_var))
         iteration_dict = {
             "size": focal_len,
@@ -598,9 +604,11 @@ def cluster_iter_aggclus(
                     newick = log_dict["successes"][0]["tree"]
                     exit_code = 0
                 else:
-                    logger.warning(spacer
+                    logger.warning(
+                        spacer
                         + "Overshot - "
-                        + "could not find parameters using current interval")
+                        + "could not find parameters using current interval"
+                    )
                     iteration = extract_closest_cluster(
                         log_dict["iterations"], min_seq, max_seq
                     )
@@ -775,9 +783,7 @@ def main(
         if focal_gene:
             res_base = param_dict["dir"] + focal_gene
         else:
-            res_base = param_dict["dir"] + re.sub(
-                r"\.[^\.]+$", "", Path(fa_path).name
-            )
+            res_base = param_dict["dir"] + re.sub(r"\.[^\.]+$", "", Path(fa_path).name)
         if algorithm == "hierarchical":
             clusters, tree = scipyaggd(
                 param_dict["dist"], float(clus_var), param_dict["link"]
@@ -944,7 +950,9 @@ def cli():
         1 - args.cluster_variable <= args.cluster_constant
         and args.alignment != "mmseqs"
     ):
-        logger.warning("1 - maximum distance exceeds minimum connection, clustering is ineffective")
+        logger.warning(
+            "1 - maximum distance exceeds minimum connection, clustering is ineffective"
+        )
         sys.exit(3)
     else:
         clus_var = args.cluster_variable

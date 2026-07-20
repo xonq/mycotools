@@ -106,12 +106,14 @@ def validate_t_and_c(config, discrepancy=False):
 
     # if there isnt a configuration, alert the user to use-restriction policies
     else:
-        logger.debug("Please review JGI use-restricted data policy here: "
+        logger.debug(
+            "Please review JGI use-restricted data policy here: "
             + "https://jgi.doe.gov/user-programs/pmo-overview/policies/"
             + "\nPlease review GenBank use-restricted data policy here: "
             + "https://ncbi.nlm.nih.gov/genbank/"
             + "\nPlease review how Mycotools handles use-restricted data here:"
-            + " https://github.com/xonq/mycotools/blob/master/MTDB.md")
+            + " https://github.com/xonq/mycotools/blob/master/MTDB.md"
+        )
         check = ""
         if check.lower() not in {"y", "yes"}:
             check = input(
@@ -447,7 +449,11 @@ def prep_taxa_cols(
         acc2org_n, acc2meta, org_failed = compile_organism_names(
             taxonomy_dir + "ncbi_dataset/"
         )
-        logger.info("%s %s", f"\t\t{len(acc2meta) + len(org_failed)}", "genomes queried from GenBank")
+        logger.info(
+            "%s %s",
+            f"\t\t{len(acc2meta) + len(org_failed)}",
+            "genomes queried from GenBank",
+        )
         logger.debug(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed')
 
     # check for RefSeq for failed entries
@@ -739,7 +745,9 @@ def prepare_ref_db(ref_db, date):
         {k: v for k, v in ref_db.items() if v["source"].lower() == "ncbi"}, index="ome"
     )
     if set(ref_db.keys()).difference(set(jgi.keys()).union(set(ncbi.keys()))):
-        logger.warning('\tWARNING: reference entries that are not labeled "jgi/ncbi" are excluded')
+        logger.warning(
+            '\tWARNING: reference entries that are not labeled "jgi/ncbi" are excluded'
+        )
 
     return jgi.mtdb2pd(), ncbi.mtdb2pd()
 
@@ -877,7 +885,9 @@ def ref_update(
                 )
                 jgi_failed.extend(jgi_failed1)
             else:
-                logger.warning("No JGI assemblies downloaded; skipping MycoCosm curation")
+                logger.warning(
+                    "No JGI assemblies downloaded; skipping MycoCosm curation"
+                )
                 jgi_mtdb = mtdb()
             jgi_mtdb.df2db(jgi_predb_path)
             for failure in jgi_failed:
@@ -1433,11 +1443,13 @@ def gen_algn_db(update_path, omes):
     # with open(update_path + date + '_mmseqsdb.sh', 'w') as out:
     #   out.write(mkdb_mmseqs)
 
-    logger.debug("OPTIONAL: To generate blastdb | mmseqsdb, run the following"
+    logger.debug(
+        "OPTIONAL: To generate blastdb | mmseqsdb, run the following"
         + "\nbash "
         + update_path
         + date
-        + "_makeblastdb.sh")
+        + "_makeblastdb.sh"
+    )
     # bash ' + update_path \
     #   + date + '_mmseqsdb.sh')
 
@@ -1942,7 +1954,9 @@ def control_flow(
         sys.exit(0)
     elif reference:
         if any(not x for x in ref_db["published"]) and not nonpublished:
-            logger.warning("nonpublished data detected in reference and will be ignored")
+            logger.warning(
+                "nonpublished data detected in reference and will be ignored"
+            )
 
         new_mtdb, update_mtdb = ref_update(
             ref_db,
@@ -2017,8 +2031,10 @@ def control_flow(
     else:
         # NEED to: insert note aboutrunning updatedb on predb
         new_mtdb.df2db(format_path(update_path + date + ".mtdb"))
-        logger.info(f"Update ready for `mtdb u -a` at "
-            + f'{format_path(update_path + date + ".mtdb")}')
+        logger.info(
+            f"Update ready for `mtdb u -a` at "
+            + f'{format_path(update_path + date + ".mtdb")}'
+        )
         # output new database and new list of omes
 
     return primaryDB()

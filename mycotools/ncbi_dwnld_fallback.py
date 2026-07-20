@@ -351,9 +351,7 @@ def collect_ftps(
                         #                        data = line.rstrip().split()
                         if data and len(data) == 2:
                             try:
-                                md5s[ftp_path + "/" + Path(data[1]).name] = data[
-                                    0
-                                ]
+                                md5s[ftp_path + "/" + Path(data[1]).name] = data[0]
                             except IndexError:  # 404 error or something else
                                 md5s = {}
                                 break
@@ -469,9 +467,7 @@ def download_files(
         elif file_type == "faa":
             file_path = output_dir + "faa/" + Path(acc_prots[file_type]).name
         elif file_type == "transcript":
-            file_path = (
-                output_dir + "transcript/" + Path(acc_prots[file_type]).name
-            )
+            file_path = output_dir + "transcript/" + Path(acc_prots[file_type]).name
 
         if Path(file_path).is_file():
             count += 1
@@ -742,10 +738,7 @@ def main(
             else:
                 for file_type in file_types:
                     ncbi_df.at[acc, file_type] = (
-                        output_path
-                        + file_type
-                        + "/"
-                        + Path(data[file_type]).name
+                        output_path + file_type + "/" + Path(data[file_type]).name
                     )
                 new_df = pd.concat([new_df, ncbi_df.loc[acc].to_frame().T])
 

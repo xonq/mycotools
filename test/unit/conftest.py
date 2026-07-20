@@ -61,6 +61,7 @@ def run_cli():
     The child process gets ``stdin`` closed (so an unexpected ``input()`` prompt
     fails fast instead of hanging) and an environment with ``MYCODB`` stripped.
     """
+
     def _run(module, *args, timeout=60):
         env = dict(os.environ)
         env.pop("MYCODB", None)

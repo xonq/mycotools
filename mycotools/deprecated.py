@@ -36,7 +36,9 @@ def _make_shim(old, new, target):
 
 # --- relocated under the `mycotools` analysis entrypoint ---------------------
 jgiDwnld = _make_shim("jgiDwnld", "mycotools download jgi", "mycotools.download.jgi")
-ncbiDwnld = _make_shim("ncbiDwnld", "mycotools download ncbi", "mycotools.download.ncbi")
+ncbiDwnld = _make_shim(
+    "ncbiDwnld", "mycotools download ncbi", "mycotools.download.ncbi"
+)
 db2search = _make_shim("db2search", "mycotools homology db", "mycotools.homology.db")
 fa2hmmer2fa = _make_shim(
     "fa2hmmer2fa", "mycotools homology fasta", "mycotools.homology.fasta"

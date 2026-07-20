@@ -239,9 +239,7 @@ def cli():
         accession_search=args.accession,
         subhit=not args.whole,
     )
-    fastaname = re.sub(
-        r"\.fa[^\.]*$", "", Path(os.path.abspath(args.fasta)).name
-    )
+    fastaname = re.sub(r"\.fa[^\.]*$", "", Path(os.path.abspath(args.fasta)).name)
     outputFas(output_fas, out_dir, fastaname)
 
     outro(start_time)

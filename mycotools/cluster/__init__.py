@@ -24,8 +24,12 @@ Examples:
   mycotools cluster fasta -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools cluster", "mycotools.cluster", SUBCOMMANDS, DESCRIPTION,
-    metavar="METHOD", arg_help="clustering method (see below)",
+    "mycotools cluster",
+    "mycotools.cluster",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="METHOD",
+    arg_help="clustering method (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

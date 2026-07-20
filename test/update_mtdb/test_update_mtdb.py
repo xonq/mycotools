@@ -116,25 +116,41 @@ def _run_control_flow(**overrides):
 # The exit codes are the script's own contract (see control_flow).
 VALIDATION_CASES = [
     # id                              overrides                                              exit
-    ("no-mode",                       dict(),                                                15),
+    ("no-mode", dict(), 15),
     # --predb is NOT counted as a standalone mode by the first guard, so
     # `--predb X` on its own exits 15 (no mode), not 18.
-    ("predb-alone",                   dict(predb="/tmp/p.tsv"),                              15),
-    ("reference-without-init",        dict(reference=str(UST_MTDB)),                         14),
-    ("lineage-without-rank",          dict(init="/tmp/x", lineage="Ceraceosorus"),           16),
-    ("lineage-without-init",          dict(update=True, lineage="Ceraceosorus",
-                                           rank="genus"),                                     17),
+    ("predb-alone", dict(predb="/tmp/p.tsv"), 15),
+    ("reference-without-init", dict(reference=str(UST_MTDB)), 14),
+    ("lineage-without-rank", dict(init="/tmp/x", lineage="Ceraceosorus"), 16),
+    (
+        "lineage-without-init",
+        dict(update=True, lineage="Ceraceosorus", rank="genus"),
+        17,
+    ),
     # --predb without --init, but with another mode set so we pass the first guard
-    ("predb-without-init",            dict(update=True, predb="/tmp/p.tsv"),                 18),
-    ("predb-with-lineage",            dict(init="/tmp/x", predb="/tmp/p.tsv",
-                                           lineage="Foo", rank="genus"),                      20),
-    ("reference-plus-add",            dict(init="/tmp/x", reference=str(UST_MTDB),
-                                           add="/tmp/a.mtdb"),                                13),
-    ("reference-plus-predb",          dict(init="/tmp/x", reference=str(UST_MTDB),
-                                           predb="/tmp/p.tsv"),                               19),
-    ("invalid-kingdom",               dict(update=True, kingdom="xyz"),                      431),
-    ("lineage-rank-length-mismatch",  dict(init="/tmp/x", lineage="A,B", rank="genus"),      18),
-    ("invalid-rank",                  dict(init="/tmp/x", lineage="Foo", rank="badrank"),    22),
+    ("predb-without-init", dict(update=True, predb="/tmp/p.tsv"), 18),
+    (
+        "predb-with-lineage",
+        dict(init="/tmp/x", predb="/tmp/p.tsv", lineage="Foo", rank="genus"),
+        20,
+    ),
+    (
+        "reference-plus-add",
+        dict(init="/tmp/x", reference=str(UST_MTDB), add="/tmp/a.mtdb"),
+        13,
+    ),
+    (
+        "reference-plus-predb",
+        dict(init="/tmp/x", reference=str(UST_MTDB), predb="/tmp/p.tsv"),
+        19,
+    ),
+    ("invalid-kingdom", dict(update=True, kingdom="xyz"), 431),
+    (
+        "lineage-rank-length-mismatch",
+        dict(init="/tmp/x", lineage="A,B", rank="genus"),
+        18,
+    ),
+    ("invalid-rank", dict(init="/tmp/x", lineage="Foo", rank="badrank"), 22),
 ]
 
 
@@ -149,8 +165,20 @@ def test_control_flow_validation_exit_codes(overrides, expected):
 
 
 @pytest.mark.parametrize(
-    "kingdom", ["f", "a", "b", "p", "r", "fungi", "animals",
-                "bacteria", "plants", "archaea", "FUNGI"],
+    "kingdom",
+    [
+        "f",
+        "a",
+        "b",
+        "p",
+        "r",
+        "fungi",
+        "animals",
+        "bacteria",
+        "plants",
+        "archaea",
+        "FUNGI",
+    ],
 )
 def test_control_flow_accepts_valid_kingdoms(kingdom):
     """Valid --kingdom values (abbreviations, full names, any case) pass the
@@ -256,9 +284,9 @@ def test_internal_redundancy_check_keeps_highest_ncbi_version():
     out = u.internal_redundancy_check(df_dup)
     kept = set(out["ome"])
 
-    assert "dupomehi" in kept          # higher version retained
-    assert "dupomelo" not in kept      # lower version dereplicated
-    assert len(out) == len(df) + 1     # exactly one of the two added rows kept
+    assert "dupomehi" in kept  # higher version retained
+    assert "dupomelo" not in kept  # lower version dereplicated
+    assert len(out) == len(df) + 1  # exactly one of the two added rows kept
 
 
 def test_extract_constraint_lineages_genus_only_is_offline():
@@ -297,7 +325,7 @@ def test_forbid_omes_round_trip(tmp_ledger_dir):
 
 def test_parse_failed_creates_header_then_round_trips(tmp_ledger_dir):
     p = str(tmp_ledger_dir / "failed.tsv")
-    assert u.parse_failed(file_path=p) == {}          # creates the header file
+    assert u.parse_failed(file_path=p) == {}  # creates the header file
     u.add_failed("acaing1", "jgi", "1.0", "20260101", p)
     assert u.parse_failed(file_path=p) == {
         "acaing1": {"source": "jgi", "version": "1.0", "attempt_date": "20260101"}

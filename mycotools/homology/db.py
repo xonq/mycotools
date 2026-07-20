@@ -232,16 +232,9 @@ def compile_trim_cmd(output, mod="", trimmed=None, ex="phylip"):
     aligns = collect_files(output + "aligns/", ex)
     if trimmed:
         trimmed = set(Path(x).name.replace(".clipkit", "") for x in trimmed)
-        aligns = [
-            x for x in aligns if Path(x).name.replace(ex, "") not in trimmed
-        ]
+        aligns = [x for x in aligns if Path(x).name.replace(ex, "") not in trimmed]
     for align in aligns:
-        trim = (
-            f"{output}trimmed/"
-            + Path(align).name.replace(ex, "clipkit")
-            + "."
-            + ex
-        )
+        trim = f"{output}trimmed/" + Path(align).name.replace(ex, "clipkit") + "." + ex
         args = ["clipkit", align, "-o", trim]
         if mod_args[0]:
             args.extend(mod_args)
@@ -1081,9 +1074,7 @@ def db_blast(db_path, blast_type, query, evalue, hsps, cpus, report_dir, diamond
 
 def dbmmseq(db_path, query, evalue, cpus, report_dir, mmseqs="mmseqs", mem=None):
 
-    out_file = (
-        report_dir + Path(db_path).name[:-3].replace(".mmseqs", "") + ".out"
-    )
+    out_file = report_dir + Path(db_path).name[:-3].replace(".mmseqs", "") + ".out"
     #    output_str = '"query,target,pident,alen,mismatch,gapopen,qstart,qend,sstart,send,evalue,bits"'
     cmd_scaf = [
         mmseqs,

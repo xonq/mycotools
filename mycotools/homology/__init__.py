@@ -24,8 +24,12 @@ Examples:
   mycotools homology fasta -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools homology", "mycotools.homology", SUBCOMMANDS, DESCRIPTION,
-    metavar="METHOD", arg_help="homology-search method (see below)",
+    "mycotools homology",
+    "mycotools.homology",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="METHOD",
+    arg_help="homology-search method (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

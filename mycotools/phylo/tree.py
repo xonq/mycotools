@@ -36,8 +36,10 @@ except ImportError:
 try:
     from ete3 import Tree
 except ImportError:
-    logger.warning("ete3 not installed.\nInstall ete3 into your "
-        + "conda environment via `conda install ete3`")
+    logger.warning(
+        "ete3 not installed.\nInstall ete3 into your "
+        + "conda environment via `conda install ete3`"
+    )
 
 
 # adopted from https://stackoverflow.com/a/2829036 for verbosity control
@@ -289,9 +291,9 @@ def prepare_nexus(concat_fa, models, spacer="\t"):
         # if some alignments aren't the same length then there is some cryptic
         # issue, likely user-caused
         if not all(len(x["sequence"]) == len0 for x in trim_fa.values()):
-            logger.error(spacer
-                + "alignment sequences are not same length "
-                + trimmed_f)
+            logger.error(
+                spacer + "alignment sequences are not same length " + trimmed_f
+            )
             sys.exit(17)
         # adjust the index of the coordinates of each sequence based on the
         # previous sequences' length
@@ -584,8 +586,10 @@ def identify_incomplete_files(files, flag_incomplete, wrk_dir):
                 "Run with -m to remove failed omes"
             )
         else:
-            logger.warning("omes removed without sequences in all \
-                    fastas: ")
+            logger.warning(
+                "omes removed without sequences in all \
+                    fastas: "
+            )
         for f, omes in incomp_files.items():
             logger.info("" + f + ": " + ",".join([x for x in omes]))
         if comp_files:
@@ -718,7 +722,9 @@ def extract_supported(trimmed_files, min_mean_support, out_dir):
             out_files.append(f_)
         else:
             logger.debug(f"{Path(t_path).name} {mean_support} failed")
-    logger.debug(f"{len(out_files)} ({len(out_files)/len(trimmed_files)*100}%)" + " passed")
+    logger.debug(
+        f"{len(out_files)} ({len(out_files)/len(trimmed_files)*100}%)" + " passed"
+    )
     return out_files
 
 
@@ -955,9 +961,13 @@ def main(
 
     if hpc:
         if slurm:
-            logger.debug("Start pipeline via `sbatch <STARTSTEP>.sh` in " + out_dir + "\n")
+            logger.debug(
+                "Start pipeline via `sbatch <STARTSTEP>.sh` in " + out_dir + "\n"
+            )
         else:
-            logger.debug("Start pipeline via `qsub <STARTSTEP>.sh` in " + out_dir + "\n")
+            logger.debug(
+                "Start pipeline via `qsub <STARTSTEP>.sh` in " + out_dir + "\n"
+            )
 
 
 def cli():

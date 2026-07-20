@@ -25,8 +25,12 @@ Examples:
   mycotools phylo tools -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools phylo", "mycotools.phylo", SUBCOMMANDS, DESCRIPTION,
-    metavar="TOOL", arg_help="phylogenetics tool (see below)",
+    "mycotools phylo",
+    "mycotools.phylo",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="TOOL",
+    arg_help="phylogenetics tool (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

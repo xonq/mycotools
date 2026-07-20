@@ -201,7 +201,9 @@ def compile_cds(gff_list, ome, gene2hg):
             elif not prot:  # if there isn't a valid accession it may mean the
                 # mycotools curation did not work or the user did not curate
                 # correctly
-                logger.debug("%s %s %s", entry["attributes"], prot_prep_i0, prot_prep_i1)
+                logger.debug(
+                    "%s %s %s", entry["attributes"], prot_prep_i0, prot_prep_i1
+                )
                 if not fail:
                     logger.debug("" + ome + " has proteins in gff with no Alias")
                 fail = True
@@ -233,9 +235,7 @@ def parse_loci(gff_path, ome, gene2hg, window=6):
     """obtain a set of tuples of HG pairs {(OG0, OG1)...}"""
 
     gff_list = gff2list(gff_path)  # open here to improve pickling
-    hg_dict = compile_cds(
-        gff_list, Path(gff_path).name.replace(".gff3", ""), gene2hg
-    )
+    hg_dict = compile_cds(gff_list, Path(gff_path).name.replace(".gff3", ""), gene2hg)
     pairs = []
     for scaf, hgs in hg_dict.items():  # for each contig
         windows = [
@@ -346,16 +346,20 @@ def align_microsynt_np(m_arr, i2ome, hg2gene, hgpair2i, wrk_dir, nschgs=None):
         elif len(nschgs) < 10:
             nschgs = []
         if nschgs:
-            logger.debug(f"{len(nschgs)} HGs with <= {max_median} median copy "
-                + f"number and <= {max_stdev} standard deviation extracted")
+            logger.debug(
+                f"{len(nschgs)} HGs with <= {max_median} median copy "
+                + f"number and <= {max_stdev} standard deviation extracted"
+            )
         max_stdev += 0.2
         if max_stdev > 2:
             max_stdev = 0.1
             max_median += 1
     if not nschgs:
-        logger.error("could not detect 10 genes present in all genomes "
+        logger.error(
+            "could not detect 10 genes present in all genomes "
             + "with median 2 copy number and less than 2 copy number "
-            + "standard deviation. Manually input focal homology groups.")
+            + "standard deviation. Manually input focal homology groups."
+        )
         sys.exit(35)
 
     pre_arr = extract_nschg_pairs(nschgs, hgpair2i, m_arr)

@@ -82,9 +82,7 @@ def build_parser():
     ops.add_argument(
         "-i", "--interface", metavar="DBPATH", help="link/initialize the MTDB at path"
     )
-    ops.add_argument(
-        "-u", "--unlink", action="store_true", help="unlink from the MTDB"
-    )
+    ops.add_argument("-u", "--unlink", action="store_true", help="unlink from the MTDB")
     ops.add_argument(
         "-l",
         "--list",

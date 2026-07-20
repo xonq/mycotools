@@ -146,8 +146,7 @@ def cli():
 
     if args.lineage or args.lineages:
         logger.warning(
-            "extracting taxonomy is subject to "
-            + "errors in NCBI's hierarchy"
+            "extracting taxonomy is subject to " + "errors in NCBI's hierarchy"
         )
 
     # these arguments require one another

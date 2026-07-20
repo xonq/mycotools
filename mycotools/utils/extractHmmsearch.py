@@ -4,7 +4,14 @@ import logging
 import re
 import sys
 import argparse
-from mycotools.lib.kontools import intro, outro, file2list, format_path, mkOutput, setup_logging
+from mycotools.lib.kontools import (
+    intro,
+    outro,
+    file2list,
+    format_path,
+    mkOutput,
+    setup_logging,
+)
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

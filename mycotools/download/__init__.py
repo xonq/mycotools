@@ -23,8 +23,12 @@ Examples:
   mycotools download ncbi -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools download", "mycotools.download", SUBCOMMANDS, DESCRIPTION,
-    metavar="SOURCE", arg_help="download source (see below)",
+    "mycotools download",
+    "mycotools.download",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="SOURCE",
+    arg_help="download source (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

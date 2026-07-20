@@ -27,8 +27,12 @@ Examples:
   mycotools seq coords -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools seq", "mycotools.seq", SUBCOMMANDS, DESCRIPTION,
-    metavar="TOOL", arg_help="sequence tool (see below)",
+    "mycotools seq",
+    "mycotools.seq",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="TOOL",
+    arg_help="sequence tool (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

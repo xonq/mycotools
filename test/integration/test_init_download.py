@@ -103,7 +103,9 @@ def build_reference_subset(dest: Path, n_per_source: int = N_PER_SOURCE) -> Path
 
 def jgi_portal_ids(n_per_source: int = N_PER_SOURCE):
     """The JGI portal ids (assembly_acc) that build_reference_subset will use."""
-    return [f[_ASSEMBLY_ACC_COL].strip() for f in list(_iter_rows("jgi"))[:n_per_source]]
+    return [
+        f[_ASSEMBLY_ACC_COL].strip() for f in list(_iter_rows("jgi"))[:n_per_source]
+    ]
 
 
 def warm_jgi_restore(portal_ids, jgi_email, jgi_pwd, timeout=JGI_RESTORE_TIMEOUT):
@@ -112,8 +114,13 @@ def warm_jgi_restore(portal_ids, jgi_email, jgi_pwd, timeout=JGI_RESTORE_TIMEOUT
     helpers so the warmed selection matches what update_mtdb will download.
     Returns the set of portal ids whose essential files are ready."""
     from mycotools.jgiDwnld import (
-        jgi_api_login, search_organism, select_file, request_restore,
-        poll_restore, _mycocosm_ids, _is_restored,
+        jgi_api_login,
+        search_organism,
+        select_file,
+        request_restore,
+        poll_restore,
+        _mycocosm_ids,
+        _is_restored,
     )
 
     session, token = jgi_api_login(jgi_email, jgi_pwd)
@@ -123,8 +130,11 @@ def warm_jgi_restore(portal_ids, jgi_email, jgi_pwd, timeout=JGI_RESTORE_TIMEOUT
         if not org:
             continue
         selected = [
-            f for f in (select_file(files, "fna", masked=True),
-                        select_file(files, "gff3", masked=True))
+            f
+            for f in (
+                select_file(files, "fna", masked=True),
+                select_file(files, "gff3", masked=True),
+            )
             if f is not None
         ]
         if len(selected) < 2:  # need both an assembly and an annotation
@@ -132,9 +142,14 @@ def warm_jgi_restore(portal_ids, jgi_email, jgi_pwd, timeout=JGI_RESTORE_TIMEOUT
         purged = [f["_id"] for f in selected if not _is_restored(f)]
         if purged:
             status_url = request_restore(
-                session, token,
-                _mycocosm_ids(org.get("id"), (org.get("top_hit") or {}).get("_id"),
-                              org.get("mycocosm_portal_id") or portal_id, purged),
+                session,
+                token,
+                _mycocosm_ids(
+                    org.get("id"),
+                    (org.get("top_hit") or {}).get("_id"),
+                    org.get("mycocosm_portal_id") or portal_id,
+                    purged,
+                ),
             )
             if not poll_restore(session, status_url, timeout=timeout, interval=20):
                 continue
@@ -162,8 +177,15 @@ def run_update_mtdb(home: Path, init_dir: Path, reference: Path, timeout=1800):
     for var in ("MYCODB", "MYCOFNA", "MYCOFAA", "MYCOGFF3"):
         env.pop(var, None)
     return subprocess.run(
-        [sys.executable, "-m", "mycotools.mtdb.update",
-         "--init", str(init_dir), "--reference", str(reference)],
+        [
+            sys.executable,
+            "-m",
+            "mycotools.mtdb.update",
+            "--init",
+            str(init_dir),
+            "--reference",
+            str(reference),
+        ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -217,7 +239,7 @@ def test_init_primary_db_downloads_jgi_and_ncbi(isolated_home, tmp_path):
         )
 
     reference = build_reference_subset(tmp_path / "reference_subset.mtdb")
-    init_dir = isolated_home / "mtdb_init"   # non-existent -> becomes the DB root
+    init_dir = isolated_home / "mtdb_init"  # non-existent -> becomes the DB root
 
     result = run_update_mtdb(isolated_home, init_dir, reference)
 

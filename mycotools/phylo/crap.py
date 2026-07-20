@@ -286,7 +286,9 @@ def run_fa2clus(
         return False, False, fa2clus_log
     except ClusteringError as le:  # if cluster error, try aggclus
         if not error:
-            logger.info(spacer + "mmseqs failed, attempting hierarchical " + "clustering")
+            logger.info(
+                spacer + "mmseqs failed, attempting hierarchical " + "clustering"
+            )
             try:
                 cluster, newick, overshot, fa2clus_log = fa2clus(
                     fa_path,
@@ -1402,7 +1404,9 @@ def hg_main(
                 x[0]: x[1] for x in pool.starmap(compile_hg_fa, compile_hg_fa_cmds)
             }
         for gene, hg in input_hgs.items():
-            if Path(wrk_dir + gene + ".fa").is_file():  # add finished in working directory back
+            if Path(
+                wrk_dir + gene + ".fa"
+            ).is_file():  # add finished in working directory back
                 hg_fas = {**hg_fas, **{gene: fa2dict(wrk_dir + gene + ".fa")}}
     else:
         for gene, hg in input_hgs.items():
@@ -1635,10 +1639,12 @@ def search_main(
             sys.exit(5)
         elif set(input_genes).difference(prot_hits):
             logger.info("Proteins missing from GFF")
-            logger.info(""
+            logger.info(
+                ""
                 + ",".join(
                     [str(x) for x in list(set(input_genes).difference(prot_hits))]
-                ))
+                )
+            )
             sys.exit(6)
         clean_gff = [
             x
@@ -2089,7 +2095,9 @@ def cli():
         else:
             logger.info("Detected non-mycotools input")
             if not input_fa or not args.search:
-                logger.info("non-mycotools input requires -s, -i as a fasta, optionally -g")
+                logger.info(
+                    "non-mycotools input requires -s, -i as a fasta, optionally -g"
+                )
                 sys.exit(4)
 
     #        eprint('\nERROR: invalid input', flush = True)

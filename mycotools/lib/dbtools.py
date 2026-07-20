@@ -370,7 +370,10 @@ class mtdb(dict):
             else:
                 tax_dict = taxonomy_string
             try:
-                tax_dict = {**tax_dict, **{x: "" for x in tax_strs if x not in tax_dict}}
+                tax_dict = {
+                    **tax_dict,
+                    **{x: "" for x in tax_strs if x not in tax_dict},
+                }
             except TypeError:  # inappropriate tax_dict in the column
                 tax_dict = {x: "" for x in tax_strs}
             return tax_dict
@@ -388,7 +391,9 @@ class mtdb(dict):
         tax_dicts = {x: tax_dicts[x] for x in tax_dicts if tax_dicts[x]}
         for genus in tax_dicts:
             tax_dicts[genus] = {
-                rank: name for rank, name in tax_dicts[genus].items() if rank not in forbid
+                rank: name
+                for rank, name in tax_dicts[genus].items()
+                if rank not in forbid
             }
         for miss in set(genera).difference(tax_dicts.keys()):
             tax_dicts[miss] = {}
@@ -570,7 +575,8 @@ def store_login(
     os.chmod(info_path, 0o600)
     logger.warning(
         "Stored credentials UNENCRYPTED at %s (permissions 600). Anyone able to "
-        "read this file can read your JGI password.", info_path
+        "read this file can read your JGI password.",
+        info_path,
     )
     # a password-encrypted key would otherwise take precedence in loginCheck;
     # remove it so the no-password store is the one that is actually used

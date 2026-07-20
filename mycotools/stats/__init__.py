@@ -21,8 +21,12 @@ Examples:
   mycotools stats assembly -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools stats", "mycotools.stats", SUBCOMMANDS, DESCRIPTION,
-    metavar="KIND", arg_help="statistic to compute (see below)",
+    "mycotools stats",
+    "mycotools.stats",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="KIND",
+    arg_help="statistic to compute (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

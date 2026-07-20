@@ -21,8 +21,12 @@ Examples:
   mycotools gff svg -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools gff", "mycotools.gff", SUBCOMMANDS, DESCRIPTION,
-    metavar="TOOL", arg_help="gff tool (see below)",
+    "mycotools gff",
+    "mycotools.gff",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="TOOL",
+    arg_help="gff tool (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

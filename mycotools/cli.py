@@ -47,8 +47,12 @@ Examples:
   mycotools homology -h"""
 
 _dispatcher = Dispatcher(
-    "mycotools", "mycotools", SUBCOMMANDS, DESCRIPTION,
-    metavar="GROUP", arg_help="analysis group or tool (see below)",
+    "mycotools",
+    "mycotools",
+    SUBCOMMANDS,
+    DESCRIPTION,
+    metavar="GROUP",
+    arg_help="analysis group or tool (see below)",
 )
 main = _dispatcher.main
 cli = _dispatcher.cli

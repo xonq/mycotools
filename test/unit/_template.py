@@ -48,9 +48,9 @@ def test_cli_help(run_cli):
 def test_argument_validation():
     """Example shape:
 
-        with pytest.raises(SystemExit) as exc:
-            mod.some_entry(bad_args...)
-        assert exc.value.code == EXPECTED
+    with pytest.raises(SystemExit) as exc:
+        mod.some_entry(bad_args...)
+    assert exc.value.code == EXPECTED
     """
     ...
 
@@ -59,5 +59,4 @@ def test_argument_validation():
 # Pure helper functions (login-free)
 # --------------------------------------------------------------------------- #
 @pytest.mark.skip(reason="TODO: scaffold - unit test the module's pure helpers")
-def test_pure_helpers(ust_mtdb):
-    ...
+def test_pure_helpers(ust_mtdb): ...

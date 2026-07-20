@@ -111,12 +111,14 @@ def gen_predb():
         "no",
         "2018",
     ]
-    logger.info('INSTRUCTIONS: fill in each column with the relevant information and \
+    logger.info(
+        'INSTRUCTIONS: fill in each column with the relevant information and \
         separate each column by a tab. The predb can be filled in \
         via spreadsheet software and exported as a tab delimited `.tsv`. \
         ASSEMBLY ACCESSIONS and PREVIOUS_OME fields must be unique to the \
         genome; otherwise predb2mtdb will update the corresponding database entry. \
-        Novel data must be filled in as "new" for the genomeSource column.')
+        Novel data must be filled in as "new" for the genomeSource column.'
+    )
     outputStr = "#" + "\t".join(predb_headers)
     outputStr += "\n#" + "\t".join(example) + "\n"
 
@@ -183,8 +185,10 @@ def read_predb(predb_path, spacer="\t"):
                 #                       required_headers.remove(head)
                 missing_headers = required_headers.difference(set(i2header.values()))
                 if missing_headers:
-                    logger.error(f"{spacer}ERROR: Required columns missing: "
-                        + f"{missing_headers}")
+                    logger.error(
+                        f"{spacer}ERROR: Required columns missing: "
+                        + f"{missing_headers}"
+                    )
                     sys.exit(4)
             #               if not headers:
             #                  predb = {x: [] for x in line.rstrip()[1:].split('\t')}
@@ -257,11 +261,13 @@ def read_predb(predb_path, spacer="\t"):
             predb["restriction"] = [bool(x) for x in predb["published"]]
 
     if any(x.lower() not in {"jgi", "ncbi", "new"} for x in predb["source"]):
-        logger.info([
+        logger.info(
+            [
                 predb["assembly_acc"][i]
                 for i, v in enumerate(predb["source"])
                 if v not in {"jgi", "ncbi", "new"}
-            ])
+            ]
+        )
         logger.error(spacer + "genomeSource entries must be in {jgi, ncbi, new}")
         sys.exit(5)
 
@@ -379,13 +385,14 @@ def gen_omes(newdb, refdb=None, ome_col="ome", forbidden=set(), spacer="\t"):
             except TypeError:
                 todel.append(i)
                 if not isinstance(newdb["assembly_acc"][i], float):
-                    logger.info(spacer
-                        + newdb["assembly_acc"][i]
-                        + " no metadata - "
-                        + "failed")
+                    logger.info(
+                        spacer + newdb["assembly_acc"][i] + " no metadata - " + "failed"
+                    )
                 elif "index" in newdb:  # for updateDB
                     if not isinstance(newdb, float):
-                        logger.info(spacer + newdb["index"][i] + " no metadata - " + "failed")
+                        logger.info(
+                            spacer + newdb["index"][i] + " no metadata - " + "failed"
+                        )
                     continue
                 else:  # no use appending failed when there's no identifiable
                     # info
@@ -514,7 +521,9 @@ def cur_mngr(
                 raw_gff_path, ome, "gff3", wrk_dir + "gff3/", suffix=".uncur"
             )
         except IOError as ie:
-            logger.info(spacer + ome + "|" + assembly_accession + " failed GFF3 parsing")
+            logger.info(
+                spacer + ome + "|" + assembly_accession + " failed GFF3 parsing"
+            )
             if exit:
                 raise ie from None
             return ome, False, "gff3"
@@ -526,7 +535,9 @@ def cur_mngr(
         try:
             gff_mngr(ome, gff, cur_gff_path, source, assembly_accession)
         except Exception as e:  # catch all errors to continue script
-            logger.info(spacer + ome + "|" + assembly_accession + " failed GFF3 curation")
+            logger.info(
+                spacer + ome + "|" + assembly_accession + " failed GFF3 curation"
+            )
             if exit:
                 raise e from None
             return ome, False, "gff3"
@@ -543,10 +554,14 @@ def cur_mngr(
             if faa and len(missing_seq) == len(faa):
                 raise ValueError("no sequences generated in proteome")
             elif missing_seq:
-                logger.warning(f"{spacer}\tWARNING: {len(missing_seq)} "
-                    + "CDSs translated blank sequences")
+                logger.warning(
+                    f"{spacer}\tWARNING: {len(missing_seq)} "
+                    + "CDSs translated blank sequences"
+                )
         except Exception as e:  # catch all errors
-            logger.info(spacer + ome + "|" + assembly_accession + " failed proteome generation")
+            logger.info(
+                spacer + ome + "|" + assembly_accession + " failed proteome generation"
+            )
             if exit:
                 raise e
             return ome, False, "faa"

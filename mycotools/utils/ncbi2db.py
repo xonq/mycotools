@@ -203,7 +203,9 @@ def main(
                 spacer="\t\t\t",
             )
 
-        logger.debug(spacer + "" + str(len(ncbi_df)) + " entries with assemblies and gffs")
+        logger.debug(
+            spacer + "" + str(len(ncbi_df)) + " entries with assemblies and gffs"
+        )
         ncbi_df = ncbi_df.rename(
             columns={
                 "Release Date": "published",
