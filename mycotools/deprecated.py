@@ -37,8 +37,11 @@ def _make_shim(old, new, target):
 # --- relocated under the `mycotools` analysis entrypoint ---------------------
 jgiDwnld = _make_shim("jgiDwnld", "mycotools download jgi", "mycotools.download.jgi")
 ncbiDwnld = _make_shim("ncbiDwnld", "mycotools download ncbi", "mycotools.download.ncbi")
-db2search = _make_shim("db2search", "mycotools search", "mycotools.search")
-db2hgs = _make_shim("db2hgs", "mycotools cluster homology", "mycotools.cluster.homology")
+db2search = _make_shim("db2search", "mycotools homology db", "mycotools.homology.db")
+fa2hmmer2fa = _make_shim(
+    "fa2hmmer2fa", "mycotools homology fasta", "mycotools.homology.fasta"
+)
+db2hgs = _make_shim("db2hgs", "mycotools cluster db", "mycotools.cluster.db")
 fa2clus = _make_shim("fa2clus", "mycotools cluster fasta", "mycotools.cluster.fasta")
 crap = _make_shim("crap", "mycotools phylo crap", "mycotools.phylo.crap")
 fa2tree = _make_shim("fa2tree", "mycotools phylo tree", "mycotools.phylo.tree")
@@ -60,8 +63,10 @@ add2gff = _make_shim("add2gff", "mycotools gff add", "mycotools.gff.add")
 gff2svg = _make_shim("gff2svg", "mycotools gff svg", "mycotools.gff.svg")
 
 # --- relocated under the `mtdb` database entrypoint --------------------------
-db2files = _make_shim("db2files", "mtdb util files", "mycotools.mtdb.util.files")
-ome2name = _make_shim("ome2name", "mtdb util name", "mycotools.mtdb.util.name")
+db2files = _make_shim("db2files", "mtdb files", "mycotools.mtdb.files")
+
+# --- relocated under the `mycotools` analysis entrypoint ---------------------
+ome2name = _make_shim("ome2name", "mycotools rename", "mycotools.rename")
 
 # --- restored acc2* aliases (retired in v2, now `mtdb accession <FORMAT>`) ----
 acc2fa = _make_shim("acc2fa", "mtdb accession fa", "mycotools.mtdb.acc2.fa")

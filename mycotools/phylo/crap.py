@@ -60,8 +60,8 @@ from mycotools.cluster.fasta import (
 from mycotools.phylo.tree import main as fa2tree, PhyloError
 from mycotools.mtdb.acc2.locus import main as acc2locus
 from mycotools.gff.svg import main as gff2svg
-from mycotools.search import blast_main as db2search
-from mycotools.mtdb.util.name import main as ome2name
+from mycotools.homology.db import blast_main as db2search
+from mycotools.rename import main as ome2name
 
 # from mycotools.utils.og2mycodb import mycodbHGs, extract_ogs
 from mycotools.phylo.synteny import compile_homolog_groups

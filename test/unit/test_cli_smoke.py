@@ -74,7 +74,7 @@ EXTRA_CLI_MODULES = [
     "mtdb.acc2.gbk",
     "mtdb.acc2.locus",
     "ncbi_dwnld_fallback",
-    "treetools",
+    "phylo.tools",
 ]
 
 ALL_MODULES = ENTRY_POINT_MODULES + EXTRA_CLI_MODULES
@@ -83,7 +83,7 @@ ALL_MODULES = ENTRY_POINT_MODULES + EXTRA_CLI_MODULES
 KNOWN_BROKEN = {
     "fa2hmmer2fa": "ImportError: cannot import name 'compAcc2fa' from mycotools.db2search",
     "s2subs": "entry point registered in pyproject but mycotools/s2subs.py does not exist",
-    "treetools": "TypeError on `type | None` union hint; requires Python >= 3.10 (env is 3.9)",
+    "phylo.tools": "cogent3 dependency uses `type | None` at import; requires Python >= 3.10 (env is 3.9)",
 }
 
 

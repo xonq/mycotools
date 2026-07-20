@@ -9,6 +9,7 @@ SUBCOMMANDS = {
     "crap": "crap",
     "tree": "tree",
     "synteny": "synteny",
+    "tools": "tools",
 }
 
 DESCRIPTION = """Build phylogenies and phylogenetic pipelines
@@ -17,10 +18,11 @@ Tools (all following arguments are forwarded to the tool):
   crap       Cluster Reconstruction and Phylogeny (CRAP) pipeline
   tree       build a phylogeny from a fasta (align -> trim -> infer)
   synteny    build a microsynteny tree
+  tools      manipulate an existing phylogeny (root/prune/rename/strip support)
 
 Examples:
   mycotools phylo crap -h
-  mycotools phylo tree -h"""
+  mycotools phylo tools -h"""
 
 _dispatcher = Dispatcher(
     "mycotools phylo", "mycotools.phylo", SUBCOMMANDS, DESCRIPTION,

@@ -1,13 +1,14 @@
 #! /usr/bin/env python3
 """Dispatcher for the `mycotools cluster` subcommand.
 
-Routes `mycotools cluster <METHOD> ...` to a per-method clustering module."""
+Routes `mycotools cluster <METHOD> ...` to a clustering module: `db`
+circumscribes database sequences into homology groups, `fasta` runs iterative
+sequence-similarity clustering of a fasta."""
 from mycotools.lib.subcmd import Dispatcher
 
 # subcommand name/alias -> submodule within this package (mycotools.cluster.<module>)
 SUBCOMMANDS = {
-    "homology": "homology",
-    "hgs": "homology",
+    "db": "db",
     "fasta": "fasta",
     "fa": "fasta",
 }
@@ -15,11 +16,11 @@ SUBCOMMANDS = {
 DESCRIPTION = """Group sequences into clusters / homology groups
 
 Methods (all following arguments are forwarded to the method):
-  homology  (hgs)   circumscribe database sequences into homology groups
-  fasta     (fa)    iterative sequence-similarity clustering of a fasta
+  db              circumscribe database sequences into homology groups
+  fasta   (fa)    iterative sequence-similarity clustering of a fasta
 
 Examples:
-  mycotools cluster homology -h
+  mycotools cluster db -h
   mycotools cluster fasta -h"""
 
 _dispatcher = Dispatcher(

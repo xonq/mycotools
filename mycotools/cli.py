@@ -2,23 +2,25 @@
 """Top-level dispatcher for the `mycotools` command.
 
 `mycotools` is the downstream-analysis entrypoint; the database lifecycle
-(update/extract/predb/manage/accession/util) lives under the separate `mtdb`
-command. Routes `mycotools <GROUP> ...` to a group dispatcher (or, for `search`,
-directly to the search module)."""
+(update/extract/predb/manage/accession/files) lives under the separate `mtdb`
+command. Routes `mycotools <GROUP> ...` to a group dispatcher, or, for a leaf
+tool like `rename`, directly to that tool's module."""
 from mycotools.lib.subcmd import Dispatcher
 
 # group name/alias -> submodule within the mycotools package. Groups (download,
-# cluster, phylo, stats, seq, gff) are subpackage dispatchers; `search` is a
-# single leaf module.
+# homology, cluster, phylo, stats, seq, gff) are subpackage dispatchers;
+# `rename` is a single leaf module.
 SUBCOMMANDS = {
     "download": "download",
-    "dl": "download",
-    "search": "search",
-    "s": "search",
+    "d": "download",
+    "homology": "homology",
+    "h": "homology",
     "cluster": "cluster",
-    "clus": "cluster",
+    "c": "cluster",
     "phylo": "phylo",
     "p": "phylo",
+    "rename": "rename",
+    "r": "rename",
     "stats": "stats",
     "seq": "seq",
     "gff": "gff",
@@ -27,10 +29,11 @@ SUBCOMMANDS = {
 DESCRIPTION = """Mycotools downstream-analysis toolkit
 
 Groups (all following arguments are forwarded to the group/tool):
-  download   (dl)     download genomes/annotations from JGI or NCBI
-  search     (s)      search query sequence(s) against the database
-  cluster    (clus)   cluster sequences / circumscribe homology groups
+  download   (d)      download genomes/annotations from JGI or NCBI
+  homology   (h)      search query sequence(s) against the database or a fasta
+  cluster    (c)      cluster sequences / circumscribe homology groups
   phylo      (p)      phylogenies and phylogenetic pipelines (crap/tree/synteny)
+  rename     (r)      substitute MTDB ome codes with taxonomic names in a file
   stats               annotation / assembly statistics
   seq                 sequence & coordinate transforms
   gff                 manipulate / render gff3 files
@@ -41,7 +44,7 @@ run `mtdb -h`.
 Examples:
   mycotools download jgi -h
   mycotools phylo crap -h
-  mycotools search -h"""
+  mycotools homology -h"""
 
 _dispatcher = Dispatcher(
     "mycotools", "mycotools", SUBCOMMANDS, DESCRIPTION,

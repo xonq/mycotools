@@ -12,8 +12,7 @@ import subprocess
 import multiprocessing as mp
 from mycotools.utils.extractHmmsearch import main as exHmm, grab_names as grabNames
 from mycotools.utils.extractHmmAcc import main as extr_hmm
-from mycotools.search import compAcc2fa
-from mycotools.mtdb.acc2.fa import famain as acc2fa
+from mycotools.homology.db import comp_hmm_acc2fa, hmm_acc2fa
 from mycotools.lib.kontools import intro, outro, findExecs, format_path, setup_logging
 from mycotools.lib.dbtools import mtdb, primaryDB
 from mycotools.lib.biotools import dict2fa
@@ -81,15 +80,16 @@ def parse_hmm_data(hmm_data):
 
 def run_acc2fa(db, biotype, output_res, subhit=True, cpu=1):
 
-    acc2fa_cmds = compAcc2fa(db, biotype, output_res, subhit)
-    output_fas = {}
-    for query in acc2fa_cmds:
-        logger.debug("" + query)
-        with mp.get_context("spawn").Pool(processes=cpu) as pool:
-            results = pool.starmap(acc2fa, acc2fa_cmds[query])
-        output_fas[query] = "\n".join([dict2fa(x) for x in results])
+    # comp_hmm_acc2fa builds one (db, {ome: [[seq, start, end], ...]}, query,
+    # coords) tuple per query; hmm_acc2fa turns each into (query, fa_dict) by
+    # retrieving from the proteome (faa). NOTE: this pair ignores `biotype`, so
+    # nhmmer (fna) hits are still pulled from faa -- use comp_blast_acc2fa if
+    # nucleotide retrieval is needed.
+    acc2fa_tuples = comp_hmm_acc2fa(db, output_res, coords=subhit)
+    with mp.get_context("spawn").Pool(processes=cpu) as pool:
+        fa_info = pool.starmap(hmm_acc2fa, acc2fa_tuples)
 
-    return output_fas
+    return {query: dict2fa(fa_dict) for query, fa_dict in fa_info}
 
 
 def outputFas(output_fas, output_dir, fastaname):

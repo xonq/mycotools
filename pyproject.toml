@@ -39,29 +39,40 @@ classifiers = [
 "Bug Tracker" = "https://github.com/xonq/mycotools/issues"
 
 [project.scripts]
+# Primary entrypoints: `mtdb` (database lifecycle) and `mycotools` (analysis).
 mtdb = "mycotools.mtdb:main"
-add2gff = "mycotools.add2gff:cli"
-annotationStats = "mycotools.annotationStats:cli"
-assemblyStats = "mycotools.assemblyStats:cli"
-bioreform = "mycotools.bioreform:cli"
-coords2fa = "mycotools.coords2fa:cli"
-crap = "mycotools.crap:cli"
-db2files = "mycotools.db2files:cli"
-db2hgs = "mycotools.db2hgs:cli"
-db2microsyntree = "mycotools.db2microsyntree:cli"
-db2search = "mycotools.db2search:cli"
-fa2clus = "mycotools.fa2clus:cli"
-fa2hmmer2fa = "mycotools.fa2hmmer2fa:cli"
-fa2mass = "mycotools.fa2mass:cli"
-fa2tree = "mycotools.fa2tree:cli"
-fna2faa = "mycotools.fna2faa:cli"
-gff2seq = "mycotools.gff2seq:cli"
-gff2svg = "mycotools.gff2svg:cli"
-jgiDwnld = "mycotools.jgiDwnld:cli"
+mycotools = "mycotools.cli:main"
+
+# Standalone tools not folded into the nested dispatchers.
 ncbiAcc2fa = "mycotools.ncbiAcc2fa:cli"
-ncbiDwnld = "mycotools.ncbiDwnld:cli"
-ome2name = "mycotools.ome2name:cli"
-s2subs = "mycotools.s2subs:cli"
+
+# DEPRECATED flat aliases -- kept for one transition release. Each prints a
+# deprecation notice and forwards to the tool's new nested invocation (shown
+# alongside). To be REMOVED in a subsequent release.
+add2gff = "mycotools.deprecated:add2gff"                  # mycotools gff add
+annotationStats = "mycotools.deprecated:annotationStats"  # mycotools stats annotation
+assemblyStats = "mycotools.deprecated:assemblyStats"      # mycotools stats assembly
+bioreform = "mycotools.deprecated:bioreform"              # mycotools seq convert
+coords2fa = "mycotools.deprecated:coords2fa"              # mycotools seq coords
+crap = "mycotools.deprecated:crap"                        # mycotools phylo crap
+db2files = "mycotools.deprecated:db2files"                # mtdb files
+db2hgs = "mycotools.deprecated:db2hgs"                    # mycotools cluster db
+db2microsyntree = "mycotools.deprecated:db2microsyntree"  # mycotools phylo synteny
+db2search = "mycotools.deprecated:db2search"              # mycotools homology db
+fa2clus = "mycotools.deprecated:fa2clus"                  # mycotools cluster fasta
+fa2hmmer2fa = "mycotools.deprecated:fa2hmmer2fa"          # mycotools homology fasta
+fa2mass = "mycotools.deprecated:fa2mass"                  # mycotools seq mass
+fa2tree = "mycotools.deprecated:fa2tree"                  # mycotools phylo tree
+fna2faa = "mycotools.deprecated:fna2faa"                  # mycotools seq translate
+gff2seq = "mycotools.deprecated:gff2seq"                  # mycotools seq gff
+gff2svg = "mycotools.deprecated:gff2svg"                  # mycotools gff svg
+jgiDwnld = "mycotools.deprecated:jgiDwnld"                # mycotools download jgi
+ncbiDwnld = "mycotools.deprecated:ncbiDwnld"              # mycotools download ncbi
+ome2name = "mycotools.deprecated:ome2name"                # mycotools rename
+acc2fa = "mycotools.deprecated:acc2fa"                    # mtdb accession fa
+acc2gff = "mycotools.deprecated:acc2gff"                  # mtdb accession gff
+acc2gbk = "mycotools.deprecated:acc2gbk"                  # mtdb accession gbk
+acc2locus = "mycotools.deprecated:acc2locus"              # mtdb accession locus
 
 
 [tool.setuptools.packages.find]
