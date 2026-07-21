@@ -28,6 +28,7 @@ from tqdm import tqdm
 from Bio import Entrez
 from datetime import datetime
 from collections import defaultdict
+from mycotools.lib import mtdb_sql
 from mycotools.lib.dbtools import (
     db2df,
     df2db,
@@ -230,10 +231,9 @@ def init_db(
             logger.error("no YYYYmmdd.mtdb in " + format_path(envs["MYCODB"]))
             sys.exit(3)
     else:
-        new_db_path = output + "mtdb/" + date + ".mtdb"
+        new_db_path = output + "mtdb/" + mtdb_sql.PRIMARY_DB_NAME
         if not Path(new_db_path).is_file():
-            with open(output + "mtdb/" + date + ".mtdb", "w") as out:
-                out.write("".join(["\t" for x in mtdb.columns]))
+            mtdb().to_sql(new_db_path)
 
     return output, config
 
@@ -722,6 +722,34 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, jgi2ncbi, fails=set(), acc2meta={}, ap
     ncbi_df, ncbi_jgi_overlap = exec_rm_overlap(ncbi_df, todel)
 
     return ncbi_df, jgi2ncbi, jgi2biosample, fails, ncbi_jgi_overlap, todel
+
+
+def write_primary(db, date, update_path=None):
+    """Install `db` as the primary MTDB.
+
+    The primary is the SQLite database at `$MYCODB/mtdb.db`, written atomically
+    so an interrupted update can never leave a partial database where
+    `primary_db()` would pick it up. The outgoing primary is archived under
+    `log/<date>/` first, alongside a `.mtdb` snapshot of the new one -- every
+    historical primary stays readable with nothing but a text editor."""
+    new_path = format_path("$MYCODB/" + mtdb_sql.PRIMARY_DB_NAME)
+    prior = primary_db(verbose=False)
+
+    # copy, rather than move, so a failed write leaves the old primary in place
+    if update_path and prior and Path(prior).is_file():
+        archive = update_path + Path(prior).name
+        if format_path(prior) != format_path(archive):
+            shutil.copy(prior, archive)
+
+    db.to_sql(new_path)
+
+    if update_path:
+        db.df2db(update_path + date + ".mtdb", headers=True)
+    # a dated flat primary predates the SQLite backend; it has been archived, so
+    # drop it rather than leave a stale database beside the real one
+    if prior and Path(prior).is_file() and format_path(prior) != format_path(new_path):
+        Path(prior).unlink()
+    return new_path
 
 
 def mk_wrk_dirs(update_path):
@@ -1908,14 +1936,7 @@ def control_flow(
         write_forbid_omes(set(addDB["ome"]), format_path("$MYCODB/../log/relics.txt"))
 
         new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save=True)
-        new_db_path = format_path("$MYCODB/" + date + ".mtdb")
-
-        new_mtdb.df2db(new_db_path)
-
-        if new_db_path != db_path:
-            if db_path:
-                Path(db_path).unlink()
-        return new_db_path
+        return write_primary(new_mtdb, date, update_path)
 
     if taxonomy:
         new_db, update_mtdb = taxonomy_update(
@@ -1927,8 +1948,7 @@ def control_flow(
             rank=rank,
             group=king,
         )
-        new_path = format_path("$MYCODB/" + date + ".mtdb")
-        update_mtdb.df2db(new_path)
+        write_primary(update_mtdb, date, update_path)
         sys.exit(0)
     elif reference:
         if any(not x for x in ref_db["published"]) and not nonpublished:
@@ -1986,19 +2006,10 @@ def control_flow(
             set(new_mtdb["ome"]), format_path("$MYCODB/../log/relics.txt")
         )
 
-        new_path = format_path("$MYCODB/" + date + ".mtdb")
-        if format_path(db_path) == new_path:
-            shutil.copy(db_path, db_path + ".tmp")
         full_mtdb, update_omes = db2primary(
             update_mtdb, new_mtdb, save=False, combined=True
         )
-        full_mtdb.df2db(new_path + ".tmp")
-        try:
-            shutil.move(primary_db(), update_path + Path(primary_db()).name)
-            # move master database to log if it exists
-        except FileNotFoundError:
-            pass
-        shutil.move(new_path + ".tmp", new_path)
+        write_primary(full_mtdb, date, update_path)
         rm_raw_data(update_path)
         logger.info("MTDB update complete")
     #        gen_algn_db(

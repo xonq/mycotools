@@ -20,15 +20,16 @@ import subprocess
 import random
 from tqdm import tqdm
 from Bio import Entrez
-from io import StringIO
 from typing import Any, Dict, Iterable, Mapping, Optional, Union
 from collections import defaultdict
 from mycotools.lib.kontools import (
+    atomic_write,
     collect_files,
     format_path,
     read_json,
     write_json,
 )
+from mycotools.lib import mtdb_sql
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -125,17 +126,59 @@ class mtdb(dict):
         return db
 
     def db2df(self, db_path: str, add_paths: bool = True) -> Dict[str, list]:
-        df = defaultdict(list)
+        """Read a database from disk into the column dict this class holds.
+
+        Dispatches on the file itself, so a SQLite primary database and a
+        tab-delimited `.mtdb` interchange file are interchangeable everywhere a
+        path is accepted."""
+        db_path = format_path(db_path)
+        if mtdb_sql.is_sqlite(db_path):
+            return mtdb_sql.read_db(db_path, add_paths=add_paths)
+        return self._read_flat(db_path, add_paths=add_paths)
+
+    @classmethod
+    def from_string(cls, data: str, add_paths: bool = True) -> "mtdb":
+        """Build an MTDB from the text of a `.mtdb` file.
+
+        This is the stdin path -- `mtdb extract -d -` and anything else piping a
+        database between tools."""
+        db = cls()
+        lines = [
+            x.rstrip().split("\t")
+            for x in data.splitlines()
+            if not x.startswith("#") and x.rstrip()
+        ]
+        parsed = db._parse_rows(lines, "<stdin>", add_paths=add_paths)
+        db.clear()
+        db.update(parsed)
+        db.index = None
+        return db
+
+    def _read_flat(self, db_path: str, add_paths: bool = True) -> Dict[str, list]:
+        """Read a tab-delimited `.mtdb` interchange file."""
         if Path(db_path).stat().st_size == 0:
             return {x: [] for x in mtdb.columns}
-        with open(format_path(db_path), "r") as raw:
+        with open(db_path, "r") as raw:
             data = [
                 x.rstrip().split("\t")
                 for x in raw
                 if not x.startswith("#") and x.rstrip()
             ]
+        return self._parse_rows(data, db_path, add_paths=add_paths)
+
+    def _parse_rows(
+        self, data: "list[list[str]]", origin: str, add_paths: bool = True
+    ) -> Dict[str, list]:
+        """Turn split `.mtdb` fields into the column dict, validating arity."""
+        df = defaultdict(list)
         columns = self.columns
-        for entry in data:
+        n_columns = len(columns)
+        for line_no, entry in enumerate(data, 1):
+            if len(entry) > n_columns:
+                raise ValueError(
+                    f"{origin} line {line_no}: {len(entry)} fields, expected at "
+                    f"most {n_columns}. Columns are {', '.join(columns)}"
+                )
             [df[c].append("") for c in columns]  # add a blank entry to each
             # column
             for i, d in enumerate(entry):
@@ -143,42 +186,80 @@ class mtdb(dict):
             try:
                 df["taxonomy"][-1] = self.read_tax(df["taxonomy"][-1])
             except json.decoder.JSONDecodeError:
-                logger.error("malformed taxonomy: %s", df["taxonomy"][-1])
-                sys.exit()
+                raise ValueError(
+                    f"{origin} line {line_no}: malformed taxonomy "
+                    f"{df['taxonomy'][-1]!r}"
+                )
             df["taxonomy"][-1]["genus"] = df["genus"][-1]
             df["taxonomy"][-1]["species"] = df["genus"][-1] + " " + df["species"][-1]
             df["taxonomy"][-1]["strain"] = df["strain"][-1]
 
         if not add_paths:
             return df
-        try:
-            for i, ome in enumerate(df["ome"]):
-                if not df["fna"][i]:
-                    if {"MYCOFNA", "MYCOFAA", "MYCOGFF3"}.difference(
-                        set(os.environ.keys())
-                    ):
-                        raise FileNotFoundError(
-                            "You are not connected to a primary MTDB. "
-                            + "Standalone databases need absolute paths"
-                        )
-                    df["fna"][i] = os.environ["MYCOFNA"] + ome + ".fna"
-                    df["faa"][i] = os.environ["MYCOFAA"] + ome + ".faa"
-                    df["gff3"][i] = os.environ["MYCOGFF3"] + ome + ".gff3"
-                elif df["fna"][i] == ome + ".fna":
-                    if {"MYCOFNA", "MYCOFAA", "MYCOGFF3"}.difference(
-                        set(os.environ.keys())
-                    ):
-                        raise FileNotFoundError(
-                            "You are not connected to a primary MTDB. "
-                            + "Standalone databases need absolute paths"
-                        )
-                    df["fna"][i] = os.environ["MYCOFNA"] + ome + ".fna"
-                    df["faa"][i] = os.environ["MYCOFAA"] + ome + ".faa"
-                    df["gff3"][i] = os.environ["MYCOGFF3"] + ome + ".gff3"
-        except KeyError:
-            logger.error("MycotoolsDB not in path, cannot delineate biofile paths")
+        # read the data directories once: os.environ decodes the entire
+        # environment on each access, which otherwise dominates load time and
+        # makes it scale with the size of the user's shell environment
+        env = mtdb_sql.read_path_env()
+        needs_env = [
+            i
+            for i, ome in enumerate(df["ome"])
+            if not df["fna"][i] or df["fna"][i] == ome + ".fna"
+        ]
+        if not needs_env:
+            return df
+        if env is None:
+            raise FileNotFoundError(
+                "You are not connected to a primary MTDB. "
+                + "Standalone databases need absolute paths"
+            )
+        fna_dir, faa_dir, gff3_dir = env["MYCOFNA"], env["MYCOFAA"], env["MYCOGFF3"]
+        for i in needs_env:
+            ome = df["ome"][i]
+            df["fna"][i] = fna_dir + ome + ".fna"
+            df["faa"][i] = faa_dir + ome + ".faa"
+            df["gff3"][i] = gff3_dir + ome + ".gff3"
 
         return df
+
+    def _export_rows(self, paths: bool = False) -> "list[list[str]]":
+        """Render this MTDB as the ordered field lists a `.mtdb` file holds.
+
+        Row dicts are copied before the genome-level ranks are stripped from
+        their taxonomy: `set_index` shares the taxonomy dict with the caller, so
+        editing it in place would delete genus/species/strain out from under an
+        MTDB that is still in use."""
+        env = mtdb_sql.read_path_env()
+        rows = []
+        for ome, row in sorted(self.set_index("ome").items(), key=lambda x: x[0]):
+            row = dict(row)
+            if not paths and env is not None:
+                for file_type, var in (
+                    ("fna", "MYCOFNA"),
+                    ("faa", "MYCOFAA"),
+                    ("gff3", "MYCOGFF3"),
+                ):
+                    default = env[var] + ome + "." + file_type
+                    if str(row.get(file_type) or "") == default:
+                        row[file_type] = ""  # abbreviate when possible
+            taxonomy = row.get("taxonomy")
+            if isinstance(taxonomy, dict):
+                taxonomy = {
+                    k: v
+                    for k, v in taxonomy.items()
+                    if k not in {"species", "genus", "strain"}
+                }
+            row["taxonomy"] = json.dumps(taxonomy) if taxonomy else "{}"
+            if not row.get("published"):
+                row["published"] = ""
+            rows.append(
+                [ome]
+                + [
+                    "" if row.get(c) is None else str(row.get(c, ""))
+                    for c in self.columns
+                    if c != "ome"
+                ]
+            )
+        return rows
 
     def df2db(
         self,
@@ -186,70 +267,27 @@ class mtdb(dict):
         headers: bool = False,
         paths: bool = False,
     ) -> None:
-        df = copy.copy(self)
-        df = df.reset_index()
-        output = mtdb(
-            {
-                k: v
-                for k, v in sorted(self.set_index("ome").items(), key=lambda x: x[0])
-            },
-            index="ome",
-        )
-        # does this work if its not an inplace change
-        abb_paths = {
-            "faa": [os.environ["MYCOFAA"], ".faa"],
-            "fna": [os.environ["MYCOFNA"], ".fna"],
-            "gff3": [os.environ["MYCOGFF3"], ".gff3"],
-        }
-        if db_path:
-            with open(db_path, "w") as out:
-                if headers:
-                    out.write("#" + "\t".join(self.columns) + "\n")
-                for ome in output:
-                    if not paths:
-                        for file_type in ["fna", "faa", "gff3"]:
-                            output[ome][file_type] = output[ome][file_type].replace(
-                                abb_paths[file_type][0] + ome + abb_paths[file_type][1],
-                                "",
-                            )  # abbreviate when possible
-                    for rank in ["species", "genus", "strain"]:
-                        try:
-                            del output[ome]["taxonomy"][rank]
-                        except (KeyError, TypeError) as e:
-                            pass
+        """Write this MTDB as a tab-delimited `.mtdb` interchange file.
 
-                    if output[ome]["taxonomy"]:
-                        output[ome]["taxonomy"] = json.dumps(output[ome]["taxonomy"])
-                    else:
-                        output[ome]["taxonomy"] = "{}"
-                    if not output[ome]["published"]:
-                        output[ome]["published"] = ""
-                    out.write(
-                        ome
-                        + "\t"
-                        + "\t".join([str(output[ome][x]) for x in output[ome]])
-                        + "\n"
-                    )
+        With no `db_path` the database is printed to stdout, which is what makes
+        `mtdb extract | ...` composable. A file write is atomic."""
+        rows = self._export_rows(paths=paths)
+        header = "#" + "\t".join(self.columns)
+        if db_path:
+            with atomic_write(db_path) as out:
+                if headers:
+                    out.write(header + "\n")
+                for row in rows:
+                    out.write("\t".join(row) + "\n")
         else:
             if headers:
-                print("#" + "\t".join(self.columns), flush=True)
+                print(header, flush=True)
+            for row in rows:
+                print("\t".join(row), flush=True)
 
-            for ome in output:
-                if not paths:
-                    for file_type in ["fna", "faa", "gff3"]:
-                        output[ome][file_type] = output[ome][file_type].replace(
-                            abb_paths[file_type][0] + ome + abb_paths[file_type][1], ""
-                        )  # abbreviate when possible
-                for rank in ["species", "genus", "strain"]:
-                    try:
-                        del output[ome]["taxonomy"][rank]
-                    except (KeyError, TypeError) as e:
-                        pass
-                output[ome]["taxonomy"] = json.dumps(output[ome]["taxonomy"])
-                print(
-                    ome + "\t" + "\t".join([str(output[ome][x]) for x in output[ome]]),
-                    flush=True,
-                )
+    def to_sql(self, db_path: str) -> str:
+        """Write this MTDB to a SQLite database, replacing it atomically."""
+        return mtdb_sql.write_db(db_path, self.reset_index())
 
     def set_index(self, column: Optional[str] = "ome", inplace: bool = False) -> "mtdb":
         data, retry, error, df, columns = (
@@ -330,19 +368,20 @@ class mtdb(dict):
             return df
 
     def append(self, info: Optional[Mapping[str, Any]] = None) -> "mtdb":
-        #        if any(x not in set(self.columns) for x in info):
-        #           raise KeyError('Invalid keys: ' + str(set(info.keys()).difference(set(self.columns))))
+        """Return a new MTDB with `info` added as a row.
+
+        `copy.copy` is shallow, so the column lists have to be rebuilt rather
+        than appended to -- otherwise the returned MTDB shares its lists with
+        this one and appending mutates both."""
         if info is None:
             info = {}
         index = self.index
-        df = copy.copy(self)
-        df = df.reset_index()
+        df = copy.copy(self).reset_index()
         info = {
             **info,
             **{k: None for k in set(self.columns).difference(set(info.keys()))},
         }
-        for key in self.columns:
-            df[key].append(info[key])
+        df = mtdb({key: list(df[key]) + [info[key]] for key in self.columns})
         return df.set_index(index)
 
     @staticmethod
@@ -437,38 +476,36 @@ class mtdb(dict):
     def infer_rank(self, lineage: str) -> str:
         """Identify the taxonomic rank associated with an inputted lineage of
         interest"""
-        linlow, rank = lineage.lower(), None
+        linlow = lineage.lower()
         for ome, row in self.items():
-            if linlow in set([x.lower() for x in row["taxonomy"].values()]):
-                rev_dict = {
-                    k.lower(): v
-                    for k, v in zip(row["taxonomy"].values(), row["taxonomy"].keys())
-                }
-                rank = rev_dict[lineage]
+            for rank, name in row["taxonomy"].items():
+                if isinstance(name, str) and name.lower() == linlow:
+                    return rank
 
-        if not rank:
-            raise KeyError(f"no entry for {lineage}")
+        raise KeyError(f"no entry for {lineage}")
 
-        return rank
+    def extract_unique(
+        self, allowed: int = 1, rank: str = "species", seed: Optional[int] = None
+    ) -> "mtdb":
+        """Extract unique rank from an MTDB.
 
-    def extract_unique(self, allowed: int = 1, rank: str = "species") -> "mtdb":
-        """Extract unique rank from an MTDB"""
-        keys = copy.deepcopy(list(self.keys()))
-        random.shuffle(keys)
-        prep_db0 = {x: self[x] for x in keys}
+        Genomes are sampled in a shuffled order, so `seed` is accepted to make a
+        selection reproducible."""
+        keys = list(self.keys())
+        random.Random(seed).shuffle(keys)
         prep_db1 = mtdb().set_index("ome")
         if rank == "strain":
             found = set()
-            for ome, row in prep_db0.items():
+            for ome in keys:
+                row = self[ome]
                 name = row["taxonomy"]["species"] + " " + row["strain"]
                 if name not in found:
                     prep_db1[ome] = row
-                found_prep = list(found)
-                found_prep.append(name)
-                found = set(found_prep)
+                found.add(name)
         else:
             found = defaultdict(int)
-            for ome, row in prep_db0.items():
+            for ome in keys:
+                row = self[ome]
                 name = row["taxonomy"][rank]
                 found[name] += 1
                 if found[name] <= allowed:
@@ -497,10 +534,11 @@ class mtdb(dict):
 
     def extract_ome(self, omes: Iterable[str], column: str = "ome") -> "mtdb":
         """Extract a list of genome codes (omes) of interest"""
+        omes = set(omes)  # hoisted: rebuilding this per row is quadratic
         new_db = mtdb().set_index(column)
         db = self.set_index(column)
         for i in db:
-            if i in list(omes):
+            if i in omes:
                 new_db[i] = db[i]
         return new_db.set_index()
 
@@ -522,6 +560,41 @@ class mtdb(dict):
             if row["published"]:
                 new_db[ome] = row
         return new_db
+
+
+def load_omes(db_path: str, omes: Iterable[str], add_paths: bool = True) -> "mtdb":
+    """Load only `omes` from the database at `db_path`.
+
+    Against the SQLite backend this is an index seek per genome; against a
+    `.mtdb` flat file the whole file still has to be parsed, so the result is
+    the same either way and only the cost differs. This is the read that most
+    Mycotools commands actually want -- they operate on the genomes behind a
+    handful of accessions, not on the whole database."""
+    db_path = format_path(db_path)
+    omes = set(omes)
+    if mtdb_sql.is_sqlite(db_path):
+        return mtdb(mtdb_sql.select_omes(db_path, omes, add_paths=add_paths))
+    return mtdb(db_path, add_paths=add_paths).set_index("ome").extract_ome(omes)
+
+
+def db_stem(db_path: Optional[str]) -> str:
+    """Basename of a database with its backend extension removed.
+
+    Export filenames are built from this rather than from the primary's own
+    filename, so they stay `.mtdb` interchange files whichever backend they were
+    extracted from -- `20240101.mtdb` and `mtdb.db` give `20240101` and `mtdb`."""
+    if not db_path:
+        return "mtdb"
+    name = Path(db_path).name
+    for suffix in (".mtdb", ".db"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def omes_from_accessions(accs: Iterable[str]) -> "set[str]":
+    """MTDB aliases are `<ome>_<acc>`, so the ome is the leading field."""
+    return {acc[: acc.find("_")] for acc in accs if "_" in acc}
 
 
 def get_login(ncbi, jgi):
@@ -725,14 +798,22 @@ def read_log(log, columns="", sep="\t"):
 
 
 def primary_db(path="$MYCODB", verbose=True):
-    """Acquire the path of the primary database by searching $MYCODB for a file
-    with a basename that starts with a date string %Y%m%d."""
+    """Acquire the path of the primary database.
+
+    A SQLite `mtdb.db` in $MYCODB is the primary database when present;
+    otherwise the newest dated `YYYYmmdd.mtdb` flat file is, which is what keeps
+    databases predating the SQLite backend usable. Callers only ever see a path
+    and pass it to `mtdb()`, which dispatches on the file's own format."""
 
     path = path.replace("$", "")
     try:
         full_path = os.environ[path]
     except KeyError:  # $MYCODB not initialized
         return None
+
+    sql_path = format_path("$" + path + "/" + mtdb_sql.PRIMARY_DB_NAME)
+    if Path(sql_path).is_file():
+        return sql_path
 
     files = collect_files(full_path, "mtdb")
     basenames = [Path(x).name for x in files]
@@ -755,42 +836,25 @@ def primary_db(path="$MYCODB", verbose=True):
 # imports database, converts into df
 # returns database dataframe
 def db2df(data, stdin=False):
-    """Deprecated legacy Pandas implementation of MTDB import"""
+    """Deprecated legacy Pandas implementation of MTDB import.
+
+    Reading is delegated to the `mtdb` class so that a SQLite primary database,
+    a `.mtdb` interchange file, and an in-memory MTDB all behave identically
+    here; only the DataFrame conversion is still this function's own. The
+    previous implementation parsed the file a second time with `pd.read_csv` and
+    overwrote explicit `fna`/`faa`/`gff3` paths with $MYCO* defaults, silently
+    relocating standalone genomes."""
     import pandas as pd
 
-    columns = mtdb.columns
     if isinstance(data, mtdb):
-        db_df = pd.DataFrame(data.reset_index())
-    elif not stdin:
-        data = format_path(data)
-        db_df = pd.read_csv(data, sep="\t")
-        if "ome" not in set(db_df.columns) and "assembly_acc" not in set(db_df.columns):
-            db_df = pd.read_csv(data, sep="\t", header=None)
+        db = data.reset_index()
+    elif stdin:
+        db = mtdb.from_string(data)
     else:
-        db_df = pd.read_csv(StringIO(data), sep="\t")
-        if "ome" not in set(db_df.columns) and "assembly_acc" not in set(db_df.columns):
-            db_df = pd.read_csv(StringIO(data), sep="\t", header=None)
+        db = mtdb(format_path(data)).reset_index()
 
-    db_df = db_df.fillna("")
-
-    db_df.columns = columns
-    for i, row in db_df.iterrows():
-        db_df.at[i, "taxonomy"] = read_tax(row["taxonomy"])
-        db_df.at[i, "taxonomy"]["genus"] = row["genus"]
-        db_df.at[i, "taxonomy"]["species"] = row["genus"] + " " + row["species"]
-        # if malformatted due to decreased entries in some lines, this will raise an IndexError
-        if (
-            row["fna"] or row["fna"] == row["ome"] + ".fna"
-        ):  # abbreviated line w/o file coordinates
-            db_df.at[i, "fna"] = os.environ["MYCOFNA"] + row["ome"] + ".fna"
-            db_df.at[i, "faa"] = os.environ["MYCOFAA"] + row["ome"] + ".faa"
-            db_df.at[i, "gff3"] = os.environ["MYCOGFF3"] + row["ome"] + ".gff3"
-        else:  # has file coordinates
-            db_df.at[i, "fna"] = format_path(row["fna"])
-            db_df.at[i, "faa"] = format_path(row["faa"])
-            db_df.at[i, "gff3"] = format_path(row["gff3"])
-
-    return db_df
+    db_df = pd.DataFrame({c: list(db[c]) for c in mtdb.columns})
+    return db_df.fillna("")
 
 
 def df2std(df):

@@ -15,6 +15,7 @@ import argparse
 import importlib
 from pathlib import Path
 from mycotools.lib.kontools import format_path, setup_logging
+from mycotools.lib import mtdb_sql
 from mycotools.lib.dbtools import (
     primary_db,
     mtdb_disconnect,
@@ -138,28 +139,49 @@ def list_links(config):
         print()
 
 
+def _resolve_ome(db_path, ome_prep):
+    """Return (ome, row) for a lookup token, or (None, None).
+
+    Against a SQLite primary this is an index seek per token; against a `.mtdb`
+    flat file the whole database has to be parsed, so the load is deferred until
+    a flat file is actually what we have."""
+    ome = re.sub(r"\.\w+[\w\d]$", "", ome_prep)
+    if mtdb_sql.is_sqlite(db_path):
+        for candidate in (ome_prep, ome):
+            rows = mtdb(mtdb_sql.select_ome_prefix(db_path, candidate)).set_index("ome")
+            if rows:
+                found = candidate if candidate in rows else sorted(rows)[0]
+                return found, rows[found]
+        return None, None
+    db = mtdb(db_path).set_index()
+    if ome_prep in db:
+        return ome_prep, db[ome_prep]
+    if ome in db:
+        return ome, db[ome]
+    for ref_ome, row in sorted(db.items()):
+        if ref_ome.startswith(ome + "."):
+            return ome, row
+    return None, None
+
+
 def lookup_omes(omes):
     """Print the database row, or a specific file path, for ome code(s)."""
-    db = mtdb(primary_db()).set_index()
+    db_path = primary_db()
     for ome_prep in omes:
-        if ome_prep in db:
-            print(ome_prep + "\t" + "\t".join(str(v) for v in db[ome_prep].values()))
-            return
-        ome = re.sub(r"\.\w+[\w\d]$", "", ome_prep)
         ext_srch = re.search(r"^\d+\.?\d*\.(.*$)", ome_prep[6:])
         extension = ext_srch[1] if ext_srch is not None else None
-        if ome in db:
-            try:
-                print(db[ome][extension] if extension else {"ome": ome, **db[ome]})
-            except KeyError:
+        ome, row = _resolve_ome(db_path, ome_prep)
+        if row is None:
+            raise KeyError("Invalid ome " + ome_prep)
+        if extension:
+            if extension not in row:
                 raise KeyError("Invalid extension " + extension)
+            print(row[extension], flush=True)
         else:
-            for ref_ome, row in db.items():
-                if ref_ome.startswith(ome + "."):
-                    print(row[extension] if extension else {"ome": ome, **row})
-                    break
-            else:
-                raise KeyError("Invalid ome " + ome)
+            print(
+                ome + "\t" + "\t".join(str(v) for v in row.values()),
+                flush=True,
+            )
 
 
 def print_primary():

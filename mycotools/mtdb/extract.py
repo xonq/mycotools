@@ -4,7 +4,6 @@
 # NEED stdin acceptance for most of these arguments
 
 import os
-import re
 import sys
 import logging
 import argparse
@@ -16,11 +15,35 @@ from mycotools.lib.kontools import (
     setup_logging,
     mk_output,
 )
-from mycotools.lib.dbtools import mtdb, primary_db
+from mycotools.lib import mtdb_sql
+from mycotools.lib.dbtools import mtdb, primary_db, db_stem
 from mycotools.mtdb.files import mtdb_main as gen_full_mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def load_db(db_path, omes_set=(), aa_set=(), lineage_list=()):
+    """Load only the rows an extraction can possibly need.
+
+    A SQLite primary database can answer "which genomes" before anything is
+    materialized, so an ome list, an assembly-accession list, or a set of
+    lineages narrows the read to an index seek. Anything else -- and any
+    `.mtdb` flat file -- falls back to reading the whole database."""
+    if not mtdb_sql.is_sqlite(db_path):
+        return mtdb(db_path)
+    if omes_set:
+        return mtdb(mtdb_sql.select_omes(db_path, omes_set))
+    if aa_set:
+        return mtdb(mtdb_sql.select_column(db_path, "assembly_acc", aa_set))
+    if lineage_list:
+        # resolve lineages against the normalized taxonomy table; a
+        # species/strain lineage is not answerable there, so read everything
+        ranks = {mtdb_sql.infer_rank(db_path, lin) for lin in lineage_list}
+        if not ranks.intersection({None, "species", "strain"}):
+            genera = mtdb_sql.genera_for_lineages(db_path, lineage_list)
+            return mtdb(mtdb_sql.select_column(db_path, "genus", genera))
+    return mtdb(db_path)
 
 
 def main(
@@ -34,12 +57,13 @@ def main(
     nonpublished=False,
     inverse=False,
     aa_set=set(),
+    seed=None,
 ):
     """Python entry point for extract_mtdb"""
 
     db = db.set_index("ome")
     if x_number > 0:
-        db = db.extract_unique(x_number, rank=rank)
+        db = db.extract_unique(x_number, rank=rank, seed=seed)
 
     # extract each taxonomic entry based on the classification specified
     if lineage_list:
@@ -125,6 +149,11 @@ def cli():
         action="store_true",
         help="Inverse [source|lineage(s)|nonpublished]",
     )
+    ex_opt.add_argument(
+        "--seed",
+        type=int,
+        help="[-a] Seed the random sample for a reproducible selection",
+    )
     ex_opt.add_argument("-ol", "--ome", help="File w/list of omes")
     ex_opt.add_argument(
         "-al", "--assembly_list", help="File w/list of assembly accessions"
@@ -168,28 +197,22 @@ def cli():
 
     output = ""
     if args.output:
-        output = format_path(args.output)
-        if not output.endswith("/"):
-            tag = ""
-
-            if args.lineage:
-                tag += "_" + args.lineage
-            if args.lineages:
-                tag += "_taxonomy"
-            if args.source:
-                tag += args.source.lower()
-            if not args.nonpublished:
-                tag += "_pub"
-            output += "/" + Path(db_path).name + tag
-
-    if args.mtdb == "-":
-        data = ""
-        for line in sys.stdin:
-            data += line.rstrip() + "\n"
-        data = data.rstrip()
-        db = mtdb(data, stdin=True)
-    else:
-        db = mtdb(db_path)
+        # `-o` names the directory to write into; the file inside it is named
+        # for the source database and the filters applied. The extension is
+        # always `.mtdb` -- an extract is an interchange file regardless of
+        # which backend it was read from.
+        out_dir = format_path(args.output, force_dir=True)
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        tag = ""
+        if args.lineage:
+            tag += "_" + args.lineage
+        if args.lineages:
+            tag += "_taxonomy"
+        if args.source:
+            tag += "_" + args.source.lower()
+        if not args.nonpublished:
+            tag += "_pub"
+        output = f"{out_dir}{db_stem(db_path)}{tag}.mtdb"
 
     if args.ome:
         omes = set(file2list(format_path(args.ome)))
@@ -207,6 +230,15 @@ def cli():
         lineage_list = [args.lineage]
     else:
         lineage_list = []
+
+    if args.mtdb == "-":
+        db = mtdb.from_string(sys.stdin.read())
+    elif args.inverse:
+        # the inverse needs every row to subtract from, so no narrowing
+        db = mtdb(db_path)
+    else:
+        db = load_db(db_path, omes, aa_set, lineage_list)
+
     new_db = main(
         db,
         lineage_list=lineage_list,
@@ -218,6 +250,7 @@ def cli():
         nonpublished=args.nonpublished,
         inverse=args.inverse,
         aa_set=aa_set,
+        seed=args.seed,
     )
     if args.new_mtdb:
         gen_full_mtdb(
@@ -225,13 +258,13 @@ def cli():
         )
     elif args.output or args.by_rank:
         if isinstance(new_db, mtdb):
-            new_db.df2db(output, paths=args.paths)
+            new_db.df2db(output, headers=bool(args.headers), paths=args.paths)
         else:
-            out_dir = mk_output(output, "extract_mtdb")
-            prefix = re.sub(r"\.mtdb$", "", Path(db_path).name)
+            out_dir = mk_output(output or str(Path.cwd()), "extract_mtdb")
+            prefix = db_stem(db_path)
             for lineage, db in new_db.items():
                 out_f = f"{out_dir}{prefix}.{lineage}.mtdb"
-                db.df2db(out_f)
+                db.df2db(out_f, headers=bool(args.headers))
     else:
         new_db.df2db(headers=bool(args.headers), paths=args.paths)
 

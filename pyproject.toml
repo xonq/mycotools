@@ -13,6 +13,9 @@ requires-python = ">=3.9,<4"
 # Versions are lower-bounded to the reference `mycotools` micromamba env
 # (Python 3.9.21). numpy, clipkit, cogent3, and dna_features_viewer were
 # previously undeclared despite being imported by the package.
+#
+# The MycotoolsDB SQLite backend (mycotools/lib/mtdb_sql.py) adds no dependency:
+# it uses the stdlib `sqlite3` module, which every supported CPython ships.
 dependencies = [
     "biopython>=1.85",
     "pandas>=2.2.3",
@@ -34,6 +37,12 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 
+# Test-only requirements; not installed for normal use.
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/xonq/mycotools"
 "Bug Tracker" = "https://github.com/xonq/mycotools/issues"
@@ -42,9 +51,6 @@ classifiers = [
 # Primary entrypoints: `mtdb` (database lifecycle) and `mycotools` (analysis).
 mtdb = "mycotools.mtdb:main"
 mycotools = "mycotools.cli:main"
-
-# Standalone tools not folded into the nested dispatchers.
-ncbi_acc2fa = "mycotools.ncbi_acc2fa:cli"
 
 # DEPRECATED flat aliases -- kept for one transition release. Each prints a
 # deprecation notice and forwards to the tool's new nested invocation (shown
@@ -68,7 +74,6 @@ gff2seq = "mycotools.deprecated:gff2seq"                  # mycotools seq gff
 gff2svg = "mycotools.deprecated:gff2svg"                  # mycotools gff svg
 jgiDwnld = "mycotools.deprecated:jgiDwnld"                # mycotools download jgi
 ncbiDwnld = "mycotools.deprecated:ncbiDwnld"              # mycotools download ncbi
-ncbiAcc2fa = "mycotools.deprecated:ncbiAcc2fa"            # ncbi_acc2fa (PEP-8 rename)
 ome2name = "mycotools.deprecated:ome2name"                # mycotools rename
 acc2fa = "mycotools.deprecated:acc2fa"                    # mtdb accession fa
 acc2gff = "mycotools.deprecated:acc2gff"                  # mtdb accession gff

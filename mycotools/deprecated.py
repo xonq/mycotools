@@ -70,9 +70,6 @@ db2files = _make_shim("db2files", "mtdb files", "mycotools.mtdb.files")
 # --- relocated under the `mycotools` analysis entrypoint ---------------------
 ome2name = _make_shim("ome2name", "mycotools rename", "mycotools.rename")
 
-# --- renamed for PEP-8 compliance (standalone tool) --------------------------
-ncbiAcc2fa = _make_shim("ncbiAcc2fa", "ncbi_acc2fa", "mycotools.ncbi_acc2fa")
-
 # --- restored acc2* aliases (retired in v2, now `mtdb accession <FORMAT>`) ----
 acc2fa = _make_shim("acc2fa", "mtdb accession fa", "mycotools.mtdb.acc2.fa")
 acc2gff = _make_shim("acc2gff", "mtdb accession gff", "mycotools.mtdb.acc2.gff")

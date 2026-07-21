@@ -7,7 +7,7 @@ import argparse
 from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
-from mycotools.lib.dbtools import mtdb, primary_db
+from mycotools.lib.dbtools import mtdb, primary_db, load_omes, omes_from_accessions
 from mycotools.lib.biotools import fa2dict, gff2list, gff3_comps
 from mycotools.mtdb.acc2.gff import db_main as acc2gff
 
@@ -580,8 +580,14 @@ def cli():
         for char in args.regex:
             regex += char
 
-    # import database and set index
-    db = mtdb(format_path(args.mtdb))
+    # import database and set index; an inputted gff is not tied to the
+    # accession list, so only an MTDB run can narrow the read to the genomes
+    # actually referenced (omes directly for --full, else the accessions' omes)
+    db_path = format_path(args.mtdb)
+    if args.gff:
+        db = mtdb(db_path)
+    else:
+        db = load_omes(db_path, set(accs) if args.full else omes_from_accessions(accs))
     db = db.set_index()
 
     # various output formats

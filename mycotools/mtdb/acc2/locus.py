@@ -8,7 +8,7 @@ import multiprocessing as mp
 from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import format_path, file2list, stdin2str, setup_logging
-from mycotools.lib.dbtools import primary_db, mtdb
+from mycotools.lib.dbtools import primary_db, mtdb, load_omes, omes_from_accessions
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3_comps
 from mycotools.mtdb.acc2.gff import grab_gff_acc
 
@@ -300,13 +300,15 @@ def cli():
 
     db = None
     out_indices = {}
+    # only the genomes behind the requested accessions are needed
+    needed_omes = omes_from_accessions(accs)
     if args.gff:
         gff = gff2list(format_path(args.gff))
         out_indices = main(
             gff, accs, args.plusminus, between=args.between, nt=args.nucleotide
         )
     else:
-        db = mtdb(format_path(args.mtdb)).set_index("ome")
+        db = load_omes(format_path(args.mtdb), needed_omes).set_index("ome")
         out_indices = mycotools_main(
             db,
             accs,
@@ -318,7 +320,7 @@ def cli():
 
     if args.output:
         if not db:
-            db = mtdb(format_path(args.mtdb)).set_index("ome")
+            db = load_omes(format_path(args.mtdb), needed_omes).set_index("ome")
         for acc in out_indices:
             if args.gff:
                 gff = format_path(args.gff)

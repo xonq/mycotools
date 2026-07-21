@@ -12,10 +12,18 @@ from mycotools.lib.dbtools import (
     get_login,
     store_login,
 )
+from mycotools.lib import mtdb_sql
 from mycotools.lib.kontools import format_path, read_json, setup_logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def ome_list(db_path):
+    """Every ome in the database, without materializing the rest of it."""
+    if mtdb_sql.is_sqlite(db_path):
+        return mtdb_sql.omes(db_path)
+    return list(mtdb(db_path)["ome"])
 
 
 def rm_outdated(omes, yes=False):
@@ -100,9 +108,47 @@ def restrictions(
         out.write("\n".join(["\t".join(x) for x in restricted]))
 
 
+def migrate(yes=False):
+    """Convert a flat-file primary MTDB into the SQLite backend.
+
+    The `.mtdb` it was built from is left in place -- `primary_db()` prefers
+    `mtdb.db` once it exists, so the flat file becomes an inert snapshot that
+    can be deleted, kept for provenance, or handed to an older Mycotools."""
+    db_path = primary_db()
+    if not db_path:
+        logger.error("Link a MycotoolsDB via `mtdb -i <MTDB_DIR>`")
+        return 1
+    if mtdb_sql.is_sqlite(db_path):
+        logger.info("Primary MTDB is already SQLite: %s", db_path)
+        return 0
+
+    target = format_path("$MYCODB/" + mtdb_sql.PRIMARY_DB_NAME)
+    db = mtdb(db_path)
+    n = len(db["ome"])
+    if not yes:
+        check = input(f"Convert {n} genomes in {db_path} to {target}? [y/N]: ")
+        if check.lower() not in {"yes", "y"}:
+            return 1
+
+    db.to_sql(target)
+    migrated = mtdb_sql.count(target)
+    if migrated != n:
+        logger.error("migrated %d of %d genomes; %s left in place", migrated, n, db_path)
+        return 1
+    logger.info("Migrated %d genomes -> %s", migrated, target)
+    logger.info("%s is now a snapshot and is no longer read", db_path)
+    return 0
+
+
 def cli():
     parser = argparse.ArgumentParser(
         description="Primary MycotoolsDB management utility"
+    )
+    parser.add_argument(
+        "-m",
+        "--migrate",
+        action="store_true",
+        help="Convert a flat-file primary MTDB to the SQLite backend",
     )
     parser.add_argument(
         "-c", "--clear_cache", action="store_true", help="Clear MycotoolsDB legacy data"
@@ -129,7 +175,8 @@ def cli():
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 
-    db = mtdb(primary_db()).set_index("assembly_acc")
+    if args.migrate:
+        sys.exit(migrate(args.yes))
 
     if args.password and args.store:
         logger.error("--password and --store are mutually exclusive")
@@ -147,9 +194,12 @@ def cli():
         for v in restricted:
             if len(v) < 3:
                 v = v + [None]
+        # loaded here rather than up front so the credential and migration
+        # operations do not pay for reading the whole database
+        db = mtdb(primary_db()).set_index("assembly_acc")
         restrictions(db, restricted, yes=args.yes)
     if args.clear_cache:
-        rm_outdated(mtdb(primary_db())["ome"], args.yes)
+        rm_outdated(set(ome_list(primary_db())), args.yes)
 
     sys.exit(0)
 

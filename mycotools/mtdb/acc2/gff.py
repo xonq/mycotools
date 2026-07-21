@@ -6,7 +6,7 @@ import sys
 import argparse
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff
-from mycotools.lib.dbtools import mtdb, primary_db
+from mycotools.lib.dbtools import mtdb, primary_db, load_omes, omes_from_accessions
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 from pathlib import Path
 
@@ -143,7 +143,8 @@ def cli():
     # if no gff is provided, then acquire it from the primary database
     db_path = format_path(args.mtdb)
     if not args.gff:
-        db = mtdb(format_path(args.mtdb))
+        # only the genomes behind the requested accessions are needed
+        db = load_omes(db_path, omes_from_accessions(accs))
         gff_lists = db_main(db, accs, cpus=args.cpu)
     # otherwise just use what is available
     else:

@@ -6,6 +6,7 @@ import sys
 import argparse
 from datetime import datetime
 from shutil import copy as cp
+from mycotools.lib import mtdb_sql
 from mycotools.lib.dbtools import primary_db, mtdb
 from mycotools.lib.kontools import format_path, prep_output, setup_logging
 from pathlib import Path
@@ -89,9 +90,12 @@ def mtdb_main(db, output_path, og_mtdb_path):
     # copy the og_mtdb configuration
     cp(og_mtdb_path + "config/mtdb.json", f"{mtdb_dir}config/mtdb.json")
 
-    # output the database
+    # output the database: the generated hierarchy is meant to be linked with
+    # `mtdb -i`, so its primary uses the SQLite backend, with a dated `.mtdb`
+    # snapshot alongside it for portability
     cdate = datetime.now().strftime("%Y%m%d")
-    db.df2db(f"{mtdb_dir}mtdb/{cdate}.mtdb")
+    db.to_sql(f"{mtdb_dir}mtdb/{mtdb_sql.PRIMARY_DB_NAME}")
+    db.df2db(f"{mtdb_dir}log/{cdate}.mtdb", headers=True)
 
     # output the files
     hard_main(["gff3", "faa", "fna"], db, f"{mtdb_dir}data/")

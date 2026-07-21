@@ -6,7 +6,7 @@ import sys
 import argparse
 from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
-from mycotools.lib.dbtools import mtdb, primary_db
+from mycotools.lib.dbtools import mtdb, primary_db, load_omes, omes_from_accessions
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 
 logger = logging.getLogger(__name__)
@@ -226,7 +226,8 @@ def cli():
 
     db_path = format_path(args.mtdb)
     if not args.fasta:  # MTDB run
-        db = mtdb(db_path)
+        # only the genomes behind the requested accessions are needed
+        db = load_omes(db_path, omes_from_accessions(accs))
         fa_dict = dbmain(db, accs)
         fasta_str = dict2fa(fa_dict)
     else:  # non MTDB
