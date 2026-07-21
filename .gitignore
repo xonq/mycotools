@@ -14,3 +14,5 @@ build.sh
 /predb2mtdb
 /mtdb
 /manage_mtdb
+.gitignore
+CLAUDE.md
