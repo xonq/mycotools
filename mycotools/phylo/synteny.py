@@ -640,9 +640,9 @@ def cli():
     find_execs(execs, exit=set(execs))
 
     if not args.output:
-        out_dir = mk_output(str(Path.cwd()) + "/", "db2microsyntree")
+        out_dir = mk_output(str(Path.cwd()) + "/", "phylo_synteny")
     else:
-        out_dir = mk_output(format_path(args.output), "db2microsyntree")
+        out_dir = mk_output(format_path(args.output), "phylo_synteny")
 
     args_dict = {
         "Database": args.db,

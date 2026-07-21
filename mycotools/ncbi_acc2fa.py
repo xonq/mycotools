@@ -11,11 +11,9 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def entrez_login():
+def entrez_login(accs):
     """Login to Entrez from user input"""
-    email = input("\nInput NCBI login email: ")
     limit = 3
-    Entrez.email = email
     if len(accs) > 3:
         api = getpass.getpass(prompt="NCBI API key (leave blank if none): ")
         if api != "":
@@ -79,7 +77,7 @@ def cli():
         else:
             accs = [args[1]]
 
-    limit = entrez_login()
+    limit = entrez_login(accs)
     out_str = grab_accs(accs, limit)
 
     print(flush=True)

@@ -265,7 +265,7 @@ def prep_mtdb_update(new_gff, ome, db):
     from mycotools.mtdb.predb import main as predb2mtdb
     from mycotools.lib.dbtools import mtdb, primary_db
 
-    out_dir = mk_output(format_path(str(Path.cwd())), "add2gff")
+    out_dir = mk_output(format_path(str(Path.cwd())), "gff_add")
     wrk_dir = out_dir + "working/"
     if not Path(wrk_dir).is_dir():
         Path(out_dir + "working/").mkdir()

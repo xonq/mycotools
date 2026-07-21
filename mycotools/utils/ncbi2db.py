@@ -120,7 +120,7 @@ def main(
     duplicates={},
     check_MD5=True,
     spacer="\t\t",
-    fallback=False,
+    chunk=100,
 ):
 
     os.chdir(out_dir)
@@ -173,35 +173,20 @@ def main(
 
     if len(ncbi_df) > 0:
         logger.debug(spacer + "Initializing NCBI acquisition")
-        if fallback:
-            from mycotools.ncbi_dwnld_fallback import main as ncbi_dwnld_fallback
-
-            ncbi_df, failed = ncbi_dwnld_fallback(
-                assembly=assem,
-                proteome=prot,
-                gff3=gff,
-                ncbi_df=ncbi_df,
-                remove=True,
-                output_path=out_dir,
-                column=ass_acc,
-                ncbi_column="assembly",
-                check_MD5=check_MD5,
-                spacer="\t\t\t",
-            )
-        else:
-            ncbi_df, failed = ncbi_dwnld(
-                assembly=assem,
-                proteome=prot,
-                gff3=gff,
-                ncbi_df=ncbi_df,
-                remove=True,
-                output_path=out_dir,
-                column=ass_acc,
-                ncbi_column="assembly",
-                check_MD5=check_MD5,
-                verbose=True,
-                spacer="\t\t\t",
-            )
+        ncbi_df, failed = ncbi_dwnld(
+            assembly=assem,
+            proteome=prot,
+            gff3=gff,
+            ncbi_df=ncbi_df,
+            remove=True,
+            output_path=out_dir,
+            column=ass_acc,
+            ncbi_column="assembly",
+            check_MD5=check_MD5,
+            verbose=True,
+            spacer="\t\t\t",
+            chunk=chunk,
+        )
 
         logger.debug(
             spacer + "" + str(len(ncbi_df)) + " entries with assemblies and gffs"

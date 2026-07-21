@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
 # NEED a db check to ensure the log is relevant to the input
-# NEED to convert to datasets
 # NEED to consider refseq genomes with annotations when genbank doesn't have them
 
 import os
@@ -384,6 +383,53 @@ def parse_datasets(datasets_path, unzip_base, req_files, spacer="\t"):
     return acc2data, acc2org, failed
 
 
+def download_datasets(
+    accs,
+    acc_file,
+    include,
+    req_files,
+    annotated,
+    output_path,
+    api=None,
+    verbose=False,
+    spacer="\t\t",
+):
+    """Write a chunk of accessions to acc_file, download them via NCBI datasets,
+    and parse the output, retrying up to three times. Returns acc2files, acc2org,
+    failed (each False if all attempts fail)."""
+    with open(acc_file, "w") as out:
+        out.write("\n".join([str(x) for x in accs]))
+
+    count = 0
+    while count < 3:
+        if not count:
+            logger.debug(f"{spacer}Downloading data")
+            count += 1
+        else:
+            count += 1
+            logger.debug(f"{spacer}\tAttempt {count}")
+
+        run_datasets(
+            include,
+            acc_file,
+            output_path,
+            api=api,
+            verbose=verbose,
+            annotated=annotated,
+        )
+
+        # Parse download output, add to df
+        acc2files, acc2org, failed = parse_datasets(
+            output_path + "ncbi_dataset.zip", output_path, req_files, spacer
+        )
+        if acc2files == False and acc2org == False and failed == False:
+            continue
+        else:
+            break
+
+    return acc2files, acc2org, failed
+
+
 def main(
     api=None,
     assembly=True,
@@ -398,6 +444,7 @@ def main(
     ncbi_column="Assembly",
     check_MD5=True,
     spacer="\t\t",
+    chunk=100,
 ):
 
     # initialize run directory and information
@@ -443,8 +490,6 @@ def main(
     ## GUARANTEE ASSEMBLY ACCESSIONS ARE LABELED THIS COLUMN NAME
     acc_file = output_path + "assembly_accs.txt"
     ncbi_df["assembly_acc"] = list([x.upper() for x in ncbi_df["assembly_acc"]])
-    with open(acc_file, "w") as out:
-        out.write("\n".join([str(x) for x in list(ncbi_df["assembly_acc"])]))
 
     include = ""
     req_files = set()
@@ -468,39 +513,35 @@ def main(
     else:
         annotated = False
 
-    # Run downloads
-    count = 0
-    while count < 3:
-        if not count:
-            logger.debug(f"{spacer}Downloading data")
-            count += 1
-        else:
-            count += 1
-            logger.debug(f"{spacer}\tAttempt {count}")
+    # Chunk the accessions so datasets is called on `chunk` accessions at a time
+    all_accs = [str(x) for x in list(ncbi_df["assembly_acc"])]
+    acc_chunks = [all_accs[i : i + chunk] for i in range(0, len(all_accs), chunk)]
 
-        run_datasets(
-            include,
+    # Run downloads chunk-by-chunk, accumulating results
+    acc2files, acc2org, failed = {}, {}, []
+    for chunk_i, acc_chunk in enumerate(acc_chunks):
+        if len(acc_chunks) > 1:
+            logger.debug(
+                f"{spacer}Chunk {chunk_i + 1}/{len(acc_chunks)} "
+                + f"({len(acc_chunk)} accessions)"
+            )
+        c_acc2files, c_acc2org, c_failed = download_datasets(
+            acc_chunk,
             acc_file,
+            include,
+            req_files,
+            annotated,
             output_path,
             api=api,
             verbose=verbose,
-            annotated=annotated,
+            spacer=spacer,
         )
-
-        # Parse download output, add to df
-        acc2files, acc2org, failed = parse_datasets(
-            output_path + "ncbi_dataset.zip", output_path, req_files, spacer
-        )
-        if acc2files == False and acc2org == False and failed == False:
-            continue
-        else:
-            break
-
-    if acc2files == False and acc2org == False and failed == False:
-        logger.error(f"{spacer}ncbiDwnld failed {count} attempts")
-        # maybe add a fallback to the old methodology here
-        logger.error(f"{spacer}Consider --fallback")
-        sys.exit(10)
+        if c_acc2files == False and c_acc2org == False and c_failed == False:
+            logger.error(f"{spacer}ncbiDwnld failed 3 attempts")
+            sys.exit(10)
+        acc2files.update(c_acc2files)
+        acc2org.update(c_acc2org)
+        failed.extend(c_failed)
 
     failed.extend(
         sorted(set(ncbi_df["assembly_acc"]).difference(set(acc2files.keys())))
@@ -516,17 +557,31 @@ def main(
             elif acc.upper().startswith("GCF"):
                 reattempt_acc.append(acc.upper().replace("GCF_", "GCA_"))
         acc_file_re = output_path + "assembly_accs.reattempt.txt"
-        with open(acc_file_re, "w") as out:
-            out.write("\n".join(reattempt_acc))
 
-        run_datasets(
-            include, acc_file_re, output_path, verbose=verbose, annotated=annotated
-        )
-        acc2files_r, acc2org_r, failed_r = parse_datasets(
-            output_path + "ncbi_dataset.zip", output_path, req_files
-        )
-        acc2files = {**acc2files, **acc2files_r}
-        acc2org = {**acc2org, **acc2org_r}
+        # Chunk the reattempt accessions as well
+        reattempt_chunks = [
+            reattempt_acc[i : i + chunk]
+            for i in range(0, len(reattempt_acc), chunk)
+        ]
+        failed_r = []
+        for acc_chunk in reattempt_chunks:
+            c_acc2files, c_acc2org, c_failed = download_datasets(
+                acc_chunk,
+                acc_file_re,
+                include,
+                req_files,
+                annotated,
+                output_path,
+                api=api,
+                verbose=verbose,
+                spacer=spacer,
+            )
+            if c_acc2files == False and c_acc2org == False and c_failed == False:
+                failed_r.extend(acc_chunk)
+                continue
+            acc2files = {**acc2files, **c_acc2files}
+            acc2org = {**acc2org, **c_acc2org}
+            failed_r.extend(c_failed)
 
         failed = []
         for acc in failed_r:
@@ -700,30 +755,25 @@ def cli():
         + "DEFAULT: attempt to decipher",
     )
     parser.add_argument("-o", "--output", help="Output directory")
-    parser.add_argument("-e", "--email", help="NCBI email")
     parser.add_argument("--api", help="NCBI API key for high query rate")
     parser.add_argument(
-        "--fallback", action="store_true", help="Fallback mode if datasets fails"
+        "--chunk",
+        type=int,
+        default=100,
+        help="Accessions to download per datasets call; DEFAULT: 100",
     )
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 
-    if args.email:
-        ncbi_email = args.email
-        Entrez.email = ncbi_email
-        if args.api:
-            ncbi_api = args.api
-            Entrez.api_key = ncbi_api
-        else:
-            ncbi_api = None
+    if args.api:
+        ncbi_api = args.api
     else:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check(jgi=False)
-        Entrez.email = ncbi_email
-        if ncbi_api:
-            Entrez.api_key = ncbi_api
+        ncbi_api, jgi_email, jgi_pwd = login_check(jgi=False)
+    if ncbi_api:
+        Entrez.api_key = ncbi_api
 
     if not args.output:
-        output = mk_output(None, "ncbiDwnld")
+        output = mk_output(None, "download_ncbi")
     else:
         output = format_path(args.output)
 
@@ -731,12 +781,12 @@ def cli():
 
     args_dict = {
         "NCBI Table": args.input,
-        "email": ncbi_email,
         "Assemblies": args.assembly,
         "Proteomes": args.proteome,
         ".gff3's": args.gff3,
         "Transcripts": args.transcript,
         "SRA": args.sra,
+        "Chunk": args.chunk,
     }
 
     start_time = intro("Download NCBI files", args_dict)
@@ -805,34 +855,19 @@ def cli():
             ncbi_column = "assembly"
 
         ncbi_df = ncbi_df.drop_duplicates(column)
-        if args.fallback:
-            from mycotools.ncbi_dwnld_fallback import main as main_fallback
-
-            new_df, failed = main_fallback(
-                assembly=args.assembly,
-                column=column,
-                ncbi_column=ncbi_column,
-                proteome=args.proteome,
-                gff3=args.gff3,
-                transcript=args.transcript,
-                ncbi_df=ncbi_df,
-                output_path=output,
-                verbose=True,
-                spacer="",
-            )
-        else:
-            new_df, failed = main(
-                assembly=args.assembly,
-                column=column,
-                ncbi_column=ncbi_column,
-                proteome=args.proteome,
-                gff3=args.gff3,
-                transcript=args.transcript,
-                ncbi_df=ncbi_df,
-                output_path=output,
-                verbose=True,
-                spacer="",
-            )
+        new_df, failed = main(
+            assembly=args.assembly,
+            column=column,
+            ncbi_column=ncbi_column,
+            proteome=args.proteome,
+            gff3=args.gff3,
+            transcript=args.transcript,
+            ncbi_df=ncbi_df,
+            output_path=output,
+            verbose=True,
+            spacer="",
+            chunk=args.chunk,
+        )
         new_df = new_df.rename(columns={"index": "#assembly_accession"})
         new_df["source"] = "ncbi"
         new_df["useRestriction (yes/no)"] = "no"

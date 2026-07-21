@@ -436,7 +436,7 @@ def cli():
     parser.add_argument(
         "-l",
         "--login",
-        help=r'Login file: "<JGI username>\t<JGI Password>\n<NCBI email>\t<NCBI API key>"',
+        help=r'Login file: "<JGI username>\t<JGI Password>\n<NCBI API key>"',
     )
     parser.add_argument("-d", "--database", help="Existing myctools `.db` to reference")
     parser.add_argument(
@@ -508,9 +508,12 @@ def cli():
             prep = raw.read()
         data = [x.split("\t") for x in prep.split("\n")]
         apikey = None
-        if len(data[1]) > 1:
-            if data[1][1] != "":
-                apikey = data[1][1]
+        if len(data) > 1 and data[1]:
+            # NCBI API key is the last field of the second line; a legacy
+            # leading NCBI email column (now unused) is tolerated
+            api_field = data[1][-1]
+            if api_field != "":
+                apikey = api_field
 
     ref_db = db2df(format_path(args.database))
     jgi_df = main(args.mycocosm, refdb, output)

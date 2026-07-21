@@ -831,7 +831,6 @@ def ref_update(
     jgi_email,
     jgi_pwd,
     config,
-    ncbi_email,
     ncbi_api,
     cpus=1,
     check_MD5=True,
@@ -840,7 +839,7 @@ def ref_update(
     kingdom="Fungi",
     remove=True,
     taxonomy=True,
-    ncbi_fallback=False,
+    chunk=100,
 ):
     """Initialize/Update the primary MTDB based on a reference database
     acquired external from any existing primary MTDB"""
@@ -909,35 +908,19 @@ def ref_update(
     logger.info("Assimilating NCBI")
     if not Path(update_path + date + ".ncbi.predb").is_file():
         logger.info("Downloading NCBI data")
-        if ncbi_fallback:
-            from mycotools.ncbi_dwnld_fallback import main as ncbi_dwnld_fallback
-
-            ncbi_predb, ncbi_failed1 = ncbi_dwnld_fallback(
-                assembly=True,
-                proteome=False,
-                gff3=True,
-                ncbi_df=ncbi_df,
-                remove=True,
-                output_path=update_path,
-                column="assembly_acc",
-                ncbi_column="genome",
-                check_MD5=check_MD5,
-                verbose=True,
-            )
-
-        else:
-            ncbi_predb, ncbi_failed1 = ncbiDwnld(
-                assembly=True,
-                proteome=False,
-                gff3=True,
-                ncbi_df=ncbi_df,
-                remove=True,
-                output_path=update_path,
-                column="assembly_acc",
-                ncbi_column="genome",
-                check_MD5=check_MD5,
-                verbose=True,
-            )
+        ncbi_predb, ncbi_failed1 = ncbiDwnld(
+            assembly=True,
+            proteome=False,
+            gff3=True,
+            ncbi_df=ncbi_df,
+            remove=True,
+            output_path=update_path,
+            column="assembly_acc",
+            ncbi_column="genome",
+            check_MD5=check_MD5,
+            verbose=True,
+            chunk=chunk,
+        )
 
         for failure in ncbi_failed1:
             add_failed(
@@ -1085,7 +1068,6 @@ def taxonomy_update(
     update_path,
     date,
     config,
-    ncbi_email,
     ncbi_api,
     rank="kingdom",
     group="fungi",
@@ -1118,7 +1100,6 @@ def rogue_update(
     jgi_email,
     jgi_pwd,
     config,
-    ncbi_email,
     ncbi_api,
     cpus=1,
     check_MD5=True,
@@ -1127,7 +1108,7 @@ def rogue_update(
     kingdom="Fungi",
     remove=True,
     lineage_constraints={},
-    ncbi_fallback=False,
+    chunk=100,
 ):
     """Initialize/update a standalone primary MTDB"""
     # NEED to mark none for new databases' refdb
@@ -1317,7 +1298,7 @@ def rogue_update(
             rerun=rerun,
             duplicates=duplicates,
             check_MD5=check_MD5,
-            fallback=ncbi_fallback,
+            chunk=chunk,
         )
 
         for failure in ncbi_failed1:
@@ -1633,10 +1614,9 @@ def control_flow(
     resume,
     no_md5,
     cpu,
-    ncbi_email=False,
     ncbi_api=None,
     overwrite=True,
-    fallback=False,
+    chunk=100,
 ):
 
     abbr2king = {
@@ -1757,9 +1737,8 @@ def control_flow(
     else:
         date = str(resume)
 
-    if not ncbi_email:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check()
-    Entrez.email = ncbi_email
+    if not ncbi_api:
+        ncbi_api, jgi_email, jgi_pwd = login_check()
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
@@ -1944,7 +1923,6 @@ def control_flow(
             update_path,
             date,
             config,
-            ncbi_email,
             ncbi_api,
             rank=rank,
             group=king,
@@ -1966,7 +1944,6 @@ def control_flow(
             jgi_email,
             jgi_pwd,
             config,
-            ncbi_email,
             ncbi_api,
             cpus=cpu,
             check_MD5=not bool(no_md5),
@@ -1975,7 +1952,7 @@ def control_flow(
             kingdom=king,
             remove=not save,
             taxonomy=True,
-            ncbi_fallback=fallback,
+            chunk=chunk,
         )
     else:
         new_mtdb, update_mtdb = rogue_update(
@@ -1986,7 +1963,6 @@ def control_flow(
             jgi_email,
             jgi_pwd,
             config,
-            ncbi_email,
             ncbi_api,
             cpus=cpu,
             check_MD5=not bool(no_md5),
@@ -1995,7 +1971,7 @@ def control_flow(
             kingdom=king,
             remove=not save,
             lineage_constraints=config["lineage_constraints"],
-            ncbi_fallback=fallback,
+            chunk=chunk,
         )
 
     if not update_mtdb:
@@ -2130,10 +2106,10 @@ def main():
         help="Skip NCBI MD5" + " (expedite large reruns)",
     )
     run_args.add_argument(
-        "--fallback",
-        action="store_false",
-        default=True,
-        help="[ALPHA] use NCBI datasets utility for downloading NCBI data",
+        "--chunk",
+        type=int,
+        default=100,
+        help="Accessions to download per datasets call; DEFAULT: 100",
     )
     run_args.add_argument("-c", "--cpu", type=int, default=1)
     args = parser.parse_args()
@@ -2149,6 +2125,7 @@ def main():
         "Retry failed": args.failed,
         "Retry forbidden": args.forbidden,
         "Save raw data": args.save,
+        "Chunk": args.chunk,
     }
 
     find_execs(["datasets"], exit={"datasets"})
@@ -2172,9 +2149,8 @@ def main():
         args.resume,
         args.no_md5,
         args.cpu,
-        ncbi_email=None,
         overwrite=not args.keep,
-        fallback=args.fallback,
+        chunk=args.chunk,
     )
 
     outro(start_time)

@@ -975,7 +975,7 @@ def cli():
         dmnd_dir = format_path(args.output)
         output = dmnd_dir + re.sub(r"\.[^\.]+$", "", Path(fa_path).name)
     else:
-        dmnd_dir = mk_output(str(Path.cwd()) + "/", "fa2clus")
+        dmnd_dir = mk_output(str(Path.cwd()) + "/", "cluster_fasta")
         output = dmnd_dir + re.sub(r"\.[^\.]+$", "", Path(fa_path).name)
 
     cluster, tree, overshot, log_dict = main(

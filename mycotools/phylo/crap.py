@@ -509,7 +509,7 @@ def make_output(base_dir, new_log):
         #           eprint('\nERROR: base output directory missing: ' + base_dir, flush = True)
         #          sys.exit(2)
         curdate = datetime.datetime.now().strftime("%Y%m%d")
-        output_dir = str(Path.cwd()) + "/crap_" + curdate + "/"
+        output_dir = str(Path.cwd()) + "/phylo_crap_" + curdate + "/"
         if not Path(output_dir).is_dir():
             Path(output_dir).mkdir()
     else:

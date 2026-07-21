@@ -58,7 +58,7 @@ def acq_forbid_omes(file_path):
 
 
 def prep_output(base_dir):
-    out_dir = mk_output(base_dir, "predb2mtdb")
+    out_dir = mk_output(base_dir, "predb")
     wrk_dir = out_dir + "working/"
     dirs = [out_dir, wrk_dir, wrk_dir + "gff3/", wrk_dir + "fna/", wrk_dir + "faa/"]
     for dir_ in dirs:
@@ -776,8 +776,8 @@ def cli():
     #    from mycotools.lib.dbtools import gather_taxonomy, assimilate_tax
     #    tax_dicts = gather_taxonomy(omedb, api_key = ncbi_api)
     #   outdb, genus_dicts = assimilate_tax(omedb, tax_dicts)
-    #  outdb.df2db(out_dir + 'predb2mtdb.mtdb')
-    omedb.df2db(out_dir + "predb2mtdb.mtdb")
+    #  outdb.df2db(out_dir + 'predb.mtdb')
+    omedb.df2db(out_dir + "predb.mtdb")
     sys.exit(0)
 
 

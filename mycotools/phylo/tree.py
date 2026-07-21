@@ -452,7 +452,7 @@ def prep_fasta_path_input(fasta_path, output_dir):
     # start from a directory of fastas
     elif Path(fasta_path).is_dir():
         if not output_dir:
-            out_dir = mk_output(output_dir_prep, "fa2tree")
+            out_dir = mk_output(output_dir_prep, "phylo_tree")
         else:
             if not Path(output_dir).is_dir():
                 Path(output_dir).mkdir()
@@ -482,7 +482,7 @@ def prep_fasta_path_input(fasta_path, output_dir):
 
 def prep_fasta_list_input(fastas, output_dir):
     if not output_dir:
-        out_dir = mk_output("./", "fa2tree")
+        out_dir = mk_output("./", "phylo_tree")
     else:
         if not Path(output_dir).is_dir():
             Path(output_dir).mkdir()

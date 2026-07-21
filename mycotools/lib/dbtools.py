@@ -526,17 +526,16 @@ class mtdb(dict):
 
 def get_login(ncbi, jgi):
 
-    ncbi_email, ncbi_api, jgi_email, jgi_pwd = None, None, None, None
+    ncbi_api, jgi_email, jgi_pwd = None, None, None
     print(flush=True)
     if ncbi:
-        ncbi_email = input("NCBI email: ")
         ncbi_api = getpass.getpass(prompt="NCBI api key (blank if none): ")
     if jgi:
         jgi_email = input("JGI email: ")
         jgi_pwd = getpass.getpass(prompt="JGI password (required): ")
     print(flush=True)
 
-    return ncbi_email, ncbi_api, jgi_email, jgi_pwd
+    return ncbi_api, jgi_email, jgi_pwd
 
 
 # Path to the UNENCRYPTED credential store (see store_login). Kept separate from
@@ -545,7 +544,6 @@ PLAIN_LOGIN_PATH = "~/.mycotools/mtdb_credentials.json"
 
 
 def store_login(
-    ncbi_email,
     ncbi_api,
     jgi_email,
     jgi_pwd,
@@ -562,7 +560,6 @@ def store_login(
     info_path = format_path(info_path)
     Path(info_path).parent.mkdir(parents=True, exist_ok=True)
     data = {
-        "ncbi_email": ncbi_email or "",
         "ncbi_api": ncbi_api or "",
         "jgi_email": jgi_email or "",
         "jgi_pwd": jgi_pwd or "",
@@ -587,12 +584,11 @@ def store_login(
 
 
 def read_plain_login(info_path=PLAIN_LOGIN_PATH):
-    """Return (ncbi_email, ncbi_api, jgi_email, jgi_pwd) from the unencrypted
-    store written by `store_login`. Missing fields come back as empty strings."""
+    """Return (ncbi_api, jgi_email, jgi_pwd) from the unencrypted store written
+    by `store_login`. Missing fields come back as empty strings."""
     with open(format_path(info_path), "r") as raw:
         data = json.load(raw)
     return (
-        data.get("ncbi_email", ""),
         data.get("ncbi_api", ""),
         data.get("jgi_email", ""),
         data.get("jgi_pwd", ""),
@@ -600,7 +596,6 @@ def read_plain_login(info_path=PLAIN_LOGIN_PATH):
 
 
 def encrypt_pw(
-    ncbi_email,
     ncbi_api,
     jgi_email,
     jgi_pwd,
@@ -627,7 +622,7 @@ def encrypt_pw(
 
     key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode("utf-8")))
     fernet = Fernet(key)
-    out_data = ncbi_email + "\t" + ncbi_api + "\t" + jgi_email + "\t" + jgi_pwd
+    out_data = ncbi_api + "\t" + jgi_email + "\t" + jgi_pwd
     encrypt_data = fernet.encrypt(out_data.encode("utf-8"))
     with open(format_path(info_path), "wb") as out:
         out.write(encrypt_data)
@@ -667,22 +662,24 @@ def login_check(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=
         with open(format_path(info_path), "rb") as raw_file:
             data = raw_file.read()
         decrypted = fernet.decrypt(data)
-        data = decrypted.decode("UTF-8").split()
-        if len(data) != 4:
+        data = decrypted.decode("UTF-8").split("\t")
+        # legacy key files stored a leading NCBI email; drop it if present
+        if len(data) == 4:
+            data = data[1:]
+        if len(data) != 3:
             logger.error("BAD PASSWORD FILE. Delete ~/.mycotools/mtdb_key to reset.")
             sys.exit(8)
-        ncbi_email = data[0].rstrip()
-        ncbi_api = data[1].rstrip()
-        jgi_email = data[2].rstrip()
-        jgi_pwd = data[3].rstrip()
-        return ncbi_email, ncbi_api, jgi_email, jgi_pwd
+        ncbi_api = data[0].rstrip()
+        jgi_email = data[1].rstrip()
+        jgi_pwd = data[2].rstrip()
+        return ncbi_api, jgi_email, jgi_pwd
     elif Path(format_path(PLAIN_LOGIN_PATH)).is_file():
         # unencrypted store written by store_login - no password required
         return read_plain_login(PLAIN_LOGIN_PATH)
     else:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = get_login(ncbi, jgi)
+        ncbi_api, jgi_email, jgi_pwd = get_login(ncbi, jgi)
         # CURRENTLY THE REST DOESNT WORK, SO SKIP FOR NOW
-        return ncbi_email, ncbi_api, jgi_email, jgi_pwd
+        return ncbi_api, jgi_email, jgi_pwd
 
 
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit`
@@ -847,7 +844,7 @@ def df2db(df, db_path, header=False, overwrite=False, std_col=True, rescue=True)
 
 
 def hit2taxonomy(
-    taxid, rank="kingdom", lineage="fungi", skip=False, email=None, api=None
+    taxid, rank="kingdom", lineage="fungi", skip=False, api=None
 ):
     """
     Takes a searchTerm string, queries NCBI via Entrez, obtains TaxIDs,
@@ -896,7 +893,6 @@ def hit2taxonomy(
                 for line in tax_handle:
                     logger.debug(line)
                 time.sleep(30)
-                Entrez.email = email
                 Entrez.api_key = api
             sleep = True
 

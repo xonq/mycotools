@@ -1490,13 +1490,13 @@ def cli():
 
     if not args.output:
         base = str(Path.cwd()) + "/"
-        output = mk_output(base, "db2search")
+        output = mk_output(base, "homology_db")
     else:
         base = format_path(args.output, force_dir=True)
         output = base
         if not Path(output).is_dir():
             Path(output).mkdir()
-    #            output = mk_output(base, 'db2search')
+    #            output = mk_output(base, 'homology_db')
 
     if args.cpu and args.cpu < mp.cpu_count():
         cpu = args.cpu

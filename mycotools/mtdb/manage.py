@@ -135,11 +135,11 @@ def cli():
         logger.error("--password and --store are mutually exclusive")
         sys.exit(1)
     if args.password:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check()
-        encrypt_pw(ncbi_email, ncbi_api, jgi_email, jgi_pwd)
+        ncbi_api, jgi_email, jgi_pwd = login_check()
+        encrypt_pw(ncbi_api, jgi_email, jgi_pwd)
     if args.store:
-        ncbi_email, ncbi_api, jgi_email, jgi_pwd = get_login(ncbi=True, jgi=True)
-        store_login(ncbi_email, ncbi_api, jgi_email, jgi_pwd)
+        ncbi_api, jgi_email, jgi_pwd = get_login(ncbi=True, jgi=True)
+        store_login(ncbi_api, jgi_email, jgi_pwd)
     if args.restrict:
         restrict_path = format_path(args.restrict)
         with open(restrict_path, "r") as raw:

@@ -508,7 +508,7 @@ def cli():
             Path(out_dir).mkdir()
             out_dir += "/"
     else:
-        out_dir = mk_output(args.out_dir, "db2hgs")
+        out_dir = mk_output(args.out_dir, "cluster_db")
 
     execs = ["mmseqs"]
     if args.hmm:

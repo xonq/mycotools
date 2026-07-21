@@ -197,7 +197,7 @@ def cli():
         out_dir = args.output
     else:
         date = datetime.datetime.today().strftime("%Y%m%d")
-        out_dir = str(Path.cwd()) + "/" + date + "_fa2hmm2fa/"
+        out_dir = str(Path.cwd()) + "/homology_fasta_" + date + "/"
     if not Path(out_dir).is_dir():
         Path(out_dir).mkdir()
     out_dir = format_path(out_dir)

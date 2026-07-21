@@ -1212,7 +1212,7 @@ def cli():
     ):
         logger.error("You must choose at least one download option.")
 
-    ncbi_email, ncbi_api, user, pwd = login_check(ncbi=False)
+    ncbi_api, user, pwd = login_check(ncbi=False)
 
     args_dict = {
         "JGI Table": args.input,
