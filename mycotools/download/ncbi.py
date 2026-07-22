@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import json
+import math
 import time
 import shutil
 import urllib
@@ -373,13 +374,85 @@ def compile_organism_names(unzip_path, spacer="\t"):
     return acc2org, acc2meta, failed
 
 
+def resolve_paired_accs(
+    accs, acc_file, output_path, api=None, spacer="\t\t", summary_chunk=500
+):
+    """Map accessions onto their counterpart in the other NCBI repository.
+
+    GenBank and RefSeq version their assemblies independently, so the
+    counterpart of GCA_017499595.2 is GCF_017499595.1 -- swapping the prefix
+    and keeping the version names GCF_017499595.2, which does not exist. NCBI
+    reports the pair it actually holds, and reports none for an assembly that
+    was never mirrored, so an accession missing from the result has nothing to
+    reattempt rather than a counterpart that failed.
+
+    These are metadata records rather than genomes, so the chunk is sized well
+    above the genome chunk for the same reason the data reports are. A chunk
+    that cannot be resolved is skipped rather than fatal: the accessions in it
+    simply keep their existing failure, which is the outcome without a
+    counterpart anyway."""
+
+    acc2pair = {}
+    accs = [str(x) for x in accs]
+    for i in range(0, len(accs), summary_chunk):
+        batch = accs[i : i + summary_chunk]
+        with open(acc_file, "w") as out:
+            out.write("\n".join(batch))
+        cmd = [
+            "datasets",
+            "summary",
+            "genome",
+            "accession",
+            "--inputfile",
+            acc_file,
+            "--as-json-lines",
+        ]
+        api_key = clean_api_key(api)
+        if api_key:
+            cmd += ["--api-key", api_key]
+
+        cwd = str(Path.cwd())
+        os.chdir(output_path)
+        try:
+            proc = subprocess.run(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+        # an absent datasets is the caller's problem to report, not a reason to
+        # end a run that has already downloaded everything it could
+        except FileNotFoundError:
+            logger.debug(f"{spacer}\tdatasets is unavailable to resolve pairs")
+            os.chdir(cwd)
+            return acc2pair
+        os.chdir(cwd)
+        if proc.returncode:
+            logger.debug(
+                f"{spacer}\tcould not resolve paired accessions: "
+                + f"{proc.stderr.rstrip()}"
+            )
+            continue
+
+        for line in proc.stdout.split("\n"):
+            if not line.strip():
+                continue
+            try:
+                report = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if report.get("accession") and report.get("paired_accession"):
+                acc2pair[report["accession"]] = report["paired_accession"]
+
+    return acc2pair
+
+
 def parse_datasets(datasets_path, unzip_base, req_files, spacer="\t"):
     """Unzip, identify complete downloads, parse file outputs and metadata,
     report missing data to check alternative repository"""
     try:
         with zipfile.ZipFile(datasets_path, "r") as zip_ref:
             zip_ref.extractall(unzip_base)
-    except zipfile.BadZipFile:
+    # a dropped transfer leaves a truncated archive, and a call that died before
+    # it opened the file leaves none at all; both are the same failure here
+    except (zipfile.BadZipFile, FileNotFoundError):
         return False, False, False
     Path(datasets_path).unlink()
     unzip_path = unzip_base + "ncbi_dataset/"
@@ -425,39 +498,109 @@ def download_datasets(
     api=None,
     verbose=False,
     spacer="\t\t",
+    max_attempts=3,
+    min_accs=10,
+    max_dead=None,
 ):
     """Write a chunk of accessions to acc_file, download them via NCBI datasets,
-    and parse the output, retrying up to three times. Returns acc2files, acc2org,
-    failed (each False if all attempts fail)."""
-    with open(acc_file, "w") as out:
-        out.write("\n".join([str(x) for x in accs]))
+    and parse the output. Returns acc2files, acc2org, failed (each False only if
+    nothing in `accs` could be retrieved).
 
-    count = 0
-    while count < 3:
-        if not count:
-            logger.debug(f"{spacer}Downloading data")
-            count += 1
-        else:
-            count += 1
-            logger.debug(f"{spacer}\tAttempt {count}")
+    NCBI drops these transfers mid-stream, and the larger the archive the likelier
+    it is to be dropped -- so a batch that fails every attempt is halved and its
+    halves are downloaded separately rather than retried whole. Retrying whole
+    restarts a multi-GB transfer from zero at the size that was already failing
+    and loses the entire batch when it fails again; halving both shrinks the
+    transfer and keeps whatever the other half retrieved.
 
-        run_datasets(
-            include,
-            acc_file,
-            output_path,
-            api=api,
-            verbose=verbose,
-            annotated=annotated,
-        )
+    Splitting is abandoned once `max_dead` batches have come back with nothing
+    and nothing at all has been retrieved, because a repository serving nothing
+    at any size is down rather than overloaded and halving it only multiplies the
+    calls made against it. The default tolerance is the depth of the split tree:
+    halving descends the first half before trying its sibling, so the first batch
+    that can succeed may be that many failures away."""
+    zip_path = output_path + "ncbi_dataset.zip"
+    if max_dead is None:
+        max_dead = 2 + math.ceil(math.log2(max(len(accs) / max(min_accs, 1), 1)))
 
-        # Parse download output, add to df
-        acc2files, acc2org, failed = parse_datasets(
-            output_path + "ncbi_dataset.zip", output_path, req_files, spacer
-        )
-        if acc2files == False and acc2org == False and failed == False:
+    def attempt_batch(batch):
+        """Download one batch, retrying a dropped transfer at the same size.
+        Returns the parsed result, or None if every attempt failed."""
+        for attempt in range(1, max_attempts + 1):
+            if attempt > 1:
+                # datasets leaves a truncated archive behind when the stream is
+                # reset, and a call that dies before reopening it would hand
+                # that same partial file back to the parser
+                Path(zip_path).unlink(missing_ok=True)
+                # a reset usually means NCBI is loaded; retrying instantly adds
+                # to the load that caused it
+                time.sleep(3 * 2 ** (attempt - 2))
+                logger.debug(f"{spacer}\tAttempt {attempt} ({len(batch)} accessions)")
+
+            with open(acc_file, "w") as out:
+                out.write("\n".join([str(x) for x in batch]))
+
+            code = run_datasets(
+                include,
+                acc_file,
+                output_path,
+                api=api,
+                verbose=verbose,
+                annotated=annotated,
+                # a failed attempt is routine now that it is retried and split,
+                # so datasets' error text is debug detail; the failures that
+                # survive the splitting are what the caller is told about
+                mute_stderr=True,
+            )
+            if code:
+                continue
+
+            parsed = parse_datasets(zip_path, output_path, req_files, spacer)
+            if parsed[0] is not False:
+                return parsed
+        Path(zip_path).unlink(missing_ok=True)
+        return None
+
+    logger.debug(f"{spacer}Downloading data")
+    acc2files, acc2org, failed = {}, {}, []
+    queue, retrieved, dead_streak = [list(accs)], False, 0
+    while queue:
+        batch = queue.pop(0)
+        parsed = attempt_batch(batch)
+        if parsed is not None:
+            retrieved = True
+            dead_streak = 0
+            acc2files.update(parsed[0])
+            acc2org.update(parsed[1])
+            failed.extend(parsed[2])
             continue
-        else:
-            break
+
+        # once anything has come back the repository is serving, and every later
+        # failure is that batch's problem rather than grounds to stop splitting
+        if not retrieved:
+            dead_streak += 1
+            if dead_streak >= max_dead:
+                logger.debug(
+                    f"{spacer}\t{dead_streak} batches returned nothing; abandoning "
+                    + f"{sum(len(b) for b in queue) + len(batch)} accessions"
+                )
+                break
+        # below this size the transfer is no longer what is failing, so the
+        # accessions are abandoned to the caller rather than split again. It
+        # derives what it never received from acc2files, so they need no
+        # accounting here
+        if len(batch) <= min_accs:
+            continue
+
+        mid = len(batch) // 2
+        logger.debug(
+            f"{spacer}\t{len(batch)} accessions failed {max_attempts} attempts; "
+            + "splitting"
+        )
+        queue[:0] = [batch[:mid], batch[mid:]]
+
+    if not retrieved:
+        return False, False, False
 
     return acc2files, acc2org, failed
 
@@ -476,7 +619,7 @@ def main(
     ncbi_column="Assembly",
     check_MD5=True,
     spacer="\t\t",
-    chunk=100,
+    chunk=25,
 ):
 
     # initialize run directory and information
@@ -497,6 +640,13 @@ def main(
     elif "version" not in ncbi_df.keys():
         ncbi_df["version"] = ""
 
+    # Uppercase before the index is taken from it, not after. The index is what
+    # downloads and failures are matched on downstream, and NCBI reports its
+    # accessions uppercase, so normalizing the column afterwards leaves a
+    # lowercase index that matches neither and drops the row out of the run
+    if "assembly_acc" in ncbi_df.keys():
+        ncbi_df["assembly_acc"] = [str(x).upper() for x in ncbi_df["assembly_acc"]]
+
     # preserve the original column, but index ncbi_df on it as well
     ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
 
@@ -516,12 +666,14 @@ def main(
         )
         column = "assembly_acc"
 
+        # collect_assembly_accs supplies the column here, so it needs the same
+        # normalization before this index is taken from it
+        ncbi_df["assembly_acc"] = [str(x).upper() for x in ncbi_df["assembly_acc"]]
         ncbi_df = ncbi_df.set_index(pd.Index(list(ncbi_df[column])))
     new_df = pd.DataFrame()
 
     ## GUARANTEE ASSEMBLY ACCESSIONS ARE LABELED THIS COLUMN NAME
     acc_file = output_path + "assembly_accs.txt"
-    ncbi_df["assembly_acc"] = list([x.upper() for x in ncbi_df["assembly_acc"]])
 
     include = ""
     req_files = set()
@@ -551,6 +703,7 @@ def main(
 
     # Run downloads chunk-by-chunk, accumulating results
     acc2files, acc2org, failed = {}, {}, []
+    dead_chunks, consecutive_dead = [], 0
     for chunk_i, acc_chunk in enumerate(acc_chunks):
         if len(acc_chunks) > 1:
             logger.debug(
@@ -568,34 +721,61 @@ def main(
             verbose=verbose,
             spacer=spacer,
         )
-        if c_acc2files == False and c_acc2org == False and c_failed == False:
-            logger.error(f"{spacer}ncbiDwnld failed 3 attempts")
-            sys.exit(10)
+        if c_acc2files is False:
+            # one chunk NCBI will not serve is not worth discarding the chunks
+            # that succeeded; its accessions fall out of the set difference below
+            # and are reported as failures. Several in a row is the repository or
+            # the connection being gone, which the remaining chunks cannot fix
+            dead_chunks.append(chunk_i + 1)
+            consecutive_dead += 1
+            if consecutive_dead >= 3:
+                logger.error(
+                    f"{spacer}ncbiDwnld failed {consecutive_dead} consecutive chunks"
+                )
+                sys.exit(10)
+            logger.warning(
+                f"{spacer}chunk {chunk_i + 1}/{len(acc_chunks)} failed; continuing"
+            )
+            continue
+        consecutive_dead = 0
         acc2files.update(c_acc2files)
         acc2org.update(c_acc2org)
         failed.extend(c_failed)
+
+    if dead_chunks:
+        logger.warning(
+            f"{spacer}{len(dead_chunks)}/{len(acc_chunks)} chunk(s) failed to "
+            + "download; their accessions are reported as failures"
+        )
+        logger.debug(f"{spacer}failed chunks: {dead_chunks}")
 
     failed.extend(
         sorted(set(ncbi_df["assembly_acc"]).difference(set(acc2files.keys())))
     )
 
-    # Attempt RefSeq accessions
+    # Attempt the counterpart repository for whatever this one did not serve
+    acc2pair = {}
     if failed:
         logger.debug(f"{spacer}Attempting alternative repository for failed downloads")
-        reattempt_acc = []
-        for acc in failed:
-            if acc.upper().startswith("GCA"):
-                reattempt_acc.append(acc.upper().replace("GCA_", "GCF_"))
-            elif acc.upper().startswith("GCF"):
-                reattempt_acc.append(acc.upper().replace("GCF_", "GCA_"))
         acc_file_re = output_path + "assembly_accs.reattempt.txt"
+        acc2pair = resolve_paired_accs(
+            failed, acc_file_re, output_path, api=api, spacer=spacer
+        )
+        pair2acc = {v: k for k, v in acc2pair.items()}
+        reattempt_acc = sorted(pair2acc)
+        unpaired = len(failed) - len(reattempt_acc)
+        if unpaired:
+            logger.debug(
+                f"{spacer}\t{unpaired} failed accession(s) are not mirrored in "
+                + "the alternative repository"
+            )
 
         # Chunk the reattempt accessions as well
         reattempt_chunks = [
             reattempt_acc[i : i + chunk]
             for i in range(0, len(reattempt_acc), chunk)
         ]
-        failed_r = []
+        recovered = set()
         for acc_chunk in reattempt_chunks:
             c_acc2files, c_acc2org, c_failed = download_datasets(
                 acc_chunk,
@@ -608,34 +788,36 @@ def main(
                 verbose=verbose,
                 spacer=spacer,
             )
-            if c_acc2files == False and c_acc2org == False and c_failed == False:
-                failed_r.extend(acc_chunk)
+            if c_acc2files is False:
                 continue
             acc2files = {**acc2files, **c_acc2files}
             acc2org = {**acc2org, **c_acc2org}
-            failed_r.extend(c_failed)
+            recovered.update(pair2acc[x] for x in c_acc2files if x in pair2acc)
 
-        failed = []
-        for acc in failed_r:
-            if acc.upper().startswith("GCA"):
-                failed.append(acc.upper().replace("GCA_", "GCF_"))
-            elif acc.upper().startswith("GCF"):
-                failed.append(acc.upper().replace("GCF_", "GCA_"))
+        # only what was actually retrieved leaves the failure list. A counterpart
+        # NCBI never served is absent from the archive rather than named in
+        # c_failed, so subtracting what came back is the only accounting that
+        # sees it -- rebuilding the list from c_failed instead dropped every
+        # unmirrored accession out of the run without a trace
+        failed = sorted(set(failed).difference(recovered))
 
     # Parse download output, add to df
     # Report failed
     failed_set = set(failed)
     rep_failed = []
+
+    def report_failure(acc, row):
+        try:
+            rep_failed.append([acc, datetime.strftime(row["version"], "%Y%m%d")])
+        except TypeError:
+            rep_failed.append([acc, row["version"]])
+
     for acc, row in ncbi_df.iterrows():
-        if acc.startswith("GCA_"):
-            check_acc = acc.replace("GCA_", "GCF_")
-        elif acc.startswith("GCF_"):
-            check_acc = acc.replace("GCF_", "GCA_")
+        # the counterpart NCBI actually holds, which versions independently of
+        # acc; None when the assembly is not mirrored at all
+        check_acc = acc2pair.get(acc)
         if acc in failed_set:
-            try:
-                rep_failed.append([acc, datetime.strftime(row["version"], "%Y%m%d")])
-            except TypeError:
-                rep_failed.append([acc, row["version"]])
+            report_failure(acc, row)
         elif acc in acc2files:
             try:
                 for file_t, file_p in acc2files[acc].items():
@@ -667,6 +849,13 @@ def main(
                     for tax, name in acc2org[check_acc].items():
                         row1[tax] = name
                     new_df = pd.concat([new_df, row1.to_frame().T])
+
+        else:
+            # nothing retrieved it and nothing named it a failure. Without this
+            # the accession leaves the run in neither new_df nor rep_failed,
+            # which is how an initialization silently lost 214 of 525 genomes
+            logger.debug(f"{spacer}\t{acc} was neither retrieved nor reported")
+            report_failure(acc, row)
 
     if "fna" in new_df.keys():
         new_df = new_df.rename(columns={"fna": "assemblyPath"})
@@ -791,8 +980,9 @@ def cli():
     parser.add_argument(
         "--chunk",
         type=int,
-        default=100,
-        help="Accessions to download per datasets call; DEFAULT: 100",
+        default=25,
+        help="Accessions to download per datasets call; larger chunks are "
+        + "likelier to be reset mid-transfer by NCBI; DEFAULT: 25",
     )
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))

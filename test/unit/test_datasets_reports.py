@@ -115,7 +115,7 @@ def test_chunks_mute_datasets_stderr(tmp_path, monkeypatch):
 
     monkeypatch.setattr(mod, "run_datasets", fake_run)
     mod.dwnld_data_reports(
-        [f"GCA_{i:09d}.1" for i in range(20)], str(tmp_path) + "/", chunk=10
+        [f"GCA_{i:09d}.1" for i in range(20)], str(tmp_path) + "/", report_chunk=10
     )
 
     assert seen and all(kw["mute_stderr"] is True for kw in seen)
@@ -198,7 +198,7 @@ def test_chunk_progress_is_reported(tmp_path, stub_datasets, monkeypatch):
 
     monkeypatch.setattr(mod, "tqdm", FakeTqdm)
     mod.dwnld_data_reports(
-        [f"GCA_{i:09d}.1" for i in range(30)], str(tmp_path) + "/", chunk=10
+        [f"GCA_{i:09d}.1" for i in range(30)], str(tmp_path) + "/", report_chunk=10
     )
 
     assert len(bars) == 1
@@ -212,14 +212,14 @@ def test_single_chunk_draws_no_bar(tmp_path, stub_datasets, monkeypatch):
     monkeypatch.setattr(
         mod, "tqdm", lambda iterable, **kw: bars.append(kw) or iterable
     )
-    mod.dwnld_data_reports(["GCA_000000000.1"], str(tmp_path) + "/", chunk=100)
+    mod.dwnld_data_reports(["GCA_000000000.1"], str(tmp_path) + "/", report_chunk=100)
     assert bars[0]["disable"] is True
 
 
 def test_reports_are_chunked(tmp_path, stub_datasets):
     accs = [f"GCA_{i:09d}.1" for i in range(250)]
     acc2org, acc2meta, failed = mod.dwnld_data_reports(
-        accs, str(tmp_path) + "/", chunk=100
+        accs, str(tmp_path) + "/", report_chunk=100
     )
 
     assert [len(c) for c in stub_datasets] == [100, 100, 50]
@@ -230,20 +230,59 @@ def test_reports_are_chunked(tmp_path, stub_datasets):
 def test_chunking_does_not_change_the_result(tmp_path, stub_datasets):
     """Whatever the chunk size, the merged report is the same."""
     accs = [f"GCA_{i:09d}.1" for i in range(60)]
-    whole, _, _ = mod.dwnld_data_reports(accs, str(tmp_path / "a") + "/", chunk=1000)
-    split, _, _ = mod.dwnld_data_reports(accs, str(tmp_path / "b") + "/", chunk=7)
+    whole, _, _ = mod.dwnld_data_reports(
+        accs, str(tmp_path / "a") + "/", report_chunk=1000
+    )
+    split, _, _ = mod.dwnld_data_reports(accs, str(tmp_path / "b") + "/", report_chunk=7)
     assert whole == split
+
+
+# --------------------------------------------------------------------------- #
+# reports and genomes are sized independently
+# --------------------------------------------------------------------------- #
+def test_reports_and_genomes_carry_separate_defaults():
+    """A genome chunk is multi-GB and is what NCBI resets mid-transfer; a report
+    chunk is a few hundred KB of metadata and is not. One knob for both meant
+    sizing genomes down also quadrupled the requests an initialization makes."""
+    from mycotools.download import ncbi
+
+    reports = inspect.signature(mod.dwnld_data_reports).parameters
+    genomes = inspect.signature(ncbi.download_datasets).parameters
+
+    assert reports["report_chunk"].default == 500
+    assert inspect.signature(ncbi.main).parameters["chunk"].default == 25
+    # the report path must not take the genome knob, or the two resynchronize
+    assert "chunk" not in reports
+    assert "report_chunk" not in genomes
+
+
+@pytest.mark.parametrize(
+    "func,expect",
+    [
+        ("dwnld_data_reports", {"report_chunk"}),
+        ("prep_taxa_cols", {"report_chunk"}),
+        ("clean_ncbi_df", {"report_chunk"}),
+        ("ref_update", {"chunk"}),  # genomes only; never acquires reports
+        ("rogue_update", {"chunk", "report_chunk"}),
+        ("control_flow", {"chunk", "report_chunk"}),
+    ],
+)
+def test_each_function_takes_only_the_knobs_it_uses(func, expect):
+    """The plumbing is the part that rots: a function holding the wrong knob
+    passes the wrong size down without anything failing."""
+    params = set(inspect.signature(getattr(mod, func)).parameters)
+    assert params & {"chunk", "report_chunk"} == expect
 
 
 def test_completed_chunks_are_not_redownloaded(tmp_path, stub_datasets):
     """A resumed run picks up where it stopped rather than starting over."""
     accs = [f"GCA_{i:09d}.1" for i in range(30)]
     out = str(tmp_path) + "/"
-    mod.dwnld_data_reports(accs, out, chunk=10)
+    mod.dwnld_data_reports(accs, out, report_chunk=10)
     assert len(stub_datasets) == 3
 
     stub_datasets.clear()
-    acc2org, _, _ = mod.dwnld_data_reports(accs, out, chunk=10)
+    acc2org, _, _ = mod.dwnld_data_reports(accs, out, report_chunk=10)
     assert stub_datasets == []
     assert len(acc2org) == 30
 
@@ -251,11 +290,11 @@ def test_completed_chunks_are_not_redownloaded(tmp_path, stub_datasets):
 def test_shifted_chunk_boundaries_invalidate_the_cache(tmp_path, stub_datasets):
     """A cached chunk is reused only if it covers exactly the same accessions."""
     out = str(tmp_path) + "/"
-    mod.dwnld_data_reports([f"GCA_{i:09d}.1" for i in range(20)], out, chunk=10)
+    mod.dwnld_data_reports([f"GCA_{i:09d}.1" for i in range(20)], out, report_chunk=10)
     stub_datasets.clear()
 
     grown = [f"GCA_{i:09d}.1" for i in range(20, 45)]
-    acc2org, _, _ = mod.dwnld_data_reports(grown, out, chunk=10)
+    acc2org, _, _ = mod.dwnld_data_reports(grown, out, report_chunk=10)
     assert stub_datasets  # re-acquired rather than trusting stale chunk dirs
     assert set(acc2org) == set(grown)
 
@@ -269,7 +308,7 @@ def test_retries_stay_off_the_terminal(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(mod, "run_datasets", fake_run)
     accs = [f"GCA_{i:09d}.1" for i in range(20)]
     with caplog.at_level("INFO"):
-        mod.dwnld_data_reports(accs, str(tmp_path) + "/", chunk=10)
+        mod.dwnld_data_reports(accs, str(tmp_path) + "/", report_chunk=10)
 
     assert "Reattempting" not in caplog.text
     assert "datasets failed - " not in caplog.text
@@ -293,7 +332,7 @@ def test_a_failed_chunk_does_not_discard_the_others(tmp_path, monkeypatch):
 
     monkeypatch.setattr(mod, "run_datasets", fake_run)
     accs = [f"GCA_{i:09d}.1" for i in range(30)]
-    acc2org, _, _ = mod.dwnld_data_reports(accs, str(tmp_path) + "/", chunk=10)
+    acc2org, _, _ = mod.dwnld_data_reports(accs, str(tmp_path) + "/", report_chunk=10)
 
     assert len(acc2org) == 20
     assert "GCA_000000015.1" not in acc2org

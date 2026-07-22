@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import json
+import time
 import shutil
 import zipfile
 import requests
@@ -347,44 +348,110 @@ def add_failed(code, source, version, date, file_path):
     log_editor(file_path, code, edit)
 
 
+def read_mycocosm(table_path):
+    """Parse a downloaded MycoCosm table into a dataframe, or raise ValueError
+    if the file is not that table.
+
+    Encodings are attempted strictest-first. MycoCosm does not declare one, and
+    the table carries non-ASCII characters in its publication and strain
+    fields, but single-byte codecs such as cp1252 and latin1 map nearly every
+    byte, so they do not raise on input that is not theirs -- they silently
+    decode it to mojibake. Only utf-8 rejects bytes that are not its own, so
+    leading with it is what makes the fallback capable of choosing at all."""
+
+    decode_error = None
+    for encoding in ("utf-8", "cp1252", "latin1"):
+        try:
+            jgi_df = pd.read_csv(table_path, encoding=encoding)
+        except UnicodeDecodeError as error:
+            decode_error = error
+            continue
+        except pd.errors.ParserError as error:
+            # not a decoding problem: the bytes were text, but not a table
+            raise ValueError(f"{table_path} is not parseable as CSV: {error}")
+
+        jgi_df.columns = [x.replace('"', "") for x in jgi_df.columns]
+        missing = {"name", "portal"}.difference(set(jgi_df.columns))
+        if missing:
+            raise ValueError(
+                f"{table_path} lacks the MycoCosm column(s) "
+                + f"{'/'.join(sorted(missing))}"
+            )
+        return jgi_df
+
+    raise ValueError(f"{table_path} could not be decoded: {decode_error}")
+
+
 def dwnld_mycocosm(
     out_file,
     mycocosm_url="https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/"
     + "download-group?flt=&seq=all&pub=all&grp=fungi&srt="
     + "released&ord=desc",
+    max_attempts=3,
 ):
-    """Download the MycoCosm genome data spreadsheet, format to UTF-8 and
-    return a Pandas dataframe of the data"""
+    """Download the MycoCosm genome data spreadsheet and return a Pandas
+    dataframe of the data.
+
+    The download is only accepted once it parses as the MycoCosm table. JGI
+    answers a failed request with a 404 HTML page, which curl reports as a
+    success unless it is asked not to, so an outage would otherwise be cached
+    to out_file as though it were data -- and because the presence of out_file
+    is what marks the download done, every later run would reread the error
+    page rather than retry the download."""
 
     check_curl = find_execs(["curl"], verbose=False)
 
-    if not Path(out_file).is_file():
-        for attempt in range(3):
+    if Path(out_file).is_file():
+        try:
+            return read_mycocosm(out_file)
+        except ValueError as error:
+            logger.warning(f"discarding unusable MycoCosm table: {error}")
+            Path(out_file).unlink()
+
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            time.sleep(3 * 2 ** (attempt - 2))
+        try:
             if check_curl:
-                curl_cmd = subprocess.call(
-                    ["curl", mycocosm_url, "-o", out_file + ".tmp"],
+                # --fail turns an HTTP error into a non-zero exit rather than a
+                # saved error page; --location follows the redirect JGI issues.
+                # curl's stderr is captured rather than inherited so that its
+                # 404 does not print over the run -- the exit status is what
+                # this needs, and the message is only worth a debug line
+                subprocess.run(
+                    ["curl", "--fail", "--location", "--silent", "--show-error",
+                     mycocosm_url, "-o", out_file + ".tmp"],
+                    check=True,
                     stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
                 )
-                if not curl_cmd:
-                    shutil.move(out_file + ".tmp", out_file)
-                    break
-            if curl_cmd:
-                logger.error("failed to retrieve MycoCosm table")
             else:
-                resp = requests.get(url)
+                resp = requests.get(mycocosm_url)
+                resp.raise_for_status()
                 with open(out_file + ".tmp", "wb") as f:
                     f.write(resp.content)
-                shutil.move(out_file + ".tmp", out_file)
+            jgi_df = read_mycocosm(out_file + ".tmp")
+        except (subprocess.CalledProcessError, requests.RequestException,
+                ValueError) as error:
+            # one failed attempt is not news until they have all failed, and
+            # during a JGI outage this fires every time -- reporting each 404
+            # buries the run in noise that says nothing the final message does
+            # not say once
+            logger.debug(f"MycoCosm table attempt {attempt} failed: {error}")
+            Path(out_file + ".tmp").unlink(missing_ok=True)
+            continue
+        shutil.move(out_file + ".tmp", out_file)
+        return jgi_df
 
-    try:
-        jgi_df = pd.read_csv(out_file, encoding="cp1252")
-    except UnicodeDecodeError:
-        jgi_df = pd.read_csv(out_file, encoding="latin1")
-    except UnicodeDecodeError:
-        jgi_df = pd.read_csv(out_file, encoding="utf-8")
-    jgi_df.columns = [x.replace('"', "").replace('"', "") for x in jgi_df.columns]
-
-    return jgi_df
+    # every attempt failed the same way, which is far more often JGI being down
+    # than anything wrong locally -- MycoCosm's ext-api has served nothing but
+    # its 404 page for days at a time, and it is what this URL resolves to
+    logger.error(
+        "MycoCosm may be inaccessible; no table was retrieved in "
+        + f"{max_attempts} attempts"
+    )
+    sys.exit(24)
 
 
 def dwnld_ncbi_metadata(
@@ -405,16 +472,27 @@ def dwnld_ncbi_metadata(
 
 
 def dwnld_data_reports(
-    accs, out_dir, api=None, chunk=100, max_attempts=3, exit_code=11, label="GenBank"
+    accs,
+    out_dir,
+    api=None,
+    report_chunk=1000,
+    max_attempts=3,
+    exit_code=11,
+    label="GenBank",
 ):
     """Acquire NCBI assembly data reports; return acc2org, acc2meta, failed.
 
-    `datasets` is called on `chunk` accessions at a time rather than on the
-    whole list at once. A from-scratch initialization queries >16,000
+    `datasets` is called on `report_chunk` accessions at a time rather than on
+    the whole list at once. A from-scratch initialization queries >16,000
     accessions, and one request that large is both slow enough to be dropped
     mid-transfer and all-or-nothing when it is: a single failure discards every
     record. Each chunk downloads into its own directory and is left there, so an
-    interrupted run resumes at the first chunk it had not finished."""
+    interrupted run resumes at the first chunk it had not finished.
+
+    These are dehydrated metadata records rather than genomes, so a chunk is a
+    few hundred KB and is sized well above the genome chunk: the transfer is
+    nowhere near large enough to be what NCBI resets, and a smaller size would
+    only multiply the requests a from-scratch run makes."""
     acc2org, acc2meta, failed = {}, {}, []
     empty_chunks = []
 
@@ -424,7 +502,9 @@ def dwnld_data_reports(
     if Path(legacy_dir + "data/assembly_data_report.jsonl").is_file():
         return compile_organism_names(legacy_dir)
 
-    acc_chunks = [accs[i : i + chunk] for i in range(0, len(accs), chunk)]
+    acc_chunks = [
+        accs[i : i + report_chunk] for i in range(0, len(accs), report_chunk)
+    ]
     # `datasets` draws its own per-call bar, which is meaningless here because
     # it restarts every chunk; it is silenced below in favor of one bar over the
     # whole acquisition
@@ -516,7 +596,8 @@ def dwnld_data_reports(
     if empty_chunks:
         logger.warning(
             f"{len(empty_chunks)}/{len(acc_chunks)} {label} chunk(s) returned "
-            + f"no genomes ({len(empty_chunks) * chunk} accessions at most); "
+            + f"no genomes ({len(empty_chunks) * report_chunk} accessions at "
+            + "most); "
             + "rerun with -v for the datasets output"
         )
         logger.debug(f"empty {label} chunks: {empty_chunks}")
@@ -531,7 +612,7 @@ def prep_taxa_cols(
     api=None,
     acc2org={},
     max_attempts=3,
-    chunk=100,
+    report_chunk=1000,
 ):
 
     skip_prep = list(acc2org.keys())
@@ -546,7 +627,7 @@ def prep_taxa_cols(
         gb_accs,
         taxonomy_dir,
         api=api,
-        chunk=chunk,
+        report_chunk=report_chunk,
         max_attempts=max_attempts,
         exit_code=11,
         label="GenBank",
@@ -579,7 +660,7 @@ def prep_taxa_cols(
         reattempt_acc,
         refseq_dir,
         api=api,
-        chunk=chunk,
+        report_chunk=report_chunk,
         max_attempts=max_attempts,
         exit_code=10,
         label="RefSeq",
@@ -638,7 +719,8 @@ def prep_jgi_cols(jgi_df, name_col="name"):
 
 
 def clean_ncbi_df(
-    ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=3, chunk=100
+    ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=3,
+    report_chunk=1000
 ):
     ncbi_df = ncbi_df.astype(str).replace(np.nan, "")
 
@@ -668,7 +750,11 @@ def clean_ncbi_df(
 
     ncbi_df = ncbi_df[ncbi_df["assembly_acc"].str.startswith(("GCA", "GCF"))]
     ncbi_df, acc2meta, acc2org = prep_taxa_cols(
-        ncbi_df, update_path + "taxonomy/", api=api, acc2org=acc2org, chunk=chunk
+        ncbi_df,
+        update_path + "taxonomy/",
+        api=api,
+        acc2org=acc2org,
+        report_chunk=report_chunk,
     )
 
     with atomic_write(acc2org_path) as out:
@@ -940,7 +1026,7 @@ def ref_update(
     kingdom="Fungi",
     remove=True,
     taxonomy=True,
-    chunk=100,
+    chunk=25,
     tape_wait=None,
 ):
     """Initialize/Update the primary MTDB based on a reference database
@@ -1232,7 +1318,8 @@ def rogue_update(
     kingdom="Fungi",
     remove=True,
     lineage_constraints={},
-    chunk=100,
+    chunk=25,
+    report_chunk=1000,
     tape_wait=None,
 ):
     """Initialize/update a standalone primary MTDB"""
@@ -1258,7 +1345,11 @@ def rogue_update(
     pre_ncbi_df1 = pre_ncbi_df0.rename(columns={"Assembly Accession": "assembly_acc"})
     logger.info("Acquiring NCBI metadata")
     ncbi_df, acc2meta = clean_ncbi_df(
-        pre_ncbi_df1, update_path, kingdom=kingdom, api=ncbi_api, chunk=chunk
+        pre_ncbi_df1,
+        update_path,
+        kingdom=kingdom,
+        api=ncbi_api,
+        report_chunk=report_chunk,
     )
 
     # begin extracting lineages of interest and store tax_dicts for later
@@ -1748,7 +1839,8 @@ def control_flow(
     cpu,
     ncbi_api=None,
     overwrite=True,
-    chunk=100,
+    chunk=25,
+    report_chunk=1000,
     tape_wait=None,
 ):
 
@@ -2098,6 +2190,7 @@ def control_flow(
             remove=not save,
             lineage_constraints=config["lineage_constraints"],
             chunk=chunk,
+            report_chunk=report_chunk,
             tape_wait=tape_wait,
         )
 
@@ -2226,8 +2319,16 @@ def main():
     run_args.add_argument(
         "--chunk",
         type=int,
-        default=100,
-        help="Accessions to download per datasets call; DEFAULT: 100",
+        default=25,
+        help="Genomes to download per datasets call; larger chunks are "
+        + "likelier to be reset mid-transfer by NCBI; DEFAULT: 25",
+    )
+    run_args.add_argument(
+        "--report_chunk",
+        type=int,
+        default=10000,
+        help="Metadata reports to acquire per datasets call; these are far "
+        + "smaller than genomes, so this is sized above --chunk; DEFAULT: 500",
     )
     run_args.add_argument(
         "--tape_wait",
@@ -2250,7 +2351,8 @@ def main():
         "Retry failed": args.failed,
         "Retry forbidden": args.forbidden,
         "Save raw data": args.save,
-        "Chunk": args.chunk,
+        "Genome chunk": args.chunk,
+        "Report chunk": args.report_chunk,
         "Max tape wait": (
             "indefinite" if args.tape_wait is None else f"{args.tape_wait} minute(s)"
         ),
@@ -2279,6 +2381,7 @@ def main():
         args.cpu,
         overwrite=not args.keep,
         chunk=args.chunk,
+        report_chunk=args.report_chunk,
         tape_wait=args.tape_wait,
     )
 

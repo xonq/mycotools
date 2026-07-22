@@ -120,7 +120,7 @@ def main(
     duplicates={},
     check_MD5=True,
     spacer="\t\t",
-    chunk=100,
+    chunk=25,
 ):
 
     os.chdir(out_dir)
