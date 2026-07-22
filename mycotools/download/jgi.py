@@ -20,6 +20,11 @@ GFF3 hierarchy selects the *filtered* gene models only - JGI ``jat_label``
 ``genes_filtered`` (i.e. the GeneCatalog / FilteredModels ``.gff``) - never the
 unfiltered ``genes_all`` models, exactly as the XML parser did.
 
+The ``get-directory`` helpers below (``jgi_login``, ``dwnld_xml``,
+``retrieve_xml``, ``parse_xml``, ``jgi_dwnld``) are RETIRED and no longer called:
+genome.jgi.doe.gov now answers that endpoint with a 302 to the API docs, so they
+can only fail. Do not wire them back into a download path.
+
 PLEASE respect JGI's rate limits.
 """
 
@@ -864,7 +869,8 @@ def poll_restore(
     session, status_url, timeout=60, interval=30, spacer="\t", label="", heartbeat=60
 ):
     """Poll a tape-restore request until its files are READY (returns True) or
-    the timeout / expiry is reached (returns False).
+    the timeout / expiry is reached (returns False). A `timeout` of None polls
+    until the restore resolves one way or the other, however long that takes.
 
     Progress is logged so the user can see the tape->disk transfer advance:
     every status transition (queued -> retrieving -> staging -> ready) is
@@ -875,7 +881,7 @@ def poll_restore(
     waited = 0
     last_status = None
     last_heartbeat = 0
-    while waited <= timeout:
+    while timeout is None or waited <= timeout:
         status = ""
         try:
             resp = session.get(
@@ -977,6 +983,226 @@ def extract_zip(zip_path, wanted, spacer="\t"):
     return extracted
 
 
+def _dwnld_org(
+    session, token, ids_payload, portal_id, selected, output, tmp_dir, spacer
+):
+    """Download one organism's `selected` {type: file record} as a single zip and
+    extract it into `output/<type>/`. Returns {type: destination path} for the
+    files actually obtained (empty when the download itself failed)."""
+    dest_zip = os.path.join(tmp_dir, f"{portal_id}.zip")
+    if not download_zip(session, token, ids_payload, dest_zip, spacer=spacer):
+        logger.warning(f"{spacer}\t{portal_id}: download failed")
+        return {}
+
+    wanted, type_dest = {}, {}
+    for typ, f in selected.items():
+        name = f["file_name"]
+        dest = os.path.join(output, typ, name)
+        wanted[name] = dest
+        type_dest[typ] = (name, dest)
+    extracted = extract_zip(dest_zip, wanted, spacer=spacer)
+    if Path(dest_zip).is_file():
+        Path(dest_zip).unlink()
+
+    obtained = {}
+    for typ, (name, dest) in type_dest.items():
+        if name in extracted and Path(dest).is_file():
+            obtained[typ] = dest
+            logger.info(f"{spacer}\t{portal_id} {typ}: {name}")
+        else:
+            logger.warning(f"{spacer}\t{portal_id}: {typ} missing from archive")
+    return obtained
+
+
+def _flush_restores(session, token, buffer, spacer="\t"):
+    """Request restores for a batch of organisms in one call - the
+    request_archived_files ``ids`` payload is keyed by organism, so many
+    organisms ride on a single request - and stamp each with the time its
+    restore was asked for, which starts its wait clock."""
+    if not buffer:
+        return
+    ids_payload = {}
+    for entry in buffer:
+        ids_payload.update(entry["ids"])
+    request_restore(session, token, ids_payload, spacer=spacer)
+    requested_at = time.time()
+    for entry in buffer:
+        entry["requested_at"] = requested_at
+        entry["last_request"] = requested_at
+    logger.info(
+        f"{spacer}\trequested tape restores for {len(buffer)} organism(s): "
+        + ", ".join(e["portal_id"] for e in buffer[:5])
+        + (", ..." if len(buffer) > 5 else "")
+    )
+    buffer.clear()
+
+
+# a restore request JGI drops or lets expire would otherwise strand an
+# indefinite wait forever, so a still-pending organism is re-requested this
+# often (seconds)
+_REREQUEST_RESTORE = 6 * 3600
+
+
+def _fmt_wait(minutes):
+    """Human-friendly rendering of a wait allowance given in minutes; None is an
+    unbounded wait."""
+    if minutes is None:
+        return "as long as it takes"
+    minutes = int(minutes)
+    if minutes < 60:
+        return f"{minutes}m"
+    if minutes % 60:
+        return f"{minutes // 60}h{minutes % 60:02d}m"
+    return f"{minutes // 60}h"
+
+
+def circle_back(
+    session,
+    token,
+    pending,
+    df,
+    output,
+    tmp_dir,
+    dwnlds,
+    ome_set,
+    deferred,
+    masked=True,
+    restore_wait=None,
+    poll_interval=60,
+    spacer="\t",
+):
+    """Revisit organisms whose files were left on tape during the main pass,
+    downloading each as JGI stages it to disk.
+
+    Availability is re-read from ``mycocosm_file_list`` per organism - that is
+    the authoritative signal. The restore request's own status URL lags behind
+    the files it restored (it still reports `pending` once they are RESTORED),
+    and the generic ``/search/?datasets=`` endpoint, though it accepts many
+    organisms at once, silently omits some MycoCosm portals; neither can be
+    trusted here.
+
+    One sweep of the pending organisms is made per `poll_interval` seconds. An
+    organism is downloaded as soon as every file it still needs is RESTORED.
+    `restore_wait` is how many minutes any one organism is waited on before it
+    is given up on - deferred, not failed; None (the default) waits for as long
+    as JGI takes, re-requesting a restore that has gone stale."""
+    wait_seconds = None if restore_wait is None else max(0, restore_wait * 60)
+    logger.info(
+        f"{spacer}{len(pending)} genome(s) awaiting tape restore; checking every "
+        f"{poll_interval}s, waiting {_fmt_wait(restore_wait)} per genome"
+    )
+    started = time.time()
+    while pending:
+        sweep_start = time.time()
+        for portal_id in list(pending):
+            entry = pending[portal_id]
+            requested_at = entry.get("requested_at") or sweep_start
+            waited = time.time() - requested_at
+
+            # a dropped or expired restore request would strand an unbounded
+            # wait, so reissue one that has been outstanding too long
+            if time.time() - (entry.get("last_request") or requested_at) >= (
+                _REREQUEST_RESTORE
+            ):
+                logger.info(
+                    f"{spacer}\t{portal_id}: still on tape after "
+                    f"{_fmt_elapsed(waited)}; re-requesting its restore"
+                )
+                request_restore(session, token, entry["ids"], spacer=spacer)
+                entry["last_request"] = time.time()
+
+            org, files = search_organism(session, portal_id, spacer=spacer)
+            still_needed = {}
+            if org:
+                for typ in entry["typs"]:
+                    chosen = select_file(files, typ, masked=masked)
+                    if chosen is not None:
+                        still_needed[typ] = chosen
+                if not still_needed:
+                    # JGI publishes none of these files any more - a permanent
+                    # condition, so do not spend the wait allowance on it
+                    logger.warning(
+                        f"{spacer}\t{portal_id}: JGI no longer lists the requested "
+                        "file(s)"
+                    )
+                    _finish_org(
+                        df,
+                        entry["i"],
+                        portal_id,
+                        dwnlds,
+                        entry["dwnlded"],
+                        ome_set,
+                        spacer,
+                    )
+                    del pending[portal_id]
+                    continue
+
+            if still_needed and all(_is_restored(f) for f in still_needed.values()):
+                logger.info(
+                    f"{spacer}\t{portal_id}: staged to disk after "
+                    f"{_fmt_elapsed(waited)}; downloading"
+                )
+                ids_payload = _mycocosm_ids(
+                    org.get("id"),
+                    (org.get("top_hit") or {}).get("_id"),
+                    org.get("mycocosm_portal_id") or portal_id,
+                    [f["_id"] for f in still_needed.values()],
+                )
+                entry["dwnlded"].update(
+                    _dwnld_org(
+                        session,
+                        token,
+                        ids_payload,
+                        portal_id,
+                        still_needed,
+                        output,
+                        tmp_dir,
+                        spacer,
+                    )
+                )
+                _finish_org(
+                    df, entry["i"], portal_id, dwnlds, entry["dwnlded"], ome_set, spacer
+                )
+                del pending[portal_id]
+            elif wait_seconds is not None and waited >= wait_seconds:
+                logger.warning(
+                    f"{spacer}\t{portal_id}: still on tape after "
+                    f"{_fmt_elapsed(waited)}; deferring to a later run"
+                )
+                ome_set.add(portal_id)
+                deferred.add(portal_id)
+                del pending[portal_id]
+
+            # spread a sweep's status checks over the interval so a large
+            # backlog never bursts requests at JGI
+            if pending:
+                time.sleep(min(poll_interval / len(pending), 1))
+
+        if pending:
+            # an unbounded wait can be a long one; say what it is waiting on
+            logger.info(
+                f"{spacer}\t{len(pending)} genome(s) still on tape after "
+                f"{_fmt_elapsed(time.time() - started)}"
+            )
+            remaining = poll_interval - (time.time() - sweep_start)
+            if remaining > 0:
+                time.sleep(remaining)
+
+
+def _finish_org(df, i, portal_id, dwnlds, dwnlded, ome_set, spacer="\t"):
+    """Record an organism's retrieved files as ``<type>_path`` columns and flag
+    it as failed when an essential type (assembly or gff3) was not obtained -
+    whether JGI had no such file, or the download/extraction did not yield it."""
+    for typ, path in dwnlded.items():
+        df.at[i, typ + "_path"] = path
+    essential = [t for t in ("fna", "gff3") if t in dwnlds and t not in dwnlded]
+    if essential:
+        logger.warning(
+            f"{spacer}\t{portal_id}: no {'/'.join(essential)} retrieved; excluding"
+        )
+        ome_set.add(portal_id)
+
+
 def main(
     df,
     output,
@@ -989,19 +1215,47 @@ def main(
     est=False,
     masked=True,
     spacer="\t",
-    restore_timeout=60,
-    poll_interval=30,
+    restore_wait=None,
+    poll_interval=60,
     request_delay=3,
+    ome_col=None,
+    deferred=None,
+    defer_tape=False,
+    restore_chunk=50,
 ):
     """Download MycoCosm data for the JGI portal ids in `df` via the JGI Data
     Portal API (non-Globus), preserving the legacy contract: `df` gains
     ``<type>_path`` columns (e.g. fna_path, gff3_path) plus genus/species/strain,
     and the function returns (df, failed_portal_ids).
 
-    Archived (PURGED) files are restored from tape before download; if a restore
-    does not finish within `restore_timeout` the portal id is deferred (added to
-    the returned failure set) so a later rerun can pick it up once ready."""
-    if "assembly_acc" in df.columns:
+    `ome_col` names the portal id column; it defaults to ``assembly_acc``, or the
+    lone column of a single-column input (MycoCosm tables label it ``portal``).
+
+    Most MycoCosm files are archived on tape (file_status PURGED) and must be
+    staged to disk before they can be downloaded. `defer_tape` chooses how that
+    wait is spent:
+
+      - False (default): each organism's restore is awaited in place, up to
+        `restore_wait` minutes, before moving to the next portal id.
+      - True: an organism needing tape I/O is skipped immediately - its restore
+        is requested (batched `restore_chunk` organisms to a call) and it is
+        revisited only after every portal id has been visited, then polled every
+        `poll_interval` seconds until staged. Far faster over a large table,
+        where nearly every genome needs a restore.
+
+    Either way `restore_wait` is the maximum a single genome is waited on, in
+    minutes, after which it is deferred rather than failed. None (the default)
+    waits for as long as JGI takes. Pass a set as `deferred` to receive the
+    portal ids given up on: unlike genuine failures (portal absent from
+    MycoCosm, no such file type, corrupt download) they are pending JGI tape
+    I/O, so callers should retry them rather than blacklist them."""
+    if deferred is None:
+        deferred = set()
+    if ome_col is not None:
+        if ome_col not in df.columns:
+            logger.error(f"Invalid input. No {ome_col} column.")
+            return df, set()
+    elif "assembly_acc" in df.columns:
         ome_col = "assembly_acc"
     elif len(df.columns) == 1:
         ome_col = list(df.columns)[0]
@@ -1034,6 +1288,7 @@ def main(
         f"{spacer}Downloading {len(df)} JGI organism(s) via the JGI Data Portal API"
     )
     ome_set = set()
+    pending, restore_buffer = {}, []
     for i, row in tqdm(df.iterrows(), total=len(df)):
         portal_id = row[ome_col]
 
@@ -1047,14 +1302,40 @@ def main(
         top_hit = (org.get("top_hit") or {}).get("_id")
         portal = org.get("mycocosm_portal_id") or portal_id
 
-        selected = {}
+        genus, species, strain = parse_org_name(org.get("name") or "")
+        _fill_if_empty(df, i, "genus", genus)
+        _fill_if_empty(df, i, "species", species)
+        _fill_if_empty(df, i, "strain", strain)
+
+        selected, absent = {}, []
         for typ in dwnlds:
             chosen = select_file(files, typ, masked=masked)
-            if chosen is not None:
+            if chosen is None:
+                absent.append(typ)
+            else:
                 selected[typ] = chosen
+        if absent:
+            logger.warning(f"{spacer}\t{portal_id}: JGI has no {'/'.join(absent)} file")
+
+        # resume a previous run: any file already retrieved is kept as-is.
+        # Downloads arrive gzipped, but curation decompresses in place, so an
+        # unzipped copy counts too (as the legacy downloader did)
+        dwnlded = {}
+        for typ, f in tuple(selected.items()):
+            dest = os.path.join(output, typ, f["file_name"])
+            for path in (dest, re.sub(r"\.gz$", "", dest)):
+                if Path(path).is_file() and Path(path).stat().st_size > 0:
+                    dwnlded[typ] = path
+                    del selected[typ]
+                    logger.info(
+                        f"{spacer}\t{portal_id} {typ}: {Path(path).name} (preexisting)"
+                    )
+                    break
+
         if not selected:
-            logger.warning(f"{spacer}\t{portal_id}: no target files available")
-            ome_set.add(portal_id)
+            # nothing left to retrieve - either all preexisting, or JGI has no
+            # files for any requested type
+            _finish_org(df, i, portal_id, dwnlds, dwnlded, ome_set, spacer)
             continue
 
         # JGI keeps most files in tape archive (file_status PURGED); those must
@@ -1068,21 +1349,35 @@ def main(
                 + ", ".join(f.get("file_name", f["_id"]) for f in on_disk)
             )
         if on_tape:
-            logger.warning(
+            logger.debug(
                 f"{spacer}\t{portal_id}: {len(on_tape)} file(s) are archived on TAPE and "
                 "must be restored to disk before download - "
                 + ", ".join(f.get("file_name", f["_id"]) for f in on_tape)
             )
-            status_url = request_restore(
-                session,
-                token,
-                _mycocosm_ids(org_id, top_hit, portal, [f["_id"] for f in on_tape]),
-                spacer=spacer,
+            tape_ids = _mycocosm_ids(
+                org_id, top_hit, portal, [f["_id"] for f in on_tape]
             )
+            if defer_tape:
+                # do not block the pass on JGI tape I/O: queue the restore and
+                # come back to this organism once every portal has been visited
+                pending[portal_id] = {
+                    "i": i,
+                    "portal_id": portal_id,
+                    "typs": list(selected),
+                    "dwnlded": dwnlded,
+                    "ids": tape_ids,
+                    "requested_at": None,
+                }
+                restore_buffer.append(pending[portal_id])
+                if len(restore_buffer) >= restore_chunk:
+                    _flush_restores(session, token, restore_buffer, spacer=spacer)
+                continue
+
+            status_url = request_restore(session, token, tape_ids, spacer=spacer)
             if not poll_restore(
                 session,
                 status_url,
-                timeout=restore_timeout,
+                timeout=None if restore_wait is None else restore_wait * 60,
                 interval=poll_interval,
                 spacer=spacer,
                 label=portal_id,
@@ -1092,50 +1387,46 @@ def main(
                     "genome (rerun later to resume once JGI has staged it to disk)"
                 )
                 ome_set.add(portal_id)
+                deferred.add(portal_id)
                 continue
 
-        file_ids = [f["_id"] for f in selected.values()]
-        dest_zip = os.path.join(tmp_dir, f"{portal_id}.zip")
-        if not download_zip(
-            session,
-            token,
-            _mycocosm_ids(org_id, top_hit, portal, file_ids),
-            dest_zip,
-            spacer=spacer,
-        ):
-            logger.warning(f"{spacer}\t{portal_id}: download failed")
-            ome_set.add(portal_id)
-            continue
-
-        wanted, type_dest = {}, {}
-        for typ, f in selected.items():
-            name = f["file_name"]
-            dest = os.path.join(output, typ, name)
-            wanted[name] = dest
-            type_dest[typ] = (name, dest)
-        extracted = extract_zip(dest_zip, wanted, spacer=spacer)
-        if Path(dest_zip).is_file():
-            Path(dest_zip).unlink()
-
-        essential_failed = False
-        for typ, (name, dest) in type_dest.items():
-            if name in extracted and Path(dest).is_file():
-                df.at[i, typ + "_path"] = dest
-                logger.info(f"{spacer}\t{portal_id} {typ}: {name}")
-            else:
-                logger.warning(f"{spacer}\t{portal_id}: {typ} missing from archive")
-                if typ in ("fna", "gff3"):
-                    essential_failed = True
-
-        genus, species, strain = parse_org_name(org.get("name") or "")
-        _fill_if_empty(df, i, "genus", genus)
-        _fill_if_empty(df, i, "species", species)
-        _fill_if_empty(df, i, "strain", strain)
-
-        if essential_failed:
-            ome_set.add(portal_id)
+        ids_payload = _mycocosm_ids(
+            org_id, top_hit, portal, [f["_id"] for f in selected.values()]
+        )
+        dwnlded.update(
+            _dwnld_org(
+                session,
+                token,
+                ids_payload,
+                portal_id,
+                selected,
+                output,
+                tmp_dir,
+                spacer,
+            )
+        )
+        _finish_org(df, i, portal_id, dwnlds, dwnlded, ome_set, spacer)
         if request_delay:
             time.sleep(request_delay)
+
+    # circle back to the organisms skipped for tape restores above
+    _flush_restores(session, token, restore_buffer, spacer=spacer)
+    if pending:
+        circle_back(
+            session,
+            token,
+            pending,
+            df,
+            output,
+            tmp_dir,
+            dwnlds,
+            ome_set,
+            deferred,
+            masked=masked,
+            restore_wait=restore_wait,
+            poll_interval=poll_interval,
+            spacer=spacer,
+        )
 
     # tidy the scratch zip dir if empty
     try:
@@ -1196,6 +1487,22 @@ def cli():
         action="store_true",
         help="[-a] Download nonmasked assemblies",
     )
+    parser.add_argument(
+        "-s",
+        "--skip-tape",
+        default=False,
+        action="store_true",
+        help="Skip genomes with tape-archived files, request their restore, and "
+        + "circle back to download them once JGI stages them to disk",
+    )
+    parser.add_argument(
+        "-w",
+        "--tape-wait",
+        type=int,
+        default=None,
+        help="Maximum minutes to wait for a single genome's tape restore before "
+        + "deferring it to a later run. DEFAULT: wait indefinitely",
+    )
     parser.add_argument("-o", "--output", default=str(Path.cwd()), help="Output dir")
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
@@ -1222,6 +1529,10 @@ def cli():
         ".gff3's": args.gff,
         "Transcripts": args.transcript,
         "EST": args.est,
+        "Skip tape files": args.skip_tape,
+        "Max tape wait": (
+            "indefinite" if args.tape_wait is None else f"{args.tape_wait} minute(s)"
+        ),
     }
 
     start_time = intro("Download JGI files", args_dict)
@@ -1259,6 +1570,8 @@ def cli():
         args.est,
         not args.nonmasked,
         spacer="",
+        restore_wait=args.tape_wait,
+        defer_tape=args.skip_tape,
     )
     jgi_df = jgi_df.rename(columns={"assembly_acc": "#assembly_acc"})
     jgi_df["source"] = "jgi"

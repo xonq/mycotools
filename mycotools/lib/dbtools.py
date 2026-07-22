@@ -597,12 +597,40 @@ def omes_from_accessions(accs: Iterable[str]) -> "set[str]":
     return {acc[: acc.find("_")] for acc in accs if "_" in acc}
 
 
+# An NCBI api key is sent to the API as the `Api-Key` HTTP header, and the
+# `datasets` CLI additionally echoes its own argv -- api key included -- into
+# `X-Datasets-Client-Cmd`. Go's net/http refuses to transmit a header value
+# holding a control character, so a key carrying the newline it was pasted with
+# fails every request before it ever leaves the machine, reporting either
+# `invalid header field value for "Api-Key"` or the same for
+# `"X-Datasets-Client-Cmd"` depending on which header it validated first.
+_ILLEGAL_HEADER_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def clean_api_key(api_key):
+    """Remove characters that make an api key an illegal HTTP header value.
+
+    Falsy keys pass through untouched so callers that distinguish `None` from
+    `""` keep doing so."""
+    if not api_key:
+        return api_key
+    cleaned = _ILLEGAL_HEADER_CHARS.sub("", str(api_key)).strip()
+    if cleaned != api_key:
+        logger.warning(
+            "Removed whitespace/control characters from the NCBI api key; "
+            "they are not transmissible as an HTTP header"
+        )
+    return cleaned
+
+
 def get_login(ncbi, jgi):
 
     ncbi_api, jgi_email, jgi_pwd = None, None, None
     print(flush=True)
     if ncbi:
-        ncbi_api = getpass.getpass(prompt="NCBI api key (blank if none): ")
+        ncbi_api = clean_api_key(
+            getpass.getpass(prompt="NCBI api key (blank if none): ")
+        )
     if jgi:
         jgi_email = input("JGI email: ")
         jgi_pwd = getpass.getpass(prompt="JGI password (required): ")
@@ -662,7 +690,7 @@ def read_plain_login(info_path=PLAIN_LOGIN_PATH):
     with open(format_path(info_path), "r") as raw:
         data = json.load(raw)
     return (
-        data.get("ncbi_api", ""),
+        clean_api_key(data.get("ncbi_api", "")),
         data.get("jgi_email", ""),
         data.get("jgi_pwd", ""),
     )
@@ -742,7 +770,7 @@ def login_check(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=
         if len(data) != 3:
             logger.error("BAD PASSWORD FILE. Delete ~/.mycotools/mtdb_key to reset.")
             sys.exit(8)
-        ncbi_api = data[0].rstrip()
+        ncbi_api = clean_api_key(data[0])
         jgi_email = data[1].rstrip()
         jgi_pwd = data[2].rstrip()
         return ncbi_api, jgi_email, jgi_pwd
@@ -1145,6 +1173,7 @@ def gather_taxonomy_dataset(
         "--inputfile",
         tax_accs_file,
     ]
+    api_key = clean_api_key(api_key)
     if api_key:
         cmd_scaf.extend(["--api-key", api_key])
 

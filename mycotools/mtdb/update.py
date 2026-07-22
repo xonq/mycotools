@@ -404,8 +404,134 @@ def dwnld_ncbi_metadata(
     return ncbi_df
 
 
+def dwnld_data_reports(
+    accs, out_dir, api=None, chunk=100, max_attempts=3, exit_code=11, label="GenBank"
+):
+    """Acquire NCBI assembly data reports; return acc2org, acc2meta, failed.
+
+    `datasets` is called on `chunk` accessions at a time rather than on the
+    whole list at once. A from-scratch initialization queries >16,000
+    accessions, and one request that large is both slow enough to be dropped
+    mid-transfer and all-or-nothing when it is: a single failure discards every
+    record. Each chunk downloads into its own directory and is left there, so an
+    interrupted run resumes at the first chunk it had not finished."""
+    acc2org, acc2meta, failed = {}, {}, []
+    empty_chunks = []
+
+    # a run started before chunking landed leaves a single whole-list download
+    # here; parse it rather than re-acquiring everything
+    legacy_dir = out_dir + "ncbi_dataset/"
+    if Path(legacy_dir + "data/assembly_data_report.jsonl").is_file():
+        return compile_organism_names(legacy_dir)
+
+    acc_chunks = [accs[i : i + chunk] for i in range(0, len(accs), chunk)]
+    # `datasets` draws its own per-call bar, which is meaningless here because
+    # it restarts every chunk; it is silenced below in favor of one bar over the
+    # whole acquisition
+    for chunk_i, acc_chunk in enumerate(
+        tqdm(
+            acc_chunks,
+            total=len(acc_chunks),
+            desc=f"{label} reports",
+            unit=" chunk",
+            disable=len(acc_chunks) < 2,
+        )
+    ):
+        chunk_dir = f"{out_dir}chunk_{chunk_i}/"
+        acc_file = f"{chunk_dir}assembly_accs.txt"
+        unzip_dir = f"{chunk_dir}ncbi_dataset/"
+        zip_path = f"{chunk_dir}ncbi_dataset.zip"
+        if not Path(chunk_dir).is_dir():
+            Path(chunk_dir).mkdir(parents=True)
+
+        # only reuse a completed chunk that covers exactly these accessions;
+        # otherwise the chunk boundaries have shifted since it was written and
+        # its contents no longer correspond to this index
+        expected = "\n".join(acc_chunk)
+        cached = (
+            Path(unzip_dir).is_dir()
+            and Path(acc_file).is_file()
+            and Path(acc_file).read_text() == expected
+        )
+        if not cached:
+            shutil.rmtree(unzip_dir, ignore_errors=True)
+            with open(acc_file, "w") as out:
+                out.write(expected)
+            # every message in this loop is debug: a retry is routine, it would
+            # overdraw the bar above, and a chunk that never succeeds is
+            # accounted for in the single summary once the bar has finished
+            attempts = 0
+            while attempts < max_attempts:
+                if attempts:
+                    logger.debug(f"Reattempting {label} chunk {chunk_i + 1}")
+                    if Path(zip_path).is_file():
+                        Path(zip_path).unlink()
+                attempts += 1
+                run_datasets(
+                    None,
+                    acc_file,
+                    chunk_dir,
+                    True,
+                    api=api,
+                    verbose=False,
+                    # datasets' own stderr would overdraw the chunk bar above;
+                    # it is kept at debug, and the failures below are what the
+                    # user is told about
+                    mute_stderr=True,
+                )
+                try:
+                    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                        zip_ref.extractall(chunk_dir)
+                    Path(zip_path).unlink()
+                    break
+                except zipfile.BadZipFile:
+                    # a truncated archive is corruption rather than absence, and
+                    # exhausting the attempts on it is fatal -- so this one is
+                    # said out loud
+                    if attempts == max_attempts:
+                        logger.error(f"{label} chunk {chunk_i + 1} download corrupted")
+                        sys.exit(exit_code)
+                    logger.debug(f"datasets download corrupted - {attempts}")
+                except FileNotFoundError:
+                    logger.debug(f"datasets failed - {attempts}")
+
+        # datasets exited without writing a report on every attempt: the chunk
+        # holds no retrievable genomes, which is not fatal to the remainder
+        if not Path(unzip_dir + "data/assembly_data_report.jsonl").is_file():
+            empty_chunks.append(chunk_i + 1)
+            continue
+
+        c_acc2org, c_acc2meta, c_failed = compile_organism_names(unzip_dir)
+        acc2org.update(c_acc2org)
+        acc2meta.update(c_acc2meta)
+        failed.extend(c_failed)
+        logger.debug(
+            f"\t\t{label} chunk {chunk_i + 1}/{len(acc_chunks)}: "
+            + f"{len(c_acc2meta)} genomes"
+        )
+
+    # one line once the bar is done, rather than a burst of them through it;
+    # empty chunks are routine for the RefSeq pass, where most accessions are
+    # speculative, so this reports the scale and leaves the detail to -v
+    if empty_chunks:
+        logger.warning(
+            f"{len(empty_chunks)}/{len(acc_chunks)} {label} chunk(s) returned "
+            + f"no genomes ({len(empty_chunks) * chunk} accessions at most); "
+            + "rerun with -v for the datasets output"
+        )
+        logger.debug(f"empty {label} chunks: {empty_chunks}")
+
+    return acc2org, acc2meta, failed
+
+
 def prep_taxa_cols(
-    df, taxonomy_dir, col="#Organism/Name", api=None, acc2org={}, max_attempts=3
+    df,
+    taxonomy_dir,
+    col="#Organism/Name",
+    api=None,
+    acc2org={},
+    max_attempts=3,
+    chunk=100,
 ):
 
     skip_prep = list(acc2org.keys())
@@ -414,46 +540,23 @@ def prep_taxa_cols(
     skip = set(gca_prep + gcf_prep)
     if not Path(taxonomy_dir).is_dir():
         Path(taxonomy_dir).mkdir()
-    aa_file = taxonomy_dir + "assembly_accs.genbank.txt"
-    with open(aa_file, "w") as out:
-        out.write("\n".join([x for x in list(df["assembly_acc"]) if x not in skip]))
 
-    attempts, datasets_cmd = 0, 0
-    if not Path(taxonomy_dir + "ncbi_dataset").is_dir():
-        datasets_path = taxonomy_dir + "ncbi_dataset.zip"
-        while attempts < max_attempts:
-            if attempts:
-                logger.info("Reattempting")
-                if Path(datasets_path).is_file():
-                    Path(datasets_path).unlink()
-            attempts += 1
-            datasets_cmd = run_datasets(
-                None, aa_file, taxonomy_dir, True, api=api, verbose=True
-            )
-            try:
-                with zipfile.ZipFile(datasets_path, "r") as zip_ref:
-                    zip_ref.extractall(taxonomy_dir)
-                Path(datasets_path).unlink()
-                break
-            except zipfile.BadZipFile:
-                logger.error(f"datasets download corrupted - {attempts}")
-                if attempts == max_attempts:
-                    sys.exit(11)
-            except FileNotFoundError:
-                logger.error(f"datasets failed - {attempts}")
-
-    if datasets_cmd:
-        logger.warning(f"datasets failed, assuming no genomes found")
-        acc2org_n, acc2meta = {}, {}
-    else:
-        acc2org_n, acc2meta, org_failed = compile_organism_names(
-            taxonomy_dir + "ncbi_dataset/"
-        )
-        logger.info(
-            "%s %s",
-            f"\t\t{len(acc2meta) + len(org_failed)}",
-            "genomes queried from GenBank",
-        )
+    gb_accs = [x for x in list(df["assembly_acc"]) if x not in skip]
+    acc2org_n, acc2meta, org_failed = dwnld_data_reports(
+        gb_accs,
+        taxonomy_dir,
+        api=api,
+        chunk=chunk,
+        max_attempts=max_attempts,
+        exit_code=11,
+        label="GenBank",
+    )
+    logger.info(
+        "%s %s",
+        f"\t\t{len(acc2meta) + len(org_failed)}",
+        "genomes queried from GenBank",
+    )
+    if len(df["assembly_acc"]):
         logger.debug(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed')
 
     # check for RefSeq for failed entries
@@ -471,46 +574,17 @@ def prep_taxa_cols(
             reattempt_acc.append(acc.upper().replace("GCA_", "GCF_"))
         elif acc.upper().startswith("GCF"):
             reattempt_acc.append(acc.upper().replace("GCF_", "GCA_"))
-    acc_file_re = refseq_dir + "assembly_accs.refseq.txt"
-    with open(acc_file_re, "w") as out:
-        out.write("\n".join(reattempt_acc))
-
-    # attempt to download the ncbi_datasets zip file until allowed attempts are
-    # exhausted
-    rs_datasets_cmd = 0
-    if not Path(refseq_dir + "ncbi_dataset").is_dir():
-        logger.debug(f"Checking RefSeq for {len(reattempt_acc)} entries")
-        rs_datasets_path = refseq_dir + "ncbi_dataset.zip"
-        attempts = 0
-        while attempts < max_attempts:
-            if attempts:
-                logger.info("Reattempting")
-                if Path(rs_datasets_path).is_file():
-                    Path(rs_datasets_path).unlink()
-            attempts += 1
-            rs_datasets_cmd = run_datasets(
-                None, acc_file_re, refseq_dir, True, api=api, verbose=True
-            )
-            try:
-                with zipfile.ZipFile(rs_datasets_path, "r") as zip_ref:
-                    zip_ref.extractall(refseq_dir)
-                Path(rs_datasets_path).unlink()
-                break
-            except zipfile.BadZipFile:
-                logger.error(f"datasets download corrupted - {attempts}")
-                if attempts == max_attempts:
-                    sys.exit(10)
-            except FileNotFoundError:
-                logger.error(f"datasets failed - {attempts}")
-
-    if rs_datasets_cmd:
-        logger.warning(f"datasets failed, assuming no genomes found")
-        acc2org_rs, acc2meta_rs = {}, {}
-    else:
-        acc2org_rs, acc2meta_rs, org_failed_2 = compile_organism_names(
-            refseq_dir + "ncbi_dataset/"
-        )
-        logger.debug(f"{len(acc2meta_rs)} genome(s) queried from RefSeq")
+    logger.debug(f"Checking RefSeq for {len(reattempt_acc)} entries")
+    acc2org_rs, acc2meta_rs, org_failed_2 = dwnld_data_reports(
+        reattempt_acc,
+        refseq_dir,
+        api=api,
+        chunk=chunk,
+        max_attempts=max_attempts,
+        exit_code=10,
+        label="RefSeq",
+    )
+    logger.debug(f"{len(acc2meta_rs)} genome(s) queried from RefSeq")
 
     acc2org, acc2meta = {**acc2org, **acc2org_n, **acc2org_rs}, {
         **acc2meta,
@@ -563,7 +637,9 @@ def prep_jgi_cols(jgi_df, name_col="name"):
     return jgi_df
 
 
-def clean_ncbi_df(ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=3):
+def clean_ncbi_df(
+    ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=3, chunk=100
+):
     ncbi_df = ncbi_df.astype(str).replace(np.nan, "")
 
     acc2org_path = update_path + "../gca2org.tsv"
@@ -592,7 +668,7 @@ def clean_ncbi_df(ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=
 
     ncbi_df = ncbi_df[ncbi_df["assembly_acc"].str.startswith(("GCA", "GCF"))]
     ncbi_df, acc2meta, acc2org = prep_taxa_cols(
-        ncbi_df, update_path + "taxonomy/", api=api, acc2org=acc2org
+        ncbi_df, update_path + "taxonomy/", api=api, acc2org=acc2org, chunk=chunk
     )
 
     with atomic_write(acc2org_path) as out:
@@ -868,6 +944,7 @@ def ref_update(
     remove=True,
     taxonomy=True,
     chunk=100,
+    tape_wait=None,
 ):
     """Initialize/Update the primary MTDB based on a reference database
     acquired external from any existing primary MTDB"""
@@ -885,7 +962,16 @@ def ref_update(
 
         if not Path(jgi_predb_path).is_file():
             logger.info("Downloading MycoCosm data")
-            post_jgi_df, jgi_failed = jgiDwnld(jgi_df, update_path, jgi_email, jgi_pwd)
+            jgi_deferred = set()
+            post_jgi_df, jgi_dwnld_failed = jgiDwnld(
+                jgi_df,
+                update_path,
+                jgi_email,
+                jgi_pwd,
+                deferred=jgi_deferred,
+                restore_wait=tape_wait,
+                defer_tape=True,
+            )
             jgi_predb = post_jgi_df.rename(
                 columns={
                     "published(s)": "published",
@@ -896,7 +982,20 @@ def ref_update(
 
             logger.info("Curating MycoCosm data")
             jgi_premtdb = jgi_predb.fillna("").to_dict(orient="list")
-            jgi_failed = list(jgi_failed)
+            # jgiDwnld reports bare portal ids; the failed ledger records
+            # [accession, version] pairs. Genomes only awaiting a JGI tape
+            # restore are retryable, so they are not recorded as failures
+            versions = dict(zip(jgi_df["assembly_acc"], jgi_df["version"]))
+            jgi_failed = [
+                [acc, versions.get(acc, "")]
+                for acc in jgi_dwnld_failed
+                if acc not in jgi_deferred
+            ]
+            if jgi_deferred:
+                logger.info(
+                    f"\t{len(jgi_deferred)} genome(s) awaiting JGI tape restore; "
+                    "they will be retried on the next run"
+                )
             # a downloaded assembly path is required to curate; if no JGI genome
             # was successfully retrieved (e.g. all portals failed) skip curation
             # rather than raising a KeyError and aborting the whole run
@@ -1137,6 +1236,7 @@ def rogue_update(
     remove=True,
     lineage_constraints={},
     chunk=100,
+    tape_wait=None,
 ):
     """Initialize/update a standalone primary MTDB"""
     # NEED to mark none for new databases' refdb
@@ -1161,7 +1261,7 @@ def rogue_update(
     pre_ncbi_df1 = pre_ncbi_df0.rename(columns={"Assembly Accession": "assembly_acc"})
     logger.info("Acquiring NCBI metadata")
     ncbi_df, acc2meta = clean_ncbi_df(
-        pre_ncbi_df1, update_path, kingdom=kingdom, api=ncbi_api
+        pre_ncbi_df1, update_path, kingdom=kingdom, api=ncbi_api, chunk=chunk
     )
 
     # begin extracting lineages of interest and store tax_dicts for later
@@ -1239,7 +1339,7 @@ def rogue_update(
 
         logger.info("Downloading MycoCosm data")
         jgi_predb_path = update_path + date + ".jgi.predb2.mtdb"
-        jgi_predb, db, jgi_failed = jgi2db(
+        jgi_predb, db, jgi_failed, jgi_deferred = jgi2db(
             jgi_df,
             db,
             update_path,
@@ -1251,10 +1351,15 @@ def rogue_update(
             failed_dict=prev_failed,
             jgi2ncbi=jgi2ncbi,
             repeatmasked=True,
+            restore_wait=tape_wait,
         )  # download JGI files and ready predb
 
-        # get ncbi hits that hit failed jgi runs
-        failed_ncbi2jgi = {jgi2ncbi[f[0]]: f[0] for f in jgi_failed if f[0] in jgi2ncbi}
+        # get ncbi hits that hit jgi runs which did not yield data - genomes
+        # awaiting a JGI tape restore included, so NCBI covers them until the
+        # next run retrieves the MycoCosm copy
+        failed_ncbi2jgi = {
+            jgi2ncbi[f[0]]: f[0] for f in jgi_failed + jgi_deferred if f[0] in jgi2ncbi
+        }
         ncbi_jgi_overlap = ncbi_jgi_overlap[
             ncbi_jgi_overlap["assembly_acc"].isin(failed_ncbi2jgi)
         ]
@@ -1279,6 +1384,8 @@ def rogue_update(
                 jgi_mtdb = mtdb()
             jgi_mtdb.df2db(jgi_predb_path)
 
+            # only genuine failures are blacklisted; genomes pending a JGI tape
+            # restore are absent from jgi_failed so the next run retries them
             for failure in jgi_failed:
                 add_failed(
                     failure[0],
@@ -1645,6 +1752,7 @@ def control_flow(
     ncbi_api=None,
     overwrite=True,
     chunk=100,
+    tape_wait=None,
 ):
 
     abbr2king = {
@@ -1973,6 +2081,7 @@ def control_flow(
             remove=not save,
             taxonomy=True,
             chunk=chunk,
+            tape_wait=tape_wait,
         )
     else:
         new_mtdb, update_mtdb = rogue_update(
@@ -1992,6 +2101,7 @@ def control_flow(
             remove=not save,
             lineage_constraints=config["lineage_constraints"],
             chunk=chunk,
+            tape_wait=tape_wait,
         )
 
     if not update_mtdb:
@@ -2122,6 +2232,13 @@ def main():
         default=100,
         help="Accessions to download per datasets call; DEFAULT: 100",
     )
+    run_args.add_argument(
+        "--tape_wait",
+        type=int,
+        default=None,
+        help="[FUNGI]: Maximum minutes to wait for a MycoCosm genome's tape "
+        + "restore before deferring it to a later run; DEFAULT: wait indefinitely",
+    )
     run_args.add_argument("-c", "--cpu", type=int, default=1)
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
@@ -2137,6 +2254,9 @@ def main():
         "Retry forbidden": args.forbidden,
         "Save raw data": args.save,
         "Chunk": args.chunk,
+        "Max tape wait": (
+            "indefinite" if args.tape_wait is None else f"{args.tape_wait} minute(s)"
+        ),
     }
 
     find_execs(["datasets"], exit={"datasets"})
@@ -2162,6 +2282,7 @@ def main():
         args.cpu,
         overwrite=not args.keep,
         chunk=args.chunk,
+        tape_wait=args.tape_wait,
     )
 
     outro(start_time)

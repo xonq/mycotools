@@ -29,7 +29,7 @@ from mycotools.lib.kontools import (
     split_input,
     setup_logging,
 )
-from mycotools.lib.dbtools import log_editor, login_check, mtdb
+from mycotools.lib.dbtools import clean_api_key, log_editor, login_check, mtdb
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -254,8 +254,22 @@ def collect_assembly_accs(
     return acc2log, failed, out_df
 
 
-def run_datasets(include, accs_file, output_path, annotated, api=None, verbose=False):
-    """Run NCBI datasets to download genomes or metadata"""
+def run_datasets(
+    include,
+    accs_file,
+    output_path,
+    annotated,
+    api=None,
+    verbose=False,
+    mute_stderr=False,
+):
+    """Run NCBI datasets to download genomes or metadata
+
+    `mute_stderr` keeps datasets' own progress bar and error text off the
+    terminal entirely; it is captured and logged at debug instead. It exists for
+    callers that draw their own progress bar and would otherwise be overdrawn,
+    so it belongs to the caller rather than the CLI and is not exposed as a
+    flag. The caller stays responsible for reporting the failure itself."""
     dataset_scaf = [
         "datasets",
         "download",
@@ -268,6 +282,7 @@ def run_datasets(include, accs_file, output_path, annotated, api=None, verbose=F
         dataset_scaf.extend(["--include", include])
     else:
         dataset_scaf.append("--dehydrated")
+    api = clean_api_key(api)
     if api:
         dataset_scaf += ["--api-key", api]
     if annotated:
@@ -276,10 +291,27 @@ def run_datasets(include, accs_file, output_path, annotated, api=None, verbose=F
     cwd = str(Path.cwd())
     os.chdir(output_path)
     if verbose:
-        v = None
+        dataset_call = subprocess.call(dataset_scaf)
     else:
-        v = subprocess.DEVNULL
-    dataset_call = subprocess.call(dataset_scaf, stdout=v, stderr=v)
+        # capture stderr rather than discard it: datasets reports why it failed
+        # there, and a silenced call that fails leaves no other explanation
+        proc = subprocess.run(
+            dataset_scaf, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True
+        )
+        dataset_call = proc.returncode
+        # datasets' progress bar shares this stream, so collapse each line to
+        # its last carriage-return frame rather than reprinting every redraw
+        # (note: splitlines() would break on \r, hence the explicit split)
+        err = "\n".join(
+            x.split("\r")[-1].rstrip()
+            for x in proc.stderr.split("\n")
+            if x.split("\r")[-1].strip()
+        )
+        if err:
+            # the bar lands here too, so it is only worth surfacing on failure
+            # -- and not even then once a caller has muted it
+            loud = dataset_call and not mute_stderr
+            (logger.error if loud else logger.debug)(err)
     os.chdir(cwd)
 
     return dataset_call

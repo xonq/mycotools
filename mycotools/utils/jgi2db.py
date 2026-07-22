@@ -2,18 +2,16 @@
 
 import logging
 import os
+import re
 import sys
 import copy
-import time
 import datetime
 import argparse
 import pandas as pd
 import numpy as np
 from mycotools.lib.kontools import intro, outro, setup_logging
 from mycotools.lib.dbtools import db2df, df2db, read_log, log_editor
-from mycotools.download.jgi import jgi_login as jgi_login
-from mycotools.download.jgi import retrieve_xml as retrieve_xml
-from mycotools.download.jgi import jgi_dwnld as jgi_dwnld
+from mycotools.download.jgi import main as jgi_dwnld
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -135,12 +133,24 @@ def jgi_redundancy_check(db, jgi_df, duplicates={}, ome_col="portal", jgi2ncbi={
     return jgi_df, db, updates, old_omes
 
 
+def logged_file(log, ome, typ, output):
+    """Return the path of an ome's `typ` file recorded in a previous run's log,
+    if that file is still on disk; otherwise None. JGI files arrive gzipped and
+    curation decompresses them in place, so either form is accepted."""
+    basename = log.get(ome, {}).get(typ, "na")
+    if basename in {"na", "error", "pending", ""}:
+        return None
+    path = f"{output}/{typ}/{basename}"
+    for candidate in (path, re.sub(r"\.gz$", "", path)):
+        if Path(candidate).is_file():
+            return candidate
+    return None
+
+
 def runjgi_dwnld(
     jgi_df,
-    i,
     user,
     pwd,
-    ome_set,
     ome_col,
     output,
     log,
@@ -150,82 +160,116 @@ def runjgi_dwnld(
     rerun,
     masked,
     spacer="\t\t",
+    restore_wait=None,
 ):
+    """Download the MycoCosm portals in `jgi_df` via the JGI Data Portal API,
+    skipping omes a previous run already completed and recording each outcome in
+    the resume log. Returns (jgi_df, log, failed, deferred).
 
-    ome = jgi_df[ome_col][i]
-    jgi_login(user, pwd)
+    Tape-archived genomes are skipped on the first pass and revisited once every
+    portal has been visited - nearly every MycoCosm genome needs a restore, so
+    waiting on each in turn would stall the update. `restore_wait` caps how many
+    minutes any one genome is waited on there; None waits for as long as JGI
+    takes.
 
-    ran_dwnld = False
-    if ome not in ome_set:
-        logger.debug(spacer + "" + ome + ": " + jgi_df["name"][i])
-        for typ in dwnlds:
-            if log[ome][typ] == "error":
-                if not rerun:
-                    logger.debug(spacer + "" + typ + ": ERROR")
-                    continue
-            check, preexisting, new_typ, ran_dwnld, org_name = jgi_dwnld(
-                ome, typ, output, masked=masked
+    Omes without an assembly or gff3 are dropped from `jgi_df`. Genuine failures
+    (portal absent from MycoCosm, no such file type, corrupt download) are logged
+    as `error` and appended to `failed` as [ome, version], as the legacy per-ome
+    loop did. Omes whose files are merely awaiting a JGI tape restore are instead
+    logged as `pending` and returned in `deferred` - they are retried on the next
+    run rather than blacklisted."""
+
+    # resume: an ome needs no download when every requested file is logged and
+    # present - or, without `rerun`, was previously logged as unobtainable
+    todwnld_i, preexisting = [], {}
+    for i, row in jgi_df.iterrows():
+        ome = row[ome_col]
+        paths = {typ: logged_file(log, ome, typ, output) for typ in dwnlds}
+        settled = [
+            typ
+            for typ, path in paths.items()
+            if path or (not rerun and log.get(ome, {}).get(typ) == "error")
+        ]
+        if len(settled) == len(dwnlds):
+            preexisting[i] = {t: p for t, p in paths.items() if p}
+        else:
+            todwnld_i.append(i)
+
+    if preexisting:
+        logger.debug(f"{spacer}{len(preexisting)} preexisting download(s)")
+    for i, paths in preexisting.items():
+        for typ, path in paths.items():
+            jgi_df.at[i, typ + "_path"] = path
+
+    api_deferred = set()
+    if todwnld_i:
+        post_df, api_failed = jgi_dwnld(
+            jgi_df.loc[todwnld_i].copy(),
+            output,
+            user,
+            pwd,
+            assembly="fna" in dwnlds,
+            proteome="faa" in dwnlds,
+            gff3="gff3" in dwnlds,
+            masked=masked,
+            spacer=spacer,
+            ome_col=ome_col,
+            deferred=api_deferred,
+            restore_wait=restore_wait,
+            defer_tape=True,
+        )
+    else:
+        post_df, api_failed = None, set()
+
+    todel, deferred = [], []
+    if post_df is not None:
+        for i, row in post_df.iterrows():
+            ome = row[ome_col]
+            if ome not in log:
+                log[ome] = {"fna": "na", "gff3": "na", "faa": "na"}
+            # a file JGI has yet to stage to disk is pending, not failed
+            unobtained = "pending" if ome in api_deferred else "error"
+            for typ in dwnlds:
+                path = row.get(typ + "_path")
+                if isinstance(path, str) and path:
+                    jgi_df.at[i, typ + "_path"] = path
+                    log[ome][typ] = Path(path).name
+                    logger.debug(f"{spacer}{ome} {typ}: {Path(path).name}")
+                else:
+                    log[ome][typ] = unobtained
+                    logger.debug(f"{spacer}{ome} {typ}: {unobtained.upper()}")
+            # JGI metadata may fill in curation fields the MycoCosm table lacks
+            for col in ("genus", "species", "strain"):
+                if col in post_df.columns:
+                    jgi_df.at[i, col] = row[col]
+            log_editor(
+                log_path,
+                ome,
+                ome
+                + "\t"
+                + log[ome]["fna"]
+                + "\t"
+                + log[ome]["gff3"]
+                + "\t"
+                + log[ome]["faa"],
             )
-            if not isinstance(check, int):
-                jgi_df.at[i, new_typ + "_path"] = check
-                base_check = Path(os.path.abspath(check)).name
-                logger.debug(spacer + "" + new_typ + ": " + str(base_check))
-                log[ome][typ] = base_check
-            else:
-                logger.debug(spacer + "" + new_typ + ": ERROR")
-                log[ome][typ] = "error"
-                if typ in {"gff3", "fna"}:
-                    log_editor(
-                        log_path,
-                        ome,
-                        ome
-                        + "\t"
-                        + log[ome]["fna"]
-                        + "\t"
-                        + log[ome]["gff3"]
-                        + "\t"
-                        + log[ome]["faa"],
-                    )
-                    failed.append([ome, jgi_df["version"][i]])
-                    jgi_df = jgi_df.drop(i)
-                    if ran_dwnld:
-                        time.sleep(60)
-                    break
-            if ran_dwnld:
-                time.sleep(60)
-        log_editor(
-            log_path,
-            ome,
-            ome
-            + "\t"
-            + log[ome]["fna"]
-            + "\t"
-            + log[ome]["gff3"]
-            + "\t"
-            + log[ome]["faa"],
+            if ome in api_deferred:
+                deferred.append([ome, jgi_df["version"][i]])
+                todel.append(i)
+            elif ome in api_failed:
+                failed.append([ome, jgi_df["version"][i]])
+                todel.append(i)
+
+    for i in todel:
+        jgi_df = jgi_df.drop(i)
+
+    if deferred:
+        logger.info(
+            f"{spacer}{len(deferred)} genome(s) awaiting JGI tape restore; "
+            "they will be retried on the next run"
         )
 
-    return jgi_df, log, failed
-
-
-def log2df(jgi_df, log, output):
-
-    typ2col = {
-        "fna": "assemblyPath",
-        "gff": "gffPath",
-        "gff3": "gffPath",
-        "faa": "proteomePath",
-    }
-    for ome in list(jgi_df.index):
-        for typ in log[ome]:
-            #            if log[ome][typ].endswith('.gff.gz'):
-            #               out_file = output + '/gff/' + log[ome][typ]
-            #              col = 'jgi_gff2_path'
-            #         else:
-            out_file = output + "/" + typ + "/" + log[ome][typ]
-            jgi_df.at[ome, typ2col[typ]] = out_file
-
-    return jgi_df
+    return jgi_df, log, failed, deferred
 
 
 def main(
@@ -246,6 +290,7 @@ def main(
     duplicates={},
     spacer="\t\t",
     jgi2ncbi={},
+    restore_wait=None,
 ):
 
     if not nonpublished:
@@ -300,30 +345,7 @@ def main(
     else:
         new_ref_db, updates = None, {}
 
-    logger.debug(spacer + "Logging into JGI")
-    jgi_login(user, pwd)
-
-    if not Path(output + "/xml").exists():
-        Path(output + "/xml").mkdir()
-
-    logger.debug(spacer + "Retrieving `xml` directories")
-    ome_set, failed, count = set(), [], 0
-    for i, row in jgi_df.iterrows():
-        error_check, attempt = True, 0
-        while error_check != -1 and attempt < 3:
-            attempt += 1
-            error_check = retrieve_xml(row[ome_col], output + "/xml")
-            if error_check is None:
-                time.sleep(1)
-                continue
-            #            elif error_check > 0:
-            #               ome_set.add(row[ome_col])
-            elif error_check != -1:
-                time.sleep(0.3)
-        if error_check != -1:
-            logger.info(f"{spacer}\t{row[ome_col]} failed to retrieve XML")
-            ome_set.add(row[ome_col])
-
+    failed = []
     log_path = output + "/jgi2db.log"
     log = compile_log(log_path)
     if not rerun:
@@ -335,7 +357,6 @@ def main(
                 drop_index = list(jgi_df[jgi_df[ome_col] == ome].index)[0]
                 failed.append([ome, jgi_df["version"][drop_index]])
                 jgi_df = jgi_df.drop(drop_index)
-                ome_set.add(ome)
 
     logger.debug(spacer + "Downloading JGI data")
     dwnlds = []
@@ -349,43 +370,22 @@ def main(
     for typ in dwnlds:
         if not Path(output + "/" + typ).is_dir():
             Path(output + "/" + typ).mkdir()
-        if typ == "gff3":
-            if not Path(output + "/gff3").is_dir():
-                Path(output + "/gff3").mkdir()
 
-    if all(x in log for x in list(jgi_df[ome_col])) and not rerun:
-        logger.debug(spacer + "All downloaded, rerun off")
-        jgi_df = jgi_df.set_index(ome_col)
-        jgi_df = log2df(jgi_df, log, output)
-        jgi_df = jgi_df.reset_index()
-    else:
-        for i, row in jgi_df.iterrows():
-            ome = row[ome_col]
-            if ome not in log:
-                log[ome] = {"fna": "na", "gff3": "na", "faa": "na"}
-            elif ome not in set(jgi_df[ome_col]):
-                continue
-            jgi_df, log, failed = runjgi_dwnld(
-                jgi_df,
-                i,
-                user,
-                pwd,
-                ome_set,
-                ome_col,
-                output,
-                log,
-                log_path,
-                dwnlds,
-                failed,
-                rerun,
-                repeatmasked,
-                spacer,
-            )
-
-    if Path("cookies").exists():
-        Path("cookies").unlink()
-    if Path(str(Path("~/.nullJGIdwnld").expanduser())).exists():
-        Path(str(Path("~/.nullJGIdwnld").expanduser())).unlink()
+    jgi_df, log, failed, deferred = runjgi_dwnld(
+        jgi_df,
+        user,
+        pwd,
+        ome_col,
+        output,
+        log,
+        log_path,
+        dwnlds,
+        failed,
+        rerun,
+        repeatmasked,
+        spacer,
+        restore_wait=restore_wait,
+    )
 
     jgi_df = jgi_df.rename(
         columns={
@@ -397,7 +397,9 @@ def main(
     )
     jgi_df["source"] = "jgi"
 
-    for ome_d in failed:  # add back the failed entries that were attempted updates
+    # add back entries whose attempted update did not complete, whether it
+    # failed outright or is still awaiting a JGI tape restore
+    for ome_d in failed + deferred:
         ome = ome_d[0]
         if ome in old_rows:  # if there is an old row to add back
             new_ref_db = new_ref_db.append(old_rows[ome])
@@ -419,7 +421,7 @@ def main(
         elif not pd.isnull(row["is public"]) and row["is public"]:
             jgi_premtdb_df.at[i, "published"] = 1
 
-    return jgi_premtdb_df, new_ref_db.reset_index(), failed
+    return jgi_premtdb_df, new_ref_db.reset_index(), failed, deferred
 
 
 def cli():
