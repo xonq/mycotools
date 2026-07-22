@@ -12,8 +12,8 @@ run before any login/network is touched:
 
   * ``control_flow`` argument validation (the mutually-exclusive / required-flag
     guards that ``sys.exit`` with distinct codes). ``login_check`` is guarded by
-    ``if not ncbi_email`` and every validation guard fires *before* that line,
-    so passing a dummy ``ncbi_email`` keeps these tests fully offline.
+    ``if not ncbi_api`` and every validation guard fires *before* that line,
+    so passing a dummy ``ncbi_api`` keeps these tests fully offline.
   * The argparse CLI surface (``python -m mycotools.mtdb.update``): help,
     unknown flags, and type-checked options all exit at the parser, before the
     ``datasets`` dependency check or ``control_flow``.
@@ -96,7 +96,7 @@ _CF_DEFAULTS = dict(
     no_md5=False,
     cpu=1,
     # dummy credential -> skips login_check() entirely
-    ncbi_email="tester@example.com",
+    ncbi_api="0123456789abcdef",
 )
 
 
@@ -228,6 +228,150 @@ def test_cli_type_checked_options_reject_bad_values(bad):
     """--cpu and --resume are ``type=int``; non-integers fail at the parser."""
     res = _cli(*bad)
     assert res.returncode == 2
+
+
+# --------------------------------------------------------------------------- #
+# --lineage/-l and --rank/-rk  (worked through `-l Galerina -rk genus`)
+# --------------------------------------------------------------------------- #
+class _StopBeforeNetwork(Exception):
+    """Raised by the ``init_db`` spy to end ``control_flow`` before login."""
+
+
+def _capture_rank2lineages(monkeypatch, tmp_path, lineage, rank):
+    """Return the ``rank2lineages`` dict ``control_flow`` builds from -l/-rk.
+
+    ``init_db`` is the first thing the parsed constraints are handed to, and
+    every step before it is offline (the ``MYCODB``-less config branch,
+    ``primary_db() -> None``, and ``login_check`` skipped via ``ncbi_api``), so
+    spying there captures the normalized constraints without any network.
+    """
+    captured = {}
+
+    def _spy(*args, **kwargs):
+        captured["rank2lineages"] = kwargs["rank2lineages"]
+        raise _StopBeforeNetwork
+
+    # control_flow exports MYCODB on its way to init_db, which would send a
+    # second call down the "MTDB linked. Unlink via `mtdb -u`" branch (175)
+    monkeypatch.delenv("MYCODB", raising=False)
+    monkeypatch.setattr(u, "init_db", _spy)
+    kwargs = dict(_CF_DEFAULTS)
+    kwargs.update(init=str(tmp_path), lineage=lineage, rank=rank)
+    with pytest.raises(_StopBeforeNetwork):
+        u.control_flow(**kwargs)
+    return captured["rank2lineages"]
+
+
+def test_lineage_rank_short_flags_are_accepted_by_the_parser():
+    """`-l Galerina -rk genus` parses; the run only stops later, on a missing
+    `datasets` (44) or the --lineage-requires---init guard (17), never on an
+    argparse usage error (2)."""
+    res = _cli("-l", "Galerina", "-rk", "genus")
+    assert res.returncode != 2
+    assert "unrecognized arguments" not in res.stderr
+    assert "expected one argument" not in res.stderr
+
+
+def test_lineage_rank_flags_are_advertised():
+    # collapse the wrapping argparse applies to the usage line
+    help_text = " ".join(_cli("--help").stdout.split())
+    assert "-l LINEAGE" in help_text and "--lineage" in help_text
+    assert "-rk RANK" in help_text and "--rank" in help_text
+
+
+def test_galerina_genus_normalizes_to_rank2lineages(monkeypatch, tmp_path):
+    """`-l Galerina -rk genus` becomes {'genus': ['galerina']} -- keyed by rank,
+    lowercased, and carried into the MTDB config as `lineage_constraints`."""
+    rank2lineages = _capture_rank2lineages(monkeypatch, tmp_path, "Galerina", "genus")
+    assert rank2lineages == {"genus": ["galerina"]}
+    cfg = u.gen_config(rank2lineages=rank2lineages)
+    assert cfg["lineage_constraints"] == {"genus": ["galerina"]}
+
+
+@pytest.mark.parametrize("lineage", ["Galerina", "galerina", "GALERINA"])
+@pytest.mark.parametrize("rank", ["genus", "Genus", "GENUS"])
+def test_galerina_genus_is_case_insensitive(monkeypatch, tmp_path, lineage, rank):
+    assert _capture_rank2lineages(monkeypatch, tmp_path, lineage, rank) == {
+        "genus": ["galerina"]
+    }
+
+
+def test_lineage_and_rank_correspond_positionally(monkeypatch, tmp_path):
+    """-l and -rk are positionally paired, and same-rank constraints collapse
+    into one sorted list."""
+    assert _capture_rank2lineages(
+        monkeypatch, tmp_path, "Galerina,Agaricales", "genus,order"
+    ) == {"genus": ["galerina"], "order": ["agaricales"]}
+    assert _capture_rank2lineages(
+        monkeypatch, tmp_path, "Galerina,Amanita", "genus,genus"
+    ) == {"genus": ["amanita", "galerina"]}
+
+
+@pytest.mark.parametrize(
+    "overrides,expected",
+    [
+        pytest.param(
+            dict(init="/tmp/x", lineage="Galerina"), 16, id="galerina-no-rank"
+        ),
+        pytest.param(
+            dict(update=True, lineage="Galerina", rank="genus"),
+            17,
+            id="galerina-no-init",
+        ),
+        pytest.param(
+            dict(init="/tmp/x", lineage="Galerina", rank="phylum,genus"),
+            18,
+            id="galerina-rank-length-mismatch",
+        ),
+        pytest.param(
+            dict(init="/tmp/x", lineage="Galerina", rank="species"),
+            22,
+            id="galerina-unpermitted-rank",
+        ),
+    ],
+)
+def test_galerina_argument_validation(overrides, expected):
+    """`species` is not a permitted rank, and -l/-rk must be equal-length and
+    accompanied by --init."""
+    assert _run_control_flow(**overrides) == expected
+
+
+def _df_with_galerina():
+    """ust.mtdb is Ustilaginomycotina-only, so graft Galerina rows onto it to
+    give a `-l Galerina` constraint something to select."""
+    df = db2df(str(UST_MTDB))
+    template = df.iloc[0].copy()
+    rows = []
+    for ome, species in (("galmar1", "marginata"), ("galpum1", "pumila")):
+        row = template.copy()
+        row["ome"], row["genus"], row["species"] = ome, "Galerina", species
+        rows.append(row)
+    return pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+
+
+def test_galerina_genus_constraint_filters_a_database(monkeypatch, tmp_path):
+    """End to end for `-l Galerina -rk genus`: the lowercased constraint
+    control_flow produces is re-capitalized by extract_constraint_lineages and
+    selects exactly the Galerina rows, without an Entrez query."""
+    rank2lineages = _capture_rank2lineages(monkeypatch, tmp_path, "Galerina", "genus")
+    df = _df_with_galerina()
+
+    tax_dicts, filtered = u.extract_constraint_lineages(
+        df, None, "fungi", rank2lineages, {}, "/tmp/unused.tsv"
+    )
+
+    assert set(filtered["ome"]) == {"galmar1", "galpum1"}
+    assert set(filtered["genus"]) == {"Galerina"}
+    assert tax_dicts == {}  # genus-only -> returned before gather_taxonomy
+
+
+def test_absent_genus_constraint_yields_an_empty_database(monkeypatch, tmp_path):
+    """A genus with no representatives filters to nothing rather than erroring."""
+    rank2lineages = _capture_rank2lineages(monkeypatch, tmp_path, "Galerina", "genus")
+    _, filtered = u.extract_constraint_lineages(
+        db2df(str(UST_MTDB)), None, "fungi", rank2lineages, {}, "/tmp/unused.tsv"
+    )
+    assert len(filtered) == 0
 
 
 # --------------------------------------------------------------------------- #

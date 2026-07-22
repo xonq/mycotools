@@ -791,9 +791,6 @@ def rm_ncbi_overlap(ncbi_df, mycocosm_df, jgi2ncbi, fails=set(), acc2meta={}, ap
                 jgi2biosample[gen_sp] = row["BioSample Accession"]
             else:
                 fails.add(row["assembly_acc"])
-    #    for i in reversed(todel):
-    #       ncbi_jgi_overlap = pd.concat([ncbi_jgi_overlap, ncbi_df.loc[i]])
-    #        ncbi_df = ncbi_df.drop(i)
 
     ncbi_df, ncbi_jgi_overlap = exec_rm_overlap(ncbi_df, todel)
 
