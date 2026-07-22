@@ -629,6 +629,27 @@ _TYPE_LABELS = {
     "est": (["ests", "est_clusters"], {"fasta", "fa", "fna", "fsa"}),
 }
 
+# Mitochondrial files that MycoCosm misfiles under a nuclear label. Mito
+# assemblies are routinely tagged `assembly_unmasked` and shelved under "Genome
+# Assembly (unmasked)" (e.g. Suilu4_MitoAssemblyScaffolds.fasta.gz), and mito
+# annotations are tagged `genes_filtered` (e.g. Lst7536_1_MitoGenes.gff3.gz).
+# Some portals list one and the same file under both the nuclear label and
+# `assembly_mitochondrial`, so the label cannot discriminate and the filename
+# has to. A mitochondrion is not an organismal genome and must never stand in
+# for one - it is ~1/1000th the size, so the substitution silently produces a
+# nonsense MTDB entry rather than an obvious failure.
+#
+# "mito" must open a filename token and be followed either by the rest of
+# "mitochondri*" or by an assembly/annotation noun. Both guards protect nuclear
+# files whose organism name merely contains the substring: it appears mid-token
+# in Fomitopsis_*_AssemblyScaffolds.fasta.gz and token-initially in
+# Mitosporidium_*_AssemblyScaffolds.fasta.gz.
+_MITO_FILE = re.compile(
+    r"(?:^|[_.\-])mito"
+    r"(?:chondri\w*|(?=[_.\-]?(?:assembl|scaffold|contig|chromosom|genome|gene)))",
+    re.IGNORECASE,
+)
+
 
 def _file_format(f):
     """Return a file's lowercase format from its metadata, falling back to the
@@ -653,11 +674,19 @@ def _is_restored(f):
     return str(f.get("file_status", "")).upper() == "RESTORED"
 
 
+def _is_mito(f):
+    """Whether a file is a mitochondrial assembly/annotation rather than the
+    organismal one, judged by filename because JGI's labels misreport it (see
+    ``_MITO_FILE``)."""
+    return bool(_MITO_FILE.search(f.get("file_name", "")))
+
+
 def select_file(files, ftype, masked=True):
     """Choose the single best file record for `ftype` from an organism's file
     list, mirroring parse_xml's selection hierarchy.
 
-    Preference, in order:
+    Mitochondrial files are excluded outright, whatever their label - see
+    ``_MITO_FILE``. Of the remainder, preference goes in order to:
       1. immediately-available (RESTORED) files over archived (PURGED) ones -
          matching the legacy parser's avoidance of on-tape ``get_tape_file``
          URLs (and its masked->unmasked flip when the preferred assembly was on
@@ -692,6 +721,8 @@ def select_file(files, ftype, masked=True):
     for f in files:
         label = _jat_label(f)
         if label not in labels:
+            continue
+        if _is_mito(f):
             continue
         if _file_format(f) not in formats:
             continue
