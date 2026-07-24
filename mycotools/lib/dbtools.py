@@ -1294,7 +1294,6 @@ def mtdb_initialize(
     }
 
     login_time = datetime.datetime.now().strftime("%Y%m%d %H:%M:%S")
-    #    login_time = datetime.datetime.now().strftime('%Y%m%d')
     if dbtype in user_config["log"]:
         user_config["log"][dbtype][mycodb_loc] = login_time
     else:

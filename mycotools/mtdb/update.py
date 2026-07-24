@@ -940,7 +940,6 @@ def ref_update(
     ncbi_api,
     cpus=1,
     check_MD5=True,
-    jgi=True,
     group="eukaryotes",
     kingdom="Fungi",
     remove=True,
@@ -958,7 +957,7 @@ def ref_update(
     jgi_df, ncbi_df = prepare_ref_db(ref_db, date)
 
     # run JGI
-    if jgi and len(jgi_df) > 0:
+    if jgi_email and len(jgi_df) > 0:
         logger.info("Assimilating MycoCosm")
         jgi_predb_path = update_path + date + ".jgi.predb2.mtdb"
 
@@ -1230,7 +1229,6 @@ def rogue_update(
     ncbi_api,
     cpus=1,
     check_MD5=True,
-    jgi=True,
     group="eukaryotes",
     kingdom="Fungi",
     remove=True,
@@ -1289,7 +1287,7 @@ def rogue_update(
         logger.debug("" + str(old_len - new_len) + " redundant entries removed")
 
     # run JGI
-    if jgi:
+    if jgi_email:
         logger.info("Assimilating MycoCosm (1 download/minute)")
         jgi_db_path = update_path + date + ".jgi.mtdb"
         mycocosm_path = update_path + date + ".mycocosm.csv"
@@ -2117,7 +2115,7 @@ def main():
             add_mtdb = prep_predb_opts(format_path(args.predb), args.failed)
         else:
             add_mtdb = mtdb(format_path(args.add))
-        add2mtdb(add_mtdb, date, ncbi_api, taxon, rank) #########
+        add2mtdb(add_mtdb, date, ncbi_api, taxon, rank)
         return 0
 
     # update w/a reference
@@ -2138,7 +2136,6 @@ def main():
             ncbi_api,
             cpus=args.cpu,
             check_MD5=not bool(args.no_md5),
-            jgi=bool(jgi_email),
             group=group,
             kingdom=taxon,
             remove=not args.save,
@@ -2159,7 +2156,6 @@ def main():
             ncbi_api,
             cpus=args.cpu,
             check_MD5=not bool(args.no_md5),
-            jgi=bool(jgi_email),
             group=group,
             kingdom=taxon,
             remove=not args.save,

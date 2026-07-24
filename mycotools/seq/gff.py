@@ -74,8 +74,6 @@ def sort_gff(unsorted_gff, idComp):
 def sort_main(gff):
 
     id_comp = re.compile(gff3_comps()["id"])
-    #    crude_sort = sorted( gff, key = lambda x: \
-    #       int( re.search(r'ID=([^;]+)', x['attributes'])[1] ))
     gff = sort_gff(gff, id_comp)
 
     return gff

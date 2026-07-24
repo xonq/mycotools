@@ -56,7 +56,7 @@ def setup_logging(verbose=False, level=None):
     root.setLevel(logging.WARNING)
     if not any(getattr(h, "_mycotools", False) for h in root.handlers):
         handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(_LevelFormatter("%(message)s"))
+#        handler.setFormatter(_LevelFormatter("%(message)s"))
         handler._mycotools = True
         root.addHandler(handler)
     logging.getLogger("mycotools").setLevel(level)

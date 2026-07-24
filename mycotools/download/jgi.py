@@ -684,7 +684,7 @@ def main(
     restore_chunk=50,
 ):
     """Download MycoCosm data for the JGI portal ids in `df` via the JGI Data
-    Portal API (non-Globus), preserving the legacy contract: `df` gains
+    Portal API (non-Globus): `df` gains
     ``<type>_path`` columns (e.g. fna_path, gff3_path) plus genus/species/strain,
     and the function returns (df, failed_portal_ids).
 
