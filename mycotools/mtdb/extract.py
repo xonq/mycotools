@@ -9,8 +9,6 @@ import logging
 import argparse
 from mycotools.lib.kontools import (
     file2list,
-    intro,
-    outro,
     format_path,
     setup_logging,
     mk_output,

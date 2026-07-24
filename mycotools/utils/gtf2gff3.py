@@ -53,26 +53,11 @@ def grab_output(output_pref):
 
 
 def intron2exon(gff, gene_comp=re.compile(r"gene_id \"(.*?)\"")):
-    """
-    Inputs: gff_dict
-    Outputs: gff_dict with introns converted to exons
-    For each entry in the gff_dict, search for the gene ID. If the gene is not
-    in `gene_info` add the gene as a key and populate a blank intron list,
-    start codon list, stop codon list, strand string, and raw list. If the
-    entry type is within the `gene_info` dict for the gene, then append the
-    list of start and stop coordinates. Append the entire entry to the raw data
-    key.
-    Create a dictionary `intron_genes` for each gene in gene_info if there is
-    an intron entry. For each gene in `intron_genes` create a blank list for
-    `exon_coords` dict under the key `gene`. If the intron coordinates' start
-    codon end coordinate is greater than the start coordinate, then change the
-    start codon entry in `intron_genes[gene]` to have the greater value first.
-    Repeat for the stop codon. Then sort the intron coordinates of that gene.
-    Append the appropriate exon coordinates for the intron based upon strand
-    sense.
-    For each gene in the gff, if it is not in `exon_coords` then simply append
-    to the `new_gff`. Then add genes with new exons.
-    """
+    """Convert intron features to exons in a gff_dict.
+
+    Groups entries by gene ID, infers each gene's exon coordinates from its
+    introns (respecting strand sense), and returns a gff with introns replaced
+    by the inferred exons."""
 
     comps = gtf_comps()
     gff1, gene_info = [], {}
@@ -385,7 +370,6 @@ def fill_transcripts(gene_dict_prep):
 
 def add_genes(gtf, safe=True, comps=gtf_comps(), gene_prefix="gene_id"):
 
-    contigs = defaultdict(dict)
     tran_compile = re.compile(comps["transcript"])
     gene_compile = re.compile(comps["id"])
     gene_dict_prep, gene_dict = {}, {}
@@ -651,7 +635,7 @@ def sort_contig(contigData):
 
 def pre_sort_gff(unsorted_gff, idComp):
 
-    sorting_groups, oldGene = {}, None
+    sorting_groups = {}
     for i, entry in enumerate(unsorted_gff):
         seqid = entry["seqid"]
         if seqid not in sorting_groups:
@@ -674,7 +658,7 @@ def pre_sort_gff(unsorted_gff, idComp):
 
 def sort_gff(unsorted_gff, idComp):
 
-    sorting_groups, oldGene = {}, None
+    sorting_groups = {}
     for i, entry in enumerate(unsorted_gff):
         if entry["type"].lower() not in {
             "mrna",

@@ -15,7 +15,6 @@ import subprocess
 import pandas as pd
 from collections import defaultdict
 from mycotools.lib.kontools import (
-    multisub,
     find_execs,
     format_path,
     read_json,
@@ -486,7 +485,6 @@ def cluster_iter_mmseqs(
             exit_code = 1
         #         clus_const += (interval*direction)
 
-        ofocal_len = copy.copy(focal_len)
         oclus_var = copy.copy(clus_var)
         clus_var += interval * direction
 

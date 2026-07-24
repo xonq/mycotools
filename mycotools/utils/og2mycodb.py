@@ -190,10 +190,6 @@ def cli():
         + "species [S]"
     )
     args = sys_start(sys.argv[1:], usage, 2, files=[sys.argv[1]])
-    if len(args) > 2:
-        cpus = int(args[2])
-    else:
-        cpus = 1
     db_main(format_path(args[0]), args[1])
     sys.exit(0)
 

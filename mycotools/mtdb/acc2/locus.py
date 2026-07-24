@@ -8,7 +8,7 @@ import multiprocessing as mp
 from itertools import chain
 from collections import defaultdict
 from mycotools.lib.kontools import format_path, file2list, stdin2str, setup_logging
-from mycotools.lib.dbtools import primary_db, mtdb, load_omes, omes_from_accessions
+from mycotools.lib.dbtools import primary_db, load_omes, omes_from_accessions
 from mycotools.lib.biotools import gff2list, fa2dict, dict2fa, list2gff, gff3_comps
 from mycotools.mtdb.acc2.gff import grab_gff_acc
 
@@ -114,7 +114,6 @@ def prep_output_xbase(coords_dict, acc, plusminus):
     """Prep the output based on the coordinates of a list of accessions if they
     are within the range of the bases alotted, provided by plusminus"""
     alias_list = list(coords_dict.keys())
-    index = alias_list.index(acc)
     start, end = coords_dict[acc][0], coords_dict[acc][1]
     low_bound, high_bound = start - plusminus, end + plusminus
     # acquire the indices of the accessions that fit the boundary
@@ -266,10 +265,6 @@ def cli():
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 
-    if args.cpu < mp.cpu_count():
-        cpu = args.cpu
-    else:
-        cpu = mp.cpu_count()
     args.sep = args.sep.replace("'", "").replace('"', "")
 
     if args.input:

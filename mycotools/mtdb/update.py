@@ -2,7 +2,6 @@
 
 # NEED reinit implementation
 # NEED to update introduction
-# NEED a verbose option
 # NEED revert version option (ome-by-ome/list of omes)
 # NEED to reference a manually curated duplicate check
 # NEED a prohibit option to import prohibited JGI/NCBI IDs and option to update
@@ -22,6 +21,7 @@ import shutil
 import zipfile
 import requests
 import argparse
+import warnings
 import subprocess
 import numpy as np
 import pandas as pd
@@ -240,13 +240,10 @@ def init_db(
 
 
 def parse_dups(file_path):
-    """Retrieve a file containing replicated genomes and ignore these.
-    This is important for dereplication of discrepant genus naming between NCBI
-    and MycoCosm due to not adhering to conserved genus naming standards and
-    updating relic genus names. It appears that MycoCosm will name genera by
-    their anamorph occassionally, and not the consensus name - though I assume
-    this is also to some extent present in NCBI. Ultimately, a manually curated
-    file is necessary for this and should be held in a central repository."""
+    """Parse a file of replicated genomes to ignore, for dereplicating
+    discrepant NCBI/MycoCosm genus naming (e.g. MycoCosm sometimes names a genus
+    by its anamorph rather than the consensus). Requires a manually curated
+    file, ideally kept in a central repository."""
     duplicates = {}
     for line in _read_ledger(file_path):
         data = [x.rstrip() for x in line.split("\t") if x]
@@ -464,7 +461,7 @@ def dwnld_ncbi_metadata(
 
     ncbi_url = ncbi_url + group + ".txt"
     if not Path(ncbi_file).is_file():
-        getTbl = subprocess.call(["curl", ncbi_url, "-o", ncbi_file + ".tmp"])
+        subprocess.call(["curl", ncbi_url, "-o", ncbi_file + ".tmp"])
         shutil.move(ncbi_file + ".tmp", ncbi_file)
     ncbi_df = pd.read_csv(ncbi_file, sep="\t")
 
@@ -1878,6 +1875,20 @@ def control_flow(
     elif predb and lineage:
         logger.error("--predb and --lineage are incompatible")
         sys.exit(20)
+    # persistent configuration is fixed at initialization; after a database
+    # exists it is changed through `mtdb configure`, not a plain update
+    elif nonpublished and not init:
+        logger.error(
+            "--nonpublished is set at initialization; "
+            "change it afterward via `mtdb configure --nonpublished`"
+        )
+        sys.exit(174)
+    elif ncbi_only and not init:
+        logger.error(
+            "--ncbi_only is set at initialization; "
+            "change it afterward via `mtdb configure --ncbi_only`"
+        )
+        sys.exit(176)
     elif reference:
         if add:
             logger.error("--add and --reference are incompatible")
@@ -1932,16 +1943,10 @@ def control_flow(
         elif not init:
             logger.error("corrupted MycotoolsDB - no configuration found")
             sys.exit(21)
-        if not init:  # is MYCODB initialized?
-            #            rogue_bool = config['rogue']
-            #                nonpublished = config['nonpublished']
-            if bool(nonpublished) and not bool(config["nonpublished"]):
-                config["nonpublished"] = validate_t_and_c(config, discrepancy=True)
-                write_json(config, config_path)
-            if bool(config["jgi"]) and bool(ncbi_only):  # and not overwrite:
-                logger.error("--ncbi_only specified after initialization")
-                sys.exit(173)
-        elif init:
+        # the persistent config options (--nonpublished/--ncbi_only) are barred
+        # after initialization above, so a non-init run leaves the on-disk
+        # config untouched; `mtdb configure` is what edits it now
+        if init:
             if format_path(init) != format_path(os.environ["MYCODB"] + "../../"):
                 logger.error("MTDB linked. Unlink via `mtdb -u`")
                 sys.exit(175)
@@ -2014,7 +2019,7 @@ def control_flow(
         if not True:  # config['rogue']: # NEED TO MAKE THIS wget a particular URL
             old_db = db2df(db_path)
             shutil.move(db_path, update_path + Path(db_path).name)
-            git_pull = subprocess.call(
+            subprocess.call(
                 [
                     "git",
                     "pull",
@@ -2286,11 +2291,13 @@ def main():
     #    parser.add_argument('--rogue', action = 'store_true',
     #       help = 'De novo MTDB') # currently required
 
-    conf_args = parser.add_argument_group("Configuration")
+    conf_args = parser.add_argument_group(
+        "Configuration (initialization only; change later via `mtdb configure`)"
+    )
     conf_args.add_argument(
         "--nonpublished",
         action="store_true",
-        help="[FUNGI]: Include MycoCosm restricted-use",
+        help="[FUNGI, -i]: Include MycoCosm restricted-use",
     )
     conf_args.add_argument(
         "--ncbi_only", help="[FUNGI, -i]: Forego MycoCosm", action="store_true"
@@ -2338,6 +2345,12 @@ def main():
         + "restore before deferring it to a later run; DEFAULT: wait indefinitely",
     )
     run_args.add_argument("-c", "--cpu", type=int, default=1)
+    run_args.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Report per-genome JGI/NCBI search diagnostics (DEBUG logging)",
+    )
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 
@@ -2389,6 +2402,9 @@ def main():
 
 
 def cli():
+    # BioPython (Bio.Entrez) raises a UserWarning when Entrez.email is unset;
+    # silence it so update output stays readable.
+    warnings.filterwarnings("ignore", category=UserWarning, module=r"Bio(\.|$)")
     main()
 
 

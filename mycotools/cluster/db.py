@@ -120,7 +120,6 @@ def parse_1to1(hg_file, useableOmes=set()):
 
     for hg, genes in hg2gene.items():
         genes = [x for x in genes if x[: x.find("_")] in useableOmes]
-        omes = set([x[: x.find("_")] for x in genes])
     hg2gene = {
         k: v for k, v in sorted(hg2gene.items(), key=lambda x: len(x[1]), reverse=True)
     }
@@ -374,7 +373,7 @@ def main(
     )
 
     logger.info("Writing output")
-    ome2pan = pangenome_output(pan_file, aln_file, hg2gene, hg2d_omes, max_mis_ome=0)
+    pangenome_output(pan_file, aln_file, hg2gene, hg2d_omes, max_mis_ome=0)
 
     with open(hg2missing_genome_file, "w") as out:
         out.write("#hg\tmissing\n")
@@ -439,16 +438,15 @@ def main(
                 Path(d).mkdir()
         if nscg:
             srch_hgs = nschgs
-            hg_dir = nscg_dir
         else:
             srch_hgs = schgs
         for hg in srch_hgs:
             if not Path(f"{msa_dir}{hg}.mafft.faa").is_file():
-                mafft_code = align_hg(
+                align_hg(
                     f"{nscg_dir}{hg}.faa", f"{msa_dir}{hg}.mafft.faa", cpus=cpus
                 )
             if not Path(f"{hmm_dir}{hg}.hmm").is_file():
-                hmm_code = hmmbuild_hg(
+                hmmbuild_hg(
                     f"{msa_dir}{hg}.mafft.faa", f"{hmm_dir}{hg}.hmm", cpus=cpus
                 )
 

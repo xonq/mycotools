@@ -21,7 +21,6 @@ from mycotools.lib.kontools import (
     find_execs,
     mk_output,
     multisub,
-    parse_run_log,
     setup_logging,
 )
 from mycotools.lib.biotools import fa2dict, dict2fa
@@ -29,10 +28,6 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-try:
-    from clipkit import clipkit
-except ImportError:
-    logger.error("clipkit is not installed. Install via `conda` or `pip`")
 try:
     from ete3 import Tree
 except ImportError:
@@ -132,7 +127,6 @@ def run_clipkit(
 
     clipkit_out_name = out_dir + Path(mafft_name).name + ".clipkit"
     if gappy:
-        mode = "gappy"
         cmd = [
             "clipkit",
             mafft_name,
@@ -155,26 +149,6 @@ def run_clipkit(
             clipkit_code = subprocess.call(
                 cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
-        #            clipkit_out = clipkit.execute(
-        #       	    input_file=mafft_name,
-        # 	            output_file=clipkit_out_name,
-        #               output_file_format='fasta',
-        #              input_file_format='fasta',
-        #             use_log = False,
-        #            complement = False,
-        #           mode=mode, gaps=gappy
-        #          )
-        # else:
-        #    with nostdout():
-        #       clipkit_out = clipkit.execute(
-        # 	        input_file=mafft_name,
-        #           output_file=clipkit_out_name,
-        #          output_file_format='fasta',
-        #         input_file_format='fasta',
-        #        use_log = False,
-        #       complement = False,
-        #      mode=mode, gaps=gappy
-        #     )
 
         # no output file, the run failed
         if not Path(clipkit_out_name).is_file():
@@ -639,7 +613,7 @@ def algn_mngr(
                     logger.debug("Alignment exists")
                 else:
                     raise ValueError
-            except (FileNotFoundError, ValueError) as e:
+            except (FileNotFoundError, ValueError):
                 # otherwise run the alignment
                 if not alignment:
                     mafft = run_mafft(
@@ -670,7 +644,7 @@ def algn_mngr(
                     clipkit_out = clipkit
                 else:
                     raise ValueError
-            except (FileNotFoundError, ValueError) as e:
+            except (FileNotFoundError, ValueError):
                 clipkit_out = run_clipkit(
                     name,
                     mafft,
@@ -875,7 +849,6 @@ def main(
     if not partition and hpc_prep:
         hpc = hpc_prep
 
-    output_dir_prep = str(Path.cwd()) + "/"
     # the fasta data should be a path if it is a string
     if isinstance(fasta_path, str):
         out_dir, wrk_dir, files = prep_fasta_path_input(fasta_path, output_dir)

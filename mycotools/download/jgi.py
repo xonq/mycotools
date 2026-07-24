@@ -14,16 +14,9 @@ drives directly (no Globus):
        the ``download_files`` endpoint, authorized with
        ``Authorization: Bearer <session token>``.
 
-The file-selection hierarchy mirrors ``parse_xml`` (retained below as the
-canonical reference and for backwards-compatible imports). In particular the
-GFF3 hierarchy selects the *filtered* gene models only - JGI ``jat_label``
+The GFF3 hierarchy selects the *filtered* gene models only - JGI ``jat_label``
 ``genes_filtered`` (i.e. the GeneCatalog / FilteredModels ``.gff``) - never the
-unfiltered ``genes_all`` models, exactly as the XML parser did.
-
-The ``get-directory`` helpers below (``jgi_login``, ``dwnld_xml``,
-``retrieve_xml``, ``parse_xml``, ``jgi_dwnld``) are RETIRED and no longer called:
-genome.jgi.doe.gov now answers that endpoint with a 302 to the API docs, so they
-can only fail. Do not wire them back into a download path.
+unfiltered ``genes_all`` models.
 
 PLEASE respect JGI's rate limits.
 """
@@ -36,10 +29,8 @@ import shutil
 import zipfile
 import logging
 import argparse
-import subprocess
 import requests
 import pandas as pd
-import xml.etree.ElementTree as ET
 from tqdm import tqdm
 from urllib.parse import unquote
 from mycotools.lib.kontools import format_path, outro, intro, setup_logging
@@ -55,573 +46,13 @@ RESTORE_URL = "https://files.jgi.doe.gov/request_archived_files/"
 DOWNLOAD_URL = "https://files-download.jgi.doe.gov/download_files/"
 
 
-def jgi_login(user, pwd):
-    """Login via JGI's prescribed method by creating a cookie cache and
-    downloading JGI's sign-in file."""
-
-    null = str(Path("~/.nulljgi_dwnld").expanduser())
-
-    login_cmd = subprocess.call(
-        [
-            "curl",
-            "https://signon.jgi.doe.gov/signon/create",
-            "--data-urlencode",
-            "login=" + str(user),
-            "--data-urlencode",
-            "password=" + str(pwd),
-            "-c",
-            "cookies",
-            "-o",
-            null,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    return login_cmd
-
-
-def dwnld_xml(output, ome, max_tempts=2):
-    attempts = 0
-    while not Path(f"{output}/{ome}.xml").is_file() and attempts < max_tempts:
-        attempts += 1
-        xml_cmd = subprocess.call(
-            [
-                "curl",
-                "https://genome.jgi.doe.gov/portal/ext-api/downloads/get-directory?organism="
-                + str(ome),
-                "-b",
-                "cookies",
-                "-o",
-                f"{output}/{ome}.xml",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if xml_cmd != 0:
-            logger.error(f"\t{ome} xml curl error: {xml_cmd}")
-    if not Path(f"{output}/{ome}.xml").is_file():
-        return -1
-    else:
-        return xml_cmd
-
-
-def is_directory_xml(xml_data):
-    """Return whether `xml_data` is a well-formed JGI organism-directory XML
-    document rather than an HTML error/redirect page.
-
-    JGI has, at times, served 302 redirect pages or error HTML (e.g. when an
-    endpoint is deprecated) in place of the directory XML. Those must be caught
-    here so they never reach the XML parser, which would otherwise raise an
-    unhandled ParseError and abort the entire download run."""
-    if not xml_data or not xml_data.strip():
-        return False
-    head = xml_data.lstrip().lower()
-    if head.startswith("<!doctype html") or head.startswith("<html"):
-        return False
-    try:
-        ET.fromstring(xml_data)
-    except ET.ParseError:
-        return False
-    return True
-
-
-def retrieve_xml(ome, output):
-    """Retrieve JGI xml file tree. First check if it already exists, if not then
-    download it using JGI's prescribed method. Then open the xml and check for
-    the common 'Portal does not exist' error, and validate that the response is
-    actually XML (not an HTML error/redirect page). Report failures so the ome
-    is skipped rather than crashing the parser."""
-
-    xml_path = f"{output}/{ome}.xml"
-
-    if not Path(xml_path).exists():
-        dwnld_xml(output, ome)
-    if not Path(xml_path).exists():
-        return None  # curl produced no file; caller will retry
-
-    with open(xml_path, "r") as xml_raw:
-        xml_data = xml_raw.read()
-
-    if xml_data == "Portal does not exist":
-        logger.error("\t`" + ome + " not in JGIs `organism` database")
-        Path(xml_path).unlink()
-        return 1
-    if not xml_data:
-        Path(xml_path).unlink()
-        return None
-    if not is_directory_xml(xml_data):
-        # non-XML response (e.g. an HTML error/redirect page from a deprecated
-        # JGI endpoint); discard so it never reaches parse_xml
-        logger.error(
-            f"\t`{ome}` returned a non-XML directory response "
-            "(the JGI download API may have changed); skipping"
-        )
-        Path(xml_path).unlink()
-        return 1
-
-    return -1
-
-
-def parse_xml(ft, xml_file, masked=False, forbidden={}, filtered=True):
-    """Parse the XML data to obtain the file types of interest based on
-    predefined hashes that contain the known subdirectories associated with JGI
-    organization"""
-
-    if ft == "fna":
-        if masked:
-            ft += "$masked"
-        else:
-            ft += "$unmasked"
-
-    # set the initial hashes for the XML hierarchy - relate file types to their
-    # hierarchy structure
-    ft2xt = {
-        "fna$masked": {"assembly"},
-        "fna$unmasked": {"assembly"},
-        "gff": {"annotation"},
-        "gff3": {"annotation"},
-        "transcripts": {"annotation"},
-        "est": {"ests and est clusters", "transcriptome"},
-    }
-    ft2fh = {
-        "fna$masked": ["genome assembly (masked)", "assembled scaffolds (masked)"],
-        "fna$unmasked": [
-            "assembled scaffolds (unmasked)",
-            "genome assembly (unmasked)",
-        ],
-        "gff": ["genes"],
-        "gff3": ["genes"],
-        "transcripts": ["transcripts"],
-        "est": ["ests", "transcriptome assembly"],
-    }
-
-    ft2fn = {
-        "fna$masked": ["masked", "Genome Assembly (masked)"],
-        "fna$unmasked": [
-            "AssembledScaffolds",
-            "scaffolds",
-            "Genome Assembly (unmasked)",
-            "AssemblyScaffolds",
-        ],
-        "gff3": ["GeneCatalog", "FilteredModels"],
-        "transcripts": ["transcripts"],
-        "est": ["EST"],
-    }
-    ft2fe = {
-        "fna$masked": {"fasta", "fa", "fna", "fsa"},
-        "fna$unmasked": {"fasta", "fa", "fna", "fsa"},
-        "gff": {"gff", "gff3"},
-        "gff3": {"gff", "gff3"},
-        "transcripts": {"fa", "fasta", "fna", "fsa"},
-        "est": {"fa", "fasta", "fna", "fsa"},
-    }
-
-    url, md5, filename = None, False, None
-
-    # parse the XML file; a malformed/non-XML file (e.g. an HTML error page that
-    # slipped through) must not abort the whole run
-    try:
-        tree = ET.parse(xml_file)
-    except ET.ParseError as parse_error:
-        logger.error(f"\tmalformed JGI directory XML {xml_file}: {parse_error}")
-        return None, None, False, None
-    root = tree.getroot()
-    flip = True
-    org_name = None
-    has_flipped = False
-    attempt = 0
-
-    # flip is a way to rerun the loop if the file type changes (e.g. from
-    # masked to unmasked); parse through the XML hiearchy in accord with the
-    # hashes established above
-    while flip and attempt < 10:
-        attempt += 1
-        for child in root:
-            # conserved subdirectory we need
-            if "Files" == child.attrib["name"]:
-                for chil1 in child:
-                    # does this subdirectory match what we need for our
-                    # filetype?
-                    if chil1.attrib["name"].lower() in ft2xt[ft]:
-                        # we only want the filtered models for annotations/RNA
-                        if ft in {"gff3", "gff", "transcripts", "est"}:
-                            for chil2 in chil1:
-                                if (
-                                    chil2.attrib["name"]
-                                    .lower()
-                                    .startswith("filtered models (")
-                                ):
-                                    chil1 = chil2
-                                    break
-                        # continue parsing toward the files of interest
-                        for chil2 in chil1:
-                            if any(
-                                x == chil2.attrib["name"].lower() for x in ft2fh[ft]
-                            ):
-                                for chil3 in chil2:
-                                    t_url = chil3.attrib["url"]
-                                    try:
-                                        org_name = chil3.attrib["label"]
-                                    except KeyError:
-                                        pass
-                                    # we want to avoid tape files as we cannot
-                                    # download them readily
-                                    if (
-                                        "get_tape_file" not in t_url
-                                        and t_url not in forbidden
-                                    ):
-                                        if all(
-                                            x not in chil3.attrib["filename"]
-                                            for x in ft2fn[ft]
-                                        ):
-                                            continue
-                                        file_ext_srch = re.search(
-                                            r"\.([^\.]+)$", chil3.attrib["filename"]
-                                        )
-                                        if file_ext_srch is not None:
-                                            file_ext = file_ext_srch[1]
-                                            if file_ext == "gz":
-                                                file_ext_srch = re.search(
-                                                    r"\.([^\.]+)\.gz$",
-                                                    chil3.attrib["filename"],
-                                                )
-                                                if file_ext_srch is not None:
-                                                    file_ext = file_ext_srch[1]
-                                            if file_ext not in ft2fe[ft]:
-                                                continue
-                                        else:
-                                            continue
-
-                                        url = chil3.attrib["url"]
-                                        filename = chil3.attrib["filename"]
-                                        # all requirements satisfied
-                                        try:
-                                            md5 = chil3.attrib["md5"]
-                                            break
-                                        # continue on to find an md5, or omit
-                                        # if exhaustively searched
-                                        except KeyError:
-                                            pass
-
-        # if the unmasked genome is not present, then query for the masked and
-        # vice versa
-        if not url and ft == "fna$masked":
-            ft = "fna$unmasked"
-            if not has_flipped:
-                flip = True
-            else:
-                flip = False
-        elif not url and ft == "fna$unmasked":
-            ft = "fna$masked"
-            if not has_flipped:
-                flip = True
-            else:
-                flip = False
-        else:
-            break
-
-    return filename, url, md5, org_name
-
-
-def handle_redirect_307(
-    dwnld_data, dwnld, dwnld_url, file_type, xml_file, masked, url, urls, spacer
-):
-    """Handle a redirection error by identifying a new file URL to download
-    from, or return the original if none exist"""
-    logger.info(
-        spacer + "\t" + dwnld + " link has moved. " + "Trying a different link."
-    )
-    filename, n_url, dwnld_md5, t_org_name = parse_xml(
-        file_type, xml_file, masked=masked, forbidden={url}.union(urls)
-    )
-
-    if n_url:
-        url = n_url
-        dwnld_url = prefix + url.replace("&amp;", "&")
-        dwnld = f"{output}{file_type}/{Path(dwnld_url).name}"
-    return url, dwnld_url, dwnld, {url}.union(urls), t_org_name
-
-
-def no_md5_checks(dwnld, md5, spacer):
-    """If there is no MD5, simply check the file has content in it"""
-    check_size = subprocess.run(["wc", "-l", dwnld], stdout=subprocess.PIPE)
-    check_size_res = check_size.stdout.decode("utf-8")
-    logger.info(spacer + "\t\tFile exists - no md5 to check.")
-    check_size_find = re.search(r"\d+", check_size_res)
-    size = check_size_find[0]
-    if int(size) < 10:
-        logger.warning(spacer + "\tInvalid file size.")
-    else:
-        md5 = None
-    return md5
-
-
-def jgi_dwnld(ome, file_type, output, masked=True, spacer="\t"):
-    """Download JGI files. For each type of file, use regular expressions to
-    gather the URL from the file. Grab the md5checksum if possible from the
-    xml as well. Create arbitrary values for md5 and curl_cmd. If the download file
-    already exists, then run an md5 checksum if an md5 value exists in the xml.
-
-    If the md5 does not match then open and check for typical errors. If those
-    errors exist, obtain the alternative download URL from the xml. If the md5
-    matches, pass through the rest of the function.
-
-    If there is no download md5, then check to see if the file is greater than 10
-    lines as a proxy to make sure that the file isn't empty/blatantly wrong. If it
-    passes this test, change the values to not enter the while loop at the end of
-    the function.
-
-    The while loop following the file exists error allows for 3 attempts. If a file
-    is downloaded it will check its md5 using the xml reference. If it fails, it will
-    proceed via the error checking above, wait a minute, and reattempt. If there is no
-    download md5 from the xml it will proceed via the error checking above as well. If it
-    passes the line count check, it will exit the loop - otherwise, it will attempt to
-    gather a new URL and restart after another minute wait. This is an unfortunate
-    circumnavigation of JGI's cryptic maximum ping / time before booting."""
-
-    # prepare data structures
-    prefix = "https://genome.jgi.doe.gov"
-    xml_file = f"{output}xml/{ome}.xml"
-    preexisting, check = False, 1
-
-    # stop gap for legacy input
-    if file_type == "gff":
-        file_type += "3"
-
-    ran_dwnld = False
-    org_name = None
-
-    # acquire the filename, URL, and MD5 from the xml for the file type of
-    # interest
-    filename, url, dwnld_md5, t_org_name = parse_xml(file_type, xml_file, masked=masked)
-    if t_org_name:
-        org_name = t_org_name
-    if not dwnld_md5:
-        dwnld_md5 = None
-
-    # if there is a URL present, begin the downloading process
-    if url:
-        f_urls = {url}
-        md5 = False
-        attempt = 0
-        curl_cmd = 420
-
-        dwnld_url = prefix + url.replace("&amp;", "&")
-
-        dwnld = f"{output}{file_type}/{Path(dwnld_url).name}"
-        unzip_dwnld = re.sub(r"\.gz$", "", dwnld)
-        # assume unzipped downloads have passed the checks
-        if Path(unzip_dwnld).is_file():
-            md5 = dwnld_md5
-            curl_cmd = 0
-            check = unzip_dwnld
-            preexisting = True
-
-        # if the file currently exists, then check its MD5
-        elif Path(dwnld).exists():
-            if dwnld_md5:
-                md5_cmd = subprocess.run(
-                    ["md5sum", dwnld], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                )
-                md5_res = md5_cmd.stdout.decode("utf-8")
-                md5_find = re.search(r"\w+", md5_res)
-                md5 = md5_find[0]
-
-            if md5 == dwnld_md5:
-                curl_cmd = 0
-                check = dwnld
-                preexisting = True
-            # if the MD5 does not equal the download MD5 then check the file
-            else:
-                while True:
-                    try:
-                        with open(dwnld, "r") as dwnld_data_raw:
-                            dwnld_data = dwnld_data_raw.read()
-                        if re.search("307 Temporary Redirect", dwnld_data):
-                            url, dwnld_url, dwnld, f_urls, t_org_name = (
-                                handle_redirect_307(
-                                    dwnld_data,
-                                    dwnld,
-                                    dwnld_url,
-                                    file_type,
-                                    xml_file,
-                                    masked,
-                                    url,
-                                    f_urls,
-                                    spacer,
-                                )
-                            )
-                            if t_org_name:
-                                org_name = t_org_name
-                        break
-                    except FileNotFoundError:
-                        md5 = False
-                        break
-                    except UnicodeDecodeError:
-                        if not dwnld_md5:
-                            md5 = no_md5_checks(dwnld, md5, spacer)
-                            if not md5:
-                                preexisting = True
-                                check = dwnld
-                        else:
-                            logger.warning(spacer + "\tmd5 does not match.")
-                        break
-
-        # while the MD5 doesn't match, or there is a curl error, try up to 3
-        # times to download the file
-        while md5 != dwnld_md5 and curl_cmd != 0 and attempt < 3:
-            attempt += 1
-            curl_cmd = subprocess.call(
-                ["curl", dwnld_url, "-b", "cookies", "-o", dwnld],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            ran_dwnld = True
-
-            if curl_cmd == 0:
-                check = dwnld
-
-                # acquire the MD5
-                if dwnld_md5:
-                    md5_cmd = subprocess.run(
-                        ["md5sum", dwnld],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    )
-                    md5_res = md5_cmd.stdout.decode("utf-8")
-                    md5_find = re.search(r"\w+", md5_res)
-                    try:
-                        md5 = md5_find[0]
-                    except TypeError:
-                        md5 = False
-                        if not Path(dwnld).is_file():
-                            attempt += 1
-                            continue
-                # if there is no MD5 attempt the crude file check
-                if not dwnld_md5:
-                    try:
-                        with open(dwnld, "r") as dwnld_data_raw:
-                            dwnld_data = dwnld_data_raw.read()
-                        if re.search("307 Temporary Redirect", dwnld_data):
-                            t_url, dwnld_url, dwnld, f_urls, t_org_name = (
-                                handle_redirect_307(
-                                    dwnld_data,
-                                    dwnld,
-                                    dwnld_url,
-                                    file_type,
-                                    xml_file,
-                                    masked,
-                                    url,
-                                    f_urls,
-                                    spacer,
-                                )
-                            )
-                            if t_org_name:
-                                org_name = t_org_name
-
-                            if t_url == url:
-                                logger.warning(spacer + "\t\tNo valid alternative")
-                                attempt = 4
-                                break
-                            else:
-                                url = t_url
-                        else:
-                            md5 = no_md5_checks(dwnld, md5, spacer)
-                            if not md5:
-                                break
-                    except FileNotFoundError:
-                        pass
-                    except UnicodeDecodeError:
-                        pass
-                    # this is slow, and was arbitrarily set to not overping JGI
-                    time.sleep(60)
-
-                # the download may have failed, so prepare to retry
-                elif md5 != dwnld_md5 and attempt == 1:
-                    logger.error(
-                        f"{spacer}\tmd5 does not match JGI. " + f"Attempt {attempt}"
-                    )
-                    curl_cmd = -1
-                    check = 2
-                    while True:
-                        try:
-                            with open(dwnld, "r") as dwnld_data_raw:
-                                dwnld_data = dwnld_data_raw.read()
-                            if re.search("307 Temporary Redirect", dwnld_data):
-                                t_url, dwnld_url, dwnld, f_urls, t_org_name = (
-                                    handle_redirect_307(
-                                        dwnld_data,
-                                        dwnld,
-                                        dwnld_url,
-                                        file_type,
-                                        xml_file,
-                                        masked,
-                                        url,
-                                        f_urls,
-                                        spacer,
-                                    )
-                                )
-                                if t_org_name:
-                                    org_name = t_org_name
-                                if t_url == url:
-                                    logger.warning(spacer + "\t\tNo valid alternative")
-                                    attempt = 4
-                                    break
-                            break
-                        except FileNotFoundError:
-                            pass
-                            break
-                        except UnicodeDecodeError:
-                            pass
-                            break
-                        time.sleep(60)
-                # if there are two fails, attempt a new URL
-                elif md5 != dwnld_md5 and attempt == 2:
-                    logger.error(f"{spacer}\tmd5 does not match JGI. Attempt {attempt}")
-                    curl_cmd = -1
-                    filename, n_url, dwnld_md5, t_org_name = parse_xml(
-                        file_type, xml_file, masked=masked, forbidden=f_urls
-                    )
-                    if t_org_name:
-                        org_name = t_org_name
-
-                    if n_url:
-                        url = n_url
-                        dwnld_url = prefix + url.replace("&amp;", "&")
-                        f_ulrs = {url}.union(f_urls)
-                        dwnld = f"{output}{file_type}/{Path(dwnld_url).name}"
-                    time.sleep(60)
-                    check = 2
-                elif md5 != dwnld_md5:
-                    logger.error(f"{spacer}\tmd5 does not match JGI. Attempt {attempt}")
-                    check = 2
-            else:
-                logger.error(
-                    f"{spacer}\tFailed to retrieve {file_type}. `curl` error: "
-                    + f"{curl_cmd}\n{spacer}\tAttempt {attempt}"
-                )
-                check = 2
-
-        # three strikes and the file is out
-        if attempt == 3:
-            if md5 != dwnld_md5:
-                logger.warning(spacer + "\tExcluding from database - potential failure")
-                curl_cmd = 0
-            if curl_cmd != 0:
-                logger.error(spacer + "\tFile failed to download")
-
-    return check, preexisting, file_type, ran_dwnld, org_name
-
-
 # ===========================================================================
 # JGI Data Portal API - non-Globus download implementation (see module docstring)
 # ===========================================================================
 
 # Ordered, most-preferred-first jat_labels and acceptable (un-gzipped) file
-# formats per download type. This encodes the same hierarchy as parse_xml's
-# ft2xt/ft2fh/ft2fn/ft2fe hashes above - most importantly, "gff3" resolves only
-# to the filtered gene models (genes_filtered), never genes_all.
+# formats per download type. Most importantly, "gff3" resolves only to the
+# filtered gene models (genes_filtered), never genes_all.
 _TYPE_LABELS = {
     "gff3": (["genes_filtered"], {"gff", "gff3"}),
     "faa": (["proteins_filtered"], {"fasta", "fa", "aa"}),
@@ -683,14 +114,11 @@ def _is_mito(f):
 
 def select_file(files, ftype, masked=True):
     """Choose the single best file record for `ftype` from an organism's file
-    list, mirroring parse_xml's selection hierarchy.
+    list.
 
     Mitochondrial files are excluded outright, whatever their label - see
     ``_MITO_FILE``. Of the remainder, preference goes in order to:
-      1. immediately-available (RESTORED) files over archived (PURGED) ones -
-         matching the legacy parser's avoidance of on-tape ``get_tape_file``
-         URLs (and its masked->unmasked flip when the preferred assembly was on
-         tape);
+      1. immediately-available (RESTORED) files over archived (PURGED) ones;
       2. the type's own label preference (e.g. masked assembly before unmasked
          when ``masked`` is set).
 
@@ -738,8 +166,8 @@ def select_file(files, ftype, masked=True):
 
 def parse_org_name(name):
     """Split a JGI organism name (e.g. "Acaromyces ingoldii MCA 4198 v1.0") into
-    (genus, species, strain), dropping a trailing version token. Mirrors the
-    legacy label parse (strain is the remaining words concatenated)."""
+    (genus, species, strain), dropping a trailing version token (strain is the
+    remaining words concatenated)."""
     parts = str(name).split()
     if not parts:
         return "", "", ""
@@ -769,8 +197,7 @@ def _fill_if_empty(df, i, col, value):
 def jgi_api_login(user, pwd, max_attempts=5, spacer="\t"):
     """Authenticate against JGI's signon service and return (session, token).
     The session token (the jgi_session cookie value) authorizes the search,
-    restore, and download endpoints. Exits (100) after repeated failures, as the
-    legacy login did."""
+    restore, and download endpoints. Exits (100) after repeated failures."""
     session = requests.Session()
     for attempt in range(1, max_attempts + 1):
         try:
@@ -809,19 +236,21 @@ def search_organism(session, portal_id, spacer="\t", max_attempts=3):
                     timeout=120,
                 )
             except requests.RequestException as error:
-                logger.warning(
+                # transient per-attempt search noise during bulk assimilation;
+                # DEBUG so it is hidden unless --verbose is set
+                logger.debug(
                     f"{spacer}\t{portal_id} search error (attempt {attempt}): {error}"
                 )
                 time.sleep(2)
                 continue
             if resp.status_code != 200:
-                logger.warning(f"{spacer}\t{portal_id} search HTTP {resp.status_code}")
+                logger.debug(f"{spacer}\t{portal_id} search HTTP {resp.status_code}")
                 time.sleep(2)
                 continue
             try:
                 data = resp.json()
             except ValueError:
-                logger.warning(f"{spacer}\t{portal_id} search returned non-JSON")
+                logger.debug(f"{spacer}\t{portal_id} search returned non-JSON")
                 time.sleep(2)
                 continue
             break
@@ -1325,7 +754,9 @@ def main(
 
         org, files = search_organism(session, portal_id, spacer=spacer)
         if not org:
-            logger.warning(f"{spacer}\t{portal_id} not found in JGI MycoCosm")
+            # expected during bulk assimilation; DEBUG so it is hidden unless
+            # --verbose is set
+            logger.debug(f"{spacer}\t{portal_id} not found in JGI MycoCosm")
             ome_set.add(portal_id)
             continue
 
@@ -1350,7 +781,7 @@ def main(
 
         # resume a previous run: any file already retrieved is kept as-is.
         # Downloads arrive gzipped, but curation decompresses in place, so an
-        # unzipped copy counts too (as the legacy downloader did)
+        # unzipped copy counts too
         dwnlded = {}
         for typ, f in tuple(selected.items()):
             dest = os.path.join(output, typ, f["file_name"])
@@ -1535,6 +966,13 @@ def cli():
         + "deferring it to a later run. DEFAULT: wait indefinitely",
     )
     parser.add_argument("-o", "--output", default=str(Path.cwd()), help="Output dir")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="Report per-genome search/download diagnostics (DEBUG logging)",
+    )
     args = parser.parse_args()
     setup_logging(verbose=getattr(args, "verbose", False))
 

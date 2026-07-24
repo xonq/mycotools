@@ -14,6 +14,7 @@ import urllib
 import logging
 import zipfile
 import argparse
+import warnings
 import subprocess
 import pandas as pd
 from tqdm import tqdm
@@ -23,7 +24,6 @@ from mycotools.lib.kontools import (
     intro,
     outro,
     format_path,
-    prep_output,
     mk_output,
     find_execs,
     read_json,
@@ -115,7 +115,7 @@ def esearch_ncbi(accession, column, database="assembly"):
             handle = Entrez.esearch(db=database, term=search_term)
             genome_ids = Entrez.read(handle)["IdList"]
             break
-        except (RuntimeError, urllib.error.HTTPError) as e:
+        except (RuntimeError, urllib.error.HTTPError):
             time.sleep(1)
             esc_count += 1
     else:
@@ -137,7 +137,7 @@ def esummary_ncbi(ID, database):
             continue
         if database == "assembly":
             try:  # is it populated with an FTP?
-                ftp_path = str(
+                str(
                     record["DocumentSummarySet"]["DocumentSummary"][0][
                         "FtpPath_GenBank"
                     ]
@@ -944,6 +944,9 @@ def go_sra(df, output=str(Path.cwd()) + "/", pe=True, column="sra"):
 
 
 def cli():
+    # BioPython (Bio.Entrez) raises a UserWarning when Entrez.email is unset;
+    # silence it so download output stays readable.
+    warnings.filterwarnings("ignore", category=UserWarning, module=r"Bio(\.|$)")
     parser = argparse.ArgumentParser(
         description="GenBank/RefSeq downloading utility. Downloads "
         + "accession by accession"

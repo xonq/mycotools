@@ -67,6 +67,7 @@ EXTRA_CLI_MODULES = [
     "mtdb.extract",
     "mtdb.update",
     "mtdb.predb",
+    "mtdb.configure",
     "mtdb.manage",
     "mtdb.acc2.fa",
     "mtdb.acc2.gff",

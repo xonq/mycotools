@@ -453,7 +453,6 @@ def cur_fna(cur_raw_fna_path, uncur_raw_fna_path, ome):
     ome_ver = re.search(r"(.{6}\d+).(\d+)$", ome)
     if ome_ver:
         less_ome = ome_ver[1]
-        ver_num = ome_ver[2]
     else:
         less_ome = ome
     with open(cur_raw_fna_path + ".tmp", "w") as out:

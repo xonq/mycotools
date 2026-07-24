@@ -307,10 +307,9 @@ class mtdb(dict):
             if not df["ome"]:
                 return mtdb({}, index=column)
         while retry:
-            oldCol = set()
             try:
                 columns.pop(columns.index(column))
-            except (ValueError, IndexError) as e:
+            except (ValueError, IndexError):
                 df = df.reset_index()  # will this actually reset the index
                 columns.pop(columns.index(column))
             try:
@@ -899,7 +898,6 @@ def df2std(df):
 # if rescue is set to 0, do not output database if output dir does not exit
 def df2db(df, db_path, header=False, overwrite=False, std_col=True, rescue=True):
     """Deprecated output pandas MTDB implementation to file"""
-    import pandas as pd
 
     df = df.set_index("ome")
     df = df.sort_index()
@@ -1185,7 +1183,7 @@ def gather_taxonomy_dataset(
     count = 0
     dataset_path = output_path + "ncbi_dataset.zip"
     while count < 3:
-        cmd_call = subprocess.call(cmd_scaf, stdout=v, stderr=v)
+        subprocess.call(cmd_scaf, stdout=v, stderr=v)
         try:
             with zipfile.ZipFile(dataset_path, "r") as zip_ref:
                 zip_ref.extractall(zip_ref)

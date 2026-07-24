@@ -50,7 +50,7 @@ def sort_contig(contigData):
 
 def sort_gff(unsorted_gff, idComp):
 
-    sorting_groups, oldGene = {}, None
+    sorting_groups = {}
     for i, entry in enumerate(unsorted_gff):
         seqid = entry["seqid"]
         if seqid not in sorting_groups:
@@ -105,7 +105,8 @@ def grab_cds(gff_dicts, spacer="\t"):
                     warning = True
                 raise TypeError(str(entry))
 
-    mrna_set = set([x for x in mrnas if x in set(genes)])
+    gene_set = set(genes)
+    mrna_set = set(x for x in mrnas if x in gene_set)
     out_cds = []
     for entry in gff_dicts:
         if entry["type"] == "CDS":

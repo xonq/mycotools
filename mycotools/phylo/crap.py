@@ -51,7 +51,6 @@ from mycotools.lib.kontools import (
 from mycotools.lib.biotools import fa2dict, dict2fa, gff2list, list2gff, gff3_comps
 from mycotools.mtdb.acc2.fa import dbmain as acc2fa
 from mycotools.cluster.fasta import (
-    write_data,
     ClusteringError,
     ClusterParameterError,
     main as fa2clus,
@@ -345,14 +344,12 @@ def outgroup_mngr(
     function to operate, or else an IndexError will result"""
 
     fa_path = clus_dir + focal_gene + ".fa"
-    out_name = str(focal_gene) + ".outgroup"
     output_path = clus_dir + str(focal_gene)
     dmnd_dir = clus_dir + "dmnd/"
     log_path = clus_dir + "." + str(focal_gene) + ".log"
     fa2clus_log = read_json(log_path)
     algorithm = fa2clus_log["algorithm"]  # use previous search algorithm
     successes = fa2clus_log["successes"]
-    prev_size = len(fa2dict(clus_dir + "../" + str(focal_gene) + ".fa"))
 
     max_success = successes[0]
     # it is best to have the largest cluster, so attempt to refine upward
@@ -380,7 +377,7 @@ def outgroup_mngr(
                     min_var=min_var,
                     max_var=max_var,
                 )  # aggclus will have a higher minimum connectivity
-            except ClusterParameterError as e:  # has run previously refined all it
+            except ClusterParameterError:  # has run previously refined all it
                 pass
 
         else:
@@ -469,7 +466,7 @@ def outgroup_mngr(
                     min_var=min_var,
                     max_var=max_var,
                 )  # mmseqs
-            except ClusterParameterError as e:
+            except ClusterParameterError:
                 pass
 
     [
@@ -975,10 +972,6 @@ def parse_log(log_path, new_log, out_dir):
 
     if old_log:
         try:
-            with open(old_log["db_path"], "rb") as raw:
-                db5 = hashlib.md5(raw.read()).hexdigest()
-            #           if db5 != old_log['db']: if md5 changes do somethign
-            #                rerun_search = True
             if old_log["search"] != new_log["search"]:
                 if Path(out_dir).is_dir():
                     shutil.rmtree(out_dir)
@@ -1088,7 +1081,7 @@ def crap_mngr(
                     ]
                 )
         with mp.Pool(processes=cpus) as pool:
-            gene_res = pool.starmap(extract_locus_gene, extract_loci_cmds)
+            pool.starmap(extract_locus_gene, extract_loci_cmds)
 
     logger.info("Mapping synteny diagrams on phylogeny")
     tree_file = tre_dir + query + tree_suffix
@@ -1276,7 +1269,6 @@ def locus_output_mngr(
     for each genome via overlapping homology group similarity"""
     files = collect_files(gff_dir, "genes")
     ome2files = defaultdict(list)
-    ome2locs = defaultdict(list)
     for f in files:
         ome = Path(f).name[: Path(f).name.find("_")]
         ome2files[ome].append(f)
@@ -1356,9 +1348,6 @@ def hg_main(
         hg_file, wrk_dir, useableOmes=set(db.keys())
     )
     input_hgs = input_genes2input_hgs(input_genes, gene2hg)
-    input_hg2gene = {
-        v: k for k, v in input_hgs.items()
-    }  # create hashes for transitioning
 
     todel, hits = [], set()
     for i, hg in enumerate(input_hgs):
@@ -1456,7 +1445,6 @@ def hg_main(
                         interval=interval,
                         verbose=False,
                     )
-                out_query = query + ".outgroup"
                 query_hits = all_keys
                 out_keys = list(set(all_keys).difference(set(in_keys)))
                 logger.debug("" + str(len(in_keys)) + " gene ingroup")
@@ -1687,7 +1675,6 @@ def search_main(
             return
 
     skips = list(search_fas.keys())
-    omes = set(db["ome"])
     if not len(search_fas) == len(query_fa):
         if binary == "diamond":
             binary = "blastp"
@@ -1763,7 +1750,6 @@ def search_main(
                         interval=interval,
                         verbose=False,
                     )
-                out_query = query + ".outgroup"
                 query_hits = all_keys
                 out_keys = list(set(all_keys).difference(set(in_keys)))
                 logger.debug("" + str(len(in_keys)) + " gene ingroup")
@@ -1771,7 +1757,7 @@ def search_main(
                     logger.debug("" + str(len(out_keys)) + " gene outgroup")
             else:
                 logger.warning("could not detect outgroup for root")
-        null = crap_mngr(
+        crap_mngr(
             db,
             query,
             query_hits,
@@ -1848,7 +1834,7 @@ def search_main(
                 logger.debug("" + str(len(out_keys)) + " gene outgroup")
         else:
             query_fa = fa2dict(wrk_dir + query + ".fa")
-        null = crap_mngr(
+        crap_mngr(
             db,
             query,
             query_hits,

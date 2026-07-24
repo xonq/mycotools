@@ -6,7 +6,7 @@ import sys
 import argparse
 import multiprocessing as mp
 from mycotools.lib.biotools import gff2list, list2gff
-from mycotools.lib.dbtools import mtdb, primary_db, load_omes, omes_from_accessions
+from mycotools.lib.dbtools import primary_db, load_omes, omes_from_accessions
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 from pathlib import Path
 
@@ -135,10 +135,6 @@ def cli():
             else:
                 accs = [args.accession]
 
-    if args.cpu < mp.cpu_count():
-        cpu = args.cpu
-    else:
-        cpu = mp.cpu_count()
 
     # if no gff is provided, then acquire it from the primary database
     db_path = format_path(args.mtdb)
@@ -148,7 +144,6 @@ def cli():
         gff_lists = db_main(db, accs, cpus=args.cpu)
     # otherwise just use what is available
     else:
-        gff_path = format_path(args.gff)
         gff_lists = gff_main(gff_data, accs)
 
     # if there is an inputted accession, then print the output to stdout

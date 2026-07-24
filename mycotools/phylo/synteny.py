@@ -17,7 +17,6 @@ from mycotools.lib.kontools import (
     mk_output,
     find_execs,
     intro,
-    outro,
     setup_logging,
 )
 from mycotools.lib.dbtools import mtdb, primary_db
@@ -265,14 +264,13 @@ def compile_loci(db, ome2i, gene2hg, window, cpus=1):
 
 def form_cooccur_array(cooccur_dict, ome2i):
 
-    count, hgx2i, size_dict, cooccur_arrays, i2hgx = 0, {}, {}, {}, {}
+    hgx2i, cooccur_arrays, i2hgx = {}, {}, {}
     cooccur_dict = {
         k: tuple(sorted(v))
         for k, v in sorted(cooccur_dict.items(), key=lambda x: len(x[0]))
     }
     cooccur_arrays = np.zeros([len(ome2i), len(cooccur_dict)], dtype=np.int32)
 
-    old_len = len(list(cooccur_dict.keys())[0])
     for i, hgx in enumerate(list(cooccur_dict.keys())):
         i2hgx[i] = hgx
         hgx2i[hgx] = i

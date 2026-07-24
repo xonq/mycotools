@@ -55,7 +55,7 @@ def add_missing(gff_list, intron, comps, ome):
         "5_prime_utr",
         "3_prime_utr",
     }
-    out_genes, t_list, rnas, introns = {}, [], {}, {}
+    out_genes, rnas, introns = {}, {}, {}
     mtdb_count, pseudocount, alt_alias = 1, 1, {}
     cds2par = {}
     rna_changes = {}  # a dictionary for changing ambigious rna id names for
@@ -429,7 +429,6 @@ def add_missing(gff_list, intron, comps, ome):
 
     out_list = []
     for geneID, geneInfo in out_genes.items():
-        multiRNA = False
         if (
             not any(x["type"] in {"RNA", "mRNA"} for x in geneInfo["rna"])
             and not geneInfo["tmrna"]
@@ -454,8 +453,6 @@ def add_missing(gff_list, intron, comps, ome):
             #            if geneInfo['rna'][0]['type'] != 'mRNA' and not geneInfo['cds']:
             #               del geneInfo['tmrna']
 
-            if len(geneInfo["rna"]) > 1:
-                multiRNA = True
             if any(x["type"] == "mRNA" for x in geneInfo["rna"]):
                 del geneInfo["tmrna"]
             # post-translational/transcriptional modification and not multiple

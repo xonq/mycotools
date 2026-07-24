@@ -135,7 +135,6 @@ def run_ex_hmm(args, hmmsearch_out, output):
 def comp_hmm_acc2fa(db, q_dict, coords=True):
 
     cmd_tuples = []
-    fa_dict = {ome: row["faa"] for ome, row in db.items()}
     for q in q_dict:
         cmd_tuples.append(
             (
@@ -500,7 +499,7 @@ def run_mmseq(
 
     if createdb_cmds:
         logger.info(f"Creating {len(createdb_cmds)} mmseqs search dbs")
-        createdb_outs = multisub(createdb_cmds, processes=cpus, verbose=2)
+        multisub(createdb_cmds, processes=cpus, verbose=2)
 
     # if len(query) > 1:
     #     if not os.path.isfile(f'{out_dir}db/query.dbtype'):
@@ -518,7 +517,7 @@ def run_mmseq(
         mergedbs_cmd.extend([f"{db_dir}{ome}_{biotype}" for ome in seq_db["ome"]])
         mergedbs_cmd.insert(3, f"{out_dir}db/searchdb")
         logger.info("Merging search dbs")
-        mergedbs_out = subprocess.call(mergedbs_cmd)  # , stderr = subprocess.DEVNULL,
+        subprocess.call(mergedbs_cmd)  # , stderr = subprocess.DEVNULL,
     #                                        stdout = subprocess.DEVNULL)
 
     logger.info("Searching")
@@ -545,7 +544,7 @@ def run_mmseq(
         if coverage:
             search_cmd.extend(["-c", str(coverage)])
 
-        search_out = subprocess.call(search_cmd)  # , stderr = subprocess.DEVNULL,
+        subprocess.call(search_cmd)  # , stderr = subprocess.DEVNULL,
         #                                     stdout = subprocess.DEVNULL)
         results_cmd = [
             mmseqs,
@@ -557,7 +556,7 @@ def run_mmseq(
             "--format-output",
             "qset,target,pident,tstart,tend,evalue,bits",
         ]
-        results_out = subprocess.call(
+        subprocess.call(
             results_cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
         )
 
@@ -648,7 +647,6 @@ def compile_results(res_dict, skip=[]):
 def comp_mmseq_acc2fa(db, biotype, output_res, coords=False, skip=None):
 
     cmd_tuples = []
-    fa_dict = {ome: row["faa"] for ome, row in db.set_index().items()}
     for q, ome_dict in output_res.items():
         q_accs = []
         if coords:
@@ -894,9 +892,9 @@ def o_by_o_search(
                 coverage=coverage * 100,
                 search_args=search_arg,
             )
-            db_outs = multisub(db_tups, processes=cpus)
+            multisub(db_tups, processes=cpus)
             logger.info(f"\t{len(search_tups)} searches to run")
-            search_outs = multisub(
+            multisub(
                 search_tups, processes=cpus, verbose=2, injectable=True
             )
             scale = 100000
@@ -913,7 +911,7 @@ def o_by_o_search(
                 coverage=coverage * 100,
                 search_args=search_arg,
             )
-            search_outs = multisub(
+            multisub(
                 search_tups, processes=cpus, verbose=2, shell=True, injectable=True
             )
             scale = 100000
@@ -1119,7 +1117,6 @@ def parse_db_out(db, file_, bitscore=0, pident=0, ppos=0, max_hits=None):
                     ome_results[ome] = []
                 ome_results[ome].append(data)
 
-    x_omes = set(db["ome"])
 
     if max_hits:
         out_results = {}
@@ -1226,7 +1223,6 @@ def blast_main(
 ):
 
     if blast in {"tblastn", "blastp"}:
-        seq_type = "prot"
         biotype = "faa"
     elif blast in {"blastx", "blastn"}:
         biotype = "fna"
@@ -1308,7 +1304,6 @@ def blast_main(
     acc2fa_cmds = comp_blast_acc2fa(
         db, biotype, output_res, coords=coordinate, skip=None
     )
-    queryfa = fa2dict(query)
     for query1, cmd in acc2fa_cmds.items():
         output_fas[query1] = {}
         logger.info("\t" + query1)

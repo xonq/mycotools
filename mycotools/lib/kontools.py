@@ -689,7 +689,6 @@ def inject_args(args, injection_calls):
     manual_cmds = []
     for in_call in injection_calls:
         if in_call in args:
-            prohibited = {";", "&", "&&", "\n", "\r"}
             man_index = args.index(in_call)
             for char in args[man_index + 1]:
                 if char == '"' or char == "'":
@@ -726,7 +725,6 @@ def intro(script_name, args_dict, credit="", log=False, stdout=True):
     """
 
     start_time = datetime.now()
-    date = start_time.strftime("%Y%m%d")
 
     out_str = (
         "\n" + script_name + "\n" + credit + "\nExecution began: " + str(start_time)

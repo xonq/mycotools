@@ -13,7 +13,7 @@ def cli():
 
     setup_logging()
     usage = "USAGE: Inputs amino acid fasta outputs linear protein weights"
-    args = sys_start(sys.argv, usage, 1)
+    sys_start(sys.argv, usage, 1)
 
     fa = fa2dict(format_path(sys.argv[1]))
     print("#protein\tkDa", flush=True)

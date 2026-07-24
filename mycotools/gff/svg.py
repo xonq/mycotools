@@ -9,7 +9,6 @@ import random
 import logging
 import argparse
 from mycotools.lib.kontools import (
-    sys_start,
     format_path,
     file2list,
     get_colors,
@@ -238,10 +237,6 @@ def cli():
     types = set(args.type.split())
 
     if args.input:
-        if args.output:
-            out_dir = format_path(args.output)
-        else:
-            out_dir = format_path(str(Path(args.input).parent))
         gffs = file2list(args.input)
         for entry in gffs:
             if entry.endswith("/"):

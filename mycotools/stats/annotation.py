@@ -63,7 +63,6 @@ def compile_alia(gff_path, output, ome=None):
     # calculate the lengths of each specific type
     gene_lens = sorted([v[1] - v[0] for v in chain(*list(gene_dict.values()))])
     prot_lens = sorted([v[1] - v[0] for v in chain(*list(prot_dict.values()))])
-    exon_lens = sorted([v[1] - v[0] for v in chain(*list(exon_dict.values()))])
     mrna_lens = sorted([v[1] - v[0] for v in chain(*list(mrna_dict.values()))])
     trna_lens = sorted([v[1] - v[0] for v in chain(*list(trna_dict.values()))])
     orna_lens = sorted([v[1] - v[0] for v in chain(*list(orna_dict.values()))])
@@ -74,7 +73,6 @@ def compile_alia(gff_path, output, ome=None):
     # calculate the number of each specific type
     gene_len = len(gene_lens)
     prot_len = len(prot_lens)
-    exon_len = len(exon_lens)
     mrna_len = len(mrna_lens)
     trna_len = len(trna_lens)
     orna_len = len(orna_lens)

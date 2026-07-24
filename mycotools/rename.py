@@ -22,7 +22,6 @@ def parse_args(args):
     )
     allowable = {"_", "-", "!", "`", ",", ".", "~", "'", '"'}
 
-    arg_index = len(args) - 1
     valid_ranks = {"kingdom", "subphylum", "phylum", "class", "order", "family"}
     tax, rank = False, None
     for arg in args[2:]:

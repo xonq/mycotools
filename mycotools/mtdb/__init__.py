@@ -35,6 +35,9 @@ SUBCOMMANDS = {
     "u": "update",
     "predb": "predb",
     "p": "predb",
+    "configure": "configure",
+    "config": "configure",
+    "c": "configure",
     "manage": "manage",
     "m": "manage",
     "accession": "acc2",
@@ -51,6 +54,7 @@ Subcommands (all following arguments are forwarded to the subcommand):
   extract     (e)   extract a sub-.mtdb file
   update      (u)   update / initialize the primary MTDB
   predb       (p)   add local genomes to the primary MTDB
+  configure   (c)   change the primary MTDB configuration
   manage      (m)   MTDB management utility
   accession   (a)   retrieve data for accession(s) by format (fa/gff/gbk/locus)
   files       (f)   symlink/copy selected files from the database

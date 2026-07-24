@@ -59,7 +59,7 @@ def jgi_redundancy_check(db, jgi_df, duplicates={}, ome_col="portal", jgi2ncbi={
             else:
                 try:
                     db_version = float(db["version"][ome])
-                except (ValueError, AttributeError) as e:
+                except (ValueError, AttributeError):
                     db_version = float(db["version"][ome].replace("v", ""))
                     db.at[ome, "version"] = db_version
             if version > db_version and db["source"][ome] == "jgi":
@@ -328,7 +328,6 @@ def main(
     if isinstance(ref_db, pd.DataFrame):
         ref_db["index"] = ref_db["assembly_acc"].copy()
         ref_db = ref_db.set_index("index")
-        old_len = len(jgi_df)
         jgi_df, new_ref_db, updates, old_rows = jgi_redundancy_check(
             ref_db, jgi_df, ome_col=ome_col, jgi2ncbi=jgi2ncbi
         )

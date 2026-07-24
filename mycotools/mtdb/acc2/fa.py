@@ -6,7 +6,7 @@ import sys
 import argparse
 from collections import defaultdict
 from mycotools.lib.biotools import fa2dict, dict2fa, reverse_complement
-from mycotools.lib.dbtools import mtdb, primary_db, load_omes, omes_from_accessions
+from mycotools.lib.dbtools import primary_db, load_omes, omes_from_accessions
 from mycotools.lib.kontools import format_path, stdin2str, setup_logging
 
 logger = logging.getLogger(__name__)

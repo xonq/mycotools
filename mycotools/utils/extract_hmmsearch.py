@@ -275,7 +275,7 @@ def main(data, accession, best, threshold, evalue, bitscore, query=True, header=
                 align += t_aligns
                 out[x] = (hits, align)
     else:
-        htis, align = "", ""
+        align = ""
         if header:
             hits = (
                 "#seq\tseq_e\tseq_score\tseq_bias\tdom_e\tdom_score\tdom_bias\texp\tN\n"
