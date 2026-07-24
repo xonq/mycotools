@@ -34,7 +34,6 @@ from mycotools.lib.dbtools import (
     db2df,
     df2db,
     gather_taxonomy,
-    assimilate_tax,
     primary_db,
     login_check,
     log_editor,
@@ -141,8 +140,6 @@ def validate_t_and_c(config, discrepancy=False):
 def gen_config(
     branch="fungi",
     forbidden="",
-    repo=None,
-    rogue=False,
     nonpublished=False,
     jgi=False,
     rank2lineages={},
@@ -150,10 +147,8 @@ def gen_config(
 
     config = {
         "forbidden": forbidden,
-        "repository": repo,
         "branch": branch,
         "nonpublished": nonpublished,
-        "rogue": rogue,
         "jgi": jgi,
         "lineage_constraints": rank2lineages,
     }
@@ -161,25 +156,28 @@ def gen_config(
     return config
 
 
-def add_vars(init_dir, dbtype):
-    """Initialize the environmental variables for MTDB"""
-    mtdb_initialize(init_dir, dbtype, init=True)
-
-
 def init_db(
     init_dir,
-    branch,
-    envs,
-    dbtype,
+    kingdom,
     date=None,
-    rogue=False,
     nonpublished=False,
     jgi=True,
-    repo=None,
     rank2lineages={},
 ):
     """Initialize database in `init_dir`"""
 
+    init_dir = format_path(init)
+    if Path(init_dir).is_dir():
+        init_dir += "mycotoolsdb/"
+    if not init_dir.endswith("/"):
+        init_dir += "/"
+    envs = {
+        "MYCOFNA": init_dir + "data/fna",
+        "MYCOFAA": init_dir + "data/faa",
+        "MYCOGFF3": init_dir + "data/gff3",
+        "MYCODB": init_dir + "mtdb/",
+    }
+    os.environ["MYCODB"] = init_dir + "mtdb/"
     new_dirs = [
         init_dir + "data/",
         init_dir + "config/",
@@ -198,45 +196,42 @@ def init_db(
             Path(new_dir).mkdir()
 
     config = gen_config(
-        branch=branch,
-        rogue=rogue,
+        branch=kingdom,
         forbidden="$MYCODB/log/forbidden.tsv",
         nonpublished=nonpublished,
         jgi=jgi,
-        repo=repo,
         rank2lineages=rank2lineages,
     )
     write_json(config, init_dir + "config/mtdb.json", indent=1)
 
-    if not rogue:
-        # this is a relic, and needs to be adjusted to a central reference if
-        # that is ever created
-        if not Path(init_dir + "mtdb").is_dir():
-            # NEED TO CHANGE FROM SSH TO LINK ONCE OPEN (config['repository'])
-            git_exit = subprocess.call(
-                [
-                    "git",
-                    "clone",
-                    "git@gitlab.com:xonq/mtdb",
-                    init_dir + "mtdb",
-                    #                '-b', branch
-                ]
-            )
-            if git_exit != 0:
-                logger.error("git clone failed.")
-                sys.exit(2)
-        else:
-            logger.info("mycotoolsdb directory already exists")
-        # NEED TO ADD GITIGNORE TO GIT
-        if not primary_db():
-            logger.error("no YYYYmmdd.mtdb in " + format_path(envs["MYCODB"]))
-            sys.exit(3)
-    else:
-        new_db_path = output + "mtdb/" + mtdb_sql.PRIMARY_DB_NAME
-        if not Path(new_db_path).is_file():
-            mtdb().to_sql(new_db_path)
+    new_db_path = output + "mtdb/" + mtdb_sql.PRIMARY_DB_NAME
+    if not Path(new_db_path).is_file():
+        mtdb().to_sql(new_db_path)
+
+    for env in envs:
+        os.environ[env] = envs[env]
+    orig_db = db2df(mtdb())  # initialize a new database
+    update_path = output + "log/" + date + "/"
+    if not Path(update_path).is_dir():
+        Path(update_path).mkdir()
+    mtdb_initialize(
+        init_dir, init=True
+    ) 
 
     return output, config
+
+
+def set_update_path
+    try:
+        output = format_path("$MYCODB/..")
+    except KeyError:
+        raise FileNotFoundError("MTDB not linked. Link via `mtdb -i <DB_PATH>`")
+    update_path = output + "log/" + date + "/"
+    if not Path(update_path).is_dir():
+        Path(update_path).mkdir()    
+    else:
+        orig_db = db2df(primary_db())
+
 
 
 def parse_dups(file_path):
@@ -250,13 +245,6 @@ def parse_dups(file_path):
         if data:
             duplicates[data[0]] = [data[1], data[2], data[3]]
     return duplicates
-
-
-# def add_dups(
-#   dup_code, dup_entry, file_path
-#  ):
-#    edit = dup_code + '\t' + '\t'.join(dup_entry)
-#   log_editor(file_path, dup_code, edit)
 
 
 def acq_forbid_omes(file_path):
@@ -613,9 +601,7 @@ def prep_taxa_cols(
 ):
 
     skip_prep = list(acc2org.keys())
-    gca_prep = [x.upper().replace("GCF", "GCA") for x in skip_prep]
-    gcf_prep = [x.upper().replace("GCA", "GCF") for x in skip_prep]
-    skip = set(gca_prep + gcf_prep)
+    skip = set(x.upper().replace("GCF", "GCA") for x in skip_prep)
     if not Path(taxonomy_dir).is_dir():
         Path(taxonomy_dir).mkdir()
 
@@ -634,40 +620,8 @@ def prep_taxa_cols(
         f"\t\t{len(acc2meta) + len(org_failed)}",
         "genomes queried from GenBank",
     )
-    if len(df["assembly_acc"]):
-        logger.debug(f'\t\t{len(org_failed)/len(df["assembly_acc"])*100}% failed')
 
-    # check for RefSeq for failed entries
-    refseq_dir = taxonomy_dir + "refseq/"
-    if not Path(refseq_dir).is_dir():
-        Path(refseq_dir).mkdir()
-    missing_accs = sorted(
-        set(df["assembly_acc"]).difference(
-            set(acc2org_n.keys()).union(set(acc2org.keys()))
-        )
-    )
-    reattempt_acc = []
-    for acc in missing_accs:
-        if acc.upper().startswith("GCA"):
-            reattempt_acc.append(acc.upper().replace("GCA_", "GCF_"))
-        elif acc.upper().startswith("GCF"):
-            reattempt_acc.append(acc.upper().replace("GCF_", "GCA_"))
-    logger.debug(f"Checking RefSeq for {len(reattempt_acc)} entries")
-    acc2org_rs, acc2meta_rs, org_failed_2 = dwnld_data_reports(
-        reattempt_acc,
-        refseq_dir,
-        api=api,
-        report_chunk=report_chunk,
-        max_attempts=max_attempts,
-        exit_code=10,
-        label="RefSeq",
-    )
-    logger.debug(f"{len(acc2meta_rs)} genome(s) queried from RefSeq")
-
-    acc2org, acc2meta = {**acc2org, **acc2org_n, **acc2org_rs}, {
-        **acc2meta,
-        **acc2meta_rs,
-    }
+    acc2org = {**acc2org, **acc2org_n}
 
     df["strain"] = ""
     todel = set()
@@ -716,10 +670,10 @@ def prep_jgi_cols(jgi_df, name_col="name"):
 
 
 def clean_ncbi_df(
-    ncbi_df, update_path, kingdom="Fungi", api=None, max_attempts=3,
+    ncbi_df_init, update_path, kingdom="Fungi", api=None, max_attempts=3,
     report_chunk=1000
 ):
-    ncbi_df = ncbi_df.astype(str).replace(np.nan, "")
+    ncbi_df = ncbi_df_init.rename(columns={"Assembly Accession": "assembly_acc"}).astype(str).replace(np.nan, "")
 
     acc2org_path = update_path + "../gca2org.tsv"
     acc2org = {}
@@ -1211,7 +1165,7 @@ def ref_update(
             output_path=tax_path,
             tax_dicts=tax_dicts,
         )
-        new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts)
+        genus_dicts = new_mtdb.assimilate_tax(tax_dicts)
 
         for ome, row in update_mtdb.items():
             if row["genus"] in genus_dicts:
@@ -1267,11 +1221,12 @@ def extract_constraint_lineages(
                     passing_tax.add(genus)
 
     df = df[df["genus"].isin(passing_tax)]
+    
     return tax_dicts, df
 
 
 def taxonomy_update(
-    orig_db,
+    db,
     update_path,
     date,
     config,
@@ -1281,8 +1236,8 @@ def taxonomy_update(
 ):
     """Reset the taxonomy for the entire database and overwrite the previous
     tax path data to accomodate new taxonomy"""
-    taxless_db = orig_db.reset_index()
-    taxless_db["taxonomy"] = [{} for x in taxless_db["taxonomy"]]
+    db = db.reset_index()
+    db["taxonomy"] = [{} for x in db["taxonomy"]]
     tax_path = f"{update_path}../taxonomy.tsv"
     gca_path = f"{update_path}../gca2org.tsv"
     if Path(tax_path).is_file():
@@ -1290,13 +1245,10 @@ def taxonomy_update(
     if Path(gca_path).is_file():
         Path(gca_path).rename(update_path + "old_gca2org.tsv")
     tax_dicts = gather_taxonomy(
-        taxless_db, api_key=ncbi_api, king=group, rank=rank, output_path=tax_path
+        db, api_key=ncbi_api, king=group, rank=rank, output_path=tax_path
     )
-    tax_db, genus_dicts = assimilate_tax(taxless_db, tax_dicts)
-    if not isinstance(tax_db, mtdb):
-        return tax_db, mtdb.pd2mtdb(tax_db)
-    else:
-        return tax_db.mtdb2pd(), tax_db
+    genus_dicts = db.assimilate_tax(tax_dicts)
+    return db
 
 
 def rogue_update(
@@ -1320,7 +1272,6 @@ def rogue_update(
     tape_wait=None,
 ):
     """Initialize/update a standalone primary MTDB"""
-    # NEED to mark none for new databases' refdb
     # initialize update
     logger.info("Initializing run")
     mk_wrk_dirs(update_path)
@@ -1338,11 +1289,10 @@ def rogue_update(
     else:
         api = 3
     ncbi_db_path = update_path + date + ".ncbi.mtdb"
-    pre_ncbi_df0 = dwnld_ncbi_metadata(update_path + date + ".ncbi.tsv", group=group)
-    pre_ncbi_df1 = pre_ncbi_df0.rename(columns={"Assembly Accession": "assembly_acc"})
+    ncbi_df_init = dwnld_ncbi_metadata(update_path + date + ".ncbi.tsv", group=group)
     logger.info("Acquiring NCBI metadata")
     ncbi_df, acc2meta = clean_ncbi_df(
-        pre_ncbi_df1,
+        ncbi_df_init,
         update_path,
         kingdom=kingdom,
         api=ncbi_api,
@@ -1352,9 +1302,6 @@ def rogue_update(
     # begin extracting lineages of interest and store tax_dicts for later
     tax_path = f"{update_path}../taxonomy.tsv"
     tax_dicts = read_prev_tax(tax_path)
-    #    tax_dicts = {v['genus']: v['taxonomy'] for k, v in db.iterrows() \
-    #                if any(y for x, y in v['taxonomy'].items() \
-    #                      if x not in {'genus', 'species', 'strain'})}
     if lineage_constraints:
         lineage_path = update_path + date + ".ncbi.posttax.df"
         if not Path(lineage_path).is_file():
@@ -1529,8 +1476,6 @@ def rogue_update(
                 date,
                 format_path("$MYCODB/../log/failed.tsv"),
             )
-        #        for dup in new_dups:
-        #           add_dups(dup, new_dups[dup], format_path('$MYCODB/../log/duplicates.tsv'))
         refdbncbi = mtdb.pd2mtdb(new_db)
         refdbncbi.df2db(update_path + date + ".ncbi.ref.mtdb")
         ncbi_predb.to_csv(update_path + date + ".ncbi.predb", sep="\t", index=None)
@@ -1594,7 +1539,6 @@ def rogue_update(
         tax_dicts=tax_dicts,
         output_path=tax_path,
     )
-    new_mtdb, genus_dicts = assimilate_tax(new_mtdb, tax_dicts)
 
     if jgi_mtdb and ncbi_mtdb:
         update_mtdb = mtdb(
@@ -1608,6 +1552,9 @@ def rogue_update(
         logger.info("No updates")
         sys.exit(0)
 
+    genus_dicts = new_mtdb.assimilate_tax(tax_dicts)
+    update_mtdb.assimilate_tax(genus_dicts)
+
     return new_mtdb, update_mtdb
 
 
@@ -1616,43 +1563,6 @@ def rm_raw_data(out_dir):
     for i in ["faa", "gff3", "gff", "xml", "fna"]:
         if Path(out_dir + i).is_dir():
             shutil.rmtree(out_dir + i)
-
-
-def gen_algn_db(update_path, omes):
-    """Generate an alignment database for the complete primary MTDB"""
-    date = Path(os.path.abspath(update_path)).name
-    fas = collect_files(os.environ["MYCOFAA"] + "/", ".faa")
-    fas = [x for x in fas if Path(x).name[:-6] in omes]
-    mkdb_base = "cat " + " ".join(fas)
-    mkdb_blast = (
-        mkdb_base
-        + " | makeblastdb -in -"
-        + " -out "
-        + os.environ["MYCOGFF3"]
-        + "../db/"
-        + date
-        + ".db -parse_seqids -dbtype prot -title "
-        + date
-        + ".db"
-    )
-    #  mkdb_mmseqs = mkdb_base + ' | mmseqs createdb stdin ' + \
-    #       format_path('$MYCOFAA/' + date + '.mmseqs.db') + '; ' + \
-    #        'mmseqs createdb ' + format_path('$MYCOFAA/' + date + \
-    #     '.mmseqs.db') + ' tmp'
-    with open(update_path + date + "_makeblastdb.sh", "w") as out:
-        out.write(mkdb_blast)
-    # with open(update_path + date + '_mmseqsdb.sh', 'w') as out:
-    #   out.write(mkdb_mmseqs)
-
-    logger.debug(
-        "OPTIONAL: To generate blastdb | mmseqsdb, run the following"
-        + "\nbash "
-        + update_path
-        + date
-        + "_makeblastdb.sh"
-    )
-    # bash ' + update_path \
-    #   + date + '_mmseqsdb.sh')
 
 
 def check_add_mtdb(orig_mtdb, add_mtdb, update_path, overwrite=True):
@@ -1678,10 +1588,6 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path, overwrite=True):
     else:
         for ome in overwrite_omes:
             del add_mtdb[ome]
-    #        eprint('\nERROR: assembly accessions ("assembly_acc") must be ' \
-    #              'unique between databases: ', flush = True)
-    #      eprint(', '.join(failed_aas), flush = True)
-    #     sys.exit(123)
 
     orig_omes = set(orig_mtdb.keys())
     new_omes = set(add_mtdb.keys())
@@ -1816,31 +1722,42 @@ def db2primary(addDB, refDB, save=False, combined=False):
     return refDB.reset_index(), updates
 
 
-def control_flow(
-    init,
-    update,
-    reference,
-    add,
-    taxonomy,
-    predb,
-    save,
-    nonpublished,
-    ncbi_only,
-    lineage,
-    rank,
-    kingdom,
-    failed,
-    forbidden,
-    resume,
-    no_md5,
-    cpu,
-    ncbi_api=None,
-    overwrite=True,
-    chunk=25,
-    report_chunk=1000,
-    tape_wait=None,
-):
+def error_handle_args(args):
+    if not any(x for x in [args.init, args.update, args.reference, args.add, args.taxonomy]:
+        raise ValueError("--update/--init/--reference/--add/--taxonomy must be specified")
+    elif args.reference and not args.init:
+        raise ValueError("--reference requires a --init directory")
+    elif args.lineage and not args.rank:
+        raise ValueError("--lineage requires --rank")
+    elif args.lineage and not args.init:
+        raise ValueError("--lineage requires --init")
+    elif args.predb and not args.init:
+        raise ValueError("--predb requires --init")
+    elif args.predb and args.lineage:
+        raise ValueError("--predb and --lineage are incompatible")
+    # persistent configuration is fixed at initialization; after a database
+    # exists it is changed through `mtdb configure`, not a plain update
+    elif args.nonpublished and not args.init:
+        raise ValueError(
+            "--nonpublished is set at initialization; "
+            "change it afterward via `mtdb configure --nonpublished`"
+        )
+    elif args.ncbi_only and not args.init:
+        raise ValueError(
+            "--ncbi_only is set at initialization; "
+            "change it afterward via `mtdb configure --ncbi_only`"
+        )
+    elif args.reference:
+        if args.add:
+            raise ValueError("--add and --reference are incompatible")
+        elif args.predb:
+            raise ValueError("--reference and --predb are incompatible")
 
+
+def import_handle_args(args):
+
+
+def determine_kingdom(raw_kingdom):
     abbr2king = {
         "a": "animals",
         "r": "archaea",
@@ -1849,66 +1766,16 @@ def control_flow(
         "p": "plants",
     }
 
-    kingdom = kingdom.lower()
+    kingdom = raw_kingdom.lower()
     if kingdom not in abbr2king:
         if kingdom not in set(abbr2king.values()):
-            logger.error("invalid --kingdom")
-            sys.exit(431)
+            raise KeyError("invalid --kingdom")
     else:
         kingdom = abbr2king[kingdom]
+    return kingdom
 
-    if not init and not update and not reference and not add and not taxonomy:
-        logger.error("--update/--init/--reference/--add must be specified")
-        sys.exit(15)
-    elif reference and not init:
-        logger.error("--reference requires a --init directory")
-        sys.exit(14)
-    elif lineage and not rank:
-        logger.error("--lineage requires --rank")
-        sys.exit(16)
-    elif lineage and not init:
-        logger.error("--lineage requires --init")
-        sys.exit(17)
-    elif predb and not init:
-        logger.error("--predb requires --init")
-        sys.exit(18)
-    elif predb and lineage:
-        logger.error("--predb and --lineage are incompatible")
-        sys.exit(20)
-    # persistent configuration is fixed at initialization; after a database
-    # exists it is changed through `mtdb configure`, not a plain update
-    elif nonpublished and not init:
-        logger.error(
-            "--nonpublished is set at initialization; "
-            "change it afterward via `mtdb configure --nonpublished`"
-        )
-        sys.exit(174)
-    elif ncbi_only and not init:
-        logger.error(
-            "--ncbi_only is set at initialization; "
-            "change it afterward via `mtdb configure --ncbi_only`"
-        )
-        sys.exit(176)
-    elif reference:
-        if add:
-            logger.error("--add and --reference are incompatible")
-            sys.exit(13)
-        elif predb:
-            logger.error("--reference and --predb are incompatible")
-            sys.exit(19)
-        else:
-            ref_db = mtdb(format_path(reference), add_paths=False)
 
-    if predb:
-        predb_path = format_path(predb)
-
-    #    if rogue:
-    rogue_bool = True
-    if ncbi_only:
-        jgi = False
-    else:
-        jgi = True
-
+def parse_lineages(lineage, rank):
     # acquire the lineages inputted
     rank2lineages = {}
     permitted_ranks = {"phylum", "subphylum", "class", "order", "family", "genus"}
@@ -1916,12 +1783,10 @@ def control_flow(
         lineage_constraints = split_input(lineage)
         rank_constraints = split_input(rank)
         if len(lineage_constraints) != len(rank_constraints):
-            logger.error("--lineage must be same length as --rank")
-            sys.exit(18)
+            raise ValueError("--lineage must be same length as --rank")
         for rank_c in rank_constraints:
             if rank_c.lower() not in permitted_ranks:
-                logger.error(f"accepted ranks: {permitted_ranks}")
-                sys.exit(22)
+                raise KeyError(f"accepted ranks: {permitted_ranks}")
         rank2lineages = defaultdict(set)
         for i, v in enumerate(lineage_constraints):
             rank2lineages[rank_constraints[i]].add(v.lower())
@@ -1929,11 +1794,13 @@ def control_flow(
             k.lower(): sorted(v)
             for k, v in sorted(rank2lineages.items(), key=lambda x: x[0])
         }
+    return rank2lineages
 
+
+def import_config(init, config_path=format_path("$MYCODB/../config/mtdb.json")):
     # parse and check configuration nonpublished arguments
     config = {}
     if "MYCODB" in os.environ:
-        config_path = format_path("$MYCODB/../config/mtdb.json")
         if Path(config_path).is_file():
             config = read_json(format_path(config_path))
             # for LEGACY installs:
@@ -1941,8 +1808,7 @@ def control_flow(
                 config["lineage_constraints"] = {}
                 write_json(config, config_path)
         elif not init:
-            logger.error("corrupted MycotoolsDB - no configuration found")
-            sys.exit(21)
+            raise FileNotFoundError(f"no configuration found at {config_path}")
         # the persistent config options (--nonpublished/--ncbi_only) are barred
         # after initialization above, so a non-init run leaves the on-disk
         # config untouched; `mtdb configure` is what edits it now
@@ -1950,286 +1816,128 @@ def control_flow(
             if format_path(init) != format_path(os.environ["MYCODB"] + "../../"):
                 logger.error("MTDB linked. Unlink via `mtdb -u`")
                 sys.exit(175)
+    return config
 
+
+def parse_nonpublished(kingdom, nonpublished, config):
     # nonfungi is nonpublished by default because it is all GenBank
     if kingdom != "fungi":
-        nonpublished = True
-    # archaic placeholder for reference / rogue DB setup
-    elif nonpublished and rogue_bool:
-        nonpublished = validate_t_and_c(config)
+        return True
+    elif nonpublished:
+        return validate_t_and_c(config)
     else:
-        nonpublished = False
+        return False
 
-    #    branch = 'stable'
-    db_path = primary_db()
-    if not resume or add:
-        date = datetime.now().strftime("%Y%m%d")
-    else:
-        date = str(resume)
 
-    if not ncbi_api:
-        ncbi_api, jgi_email, jgi_pwd = login_check()
+def gather_login(ncbi_only):
+
+    ncbi_api, jgi_email, jgi_pwd = login_check()
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
-    if init:
-        dbtype = kingdom
-        init_dir = format_path(init)
-        if Path(init_dir).is_dir():
-            init_dir += "mycotoolsdb/"
-        if not init_dir.endswith("/"):
-            init_dir += "/"
-        envs = {
-            "MYCOFNA": init_dir + "data/fna",
-            "MYCOFAA": init_dir + "data/faa",
-            "MYCOGFF3": init_dir + "data/gff3",
-            "MYCODB": init_dir + "mtdb/",
-        }
-        os.environ["MYCODB"] = init_dir + "mtdb/"
-        output, config = init_db(
-            init_dir,
-            dbtype,
-            envs,
-            dbtype,
-            date=date,
-            rogue=rogue_bool,
-            nonpublished=nonpublished,
-            jgi=jgi,
-            repo=format_path(reference),
-            rank2lineages=rank2lineages,
-        )
-        for env in envs:
-            os.environ[env] = envs[env]
-        orig_db = db2df(mtdb())  # initialize a new database
-        update_path = output + "log/" + date + "/"
-        if not Path(update_path).is_dir():
-            Path(update_path).mkdir()
-        mtdb_initialize(
-            init_dir, init=True
-        )  # init_dir + 'config/mtdb.json', init = True)
-    else:
-        try:
-            output = format_path("$MYCODB/..")
-        except KeyError:
-            logger.error("MTDB not linked. Link via `mtdb -i <DB_PATH>`")
-            sys.exit(50)
-        update_path = output + "log/" + date + "/"
-        if not Path(update_path).is_dir():
-            Path(update_path).mkdir()
-        if not True:  # config['rogue']: # NEED TO MAKE THIS wget a particular URL
-            old_db = db2df(db_path)
-            shutil.move(db_path, update_path + Path(db_path).name)
-            subprocess.call(
-                [
-                    "git",
-                    "pull",
-                    "-C",
-                    output + "mtdb",
-                    config["repository"],
-                    "-B",
-                    branch,
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            new_db = db2df(primary_db())
-            orig_db = pd.concat([old_db, new_db.loc[~new_db["ome"].isin(old_db.index)]])
-        else:
-            orig_db = db2df(primary_db())
+    if ncbi_only:
+        jgi_email = None
 
-    orig_db = orig_db.dropna(subset=["ome"])
+    return ncbi_api, jgi_email, jgi_pwd
 
+
+def set_kingdom_options(config, jgi_email): 
     if config["branch"] in {"prokaryote", "bacteria"}:
-        jgi = False
+        jgi_email = None
         group = "prokaryotes"
-        king = "bacteria"  # NEED to make DB tools pull from this
+        taxon = "bacteria"  # NEED to make DB tools pull from this
         rank = "superkingdom"
     elif config["branch"] in {"plants"}:
-        jgi = False
+        jgi_email = None
         group = "eukaryotes"
-        king = "viridiplantae"
+        taxon = "viridiplantae"
         rank = "kingdom"
-    #    elif config['branch'] in {'protists'}:
-    #       jgi = False
-    #      group = 'eukaryotes'
-    #     king = 'protists'
-    #    rank = 'kingdom'
     elif config["branch"] in {"animals"}:
-        jgi = False
+        jgi_email = None
         group = "eukaryotes"
-        king = "metazoa"
+        taxon = "metazoa"
         rank = "kingdom"
     elif config["branch"] in {"archaea"}:
-        jgi = False
+        jgi_email = None
         group = "prokaryotes"
-        king = "Archaea"
+        taxon = "Archaea"
         rank = "superkingdom"
     else:
-        jgi = not ncbi_only
         group = "eukaryotes"
-        king = "fungi"
+        taxon = "fungi"
         rank = "kingdom"
+    return jgi_email, group, taxon, rank
 
-    if add or predb:  # add predb2mtdb 2 master database
-        if predb:
-            add_predb = read_predb(predb_path)
-            addDB, init_failed = predb2mtdb(
-                add_predb, orig_db, update_path, cpus=cpu, remove=False, spacer="\t\t"
-            )
-            if init_failed:
-                if not failed:
-                    logger.error("some genomes failed curation")
-                    sys.exit(23)
-                else:
-                    logger.warning("some genomes failed curation")
 
+def prep_predb_opts(predb, rerun_failed):
+    add_predb = read_predb(predb)
+    add_mtdb, init_failed = predb2mtdb(
+        add_predb, orig_db, update_path, cpus=cpu, remove=False, spacer="\t\t"
+    )
+    if init_failed:
+        if not rerun_failed:
+            raise ValueError("some genomes failed curation")
         else:
-            addDB = mtdb(format_path(add))
-        # we need full Paths for an addDB
-        gff_fail, fna_fail, faa_fail = False, False, False
-        if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["gff3"]):
-            logger.error("some GFF paths do not exist")
-            gff_fail = [
-                x
-                for x in addDB.reset_index()["gff3"]
-                if not Path(format_path(x)).is_file()
-            ]
-            logger.debug(",".join(gff_fail))
-        if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["fna"]):
-            logger.error("some FNA paths do not exist")
-            fna_fail = [
-                x
-                for x in addDB.reset_index()["fna"]
-                if not Path(format_path(x)).is_file()
-            ]
-            logger.debug(",".join(fna_fail))
-        if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["faa"]):
-            logger.error("some FAA paths do not exist")
-            faa_fail = [
-                x
-                for x in addDB.reset_index()["faa"]
-                if not Path(format_path(x)).is_file()
-            ]
-            logger.debug(",".join(faa_fail))
-        if gff_fail or fna_fail or faa_fail:
-            sys.exit(124)
+            logger.warning("some genomes failed curation")
+    return add_mtdb
 
-        addDB["aquisition_date"] = [date for x in addDB["ome"]]
-        # make date the acquisition time
-        orig_mtdb = mtdb(primary_db())
-        update_path = format_path("$MYCODB/../" + "log/" + date + "/")
-        if not Path(update_path).is_dir():
-            Path(update_path).mkdir()
-        shutil.copy(primary_db(), update_path)
 
-        tax_path = f"{update_path}../taxonomy.tsv"
-        tax_dicts = read_prev_tax(tax_path)
-        tax_dicts = gather_taxonomy(
-            addDB,
-            api_key=ncbi_api,
-            king=king,
-            rank=rank,
-            tax_dicts=tax_dicts,
-            output_path=tax_path,
-        )
-        addDB, genus_dicts = assimilate_tax(addDB, tax_dicts)
-        addDB = check_add_mtdb(orig_mtdb, addDB, update_path, overwrite)
-
-        write_forbid_omes(set(addDB["ome"]), format_path("$MYCODB/../log/relics.txt"))
-
-        new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save=True)
-        return write_primary(new_mtdb, date, update_path)
-
-    if taxonomy:
-        new_db, update_mtdb = taxonomy_update(
-            orig_db,
-            update_path,
-            date,
-            config,
-            ncbi_api,
-            rank=rank,
-            group=king,
-        )
-        write_primary(update_mtdb, date, update_path)
-        sys.exit(0)
-    elif reference:
-        if any(not x for x in ref_db["published"]) and not nonpublished:
-            logger.warning(
-                "nonpublished data detected in reference and will be ignored"
-            )
-
-        new_mtdb, update_mtdb = ref_update(
-            ref_db,
-            update_path,
-            date,
-            failed,
-            jgi_email,
-            jgi_pwd,
-            config,
-            ncbi_api,
-            cpus=cpu,
-            check_MD5=not bool(no_md5),
-            jgi=jgi,
-            group=group,
-            kingdom=king,
-            remove=not save,
-            taxonomy=True,
-            chunk=chunk,
-            tape_wait=tape_wait,
-        )
-    else:
-        new_mtdb, update_mtdb = rogue_update(
-            orig_db,
-            update_path,
-            date,
-            failed,
-            jgi_email,
-            jgi_pwd,
-            config,
-            ncbi_api,
-            cpus=cpu,
-            check_MD5=not bool(no_md5),
-            jgi=jgi,
-            group=group,
-            kingdom=king,
-            remove=not save,
-            lineage_constraints=config["lineage_constraints"],
-            chunk=chunk,
-            report_chunk=report_chunk,
-            tape_wait=tape_wait,
+def add2mtdb(): #####
+    # we need full Paths for an addDB
+    gff_fail, fna_fail, faa_fail = False, False, False
+    if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["gff3"]):
+        logger.error("some GFF paths do not exist")
+        gff_fail = [
+            x
+            for x in addDB.reset_index()["gff3"]
+            if not Path(format_path(x)).is_file()
+        ]
+        logger.error(",".join(gff_fail))
+    if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["fna"]):
+        logger.error("some FNA paths do not exist")
+        fna_fail = [
+            x
+            for x in addDB.reset_index()["fna"]
+            if not Path(format_path(x)).is_file()
+        ]
+        logger.error(",".join(fna_fail))
+    if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["faa"]):
+        logger.error("some FAA paths do not exist")
+        faa_fail = [
+            x
+            for x in addDB.reset_index()["faa"]
+            if not Path(format_path(x)).is_file()
+        ]
+        logger.error(",".join(faa_fail))
+    if gff_fail or fna_fail or faa_fail:
+        raise FileNotFoundError(:w
         )
 
-    if not update_mtdb:
-        logger.info("No new data acquired")
+    addDB["aquisition_date"] = [date for x in addDB["ome"]]
+    # make date the acquisition time
+    orig_mtdb = mtdb(primary_db())
+    update_path = format_path("$MYCODB/../" + "log/" + date + "/")
+    if not Path(update_path).is_dir():
+        Path(update_path).mkdir()
+    shutil.copy(primary_db(), update_path)
 
-    if not save:  # add the predb2mtdb and remove files
-        #        df2db(db, format_path('$MYCODB/' + date + '.mtdb'))
-        # output new database and new list of omes
+    tax_path = f"{update_path}../taxonomy.tsv"
+    tax_dicts = read_prev_tax(tax_path)
+    tax_dicts = gather_taxonomy(
+        addDB,
+        api_key=ncbi_api,
+        king=king,
+        rank=rank,
+        tax_dicts=tax_dicts,
+        output_path=tax_path,
+    )
+    genus_dicts = addDB.assimilate_tax(tax_dicts)
+    addDB = check_add_mtdb(orig_mtdb, addDB, update_path, overwrite)
 
-        logger.info("Moving data into database")
-        write_forbid_omes(
-            set(new_mtdb["ome"]), format_path("$MYCODB/../log/relics.txt")
-        )
+    write_forbid_omes(set(addDB["ome"]), format_path("$MYCODB/../log/relics.txt"))
 
-        full_mtdb, update_omes = db2primary(
-            update_mtdb, new_mtdb, save=False, combined=True
-        )
-        write_primary(full_mtdb, date, update_path)
-        rm_raw_data(update_path)
-        logger.info("MTDB update complete")
-    #        gen_algn_db(
-    #           update_path, set(full_mtdb['ome'])
-    #          )
-    else:
-        # NEED to: insert note aboutrunning updatedb on predb
-        new_mtdb.df2db(format_path(update_path + date + ".mtdb"))
-        logger.info(
-            f"Update ready for `mtdb u -a` at "
-            + f'{format_path(update_path + date + ".mtdb")}'
-        )
-        # output new database and new list of omes
-
-    return primary_db()
+    new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save=True)
+    return #### 
 
 
 def main():
@@ -2287,10 +1995,6 @@ def main():
         help="[-u] Do not integrate/delete new data; -a to complete",
     )
 
-    #    init_args.add_argument('--reinit', action = 'store_true', help = 'Redownload all web data')
-    #    parser.add_argument('--rogue', action = 'store_true',
-    #       help = 'De novo MTDB') # currently required
-
     conf_args = parser.add_argument_group(
         "Configuration (initialization only; change later via `mtdb configure`)"
     )
@@ -2312,9 +2016,6 @@ def main():
     )
     conf_args.add_argument("--failed", action="store_true", help="Rerun/ignore failed")
     conf_args.add_argument("--forbidden", action="store_true", help="Rerun forbidden")
-
-    #    conf_args.add_argument('--deviate', action = 'store_true', help = 'Deviate' \
-    #       + ' from existing config without prompting')
 
     run_args = parser.add_argument_group("Runtime")
     run_args.add_argument("--resume", type=int, help="Resume previous date (YYYYmmdd)")
@@ -2358,7 +2059,7 @@ def main():
         "Primary MTDB": primary_db(verbose=False),
         "Update": args.update,
         "Initialize": args.init,
-        "Add": format_path(args.add),  #'Rogue': rogue_bool,
+        "Add": format_path(args.add),
         "Include Restricted": bool(args.nonpublished),
         "Resume": args.resume,
         "Retry failed": args.failed,
@@ -2374,38 +2075,135 @@ def main():
     find_execs(["datasets"], exit={"datasets"})
     start_time = intro("Update MycotoolsDB", args_dict)
 
-    control_flow(
-        args.init,
-        args.update,
-        args.reference,
-        args.add,
-        args.taxonomy,
-        args.predb,
-        args.save,
-        args.nonpublished,
-        args.ncbi_only,
-        args.lineage,
-        args.rank,
-        args.kingdom,
-        args.failed,
-        args.forbidden,
-        args.resume,
-        args.no_md5,
-        args.cpu,
-        overwrite=not args.keep,
-        chunk=args.chunk,
-        report_chunk=args.report_chunk,
-        tape_wait=args.tape_wait,
-    )
+    error_handle_args(args)
+    kingdom = determine_kingdom(args.kingdom)
+    rank2lineages = parse_lineages(args.lineage, args.rank)
+    config = import_config(args.init)
+    nonpublished = parse_nonpublished(kingdom, args.nonpublished, config)
+    ncbi_api, jgi_email, jgi_pwd = gather_login(args.ncbi_only)
 
-    outro(start_time)
+    db_path = primary_db()
+    if not resume or add:
+        date = datetime.now().strftime("%Y%m%d")
+    else:
+        date = str(resume)
+
+    if args.init
+        init_db(
+            format_path(args.init),
+            kingdom,
+            date=date,
+            nonpublished=nonpublished,
+            jgi=bool(jgi_email),
+            rank2lineages=rank2lineages
+        )
+    else:
+        ######
+
+    orig_db = orig_db.dropna(subset=["ome"])
+
+    jgi_email, group, taxon, rank = set_kingdom_options(config, jgi_email)
+
+    if args.add or args.predb:  # add predb2mtdb 2 master database
+        if args.predb:
+            addDB = prep_predb_opts(format_path(args.predb), args.failed)
+        else:
+            addDB = mtdb(format_path(args.add))
+        add2mtdb() #########
+        write_primary(new_mtdb, date, update_path)
+        return 0
+    elif args.taxonomy:
+        update_mtdb = taxonomy_update(
+            orig_db,
+            update_path,
+            date,
+            config,
+            ncbi_api,
+            rank=rank,
+            group=taxon,
+        )
+        write_primary(update_mtdb, date, update_path)
+        return 0
+    elif args.reference:
+        ref_db = mtdb(format_path(reference), add_paths=False)
+        if any(not x for x in ref_db["published"]) and not nonpublished:
+            logger.warning(
+                "nonpublished data detected in reference and will be ignored"
+            )
+        new_mtdb, update_mtdb = ref_update(
+            ref_db,
+            update_path,
+            date,
+            failed,
+            jgi_email,
+            jgi_pwd,
+            config,
+            ncbi_api,
+            cpus=args.cpu,
+            check_MD5=not bool(args.no_md5),
+            jgi=bool(jgi_email),
+            group=group,
+            kingdom=taxon,
+            remove=not args.save,
+            taxonomy=True,
+            chunk=args.chunk,
+            tape_wait=args.tape_wait,
+        )
+    else:
+        new_mtdb, update_mtdb = rogue_update(
+            orig_db,
+            update_path,
+            date,
+            args.failed,
+            jgi_email,
+            jgi_pwd,
+            config,
+            ncbi_api,
+            cpus=args.cpu,
+            check_MD5=not bool(args.no_md5),
+            jgi=bool(jgi_email),
+            group=group,
+            kingdom=taxon,
+            remove=not args.save,
+            lineage_constraints=config["lineage_constraints"],
+            chunk=args.chunk,
+            report_chunk=args.report_chunk,
+            tape_wait=args.tape_wait,
+        )
+
+    if not update_mtdb:
+        logger.info("No new data acquired")
+
+    if not args.save:  # add the predb2mtdb and remove files
+        # output new database and new list of omes
+        logger.info("Moving data into database")
+        write_forbid_omes(
+            set(new_mtdb["ome"]), format_path("$MYCODB/../log/relics.txt")
+        )
+
+        full_mtdb, update_omes = db2primary(
+            update_mtdb, new_mtdb, save=False, combined=True
+        )
+        write_primary(full_mtdb, date, update_path)
+        rm_raw_data(update_path)
+        logger.info("MTDB update complete")
+        return 0
+    else:
+        # NEED to: insert note aboutrunning updatedb on predb
+        new_mtdb.df2db(format_path(update_path + date + ".mtdb"))
+        logger.info(
+            f"Update ready for `mtdb u -a` at "
+            + f'{format_path(update_path + date + ".mtdb")}'
+        )
+        return 0
 
 
 def cli():
     # BioPython (Bio.Entrez) raises a UserWarning when Entrez.email is unset;
     # silence it so update output stays readable.
     warnings.filterwarnings("ignore", category=UserWarning, module=r"Bio(\.|$)")
-    main()
+    exit_code = main()
+    outro(start_time)
 
 
 if __name__ == "__main__":
