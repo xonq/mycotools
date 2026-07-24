@@ -470,7 +470,7 @@ class mtdb(dict):
         tax_dicts = self._reconcile_tax_dicts(set(self["genus"]), tax_dicts, forbid)
         for i, genus in enumerate(self["genus"]):
             self["taxonomy"][i] = tax_dicts[genus]
-        return mtdb(self), tax_dicts
+        return tax_dicts
 
     def infer_rank(self, lineage: str) -> str:
         """Identify the taxonomic rank associated with an inputted lineage of
@@ -757,8 +757,6 @@ def login_check(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=
             hash_pwd = sys.stdin.readline().rstrip()
         key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode("utf-8")))
         fernet = Fernet(key)
-        #        with open(format_path(info_path) + '/.key', 'rb') as raw_key:
-        #           fernet = Fernet(raw_key)
         with open(format_path(info_path), "rb") as raw_file:
             data = raw_file.read()
         decrypted = fernet.decrypt(data)
@@ -1242,21 +1240,6 @@ def parse_dataset_taxonomy(tax_json, tax_dicts, tax_head, rank_head):
 # read_tax is defined as mtdb.read_tax; expose it at module scope for the
 # historical ``from mycotools.lib.dbtools import read_tax`` import.
 read_tax = mtdb.read_tax
-
-
-# assimilate taxonomy dictionary strings and append the resulting taxonomy string dicts to an inputted database
-# forbid a list of taxonomic classifications you are not interested in and return a new database
-def assimilate_tax(db, tax_dicts, ome_index="ome", forbid=None):
-    """Backwards-compatible dispatcher for ``mtdb.assimilate_tax``; retains the
-    deprecated pandas DataFrame path."""
-    if forbid is None:
-        forbid = mtdb._forbidden_tax_ranks
-    if isinstance(db, mtdb):
-        return db.assimilate_tax(tax_dicts, forbid=forbid)
-    tax_dicts = mtdb._reconcile_tax_dicts(set(db["genus"]), tax_dicts, forbid)
-    for i, row in db.iterrows():
-        db.at[i, "taxonomy"] = tax_dicts[row["genus"]]
-    return db, tax_dicts
 
 
 def parse_user_config(mtdb_config_file=format_path("~/.mycotools/config.json")):

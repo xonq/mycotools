@@ -207,10 +207,7 @@ def main(
                 ]  # remove it from potential updates
 
         ref_db = ref_db.set_index("assembly_acc")  # update ome codes
-        #  try:
         ncbi_df = ncbi_df.set_index("assembly_acc")
-        #    except KeyError: # no entries
-        #       return ncbi_df, ref_db.reset_index(), failed, duplicates
         for assembly_acc, update_d in update_check.items():
             old_ome = update_d[-1]
             ncbi_df.at[assembly_acc, "ome"] = old_ome
