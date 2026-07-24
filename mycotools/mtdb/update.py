@@ -156,14 +156,7 @@ def gen_config(
     return config
 
 
-def init_db(
-    init_dir,
-    kingdom,
-    date=None,
-    nonpublished=False,
-    jgi=True,
-    rank2lineages={},
-):
+def init_db(init_dir):
     """Initialize database in `init_dir`"""
 
     init_dir = format_path(init)
@@ -195,42 +188,17 @@ def init_db(
         if not Path(new_dir).is_dir():
             Path(new_dir).mkdir()
 
-    config = gen_config(
-        branch=kingdom,
-        forbidden="$MYCODB/log/forbidden.tsv",
-        nonpublished=nonpublished,
-        jgi=jgi,
-        rank2lineages=rank2lineages,
-    )
-    write_json(config, init_dir + "config/mtdb.json", indent=1)
-
     new_db_path = output + "mtdb/" + mtdb_sql.PRIMARY_DB_NAME
     if not Path(new_db_path).is_file():
         mtdb().to_sql(new_db_path)
 
     for env in envs:
         os.environ[env] = envs[env]
-    orig_db = db2df(mtdb())  # initialize a new database
-    update_path = output + "log/" + date + "/"
-    if not Path(update_path).is_dir():
-        Path(update_path).mkdir()
+    init_db = db2df(mtdb())  # initialize a new database
     mtdb_initialize(
         init_dir, init=True
     ) 
-
-    return output, config
-
-
-def set_update_path
-    try:
-        output = format_path("$MYCODB/..")
-    except KeyError:
-        raise FileNotFoundError("MTDB not linked. Link via `mtdb -i <DB_PATH>`")
-    update_path = output + "log/" + date + "/"
-    if not Path(update_path).is_dir():
-        Path(update_path).mkdir()    
-    else:
-        orig_db = db2df(primary_db())
+    return init_db, f"{output}log/{date}/"
 
 
 
@@ -1673,7 +1641,7 @@ def check_add_mtdb(orig_mtdb, add_mtdb, update_path, overwrite=True):
         return add_mtdb.reset_index()
 
 
-def db2primary(addDB, refDB, save=False, combined=False):
+def db2primary(add_mtdb, refDB, save=False, combined=False):
     """Finalize an update by converting the updated MTDB into the primary
     MTDB"""
     if save:
@@ -1681,11 +1649,11 @@ def db2primary(addDB, refDB, save=False, combined=False):
     else:
         move_ns = shutil.move
 
-    addDB = addDB.reset_index()
+    add_mtdb = add_mtdb.reset_index()
     refDB = refDB.reset_index()
 
     refOmes = set(refDB["ome"])
-    addOmes = set(addDB["ome"])
+    addOmes = set(add_mtdb["ome"])
     base_ome2update_ome = {re.search(r"^[^\d]+\d+", x)[0]: x for x in refDB["ome"] if x}
     updates = {}
     refDB = refDB.set_index()
@@ -1694,36 +1662,36 @@ def db2primary(addDB, refDB, save=False, combined=False):
         raise KeyError(
             "ERROR: ome codes exist in database. Rerun `mtdb predb` or remove manually"
         )
-    for i, ome in enumerate(addDB["ome"]):
+    for i, ome in enumerate(add_mtdb["ome"]):
         base_ome = re.search(r"^[^\d]+\d+", ome)[0]
         if base_ome in base_ome2update_ome:
             update_ome = base_ome2update_ome[base_ome]
             updates[update_ome] = ome
             del refDB[update_ome]
-        if Path(addDB["gff3"][i]).is_file():
-            move_ns(addDB["gff3"][i], format_path("$MYCOGFF3/" + ome + ".gff3"))
+        if Path(add_mtdb["gff3"][i]).is_file():
+            move_ns(add_mtdb["gff3"][i], format_path("$MYCOGFF3/" + ome + ".gff3"))
         elif not Path(format_path("$MYCOGFF3/" + ome + ".gff3")).is_file():
             raise FileNotFoundError(f"{ome} missing gff3 for unknown reason")
-        if Path(addDB["fna"][i]).is_file():
-            move_ns(addDB["fna"][i], format_path("$MYCOFNA/" + ome + ".fna"))
+        if Path(add_mtdb["fna"][i]).is_file():
+            move_ns(add_mtdb["fna"][i], format_path("$MYCOFNA/" + ome + ".fna"))
         elif not Path(format_path("$MYCOFNA/" + ome + ".fna")).is_file():
             raise FileNotFoundError(f"{ome} missing fna for unknown reason")
-        if Path(addDB["faa"][i]).is_file():
-            move_ns(addDB["faa"][i], format_path("$MYCOFAA/" + ome + ".faa"))
+        if Path(add_mtdb["faa"][i]).is_file():
+            move_ns(add_mtdb["faa"][i], format_path("$MYCOFAA/" + ome + ".faa"))
         elif not Path(format_path("$MYCOFAA/" + ome + ".faa")).is_file():
             raise FileNotFoundError(f"{ome} missing faa for unknown reason")
-        addDB["gff3"][i] = os.environ["MYCOGFF3"] + ome + ".gff3"
-        addDB["fna"][i] = os.environ["MYCOFNA"] + ome + ".fna"
-        addDB["faa"][i] = os.environ["MYCOFAA"] + ome + ".faa"
-    addDB = addDB.set_index()
-    for ome, row in addDB.items():
+        add_mtdb["gff3"][i] = os.environ["MYCOGFF3"] + ome + ".gff3"
+        add_mtdb["fna"][i] = os.environ["MYCOFNA"] + ome + ".fna"
+        add_mtdb["faa"][i] = os.environ["MYCOFAA"] + ome + ".faa"
+    add_mtdb = add_mtdb.set_index()
+    for ome, row in add_mtdb.items():
         refDB[ome] = row
 
     return refDB.reset_index(), updates
 
 
 def error_handle_args(args):
-    if not any(x for x in [args.init, args.update, args.reference, args.add, args.taxonomy]:
+    if not any(x for x in [args.init, args.update, args.reference, args.add, args.taxonomy]):
         raise ValueError("--update/--init/--reference/--add/--taxonomy must be specified")
     elif args.reference and not args.init:
         raise ValueError("--reference requires a --init directory")
@@ -1752,9 +1720,6 @@ def error_handle_args(args):
             raise ValueError("--add and --reference are incompatible")
         elif args.predb:
             raise ValueError("--reference and --predb are incompatible")
-
-
-def import_handle_args(args):
 
 
 def determine_kingdom(raw_kingdom):
@@ -1797,7 +1762,17 @@ def parse_lineages(lineage, rank):
     return rank2lineages
 
 
-def import_config(init, config_path=format_path("$MYCODB/../config/mtdb.json")):
+def parse_nonpublished(kingdom, nonpublished, config):
+    # nonfungi is nonpublished by default because it is all GenBank
+    if kingdom != "fungi":
+        return True
+    elif nonpublished:
+        return validate_t_and_c(config)
+    else:
+        return False
+
+
+def import_config(init, kingdom, nonpublished, jgi, rank2lineages, config_path=format_path("$MYCODB/../config/mtdb.json")):
     # parse and check configuration nonpublished arguments
     config = {}
     if "MYCODB" in os.environ:
@@ -1816,17 +1791,20 @@ def import_config(init, config_path=format_path("$MYCODB/../config/mtdb.json")):
             if format_path(init) != format_path(os.environ["MYCODB"] + "../../"):
                 logger.error("MTDB linked. Unlink via `mtdb -u`")
                 sys.exit(175)
+    elif args.init:
+        config = gen_config(
+            branch=kingdom,
+            forbidden="$MYCODB/log/forbidden.tsv",
+            nonpublished=nonpublished,
+            jgi=jgi,
+            rank2lineages=rank2lineages,
+        )
+        write_json(config, init_dir + "config/mtdb.json", indent=1)
+
+    nonpublished = parse_nonpublished(kingdom, nonpublished, config)
+    config["nonpublished"] = nonpublished
     return config
 
-
-def parse_nonpublished(kingdom, nonpublished, config):
-    # nonfungi is nonpublished by default because it is all GenBank
-    if kingdom != "fungi":
-        return True
-    elif nonpublished:
-        return validate_t_and_c(config)
-    else:
-        return False
 
 
 def gather_login(ncbi_only):
@@ -1882,38 +1860,37 @@ def prep_predb_opts(predb, rerun_failed):
     return add_mtdb
 
 
-def add2mtdb(): #####
-    # we need full Paths for an addDB
+def add2mtdb(add_mtdb, date, ncbi_api, taxon, rank):
+    # we need full Paths for an add_mtdb
     gff_fail, fna_fail, faa_fail = False, False, False
-    if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["gff3"]):
+    if not all(Path(format_path(x)).is_file() for x in add_mtdb.reset_index()["gff3"]):
         logger.error("some GFF paths do not exist")
         gff_fail = [
             x
-            for x in addDB.reset_index()["gff3"]
+            for x in add_mtdb.reset_index()["gff3"]
             if not Path(format_path(x)).is_file()
         ]
         logger.error(",".join(gff_fail))
-    if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["fna"]):
+    if not all(Path(format_path(x)).is_file() for x in add_mtdb.reset_index()["fna"]):
         logger.error("some FNA paths do not exist")
         fna_fail = [
             x
-            for x in addDB.reset_index()["fna"]
+            for x in add_mtdb.reset_index()["fna"]
             if not Path(format_path(x)).is_file()
         ]
         logger.error(",".join(fna_fail))
-    if not all(Path(format_path(x)).is_file() for x in addDB.reset_index()["faa"]):
+    if not all(Path(format_path(x)).is_file() for x in add_mtdb.reset_index()["faa"]):
         logger.error("some FAA paths do not exist")
         faa_fail = [
             x
-            for x in addDB.reset_index()["faa"]
+            for x in add_mtdb.reset_index()["faa"]
             if not Path(format_path(x)).is_file()
         ]
         logger.error(",".join(faa_fail))
     if gff_fail or fna_fail or faa_fail:
-        raise FileNotFoundError(:w
-        )
+        raise FileNotFoundError()
 
-    addDB["aquisition_date"] = [date for x in addDB["ome"]]
+    add_mtdb["aquisition_date"] = [date for x in add_mtdb["ome"]]
     # make date the acquisition time
     orig_mtdb = mtdb(primary_db())
     update_path = format_path("$MYCODB/../" + "log/" + date + "/")
@@ -1924,20 +1901,36 @@ def add2mtdb(): #####
     tax_path = f"{update_path}../taxonomy.tsv"
     tax_dicts = read_prev_tax(tax_path)
     tax_dicts = gather_taxonomy(
-        addDB,
+        add_mtdb,
         api_key=ncbi_api,
-        king=king,
+        king=taxon,
         rank=rank,
         tax_dicts=tax_dicts,
         output_path=tax_path,
     )
-    genus_dicts = addDB.assimilate_tax(tax_dicts)
-    addDB = check_add_mtdb(orig_mtdb, addDB, update_path, overwrite)
+    genus_dicts = add_mtdb.assimilate_tax(tax_dicts)
+    add_mtdb = check_add_mtdb(orig_mtdb, add_mtdb, update_path)
 
-    write_forbid_omes(set(addDB["ome"]), format_path("$MYCODB/../log/relics.txt"))
+    write_forbid_omes(set(add_mtdb["ome"]), format_path("$MYCODB/../log/relics.txt"))
 
-    new_mtdb, update_omes = db2primary(addDB, orig_mtdb, save=True)
-    return #### 
+    new_mtdb, update_omes = db2primary(add_mtdb, orig_mtdb, save=True)
+    write_primary(new_mtdb, date, update_path)
+
+
+def write_update_mtdb(new_mtdb, update_mtdb, date, update_path):
+    # output new database and new list of omes
+    logger.info("Moving data into database")
+    write_forbid_omes(
+        set(new_mtdb["ome"]), format_path("$MYCODB/../log/relics.txt")
+    )
+
+    full_mtdb, update_omes = db2primary(
+        update_mtdb, new_mtdb, save=False, combined=True
+    )
+    write_primary(full_mtdb, date, update_path)
+    rm_raw_data(update_path)
+    logger.info("MTDB update complete")
+
 
 
 def main():
@@ -2078,41 +2071,34 @@ def main():
     error_handle_args(args)
     kingdom = determine_kingdom(args.kingdom)
     rank2lineages = parse_lineages(args.lineage, args.rank)
-    config = import_config(args.init)
-    nonpublished = parse_nonpublished(kingdom, args.nonpublished, config)
     ncbi_api, jgi_email, jgi_pwd = gather_login(args.ncbi_only)
+    config = import_config(args.init, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
 
     db_path = primary_db()
-    if not resume or add:
+    if not args.resume or args.add:
         date = datetime.now().strftime("%Y%m%d")
     else:
-        date = str(resume)
+        date = str(args.resume)
 
-    if args.init
-        init_db(
-            format_path(args.init),
-            kingdom,
-            date=date,
-            nonpublished=nonpublished,
-            jgi=bool(jgi_email),
-            rank2lineages=rank2lineages
-        )
+    # initialize
+    if args.init:
+        orig_db, update_path = init_db(format_path(args.init))
+    # load existing database
     else:
-        ######
+        try:
+            output = format_path("$MYCODB/..")
+        except KeyError:
+            raise FileNotFoundError("MTDB not linked. Link via `mtdb -i <DB_PATH>`")
+        update_path = output + "log/" + date + "/"
+        orig_db = db2df(primary_db())
 
+    if not Path(update_path).is_dir():
+        Path(update_path).mkdir()
     orig_db = orig_db.dropna(subset=["ome"])
-
     jgi_email, group, taxon, rank = set_kingdom_options(config, jgi_email)
 
-    if args.add or args.predb:  # add predb2mtdb 2 master database
-        if args.predb:
-            addDB = prep_predb_opts(format_path(args.predb), args.failed)
-        else:
-            addDB = mtdb(format_path(args.add))
-        add2mtdb() #########
-        write_primary(new_mtdb, date, update_path)
-        return 0
-    elif args.taxonomy:
+    # update taxonomy
+    if args.taxonomy:
         update_mtdb = taxonomy_update(
             orig_db,
             update_path,
@@ -2124,9 +2110,20 @@ def main():
         )
         write_primary(update_mtdb, date, update_path)
         return 0
-    elif args.reference:
+
+    # add finalized DB
+    if args.add or args.predb:  # add predb2mtdb 2 master database
+        if args.predb:
+            add_mtdb = prep_predb_opts(format_path(args.predb), args.failed)
+        else:
+            add_mtdb = mtdb(format_path(args.add))
+        add2mtdb(add_mtdb, date, ncbi_api, taxon, rank) #########
+        return 0
+
+    # update w/a reference
+    if args.reference:
         ref_db = mtdb(format_path(reference), add_paths=False)
-        if any(not x for x in ref_db["published"]) and not nonpublished:
+        if any(not x for x in ref_db["published"]) and not config["nonpublished"]:
             logger.warning(
                 "nonpublished data detected in reference and will be ignored"
             )
@@ -2149,6 +2146,7 @@ def main():
             chunk=args.chunk,
             tape_wait=args.tape_wait,
         )
+    # update de novo
     else:
         new_mtdb, update_mtdb = rogue_update(
             orig_db,
@@ -2173,28 +2171,16 @@ def main():
 
     if not update_mtdb:
         logger.info("No new data acquired")
-
-    if not args.save:  # add the predb2mtdb and remove files
-        # output new database and new list of omes
-        logger.info("Moving data into database")
-        write_forbid_omes(
-            set(new_mtdb["ome"]), format_path("$MYCODB/../log/relics.txt")
-        )
-
-        full_mtdb, update_omes = db2primary(
-            update_mtdb, new_mtdb, save=False, combined=True
-        )
-        write_primary(full_mtdb, date, update_path)
-        rm_raw_data(update_path)
-        logger.info("MTDB update complete")
         return 0
-    else:
-        # NEED to: insert note aboutrunning updatedb on predb
+    elif args.save:
         new_mtdb.df2db(format_path(update_path + date + ".mtdb"))
         logger.info(
             f"Update ready for `mtdb u -a` at "
             + f'{format_path(update_path + date + ".mtdb")}'
         )
+        return 0
+    else:
+        write_update_mtdb(new_mtdb, update_mtdb, date, update_path)
         return 0
 
 
