@@ -6,15 +6,64 @@ import sys
 import glob
 import gzip
 import json
+import logging
 import shutil
 import tarfile
 import argparse
 import subprocess
+from pathlib import Path
+from contextlib import contextmanager
 from tqdm import tqdm
 from datetime import datetime
 
 
-class kon_log:
+logger = logging.getLogger(__name__)
+
+
+class _LevelFormatter(logging.Formatter):
+    """Prefix records with their level name, except INFO, which is emitted
+    verbatim so status messages read as they did before the logging
+    migration."""
+
+    _PREFIX = {
+        logging.DEBUG: "DEBUG: ",
+        logging.INFO: "",
+        logging.WARNING: "WARNING: ",
+        logging.ERROR: "ERROR: ",
+        logging.CRITICAL: "CRITICAL: ",
+    }
+
+    def format(self, record):
+        message = super().format(record)
+        prefix = self._PREFIX.get(record.levelno, "")
+        # Do not double-prefix messages that already carry their level word.
+        if prefix and message.lstrip().upper().startswith(prefix.strip().rstrip(":")):
+            prefix = ""
+        return prefix + message
+
+
+def setup_logging(verbose=False, level=None):
+    """Configure logging for the Mycotools CLI.
+
+    Attaches a single stderr handler to the root logger (idempotent across
+    repeated calls) and sets the ``mycotools`` logger to INFO, or DEBUG when
+    ``verbose`` is True. The root logger stays at WARNING so third-party
+    libraries do not clutter diagnostic output. Call once from a script's
+    entry point after parsing arguments."""
+    if level is None:
+        level = logging.DEBUG if verbose else logging.INFO
+    root = logging.getLogger()
+    root.setLevel(logging.WARNING)
+    if not any(getattr(h, "_mycotools", False) for h in root.handlers):
+        handler = logging.StreamHandler(sys.stderr)
+#        handler.setFormatter(_LevelFormatter("%(message)s"))
+        handler._mycotools = True
+        root.addHandler(handler)
+    logging.getLogger("mycotools").setLevel(level)
+    return logging.getLogger("mycotools")
+
+
+class KonLog:
     """A print class designed to enable swift string formatting while moving
     between scripts"""
 
@@ -127,7 +176,7 @@ def parse_run_log(log_path, args_dict, fail=set()):
     if isinstance(args_dict, argparse.Namespace):
         args_dict = namespace_to_dict(args_dict)
 
-    if not os.path.isfile(log_path):
+    if not Path(log_path).is_file():
         write_json(args_dict, log_path)
         return {}
     else:
@@ -151,7 +200,7 @@ def hex2rgb(hexCode):
     return tuple(int(hexCode.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
 
 
-def getColors(size, ignore=[], rgb=False):
+def get_colors(size, ignore=[], rgb=False):
     if size < 16:
         colors = [
             "#000000",
@@ -286,59 +335,34 @@ def getColors(size, ignore=[], rgb=False):
 
 def tardir(dir_, rm=True):
 
-    if not os.path.isdir(format_path(dir_)):
+    if not Path(format_path(dir_)).is_dir():
         return False
     with tarfile.open(format_path(dir_)[:-1] + ".tar.gz", "w:gz") as tar:
-        tar.add(dir_, arcname=os.path.basename(format_path(dir_)[:-1]))
+        tar.add(dir_, arcname=Path(format_path(dir_)[:-1]).name)
     if rm:
         shutil.rmtree(dir_)
 
 
 def untardir(dir_, rm=False, to=None):
     if not to:
-        to = os.path.dirname(dir_[:-1])
+        to = str(Path(dir_[:-1]).parent)
     tar = tarfile.TarFile.open(dir_)
     tar.extractall(path=to)
     tar.close()
     if rm:
-        os.remove(dir_)
+        Path(dir_).unlink()
 
 
 def checkdir(dir_, unzip=False, to=None, rm=False):
-    if os.path.isdir(dir_):
+    if Path(dir_).is_dir():
         return True
-    elif os.path.isfile(format_path(dir_) + ".tar.gz"):
+    elif Path(format_path(dir_) + ".tar.gz").is_file():
         if unzip:
             if dir_.endswith("/"):
                 dir_ = dir_[:-1]
             untardir(dir_ + ".tar.gz", rm=rm, to=to)
             return True
     return False
-
-
-def eprint(*args, **kwargs):
-    """Prints to stderr"""
-    print(*args, file=sys.stderr, **kwargs)
-
-
-def fprint(out_str, log):
-    with open(log, "a") as out:
-        out.write(args)
-
-
-def zprint(out_str, log=None, flush=True):
-    fprint(out_str, log)
-    print(out_str, flush=flush)
-
-
-def vprint(toPrint, v=False, e=False, flush=True):
-    """Boolean print option to stdout or stderr (e)"""
-
-    if v:
-        if e:
-            eprint(toPrint, flush=True)
-        else:
-            print(toPrint, flush=True)
 
 
 def read_json(config_path, compress=False):
@@ -362,6 +386,32 @@ def write_json(obj, json_path, compress=False, indent=1, **kwargs):
             json.dump(obj, json_out, indent=indent, **kwargs)
 
 
+@contextmanager
+def atomic_write(path, mode="w", suffix=".tmp", **kwargs):
+    """Context manager for crash-safe file writes.
+
+    Yields a handle to a temporary sibling file (`path` + `suffix`) and, only
+    upon leaving the block without error, atomically replaces `path` with it.
+    Because the temporary file lives beside the target it shares a filesystem,
+    so the final replace is atomic and can never leave a half-written `path`
+    behind. If the block raises, the temporary file is removed and `path` is
+    left untouched.
+
+    Consolidates the `open(path + '.tmp')` ... `shutil.move`/`Path.rename`
+    idiom repeated throughout the codebase.
+    """
+    path = Path(path)
+    tmp_path = path.with_name(path.name + suffix)
+    try:
+        with open(tmp_path, mode, **kwargs) as handle:
+            yield handle
+        tmp_path.replace(path)
+    except BaseException:
+        if tmp_path.is_file():
+            tmp_path.unlink()
+        raise
+
+
 def gunzip(gzip_file, remove=True, spacer="\t"):
     """gunzips gzip_file and removes if successful"""
 
@@ -372,12 +422,12 @@ def gunzip(gzip_file, remove=True, spacer="\t"):
                 for line in f_in:
                     f_out.write(line)
         if remove:
-            os.remove(gzip_file)
+            Path(gzip_file).unlink()
         return new_file
     except:
-        if os.path.isfile(new_file):
-            if os.path.isfile(gzip_file):
-                os.remove(new_file)
+        if Path(new_file).is_file():
+            if Path(gzip_file).is_file():
+                Path(new_file).unlink()
         raise IOError("gunzip " + str(gzip_file) + " failed")
 
 
@@ -466,96 +516,77 @@ def fmt_float(val, sig_dig=None):
     return val_str
 
 
-def findExecs(deps, exit=set(), verbose=True):
+def find_execs(deps, exit=set(), verbose=True):
     """
     Inputs list of dependencies, `dep`, to check path.
     If dependency is in exit and dependency is not in path,
     then exit.
     """
 
-    vprint("\nDependency check:", v=verbose, e=True, flush=True)
+    logger.debug("Dependency check:")
     checks, failed = [], []
     if isinstance(deps, str):
         deps = [deps]
     for dep in sorted(deps):
         check = shutil.which(dep)
-        vprint("{:<15}".format(dep + ":", flush=True) + str(check), v=verbose, e=True)
+        logger.debug("{:<15}".format(dep + ":") + str(check))
         if not check and dep in exit:
             failed.append(dep)
         else:
             checks.append(check)
 
     if failed:
-        eprint("\nERROR: missing dependencies:", flush=True)
-        for f in failed:
-            vprint(f, v=verbose, e=True)
-        eprint()
+        logger.error("missing dependencies: " + ", ".join(failed))
         sys.exit(300)
 
     return checks
 
 
-def findEnvs(envs, exit=set(), verbose=True):
+def find_envs(envs, exit=set(), verbose=True):
     """
     Inputs list of paths, `envs`, to check path.
     If env is not in path and it is in exit, exit.
     """
 
-    vprint("\nEnvironment check:", v=verbose, e=True, flush=True)
+    logger.debug("Environment check:")
     if type(envs) is str:
         envs = [envs]
-    eprint(flush=True)
     for env in envs:
         try:
-            vprint(
-                "{:<15}".format(env + ":", flush=True) + str(os.environ[env]),
-                v=verbose,
-                e=True,
-            )
+            logger.debug("{:<15}".format(env + ":") + str(os.environ[env]))
         except KeyError:
-            vprint("{:<15}".format(env + ":", flush=True) + "None", v=verbose, e=True)
+            logger.debug("{:<15}".format(env + ":") + "None")
             if env in exit:
-                eprint("\nERROR: " + env + " not in PATH", flush=True)
+                logger.error(env + " not in PATH")
                 sys.exit(301)
 
 
-def expandEnvVar(path):
-    """Expands environment variables by regex substitution"""
-
-    envs = re.findall(r"\$[^/]+", path)
-    for env in envs:
-        path = path.replace(env, os.environ[env.replace("$", "")])
-
-    return path.replace("//", "/")
-
-
 def format_path(path, force_dir=False):
-    """Goal is to convert all path types to absolute path with explicit dirs"""
+    """Convert a path to an absolute path with explicit directories.
 
-    #    path = path.replace('//','/')
-    #    except AttributeError: # not a string
-    #       return None # removed this because let it be handled on the other end
-    #   try:
+    Expands ``~`` and ``$VAR`` (raising KeyError on an undefined variable). By
+    convention an existing directory is returned with a trailing ``/`` while
+    files and non-existent paths have none; ``force_dir`` forces a trailing
+    ``/`` for directories that do not exist yet. Symlinks are not resolved."""
+
     if path:
-        path = os.path.expanduser(path)
-        path = expandEnvVar(path)
-        #    path = os.path.abspath( path )
-        #    except TypeError:
-        #      return None again, let this be handled on the other end to increase
-        #      throughput
+        path = str(Path(str(path)).expanduser())
+        for env in re.findall(r"\$[^/]+", path):
+            path = path.replace(env, os.environ[env.replace("$", "")])
+        path = path.replace("//", "/")
 
         if force_dir:
             if not path.endswith("/"):
                 path += "/"
         else:
             if path.endswith("/"):
-                if not os.path.isdir(path):
+                if not Path(path).is_dir():
                     path = path[:-1]
             else:
-                if os.path.isdir(path):
+                if Path(path).is_dir():
                     path += "/"
             if not path.startswith("/"):
-                path = os.getcwd() + "/" + path
+                path = str(Path.cwd()) + "/" + path
 
         path = path.replace("/./", "/")
         while "/../" in path:
@@ -580,17 +611,12 @@ def collect_files(directory="./", filetype="*", recursive=False):
     else:
         filetypes = [filetype]
 
-    directory = format_path(directory)
+    directory = Path(format_path(directory))
     filelist = []
     for filetype in filetypes:
-        if recursive:
-            filelist.extend(
-                glob.glob(directory + "/**/*." + filetype, recursive=recursive)
-            )
-        else:
-            filelist.extend(
-                glob.glob(directory + "/*." + filetype, recursive=recursive)
-            )
+        pattern = "*." + filetype
+        matches = directory.rglob(pattern) if recursive else directory.glob(pattern)
+        filelist.extend(str(match) for match in matches)
 
     return filelist
 
@@ -603,10 +629,10 @@ def collect_dirs(input_glob, recursive=False):
     """
 
     in_dirs = glob.glob(input_glob, recursive=recursive)
-    return [dir_ for dir_ in in_dirs if os.path.isdir(dir_)]
+    return [dir_ for dir_ in in_dirs if Path(dir_).is_dir()]
 
 
-def dictSplit(Dict, factor):
+def dict_split(Dict, factor):
     """
     Inputs: a dictionary `Dict`, and an integer `factor` to split by
     Outputs: a list of split dictionaries `list_dict`
@@ -647,13 +673,13 @@ def sys_start(args, usage, min_len, dirs=[], files=[]):
     elif len(args) < min_len:
         print("\n" + usage + "\n", flush=True)
         sys.exit(1)
-    elif not all(os.path.isfile(format_path(x)) for x in files):
+    elif not all(Path(format_path(x)).is_file() for x in files):
         print("\n" + usage, flush=True)
-        eprint("ERROR: input file(s) do not exist\n", flush=True)
+        logger.error("input file(s) do not exist")
         sys.exit(3)
-    elif not all(os.path.isfile(format_path(x)) for x in dirs):
+    elif not all(Path(format_path(x)).is_file() for x in dirs):
         print("\n" + usage, flush=True)
-        eprint("ERROR: input directory does not exist\n", flush=True)
+        logger.error("input directory does not exist")
         sys.exit(4)
 
     return args
@@ -663,7 +689,6 @@ def inject_args(args, injection_calls):
     manual_cmds = []
     for in_call in injection_calls:
         if in_call in args:
-            prohibited = {";", "&", "&&", "\n", "\r"}
             man_index = args.index(in_call)
             for char in args[man_index + 1]:
                 if char == '"' or char == "'":
@@ -700,7 +725,6 @@ def intro(script_name, args_dict, credit="", log=False, stdout=True):
     """
 
     start_time = datetime.now()
-    date = start_time.strftime("%Y%m%d")
 
     out_str = (
         "\n" + script_name + "\n" + credit + "\nExecution began: " + str(start_time)
@@ -709,12 +733,7 @@ def intro(script_name, args_dict, credit="", log=False, stdout=True):
     for arg in args_dict:
         out_str += "\n" + "{:<30}".format(arg.upper() + ":") + str(args_dict[arg])
 
-    if log:
-        zprint(out_str, log)
-    elif stdout:
-        print(out_str, flush=True)
-    else:
-        eprint(out_str, flush=True)
+    logger.info(out_str)
 
     return start_time
 
@@ -736,12 +755,7 @@ def outro(start_time, log=False, stdout=True):
         + " minutes\n"
     )
 
-    if log:
-        zprint(out_str, log)
-    elif not stdout:
-        eprint(out_str, flush=True)
-    else:
-        print(out_str, flush=True)
+    logger.info(out_str)
 
     sys.exit(0)
 
@@ -754,17 +768,17 @@ def prep_output(output, mkdir=True, require_newdir=False, cd=False):
     """
 
     output = format_path(output, force_dir=True)
-    if os.path.isdir(output):
+    if Path(output).is_dir():
         if require_newdir:
-            eprint("\nERROR: directory exists.", flush=True)
+            logger.error("directory exists.")
             return None
-    elif os.path.exists(output):
-        output = os.path.dirname(output)
+    elif Path(output).exists():
+        output = str(Path(output).parent)
     else:
         if not mkdir:
-            eprint("\nERROR: directory does not exist.", flush=True)
+            logger.error("directory does not exist.")
             return None
-        os.mkdir(output)
+        Path(output).mkdir()
 
     if cd:
         os.chdir(output)
@@ -772,10 +786,10 @@ def prep_output(output, mkdir=True, require_newdir=False, cd=False):
     return output
 
 
-def mkOutput(base_dir, program, reuse=True, suffix=datetime.now().strftime("%Y%m%d")):
+def mk_output(base_dir, program, reuse=True, suffix=datetime.now().strftime("%Y%m%d")):
     if not base_dir:
-        base_dir = os.getcwd() + "/"
-    if not os.path.isdir(format_path(base_dir)):
+        base_dir = str(Path.cwd()) + "/"
+    if not Path(format_path(base_dir)).is_dir():
         raise FileNotFoundError(base_dir + " does not exist")
     if suffix:
         out_dir = format_path(base_dir) + program + "_" + suffix
@@ -784,18 +798,18 @@ def mkOutput(base_dir, program, reuse=True, suffix=datetime.now().strftime("%Y%m
 
     if not reuse:
         count, count_dir = 1, out_dir
-        while os.path.isdir(count_dir):
+        while Path(count_dir).is_dir():
             count_dir += "_" + str(count)
             count += 1
-        os.mkdir(count_dir)
+        Path(count_dir).mkdir()
         return count_dir + "/"
     else:
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
+        if not Path(out_dir).is_dir():
+            Path(out_dir).mkdir()
         return out_dir + "/"
 
 
-def checkDep(dep_list=[], var_list=[], exempt=set()):
+def check_dep(dep_list=[], var_list=[], exempt=set()):
     """Checks all dependencies in path from list, optional exemption set"""
 
     failedVars = []
@@ -809,12 +823,12 @@ def checkDep(dep_list=[], var_list=[], exempt=set()):
                 check.append(False)
                 failedVars.append(var)
     if not all(check):
-        eprint("\nERROR: Dependencies not met:", flush=True)
+        logger.error("Dependencies not met:")
         for dep in dep_list:
             if not shutil.which(dep):
-                eprint(dep + " not in PATH", flush=True)
+                logger.error(dep + " not in PATH")
         for failed in failedVars:
-            eprint(failed + " variable not set", flush=True)
+            logger.error(failed + " variable not set")
         sys.exit(135)
 
 

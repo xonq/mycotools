@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 
-import os
 import re
 import sys
 import multiprocessing as mp
-from mycotools.lib.biotools import gff2list, list2gff, gff3Comps
+from mycotools.lib.biotools import gff2list, list2gff, gff3_comps
 from mycotools.lib.kontools import format_path, sys_start
+from pathlib import Path
 
 
 def og2dict(orthogroup_file):
@@ -24,7 +24,7 @@ def og2dict(orthogroup_file):
     return ome_ogs
 
 
-def sortOGtag(ogtag_dict):
+def sort_ogtag(ogtag_dict):
     sort_list = ["K", "P", "U", "C", "O", "F", "G", "S"]
 
     sorted_dict = {}
@@ -38,7 +38,7 @@ def sortOGtag(ogtag_dict):
     return sorted_dict
 
 
-def readOGtag(ogtagData):
+def read_ogtag(ogtagData):
 
     ogs = ogtagData.split("|")
     ogtag_dict = {}
@@ -49,19 +49,19 @@ def readOGtag(ogtagData):
     return ogtag_dict
 
 
-def writeOGtag(ogtag_dict):
+def write_ogtag(ogtag_dict):
     og_str = ""
     for i in ogtag_dict:
         og_str += i + ":" + str(ogtag_dict[i]) + "|"
     return og_str[:-1]
 
 
-def editOGtag(ogtag_dict, ogtag, og):
+def edit_ogtag(ogtag_dict, ogtag, og):
 
     ogtag_dict[ogtag] = og
 
     new_oginfo = "OG="
-    ogtag_dict = sortOGtag(ogtag_dict)
+    ogtag_dict = sort_ogtag(ogtag_dict)
     for i in ogtag_dict:
         new_oginfo += i + ":" + str(ogtag_dict[i]) + "|"
     new_oginfo = new_oginfo[:-1]
@@ -69,7 +69,7 @@ def editOGtag(ogtag_dict, ogtag, og):
     return new_oginfo
 
 
-def mycodbOGs(file_path=format_path("$MYCOGFF3/../ogs.tsv"), omes=set()):
+def mycodb_ogs(file_path=format_path("$MYCOGFF3/../ogs.tsv"), omes=set()):
 
     ogInfo_dict = {}
     with open(file_path, "r") as raw:
@@ -78,13 +78,13 @@ def mycodbOGs(file_path=format_path("$MYCOGFF3/../ogs.tsv"), omes=set()):
                 og_info = line.rstrip().split("\t")
                 gene, ogtag_info = og_info[0], og_info[1]
                 if gene[: gene.find("_")] in omes:
-                    ogtag_dict = readOGtag(ogtag_info)
+                    ogtag_dict = read_ogtag(ogtag_info)
                 ogInfo_dict[gene] = ogtag_dict
         else:
             for line in raw:
                 og_info = line.rstrip().split("\t")
                 gene, ogtag_info = og_info[0], og_info[1]
-                ogtag_dict = readOGtag(ogtag_info)
+                ogtag_dict = read_ogtag(ogtag_info)
                 ogInfo_dict[gene] = ogtag_dict
 
     return ogInfo_dict
@@ -104,10 +104,10 @@ def extract_ogs(ogInfo_dict, ogtag):
     return og2gene, gene2og
 
 
-def og2mycoDB(ogInfo_dict, omes=set(), file_path=format_path("$MYCOGFF3/../ogs.tsv")):
+def og2mycodb(ogInfo_dict, omes=set(), file_path=format_path("$MYCOGFF3/../ogs.tsv")):
 
     out_list = []
-    if os.path.isfile(file_path):
+    if Path(file_path).is_file():
         with open(file_path, "r") as raw:
             for line in raw:
                 data = line.rstrip().split("\t")
@@ -116,7 +116,7 @@ def og2mycoDB(ogInfo_dict, omes=set(), file_path=format_path("$MYCOGFF3/../ogs.t
                     out_list.append(line.split("\t"))
 
     for gene in ogInfo_dict:
-        out_list.append([gene, writeOGtag(ogInfo_dict[gene])])
+        out_list.append([gene, write_ogtag(ogInfo_dict[gene])])
 
     sorted_list = [
         "\t".join([str(x) for x in y]) for y in sorted(out_list, key=lambda x: x[0])
@@ -131,14 +131,14 @@ def og2gff(ogs_dict, gff_path, ogtag):
 
     for entry in gff:
         if entry["type"] == "gene":
-            gene = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+            gene = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
             if gene in ogs_dict:
-                ogSearch = re.search(gff3Comps()["OG"], entry["attributes"])
+                ogSearch = re.search(gff3_comps()["OG"], entry["attributes"])
                 if ogSearch:
-                    ogtag_dict = readOGtag(ogSearch[1])
-                    new_oginfo = editOGtag(ogtag_dict, ogtag, ogs_dict[gene])
+                    ogtag_dict = read_ogtag(ogSearch[1])
+                    new_oginfo = edit_ogtag(ogtag_dict, ogtag, ogs_dict[gene])
                     entry["attributes"] = re.sub(
-                        gff3Comps()["OG"], new_oginfo, entry["attributes"]
+                        gff3_comps()["OG"], new_oginfo, entry["attributes"]
                     )
                 else:
                     if not entry["attributes"].endswith(";"):
@@ -149,11 +149,11 @@ def og2gff(ogs_dict, gff_path, ogtag):
         out.write(list2gff(gff))
 
 
-def dbMain(og_file, ogtag):
+def db_main(og_file, ogtag):
     ome_ogs = og2dict(og_file)
     omes = set(ome_ogs.keys())
     try:
-        ogInfo_dict = mycodbOGs(
+        ogInfo_dict = mycodb_ogs(
             file_path=format_path("$MYCOGFF3/../ogs.tsv"), omes=omes
         )
     except FileNotFoundError:
@@ -165,10 +165,10 @@ def dbMain(og_file, ogtag):
             else:
                 ogInfo_dict[gene] = {ogtag: ome_ogs[ome][gene]}
 
-    og2mycoDB(ogInfo_dict, omes=omes, file_path=format_path("$MYCOGFF3/../ogs.tsv"))
+    og2mycodb(ogInfo_dict, omes=omes, file_path=format_path("$MYCOGFF3/../ogs.tsv"))
 
 
-def dbMainGff(og_file, ogtag, cpus=1):
+def db_main_gff(og_file, ogtag, cpus=1):
 
     ome_ogs = og2dict(og_file)
 
@@ -190,11 +190,7 @@ def cli():
         + "species [S]"
     )
     args = sys_start(sys.argv[1:], usage, 2, files=[sys.argv[1]])
-    if len(args) > 2:
-        cpus = int(args[2])
-    else:
-        cpus = 1
-    dbMain(format_path(args[0]), args[1])
+    db_main(format_path(args[0]), args[1])
     sys.exit(0)
 
 

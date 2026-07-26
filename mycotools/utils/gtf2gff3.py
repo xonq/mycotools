@@ -4,7 +4,7 @@
 # NEED to arrive at a consensus for protein IDs
 # NEED to name tRNAs, pseudogenes, etc. similar to curGFF.py
 
-import os
+import logging
 import re
 import sys
 import copy
@@ -16,16 +16,19 @@ from mycotools.lib.biotools import (
     list2gff,
     fa2dict,
     dict2fa,
-    gtfComps,
-    gff3Comps,
-    gff2Comps,
+    gtf_comps,
+    gff3_comps,
+    gff2_comps,
 )
-from mycotools.lib.kontools import collect_files, eprint, format_path
-from mycotools.gff2seq import aamain as gff2proteome
-from mycotools.utils.curGFF3 import rename_and_organize
+from mycotools.lib.kontools import collect_files, format_path, setup_logging
+from mycotools.seq.gff import aamain as gff2proteome
+from mycotools.utils.cur_gff3 import rename_and_organize
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
-def grabOutput(output_pref):
+def grab_output(output_pref):
     """
     Inputs: orthofiller `output_path` for results
     Outputs: gff_dict and fasta_dict of results
@@ -34,44 +37,29 @@ def grabOutput(output_pref):
     both.
     """
 
-    output_path, pref = os.path.dirname(output_pref), os.path.basename(output_pref)
+    output_path, pref = str(Path(output_pref).parent), Path(output_pref).name
     output_files = collect_files(output_path, "*")
-    hits = [x for x in output_files if os.path.basename(x).startswith(pref)]
+    hits = [x for x in output_files if Path(x).name.startswith(pref)]
     proteome = [x for x in hits if x.endswith(".results.aa.fasta")]
     gtf = [x for x in hits if x.endswith(".results.gtf")]
     if len(gtf) != 1 or len(proteome) != 1:
         if len(gtf) < 1 or len(proteome) < 1:
-            print("\nERROR: complete output files not detected", flush=True)
+            logger.error("complete output files not detected")
         else:
-            print("\nERROR: multiple eligible complete output detected", flush=True)
+            logger.error("multiple eligible complete output detected")
         sys.exit(3)
 
     return gff2list(gtf[0]), fa2dict(proteome[0])
 
 
 def intron2exon(gff, gene_comp=re.compile(r"gene_id \"(.*?)\"")):
-    """
-    Inputs: gff_dict
-    Outputs: gff_dict with introns converted to exons
-    For each entry in the gff_dict, search for the gene ID. If the gene is not
-    in `gene_info` add the gene as a key and populate a blank intron list,
-    start codon list, stop codon list, strand string, and raw list. If the
-    entry type is within the `gene_info` dict for the gene, then append the
-    list of start and stop coordinates. Append the entire entry to the raw data
-    key.
-    Create a dictionary `intron_genes` for each gene in gene_info if there is
-    an intron entry. For each gene in `intron_genes` create a blank list for
-    `exon_coords` dict under the key `gene`. If the intron coordinates' start
-    codon end coordinate is greater than the start coordinate, then change the
-    start codon entry in `intron_genes[gene]` to have the greater value first.
-    Repeat for the stop codon. Then sort the intron coordinates of that gene.
-    Append the appropriate exon coordinates for the intron based upon strand
-    sense.
-    For each gene in the gff, if it is not in `exon_coords` then simply append
-    to the `new_gff`. Then add genes with new exons.
-    """
+    """Convert intron features to exons in a gff_dict.
 
-    comps = gtfComps()
+    Groups entries by gene ID, infers each gene's exon coordinates from its
+    introns (respecting strand sense), and returns a gff with introns replaced
+    by the inferred exons."""
+
+    comps = gtf_comps()
     gff1, gene_info = [], {}
     for entry in gff:
         try:
@@ -84,7 +72,7 @@ def intron2exon(gff, gene_comp=re.compile(r"gene_id \"(.*?)\"")):
                 continue
             gene_comp = re.compile(r"name \"(.*?)\"")
             gene = gene_comp.search(entry["attributes"])[1]
-            comps = gff2Comps()
+            comps = gff2_comps()
         if int(entry["start"]) > int(entry["end"]):
             start, end = copy.deepcopy(entry["start"]), copy.deepcopy(entry["end"])
             entry["start"], entry["end"] = end, start
@@ -209,7 +197,7 @@ def intron2exon(gff, gene_comp=re.compile(r"gene_id \"(.*?)\"")):
     return gff2, comps
 
 
-def curCDS(gff, gene_compile=re.compile(r"gene_id \"(.*?)\"")):
+def cur_cds(gff, gene_compile=re.compile(r"gene_id \"(.*?)\"")):
 
     new_gff, info_dict = [], {}
     for entry in gff:
@@ -264,7 +252,7 @@ def curCDS(gff, gene_compile=re.compile(r"gene_id \"(.*?)\"")):
     return new_gff
 
 
-def liberalRemoval(gene_dict_prep, contigs):
+def liberal_removal(gene_dict_prep, contigs):
 
     check_contigs, failed, gene_dict = {}, [], {}
     for i in contigs:
@@ -322,7 +310,7 @@ def liberalRemoval(gene_dict_prep, contigs):
     return gene_dict, failed
 
 
-def conservativeRemoval(gene_dict_prep):
+def conservative_removal(gene_dict_prep):
 
     gene_dict, flagged, failed = {}, [], []
     for gene, temp in gene_dict_prep.items():
@@ -357,7 +345,7 @@ def conservativeRemoval(gene_dict_prep):
                         ]
                 flagged.append(gene)
         except IndexError:
-            eprint(gene + " cannot create gene coordinates", flush=True)
+            logger.info(gene + " cannot create gene coordinates")
             continue
 
         gene_dict[gene] = temp
@@ -380,9 +368,8 @@ def fill_transcripts(gene_dict_prep):
     return gene_dict_prep
 
 
-def add_genes(gtf, safe=True, comps=gtfComps(), gene_prefix="gene_id"):
+def add_genes(gtf, safe=True, comps=gtf_comps(), gene_prefix="gene_id"):
 
-    contigs = defaultdict(dict)
     tran_compile = re.compile(comps["transcript"])
     gene_compile = re.compile(comps["id"])
     gene_dict_prep, gene_dict = {}, {}
@@ -421,7 +408,7 @@ def add_genes(gtf, safe=True, comps=gtfComps(), gene_prefix="gene_id"):
             gene_dict_prep[gene]["rna"][tran] = gtf[i]
 
     gene_dict_prep = fill_transcripts(gene_dict_prep)
-    gene_dict, flagged, failed = conservativeRemoval(gene_dict_prep)
+    gene_dict, flagged, failed = conservative_removal(gene_dict_prep)
 
     check, insert_list = set(), []
     for index, entry in enumerate(gtf):
@@ -508,7 +495,7 @@ def remove_start_stop(gtf):
     return [x for x in gtf if x["type"] not in {"start_codon", "stop_codon"}]
 
 
-def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
+def curate(gff, prefix=None, failed=set(), comps=gtf_comps()):
 
     failed = set(failed)
     gene_comp = re.compile(comps["id"])
@@ -526,7 +513,7 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
             try:
                 gene_id = gene_comp.search(line["attributes"])[1]
             except TypeError:
-                gene_id = re.search(gtfComps()["id"], line["attributes"])[1]
+                gene_id = re.search(gtf_comps()["id"], line["attributes"])[1]
             try:
                 tran_id = tran_comp.search(line["attributes"])[1]
             except TypeError:
@@ -561,7 +548,7 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
                     alias_dict[trans] = prefix + "_" + str(count)
                 count += 1
 
-    crudesortGff = preSortGFF(gff, gene_comp)
+    crudesortGff = pre_sort_gff(gff, gene_comp)
 
     newGff, exon_check, cds_check = [], defaultdict(int), defaultdict(int)
     for entry in crudesortGff:
@@ -587,7 +574,6 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
                 entry["attributes"] += f";Alias={alias_dict[trans]}"
             exon_check[trans] += 1
         elif entry["type"] == "CDS":
-            alias = alias_dict[trans]
             trans = tran_comp.search(entry["attributes"])[1]
             cds = cds_check[trans] + 1
             entry["attributes"] = f"ID={trans}.cds{cds};Parent="
@@ -611,7 +597,7 @@ def curate(gff, prefix=None, failed=set(), comps=gtfComps()):
     return newGff, translation_str
 
 
-def sortGene(sorting_group):
+def sort_gene(sorting_group):
 
     out_group = []
     for entryType in ["gene", "mrna", "trna", "rrna", "exon", "cds"]:
@@ -629,7 +615,7 @@ def sortGene(sorting_group):
     return out_group
 
 
-def sortContig(contigData):
+def sort_contig(contigData):
 
     coordinates = {}
     for gene in contigData:
@@ -647,9 +633,9 @@ def sortContig(contigData):
     return outContig
 
 
-def preSortGFF(unsorted_gff, idComp):
+def pre_sort_gff(unsorted_gff, idComp):
 
-    sorting_groups, oldGene = {}, None
+    sorting_groups = {}
     for i, entry in enumerate(unsorted_gff):
         seqid = entry["seqid"]
         if seqid not in sorting_groups:
@@ -664,15 +650,15 @@ def preSortGFF(unsorted_gff, idComp):
     for seqid in sorting_groups:
         contigData = {}
         for gene in sorting_groups[seqid]:
-            contigData[gene] = sortGene(sorting_groups[seqid][gene])
-        sortedGff.extend(sortContig(contigData))
+            contigData[gene] = sort_gene(sorting_groups[seqid][gene])
+        sortedGff.extend(sort_contig(contigData))
 
     return sortedGff
 
 
-def sortGFF(unsorted_gff, idComp):
+def sort_gff(unsorted_gff, idComp):
 
-    sorting_groups, oldGene = {}, None
+    sorting_groups = {}
     for i, entry in enumerate(unsorted_gff):
         if entry["type"].lower() not in {
             "mrna",
@@ -700,13 +686,13 @@ def sortGFF(unsorted_gff, idComp):
     for seqid in sorting_groups:
         contigData = {}
         for gene in sorting_groups[seqid]:
-            contigData[gene] = sortGene(sorting_groups[seqid][gene])
-        sortedGff.extend(sortContig(contigData))
+            contigData[gene] = sort_gene(sorting_groups[seqid][gene])
+        sortedGff.extend(sort_contig(contigData))
 
     return sortedGff
 
 
-def addExons(gff):
+def add_exons(gff):
 
     exon_check = {}
     for i in range(len(gff)):
@@ -738,15 +724,15 @@ def main(gff_path, prefix, fail=True):
         gff = gff_path
 
     exonGtf, comps = intron2exon(gff)
-    exonGtfCur = curCDS(exonGtf, re.compile(comps["id"]))
+    exonGtfCur = cur_cds(exonGtf, re.compile(comps["id"]))
     exonGtfCurGenes, failed, flagged = add_genes(exonGtfCur, safe=fail, comps=comps)
 
     preGff = remove_start_stop(exonGtfCurGenes)
     unsortedGff, trans_str = curate(preGff, prefix, failed, comps)
-    #    unsortedGff = addExons(gffUncur)
+    #    unsortedGff = add_exons(gffUncur)
 
     if prefix:
-        out_gff = sortGFF(unsortedGff, re.compile(gff3Comps()["Alias"]))
+        out_gff = sort_gff(unsortedGff, re.compile(gff3_comps()["Alias"]))
         for i, entry in enumerate(out_gff):
             entry["start"] = int(entry["start"])
             entry["end"] = int(entry["end"])
@@ -757,14 +743,14 @@ def main(gff_path, prefix, fail=True):
     return gff, trans_str, failed, flagged
 
 
-def sortMain(gff, prefix):
+def sort_main(gff, prefix):
 
-    id_comp = re.compile(gff3Comps()["id"])
+    id_comp = re.compile(gff3_comps()["id"])
     crude_sort = sorted(
         gff,
         key=lambda x: int(re.search(r"ID=" + prefix + r"_(\d+)", x["attributes"])[1]),
     )
-    gff = preSortGFF(crude_sort, id_comp)
+    gff = pre_sort_gff(crude_sort, id_comp)
 
     return gff
 
@@ -789,18 +775,19 @@ def cli():
     #    parser.add_argument('--fail', default = True, action = 'store_false',
     #        help = 'Fail genes without start or stop codons.')
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     if args.output:
         output = format_path(args.output)
-        if not os.path.isdir(output):
-            os.mkdir(output)
+        if not Path(output).is_dir():
+            Path(output).mkdir()
             output += "/"
         output += args.prefix
     else:
         output = args.prefix
 
     if args.sort:
-        gff = sortMain(gff2list(format_path(args.gff)), args.prefix)
+        gff = sort_main(gff2list(format_path(args.gff)), args.prefix)
         with open(output + ".gff3", "w") as out:
             out.write(list2gff(gff) + "\n")
         sys.exit(0)
@@ -810,7 +797,7 @@ def cli():
 
     if args.prefix:
         if "_" in args.prefix:
-            eprint('\nERROR: "_" not allowed in prefix\n', flush=True)
+            logger.error('\nERROR: "_" not allowed in prefix\n')
             sys.exit(1)
 
     gff, trans_str, failed, flagged = main(
@@ -827,11 +814,11 @@ def cli():
     with open(output + ".transitions", "w") as out:
         out.write(trans_str)
     if failed:
-        print("\n" + str(len(failed)) + " failures\n", flush=True)
+        logger.debug("" + str(len(failed)) + " failures\n")
         with open(output + ".failed", "w") as out:
             out.write("\n".join(["\t".join(x) for x in failed]))
     if flagged:
-        print("\n" + str(len(flagged)) + " flagged\n", flush=True)
+        logger.debug("" + str(len(flagged)) + " flagged\n")
         with open(output + ".flagged", "w") as out:
             out.write("\n".join(flagged))
 

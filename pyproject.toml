@@ -4,18 +4,43 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mycotools"
-version = "1.0.0"
+version = "2.0.0"
 authors = [{name="Zachary Konkel", email="konkelzach@protonmail.com"}]
 description = "Comparative genomics automation and standardization software"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = '>=3.0,<4'
-dependencies = ['biopython', 'pandas', 'requests', 'scipy', 'openpyxl', 'tqdm',
-                'cryptography', 'ete3', 'pyqt5']
+requires-python = ">=3.9,<4"
+# Versions are lower-bounded to the reference `mycotools` micromamba env
+# (Python 3.9.21). numpy, clipkit, cogent3, and dna_features_viewer were
+# previously undeclared despite being imported by the package.
+#
+# The MycotoolsDB SQLite backend (mycotools/lib/mtdb_sql.py) adds no dependency:
+# it uses the stdlib `sqlite3` module, which every supported CPython ships.
+dependencies = [
+    "biopython>=1.85",
+    "pandas>=2.2.3",
+    "numpy>=2.0.2",
+    "scipy>=1.13.1",
+    "requests>=2.32.3",
+    "openpyxl>=3.1.5",
+    "tqdm>=4.67.1",
+    "cryptography>=44.0.0",
+    "ete3>=3.1.3",
+    "pyqt5>=5.15.9",
+    "clipkit>=2.4.1",
+    "cogent3>=2025.3.22a2",
+    "dna_features_viewer>=3.1.5",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
     "Operating System :: POSIX :: Linux",
+]
+
+# Test-only requirements; not installed for normal use.
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
 ]
 
 [project.urls]
@@ -23,37 +48,37 @@ classifiers = [
 "Bug Tracker" = "https://github.com/xonq/mycotools/issues"
 
 [project.scripts]
+# Primary entrypoints: `mtdb` (database lifecycle) and `mycotools` (analysis).
 mtdb = "mycotools.mtdb:main"
-acc2fa = "mycotools.acc2fa:cli"
-acc2gbk = "mycotools.acc2gbk:cli"
-acc2gff = "mycotools.acc2gff:cli"
-acc2locus = "mycotools.acc2locus:cli"
-add2gff = "mycotools.add2gff:cli"
-annotationStats = "mycotools.annotationStats:cli"
-assemblyStats = "mycotools.assemblyStats:cli"
-bioreform = "mycotools.bioreform:cli"
-coords2fa = "mycotools.coords2fa:cli"
-crap = "mycotools.crap:cli"
-db2files = "mycotools.db2files:cli"
-db2hgs = "mycotools.db2hgs:cli"
-db2microsyntree = "mycotools.db2microsyntree:cli"
-db2search = "mycotools.db2search:cli"
-extract_mtdb = "mycotools.extract_mtdb:cli"
-fa2clus = "mycotools.fa2clus:cli"
-fa2hmmer2fa = "mycotools.fa2hmmer2fa:cli"
-fa2mass = "mycotools.fa2mass:cli"
-fa2tree = "mycotools.fa2tree:cli"
-fna2faa = "mycotools.fna2faa:cli"
-gff2seq = "mycotools.gff2seq:cli"
-gff2svg = "mycotools.gff2svg:cli"
-jgiDwnld = "mycotools.jgiDwnld:cli"
-manage_mtdb = "mycotools.manage_mtdb:cli"
-ncbiAcc2fa = "mycotools.ncbiAcc2fa:cli"
-ncbiDwnld = "mycotools.ncbiDwnld:cli"
-ome2name = "mycotools.ome2name:cli"
-predb2mtdb = "mycotools.predb2mtdb:cli"
-s2subs = "mycotools.s2subs:cli"
-update_mtdb = "mycotools.update_mtdb:cli"
+mycotools = "mycotools.cli:main"
+
+# DEPRECATED flat aliases -- kept for one transition release. Each prints a
+# deprecation notice and forwards to the tool's new nested invocation (shown
+# alongside). To be REMOVED in a subsequent release.
+add2gff = "mycotools.deprecated:add2gff"                  # mycotools gff add
+annotationStats = "mycotools.deprecated:annotationStats"  # mycotools stats annotation
+assemblyStats = "mycotools.deprecated:assemblyStats"      # mycotools stats assembly
+bioreform = "mycotools.deprecated:bioreform"              # mycotools seq convert
+coords2fa = "mycotools.deprecated:coords2fa"              # mycotools seq coords
+crap = "mycotools.deprecated:crap"                        # mycotools phylo crap
+db2files = "mycotools.deprecated:db2files"                # mtdb files
+db2hgs = "mycotools.deprecated:db2hgs"                    # mycotools cluster db
+db2microsyntree = "mycotools.deprecated:db2microsyntree"  # mycotools phylo synteny
+db2search = "mycotools.deprecated:db2search"              # mycotools homology db
+fa2clus = "mycotools.deprecated:fa2clus"                  # mycotools cluster fasta
+fa2hmmer2fa = "mycotools.deprecated:fa2hmmer2fa"          # mycotools homology fasta
+fa2mass = "mycotools.deprecated:fa2mass"                  # mycotools seq mass
+fa2tree = "mycotools.deprecated:fa2tree"                  # mycotools phylo tree
+fna2faa = "mycotools.deprecated:fna2faa"                  # mycotools seq translate
+gff2seq = "mycotools.deprecated:gff2seq"                  # mycotools seq gff
+gff2svg = "mycotools.deprecated:gff2svg"                  # mycotools gff svg
+jgiDwnld = "mycotools.deprecated:jgiDwnld"                # mycotools download jgi
+ncbiDwnld = "mycotools.deprecated:ncbiDwnld"              # mycotools download ncbi
+ome2name = "mycotools.deprecated:ome2name"                # mycotools rename
+acc2fa = "mycotools.deprecated:acc2fa"                    # mtdb accession fa
+acc2gff = "mycotools.deprecated:acc2gff"                  # mtdb accession gff
+acc2gbk = "mycotools.deprecated:acc2gbk"                  # mtdb accession gbk
+acc2locus = "mycotools.deprecated:acc2locus"              # mtdb accession locus
 
 
 [tool.setuptools.packages.find]

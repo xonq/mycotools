@@ -2,20 +2,22 @@
 
 # NEED to arrive at a consensus for protein and transcript IDs
 
+import logging
 import re
 import sys
-import copy
 import argparse
 from collections import defaultdict
-from mycotools.lib.biotools import gff2list, list2gff, gff2Comps, gff3Comps
-from mycotools.lib.kontools import format_path, eprint, vprint
-from mycotools.utils.gtf2gff3 import add_genes, remove_start_stop
-from mycotools.utils.curGFF3 import rename_and_organize
+from mycotools.lib.biotools import gff2list, list2gff, gff2_comps, gff3_comps
+from mycotools.lib.kontools import format_path, setup_logging
+from mycotools.utils.gtf2gff3 import add_genes
+from mycotools.utils.cur_gff3 import rename_and_organize
+
+logger = logging.getLogger(__name__)
 
 
 def gff2gff3(gff_list, ome, jgi_ome):
 
-    comps2, exon_dict, cds_dict, out_list, gene_dict = gff2Comps(), {}, {}, [], {}
+    comps2, exon_dict, cds_dict, out_list, gene_dict = gff2_comps(), {}, {}, [], {}
     for entry in gff_list:
         if entry["type"] == "exon":
             name = re.search(comps2["id"], entry["attributes"])[1]
@@ -49,7 +51,7 @@ def gff2gff3(gff_list, ome, jgi_ome):
             cds_id = "CDS_$_" + str(cds_dict[name])
             entry["attributes"] = "ID=" + cds_id + ";Alias=" + name
 
-    comps3 = gff3Comps()
+    comps3 = gff3_comps()
     for entry in gff_list:
         if entry["type"] not in {"start_codon", "stop_codon"}:
             if entry["type"] == "exon":
@@ -128,12 +130,12 @@ def resolve_alternate_splicing(gff):
     # this is a hack job and should be done during add_genes
     contig2gene, a2z, a2gi = defaultdict(dict), defaultdict(list), {}
     for i, entry in enumerate(gff):
-        alias = re.search(gff3Comps()["Alias"], entry["attributes"])[1]
+        alias = re.search(gff3_comps()["Alias"], entry["attributes"])[1]
         if entry["type"] == "gene":
             a2gi[alias] = i
             contig = entry["seqid"]
             start, end = entry["start"], entry["end"]
-            gene = re.search(gff3Comps()["id"], entry["attributes"])[1]
+            gene = re.search(gff3_comps()["id"], entry["attributes"])[1]
             contig2gene[contig][gene] = (start, end, alias)
         a2z[alias].append(entry)
 
@@ -172,7 +174,7 @@ def resolve_alternate_splicing(gff):
         max_iz, min_iz = [], []
         for g_entry in a2z[a0]:
             if g_entry["type"] == "gene":
-                gid = re.search(gff3Comps()["id"], g_entry["attributes"])[1]
+                gid = re.search(gff3_comps()["id"], g_entry["attributes"])[1]
                 g_entry["attributes"] += "|" + "|".join(accs[1:])
                 max_iz.append(max(g_entry["start"], g_entry["end"]))
                 min_iz.append(min(g_entry["start"], g_entry["end"]))
@@ -182,7 +184,7 @@ def resolve_alternate_splicing(gff):
             for entry in a2z[a1]:
                 if "RNA" in entry["type"]:
                     entry["attributes"] = re.sub(
-                        gff3Comps()["par"], f"Parent={gid}", entry["attributes"]
+                        gff3_comps()["par"], f"Parent={gid}", entry["attributes"]
                     )
                     max_iz.append(max(entry["start"], entry["end"]))
                     min_iz.append(min(entry["start"], entry["end"]))
@@ -197,7 +199,7 @@ def resolve_alternate_splicing(gff):
 def find_jgi_problems(gff3):
     # check for out of bounds CDS and exons
     rna2gene = {}
-    gene_coords, other_coords, comps = {}, defaultdict(list), gff3Comps()
+    gene_coords, other_coords, comps = {}, defaultdict(list), gff3_comps()
     for entry in gff3:
         if entry["type"] == "gene":
             gene = re.search(comps["id"], entry["attributes"])[1]
@@ -227,23 +229,18 @@ def find_jgi_problems(gff3):
 def main(gff_list, ome, jgi_ome, safe=True, verbose=True):
 
     if gff_list[0]["attributes"].startswith("gene_id"):
-        comps = gtfComps()
+        comps = gtf_comps()
         gene_prefix = "gene_id"
     else:
-        comps = gff2Comps()
+        comps = gff2_comps()
         gene_prefix = "name"
     gff_prep, failed, flagged = add_genes(
         gff_list, safe=safe, comps=comps, gene_prefix=gene_prefix
     )
     if failed:
-        vprint(str(len(failed)) + "\tgenes failed", v=verbose, e=True, flush=True)
+        logger.debug(str(len(failed)) + "genes failed")
     if flagged:
-        vprint(
-            str(len(flagged)) + "\tgene coordinates from exons",
-            v=verbose,
-            e=True,
-            flush=True,
-        )
+        logger.debug(str(len(flagged)) + "gene coordinates from exons")
     pregff3 = gff2gff3(gff_prep, ome, jgi_ome)
     gff3 = resolve_alternate_splicing(pregff3)
     gff3 = rename_and_organize(gff3)
@@ -253,11 +250,11 @@ def main(gff_list, ome, jgi_ome, safe=True, verbose=True):
             err_name.append(err.upper())
             if verbose:
                 if err == "ob":
-                    eprint("ERROR: genes with out of bounds coordinates", flush=True)
-                    eprint(",".join(err_list), flush=True)
+                    logger.error("genes with out of bounds coordinates")
+                    logger.info(",".join(err_list))
                 elif err == "nr":
-                    eprint("ERROR: missing RNA", flush=True)
-                    eprint(",".join(err_list), flush=True)
+                    logger.error("missing RNA")
+                    logger.info(",".join(err_list))
 
     return gff3, errors
 
@@ -275,9 +272,10 @@ def cli():
         help="Fail genes w/o CDS sequences that lack start or stop codons",
     )
     args = parser.parse_args()
+    setup_logging(verbose=getattr(args, "verbose", False))
 
     gff_list = gff2list(format_path(args.input))
-    eprint(args.ome + "\t" + args.input, flush=True)
+    logger.info(args.ome + "" + args.input)
     gff3, errors = main(gff_list, args.ome, args.jgi, args.fail)
     print(list2gff(gff3), flush=True)
 
