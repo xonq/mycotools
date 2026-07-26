@@ -545,6 +545,9 @@ class Feature:
         if ingest:
             self._ingest()
 
+        if not self.fid:
+            raise AttributeError('No ID obtained for feature')
+
 
     def _ingest(self):
         """Normalize ``attributes`` and derive ``fid``/``pid`` from them.
@@ -622,13 +625,13 @@ def group_features(features: list, parent_ids: list = ["Parent", "parent"], ids:
     return feature_dict
 
 
-# GFF `type` tokens grouped into the canonical feature classes FeatureList
+# GFF `type` tokens grouped into the canonical feature classes FeatureCol
 # exposes. RNA is a category: any type ending in "rna"/"transcript" (mRNA,
 # tRNA, ncRNA, primary_transcript, ...) resolves to the "rna" class.
 _FEATURE_CLASSES = ("gene", "rna", "cds", "exon")
 
 
-class FeatureList:
+class FeatureCol:
     """An ordered collection of Features linked by Parent <-> ID relationships.
 
     On construction the supplied Features are hierarchically grouped (see
@@ -638,6 +641,8 @@ class FeatureList:
     `fl["mRNA"]`); both resolve to the same lists, extracted once by
     `_extract_types`."""
 
+# NEED ID keying
+# NEED general buckets for features
     def __init__(self, features: list = None, group: bool = True):
         self.features = list(features) if features is not None else []
         if group:
@@ -652,8 +657,6 @@ class FeatureList:
         if not ftype:
             return None
         t = ftype.lower()
-        if t in ("gene", "cds", "exon"):
-            return t
         if t.endswith("rna") or t.endswith("transcript"):
             return "rna"
         return None
@@ -702,6 +705,15 @@ class FeatureList:
         self._extract_types()
         return self
 
+    def roots(self):
+        """Return a new FeatureCol of only the root features (those with no
+        parent within this collection).
+
+        Each root retains its existing `descendants`/`parent` wiring, so the
+        full hierarchy stays reachable through `.descendants`; grouping is
+        skipped to preserve those links rather than rebuild them."""
+        return FeatureCol([f for f in self.features if f.parent is None], group=False)
+
     def _resolve_key(self, key: str):
         """Map an access key to a canonical class: a class name ('gene'), its
         plural ('genes'), or a raw GFF type ('mRNA')."""
@@ -724,7 +736,7 @@ class FeatureList:
         if isinstance(key, str):
             return self._buckets[self._resolve_key(key)]
         raise TypeError(
-            f"FeatureList keys must be str, int, or slice, not {type(key).__name__}"
+            f"FeatureCol keys must be str, int, or slice, not {type(key).__name__}"
         )
 
     def __iter__(self):
@@ -734,7 +746,7 @@ class FeatureList:
         return len(self.features)
 
     def __repr__(self):
-        return (f"FeatureList({len(self.genes)} genes, {len(self.rnas)} RNAs, "
+        return (f"FeatureCol({len(self.genes)} genes, {len(self.rnas)} RNAs, "
                 f"{len(self.cds)} CDS, {len(self.exons)} exons)")
 
 
@@ -762,15 +774,15 @@ def gff2list(gff_info, path=True, error=True):
         for col_list in data:
             feature_list.append(
                 Feature (
-                    "seqid": col_list[0],
-                    "source": col_list[1],
-                    "type": col_list[2],
-                    "start": int(col_list[3]),
-                    "end": int(col_list[4]),
-                    "score": col_list[5],
-                    "strand": col_list[6],
-                    "phase": col_list[7],
-                    "attributes": col_list[8],
+                    seqid = col_list[0],
+                    source = col_list[1],
+                    type = col_list[2],
+                    start = int(col_list[3]),
+                    end = int(col_list[4]),
+                    score = col_list[5],
+                    strand = col_list[6],
+                    phase = col_list[7],
+                    attributes = col_list[8],
                 )
             )
     except IndexError:
@@ -785,14 +797,14 @@ def gff2list(gff_info, path=True, error=True):
             str(col_list[4:6]) + " invalid integer " + "conversion: " + str(col_list)
         )
 
-    return FeatureList(feature_list)
+    return FeatureCol(feature_list)
 
 
 def list2gff(gff_list, ver=3):
     """Serialize to a GFF string, prefixed with a ``##gff-version`` header when
     ``ver`` is truthy.
 
-    Accepts either a ``FeatureList`` (each Feature emits one line in list order)
+    Accepts either a ``FeatureCol`` (each Feature emits one line in list order)
     or the legacy list of column dicts from ``gff2list``."""
     if ver:
         gff_str = "##gff-version " + str(ver) + "\n"
