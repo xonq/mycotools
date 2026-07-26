@@ -408,7 +408,9 @@ def calc_gc(gene):
 
 
 class GFFList():
-    def __init__():
+    def __init__(self):
+        pass
+
 
 # GFF strand column -> BioPython-style strand integer ('.'/'?' -> None)
 _STRAND = {"+": 1, "-": -1}
@@ -431,6 +433,16 @@ def _gff_escape(value: str) -> str:
     return value
 
 
+def _gff_unescape(value: str) -> str:
+    """Percent-decode the GFF3 attribute-reserved characters in ``value``.
+
+    Iterates in reverse so '%25' -> '%' is applied last, preventing an already
+    decoded literal from being decoded a second time."""
+    for char, code in reversed(_GFF_ATTR_ESCAPES):
+        value = value.replace(code, char)
+    return value
+
+
 def _format_gff_attributes(attributes: dict, field_delimiter: str = ";", value_delimiter: str = "=") -> str:
     """Serialize a ``{key: value}`` attribute dict to a GFF3 column-9 string.
 
@@ -442,6 +454,26 @@ def _format_gff_attributes(attributes: dict, field_delimiter: str = ";", value_d
         f"{_gff_escape(str(key))}{value_delimiter}{_gff_escape(str(value))}"
         for key, value in attributes.items()
     )
+
+
+def _parse_gff_attributes(attributes: str, field_delimiter: str = ";", value_delimiter: str = "=") -> dict:
+    """Parse a GFF3 column-9 string into a ``{key: value}`` dict, inverting
+    ``_format_gff_attributes``.
+
+    Fields are split on ``field_delimiter`` and each into key/value on the first
+    ``value_delimiter``; reserved characters are percent-decoded. A valueless
+    field maps to ``""``; the '.' placeholder (or an empty string) yields an
+    empty dict."""
+    parsed = {}
+    if not attributes or attributes in _UNDEFINED:
+        return parsed
+    for field in attributes.split(field_delimiter):
+        field = field.strip()
+        if not field:
+            continue
+        key, sep, value = field.partition(value_delimiter)
+        parsed[_gff_unescape(key.strip())] = _gff_unescape(value.strip()) if sep else ""
+    return parsed
 
 
 def _as_int(value, name: str):
@@ -467,14 +499,16 @@ def _as_strand(value):
     raise ValueError(f"strand must be one of '+'/'-'/1/-1, got {value!r}")
 
 
-class Feature():
+class Feature:
     """A single cross-annotation feature
     `start` and `end` are sorted by smallest to largest and are expected to be 0-based half-open upon input"""
 
     def __init__(self, fid=None, pid=None, seqid=None, source=None, type=None, start=None, end=None, score=None, strand=None, phase=None,
-                 attributes: dict = None, descendants: list = None, parent: Feature = None, sequence: str = "", origin_sequence: str = ""
+                 attributes=None, descendants: list = None, parent: "Feature" = None, sequence: str = "", origin_sequence: str = "",
+                 ingest: bool = False
                  ):
-        self.id = fid
+        # feature ID
+        self.fid = fid
         # parent ID
         self.pid = pid
         self.seqid = seqid
@@ -508,6 +542,24 @@ class Feature():
         else:
             self.sequence = ""
 
+        if ingest:
+            self._ingest()
+
+
+    def _ingest(self):
+        """Normalize ``attributes`` and derive ``fid``/``pid`` from them.
+
+        A string ``attributes`` (a raw GFF3 column-9 field) is parsed into a
+        dict; ``fid`` is then set from the first present of ID/Id/id and ``pid``
+        from the first of Parent/parent. An attribute hit overrides the
+        constructor value; a miss leaves it untouched."""
+        if isinstance(self.attributes, str):
+            self.attributes = _parse_gff_attributes(self.attributes)
+        if not self.fid:
+            self.fid = _attr_get(self.attributes, ("ID", "Id", "id"))
+        if not self.pid:
+            self.pid = _attr_get(self.attributes, ("Parent", "parent"))
+
 
     def _to_gff_line(self) -> str:
         """Serialize this feature (without its descendants) to one GFF3 line.
@@ -526,7 +578,7 @@ class Feature():
             id_dict["Parent"] = self.pid
         return "\t".join((
             self.seqid, self.source, self.type, start, end,
-            score, strand, phase, _format_gff_attributes({**id_dict, **self.attributes)),
+            score, strand, phase, _format_gff_attributes({**id_dict, **self.attributes}),
         ))
     
     def to_gff(self) -> str:
@@ -565,19 +617,131 @@ def group_features(features: list, parent_ids: list = ["Parent", "parent"], ids:
             # link features together
             id2feature[par_id].descendants.append(feature)
             feature.parent = id2feature[par_id]
-        feature_dict[seqid].append(feature)
+        feature_dict[feature.seqid].append(feature)
 
     return feature_dict
 
 
+# GFF `type` tokens grouped into the canonical feature classes FeatureList
+# exposes. RNA is a category: any type ending in "rna"/"transcript" (mRNA,
+# tRNA, ncRNA, primary_transcript, ...) resolves to the "rna" class.
+_FEATURE_CLASSES = ("gene", "rna", "cds", "exon")
 
 
+class FeatureList:
+    """An ordered collection of Features linked by Parent <-> ID relationships.
+
+    On construction the supplied Features are hierarchically grouped (see
+    `group_features`), populating each Feature's `parent`/`descendants`.
+    Features of a canonical class are then reachable both as attributes
+    (`.genes`, `.rnas`, `.cds`, `.exons`) and by key (`fl["gene"]`,
+    `fl["mRNA"]`); both resolve to the same lists, extracted once by
+    `_extract_types`."""
+
+    def __init__(self, features: list = None, group: bool = True):
+        self.features = list(features) if features is not None else []
+        if group:
+            # wire up parent/descendant links in place
+            group_features(self.features)
+        self._extract_types()
+
+    @staticmethod
+    def _class_of(ftype):
+        """Return the canonical class ('gene'/'rna'/'cds'/'exon') for a GFF
+        `type`, or None if it is not one of them."""
+        if not ftype:
+            return None
+        t = ftype.lower()
+        if t in ("gene", "cds", "exon"):
+            return t
+        if t.endswith("rna") or t.endswith("transcript"):
+            return "rna"
+        return None
+
+    def _extract_types(self):
+        """Bucket features by canonical class and store each list as an
+        attribute (`self.genes`, `self.rnas`, `self.cds`, `self.exons`)."""
+        buckets = {name: [] for name in _FEATURE_CLASSES}
+        for feature in self.features:
+            cls = self._class_of(feature.type)
+            if cls is not None:
+                buckets[cls].append(feature)
+        self._buckets = buckets
+        self.genes = buckets["gene"]
+        self.rnas = buckets["rna"]
+        self.cds = buckets["cds"]
+        self.exons = buckets["exon"]
+
+    def sort(self):
+        """Order features by contig (seqid), then parent-before-descendant,
+        then start coordinate; returns self.
+
+        Root features (no parent within this collection) are grouped by seqid
+        and ordered by start, then each is emitted immediately before its
+        descendants. Every descendant list is sorted by start in place, so the
+        depth-first walk here and `Feature.to_gff` share one sibling order. An
+        undefined ('.') seqid or start sorts to the end of its group."""
+        def _start_key(feature):
+            return (feature.start is None, feature.start)
+
+        for feature in self.features:
+            feature.descendants.sort(key=_start_key)
+
+        def _walk(feature):
+            yield feature
+            for descendant in feature.descendants:
+                yield from _walk(descendant)
+
+        roots = [f for f in self.features if f.parent is None]
+        roots.sort(key=lambda f: (f.seqid is None, f.seqid, _start_key(f)))
+
+        ordered = []
+        for root in roots:
+            ordered.extend(_walk(root))
+        self.features = ordered
+        self._extract_types()
+        return self
+
+    def _resolve_key(self, key: str):
+        """Map an access key to a canonical class: a class name ('gene'), its
+        plural ('genes'), or a raw GFF type ('mRNA')."""
+        k = key.lower()
+        if k in self._buckets:
+            return k
+        if k.endswith("s") and k[:-1] in self._buckets:
+            return k[:-1]
+        cls = self._class_of(k)
+        if cls is None:
+            raise KeyError(f"{key!r} is not a gene/RNA/CDS/exon feature class")
+        return cls
+
+    def __getitem__(self, key):
+        """Key by feature class ('gene'/'rna'/'cds'/'exon', a plural, or a raw
+        GFF type such as 'mRNA') to get that class's list; index or slice into
+        the full feature list with an int or slice."""
+        if isinstance(key, (int, slice)):
+            return self.features[key]
+        if isinstance(key, str):
+            return self._buckets[self._resolve_key(key)]
+        raise TypeError(
+            f"FeatureList keys must be str, int, or slice, not {type(key).__name__}"
+        )
+
+    def __iter__(self):
+        return iter(self.features)
+
+    def __len__(self):
+        return len(self.features)
+
+    def __repr__(self):
+        return (f"FeatureList({len(self.genes)} genes, {len(self.rnas)} RNAs, "
+                f"{len(self.cds)} CDS, {len(self.exons)} exons)")
 
 
 # need to change into a class
 def gff2list(gff_info, path=True, error=True):
 
-    gff_list_dict = []
+    feature_list = []
     data = []
     if path:
         with open(gff_info, "r") as raw_gff:
@@ -596,8 +760,8 @@ def gff2list(gff_info, path=True, error=True):
                 break
     try:
         for col_list in data:
-            gff_list_dict.append(
-                {
+            feature_list.append(
+                Feature (
                     "seqid": col_list[0],
                     "source": col_list[1],
                     "type": col_list[2],
@@ -607,7 +771,7 @@ def gff2list(gff_info, path=True, error=True):
                     "strand": col_list[6],
                     "phase": col_list[7],
                     "attributes": col_list[8],
-                }
+                )
             )
     except IndexError:
         raise IndexError(
@@ -621,18 +785,21 @@ def gff2list(gff_info, path=True, error=True):
             str(col_list[4:6]) + " invalid integer " + "conversion: " + str(col_list)
         )
 
-    return gff_list_dict
+    return FeatureList(feature_list)
 
 
 def list2gff(gff_list, ver=3):
+    """Serialize to a GFF string, prefixed with a ``##gff-version`` header when
+    ``ver`` is truthy.
 
+    Accepts either a ``FeatureList`` (each Feature emits one line in list order)
+    or the legacy list of column dicts from ``gff2list``."""
     if ver:
         gff_str = "##gff-version " + str(ver) + "\n"
     else:
         gff_str = ""
-    for line in gff_list:
-        add_str = "\t".join(str(val) for val in list(line.values()))
-        gff_str += add_str + "\n"
+    for feature in gff_list:
+        gff_str += feature._to_gff_line() + "\n"
 
     return gff_str.rstrip()
 
