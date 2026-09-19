@@ -572,7 +572,10 @@ def format_path(path, force_dir=False):
     if path:
         path = str(Path(str(path)).expanduser())
         for env in re.findall(r"\$[^/]+", path):
-            path = path.replace(env, os.environ[env.replace("$", "")])
+            try:
+                path = path.replace(env, os.environ[env.replace("$", "")])
+            except KeyError:
+                pass
         path = path.replace("//", "/")
 
         if force_dir:

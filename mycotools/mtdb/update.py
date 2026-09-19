@@ -156,10 +156,9 @@ def gen_config(
     return config
 
 
-def init_db(init_dir):
+def init_db(init_dir, date):
     """Initialize database in `init_dir`"""
 
-    init_dir = format_path(init)
     if Path(init_dir).is_dir():
         init_dir += "mycotoolsdb/"
     if not init_dir.endswith("/"):
@@ -194,11 +193,8 @@ def init_db(init_dir):
 
     for env in envs:
         os.environ[env] = envs[env]
-    init_db = db2df(mtdb())  # initialize a new database
-    mtdb_initialize(
-        init_dir, init=True
-    ) 
-    return init_db, f"{output}log/{date}/"
+    new_init_db = db2df(mtdb())  # initialize a new database
+    return new_init_db, f"{output}log/{date}/"
 
 
 
@@ -337,9 +333,7 @@ def read_mycocosm(table_path):
 
 def dwnld_mycocosm(
     out_file,
-    mycocosm_url="https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/"
-    + "download-group?flt=&seq=all&pub=all&grp=fungi&srt="
-    + "released&ord=desc",
+    mycocosm_url="https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/download-group?flt=&seq=all&pub=all&grp=fungi&srt=released&ord=desc",
     max_attempts=3,
 ):
     """Download the MycoCosm genome data spreadsheet and return a Pandas
@@ -373,7 +367,7 @@ def dwnld_mycocosm(
                 # this needs, and the message is only worth a debug line
                 subprocess.run(
                     ["curl", "--fail", "--location", "--silent", "--show-error",
-                     mycocosm_url, "-o", out_file + ".tmp"],
+                     "-o", out_file + ".tmp", mycocosm_url],
                     check=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -1770,7 +1764,7 @@ def parse_nonpublished(kingdom, nonpublished, config):
         return False
 
 
-def import_config(init, kingdom, nonpublished, jgi, rank2lineages, config_path=format_path("$MYCODB/../config/mtdb.json")):
+def import_config(init_dir, kingdom, nonpublished, jgi, rank2lineages, config_path=format_path("$MYCODB/../config/mtdb.json")):
     # parse and check configuration nonpublished arguments
     config = {}
     if "MYCODB" in os.environ:
@@ -1780,16 +1774,16 @@ def import_config(init, kingdom, nonpublished, jgi, rank2lineages, config_path=f
             if "lineage_constraints" not in config:
                 config["lineage_constraints"] = {}
                 write_json(config, config_path)
-        elif not init:
+        elif not init_dir:
             raise FileNotFoundError(f"no configuration found at {config_path}")
         # the persistent config options (--nonpublished/--ncbi_only) are barred
         # after initialization above, so a non-init run leaves the on-disk
         # config untouched; `mtdb configure` is what edits it now
-        if init:
-            if format_path(init) != format_path(os.environ["MYCODB"] + "../../"):
-                logger.error("MTDB linked. Unlink via `mtdb -u`")
-                sys.exit(175)
-    elif args.init:
+    #    if init_dir:
+     #       if init_dir != format_path(os.environ["MYCODB"] + "../../"):
+      #          logger.error("MTDB linked. Unlink via `mtdb -u`")
+       #         sys.exit(175)
+    elif init_dir:
         config = gen_config(
             branch=kingdom,
             forbidden="$MYCODB/log/forbidden.tsv",
@@ -2070,7 +2064,6 @@ def main():
     kingdom = determine_kingdom(args.kingdom)
     rank2lineages = parse_lineages(args.lineage, args.rank)
     ncbi_api, jgi_email, jgi_pwd = gather_login(args.ncbi_only)
-    config = import_config(args.init, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
 
     db_path = primary_db()
     if not args.resume or args.add:
@@ -2080,7 +2073,11 @@ def main():
 
     # initialize
     if args.init:
-        orig_db, update_path = init_db(format_path(args.init))
+        orig_db, update_path = init_db(format_path(args.init), date)
+        config = import_config(update_path, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
+        mtdb_initialize(
+            format_path(args.init), init=True
+        ) 
     # load existing database
     else:
         try:
@@ -2089,6 +2086,7 @@ def main():
             raise FileNotFoundError("MTDB not linked. Link via `mtdb -i <DB_PATH>`")
         update_path = output + "log/" + date + "/"
         orig_db = db2df(primary_db())
+        config = import_config(None, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
 
     if not Path(update_path).is_dir():
         Path(update_path).mkdir()
