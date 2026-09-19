@@ -156,20 +156,50 @@ def gen_config(
     return config
 
 
-def init_db(init_dir, date):
+def init_db(init_dir, date, kingdom, nonpublished, jgi, rank2lineages):
     """Initialize database in `init_dir`"""
 
     if Path(init_dir).is_dir():
         init_dir += "mycotoolsdb/"
     if not init_dir.endswith("/"):
         init_dir += "/"
-    envs = {
-        "MYCOFNA": init_dir + "data/fna",
-        "MYCOFAA": init_dir + "data/faa",
-        "MYCOGFF3": init_dir + "data/gff3",
-        "MYCODB": init_dir + "mtdb/",
-    }
-    os.environ["MYCODB"] = init_dir + "mtdb/"
+
+    config_path = init_dir + "config/mtdb.json"
+    config = {}
+    # MTDB is already linked, may be the same as the current init
+    if "MYCODB" in os.environ:
+        if Path(config_path).is_file():
+            config = read_json(format_path(config_path))
+            # for LEGACY installs:
+            if "lineage_constraints" not in config:
+                config["lineage_constraints"] = {}
+        elif not init_dir:
+            raise FileNotFoundError(f"no configuration found at {config_path}")
+        # the persistent config options (--nonpublished/--ncbi_only) are barred
+        # after initialization above, so a non-init run leaves the on-disk
+        # config untouched; `mtdb configure` is what edits it now
+        if init_dir != format_path(os.environ["MYCODB"] + "../../"):
+            logger.error("MTDB linked. Unlink via `mtdb -u`")
+            sys.exit(175)
+    else:
+        envs = {
+            "MYCOFNA": init_dir + "data/fna",
+            "MYCOFAA": init_dir + "data/faa",
+            "MYCOGFF3": init_dir + "data/gff3",
+            "MYCODB": init_dir + "mtdb/",
+        }
+        config = gen_config(
+            branch=kingdom,
+            forbidden="$MYCODB/log/forbidden.tsv",
+            nonpublished=nonpublished,
+            jgi=jgi,
+            rank2lineages=rank2lineages,
+        )
+        os.environ["MYCODB"] = init_dir + "mtdb/"
+
+    nonpublished = parse_nonpublished(kingdom, nonpublished, config)
+    config["nonpublished"] = nonpublished
+
     new_dirs = [
         init_dir + "data/",
         init_dir + "config/",
@@ -194,8 +224,10 @@ def init_db(init_dir, date):
     for env in envs:
         os.environ[env] = envs[env]
     new_init_db = db2df(mtdb())  # initialize a new database
-    return new_init_db, f"{output}log/{date}/"
 
+    write_json(config, config_path, indent=1)
+
+    return new_init_db, f"{output}log/{date}/", config
 
 
 def parse_dups(file_path):
@@ -1764,41 +1796,6 @@ def parse_nonpublished(kingdom, nonpublished, config):
         return False
 
 
-def import_config(init_dir, kingdom, nonpublished, jgi, rank2lineages, config_path=format_path("$MYCODB/../config/mtdb.json")):
-    # parse and check configuration nonpublished arguments
-    config = {}
-    if "MYCODB" in os.environ:
-        if Path(config_path).is_file():
-            config = read_json(format_path(config_path))
-            # for LEGACY installs:
-            if "lineage_constraints" not in config:
-                config["lineage_constraints"] = {}
-                write_json(config, config_path)
-        elif not init_dir:
-            raise FileNotFoundError(f"no configuration found at {config_path}")
-        # the persistent config options (--nonpublished/--ncbi_only) are barred
-        # after initialization above, so a non-init run leaves the on-disk
-        # config untouched; `mtdb configure` is what edits it now
-    #    if init_dir:
-     #       if init_dir != format_path(os.environ["MYCODB"] + "../../"):
-      #          logger.error("MTDB linked. Unlink via `mtdb -u`")
-       #         sys.exit(175)
-    elif init_dir:
-        config = gen_config(
-            branch=kingdom,
-            forbidden="$MYCODB/log/forbidden.tsv",
-            nonpublished=nonpublished,
-            jgi=jgi,
-            rank2lineages=rank2lineages,
-        )
-        write_json(config, init_dir + "config/mtdb.json", indent=1)
-
-    nonpublished = parse_nonpublished(kingdom, nonpublished, config)
-    config["nonpublished"] = nonpublished
-    return config
-
-
-
 def gather_login(ncbi_only):
 
     ncbi_api, jgi_email, jgi_pwd = login_check()
@@ -2073,8 +2070,7 @@ def main():
 
     # initialize
     if args.init:
-        orig_db, update_path = init_db(format_path(args.init), date)
-        config = import_config(update_path, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
+        orig_db, update_path, config = init_db(format_path(args.init), date, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
         mtdb_initialize(
             format_path(args.init), init=True
         ) 
