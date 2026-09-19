@@ -12,9 +12,15 @@ The substitution is silent and destructive - a mitochondrion is ~1/1000th the
 size of the genome it would replace, so it yields a nonsense MTDB entry rather
 than an obvious failure. Every record below is copied from a live JGI listing.
 """
+
 import pytest
 
-from mycotools.download.jgi import _is_mito, select_file
+from mycotools.download.jgi import (
+    _gff_family_rank,
+    _is_alt_allele,
+    _is_mito,
+    select_file,
+)
 
 
 def _f(name, label, fmt="fasta", status="RESTORED"):
@@ -182,3 +188,128 @@ def test_restored_still_outranks_purged_among_genomes():
     ]
     chosen = select_file(files, "fna", masked=True)
     assert chosen["file_name"] == "Neucr2_AssemblyScaffolds.fasta.gz"
+
+
+# --------------------------------------------------------------------------- #
+# gff3 - only an approved gene-model family may fill the annotation slot
+# --------------------------------------------------------------------------- #
+# `genes_filtered` is not a promise of the primary gene catalog. Boled5 lists
+# Boled5_secondary_alleles_20170707.gff3.gz under it: the *other* haplotype's
+# models of a dikaryon, which cover neither the primary assembly nor the
+# primary proteome. So `select_file` screens allele annotations outright and
+# additionally requires the gff3's name to match an approved family.
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Boled5_secondary_alleles_20170707.gff3.gz",
+        "Boled5_secondary_alleles_20170707.aa.fa.gz",
+        "Xxx1_SecondaryAlleles.gff3.gz",
+        "Xxx1_alt_alleles_2019.gff3.gz",
+        "Xxx1-alternate-alleles.gff3.gz",
+        "Xxx1_alleles.gff3.gz",
+    ],
+)
+def test_allele_annotations_are_recognized(name):
+    assert _is_alt_allele({"file_name": name})
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Aspni7_GeneCatalog_genes_20131226.gff.gz",
+        "Trici4_FilteredModels1_deflines.gff3.gz",
+        "Allomyces_macrogynus_GeneCatalog_genes_2011.gff.gz",
+    ],
+)
+def test_primary_annotations_are_not_mistaken_for_alleles(name):
+    assert not _is_alt_allele({"file_name": name})
+
+
+def test_secondary_alleles_never_fill_the_gff3_slot():
+    """The reported bug: Boled5_secondary_alleles_20170707.gff3.gz carries
+    genes_filtered alongside the real catalog."""
+    files = [
+        _f("Boled5_secondary_alleles_20170707.gff3.gz", "genes_filtered", fmt="gff3"),
+        _f("Boled5_GeneCatalog_genes_20170707.gff3.gz", "genes_filtered", fmt="gff3"),
+    ]
+    for order in (files, files[::-1]):
+        chosen = select_file(order, "gff3")
+        assert chosen["file_name"] == "Boled5_GeneCatalog_genes_20170707.gff3.gz"
+
+
+def test_secondary_alleles_alone_yield_no_gff3():
+    """Refused, not substituted - an excluded genome is recoverable, an entry
+    built on the wrong haplotype's models is not."""
+    files = [
+        _f("Boled5_secondary_alleles_20170707.gff3.gz", "genes_filtered", fmt="gff3")
+    ]
+    assert select_file(files, "gff3") is None
+
+
+def test_secondary_alleles_never_fill_the_faa_slot():
+    """The same release publishes a proteome under proteins_filtered."""
+    files = [
+        _f("Boled5_secondary_alleles_20170707.aa.fa.gz", "proteins_filtered"),
+        _f("Boled5_GeneCatalog_proteins_20170707.aa.fa.gz", "proteins_filtered"),
+    ]
+    for order in (files, files[::-1]):
+        chosen = select_file(order, "faa")
+        assert chosen["file_name"] == "Boled5_GeneCatalog_proteins_20170707.aa.fa.gz"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # every MycoCosm gene-model naming era, from live listings
+        "Aspni7_GeneCatalog_genes_20131226.gff.gz",
+        "Rhoto_IFO0880_4_GeneCatalog_genes_20170509.gff.gz",
+        "Neucr2_GeneCatalog_genes_20130412.gff.gz",
+        "Xxx1_frozen_GeneCatalog_genes_2010.gff.gz",
+        "Mycfi2_GeneCatalog_20110616.gff.gz",
+        "Trici4_FilteredModels1_deflines.gff3.gz",
+        "Lst7536_1_FilteredModels1_2023-09-10.gff3.gz",
+        "Aspnid1_FilteredModels1.gff.gz",
+        "Trire2_GeneModels_FilteredModels3.gff.gz",
+        "Botci1_best_models.gff3.gz",
+    ],
+)
+def test_approved_gff3_families_are_accepted(name):
+    """The allow-list must not strand legitimate portals."""
+    assert _gff_family_rank(name) is not None
+    fmt = "gff" if name.endswith((".gff", ".gff.gz")) else "gff3"
+    assert select_file([_f(name, "genes_filtered", fmt=fmt)], "gff3")
+
+
+def test_unrecognized_gff3_is_refused_and_reported(caplog):
+    """An unknown family is named in the log rather than silently downloaded,
+    so it can be vetted and added to `_GFF_FAMILIES`."""
+    files = [_f("Xxx1_weird_models.gff3.gz", "genes_filtered", fmt="gff3")]
+    assert select_file(files, "gff3") is None
+    assert "Xxx1_weird_models.gff3.gz" in caplog.text
+
+
+def test_gene_catalog_outranks_filtered_models():
+    files = [
+        _f("Xxx1_FilteredModels1.gff3.gz", "genes_filtered", fmt="gff3"),
+        _f("Xxx1_GeneCatalog_genes_2015.gff3.gz", "genes_filtered", fmt="gff3"),
+    ]
+    for order in (files, files[::-1]):
+        chosen = select_file(order, "gff3")
+        assert chosen["file_name"] == "Xxx1_GeneCatalog_genes_2015.gff3.gz"
+
+
+def test_restored_outranks_the_preferred_gff3_family():
+    """Tape avoidance still dominates the filename preference."""
+    files = [
+        _f(
+            "Xxx1_GeneCatalog_genes_2015.gff3.gz",
+            "genes_filtered",
+            fmt="gff3",
+            status="PURGED",
+        ),
+        _f("Xxx1_FilteredModels1.gff3.gz", "genes_filtered", fmt="gff3"),
+    ]
+    chosen = select_file(files, "gff3")
+    assert chosen["file_name"] == "Xxx1_FilteredModels1.gff3.gz"
