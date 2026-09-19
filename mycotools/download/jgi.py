@@ -16,7 +16,10 @@ by the caller (``--token``, or the credential store written by
 
 The GFF3 hierarchy selects the *filtered* gene models only - JGI ``jat_label``
 ``genes_filtered`` (i.e. the GeneCatalog / FilteredModels ``.gff``) - never the
-unfiltered ``genes_all`` models.
+unfiltered ``genes_all`` models. Because ``genes_filtered`` also tags annotation
+products that are not the organism's primary gene catalog, the label alone is
+not sufficient and the GFF3 filename must match an approved family (see
+``_GFF_FAMILIES``).
 
 PLEASE respect JGI's rate limits.
 """
@@ -80,6 +83,42 @@ _MITO_FILE = re.compile(
 )
 
 
+# Approved GFF3 filename families, most-preferred first. `genes_filtered` is
+# not by itself a promise that a .gff3 is the organism's primary gene catalog -
+# MycoCosm files several *derived* annotations under the same label - so the
+# chosen GFF3 must also look like one of MycoCosm's canonical gene-model
+# products across its naming eras:
+#   Aspni7_GeneCatalog_genes_20131226.gff.gz
+#   Rhoto_IFO0880_4_GeneCatalog_genes_20170509.gff.gz
+#   Trici4_FilteredModels1_deflines.gff3.gz
+#   Lst7536_1_FilteredModels1_2023-09-10.gff3.gz
+#   Trire2_GeneModels_FilteredModels3.gff.gz
+# An unrecognized name is refused rather than guessed at: a genome excluded
+# with a logged reason is recoverable, an MTDB entry built on the wrong gene
+# set is not. Widen this tuple when a legitimate family shows up in the
+# "no approved gff3" warning.
+_GFF_FAMILIES = (
+    re.compile(r"(?:^|[_.\-])GeneCatalog[_.\-]genes(?:[_.\-]|$)", re.IGNORECASE),
+    re.compile(r"(?:^|[_.\-])GeneCatalog(?:[_.\-]|$)", re.IGNORECASE),
+    re.compile(r"(?:^|[_.\-])FilteredModels\d*(?:[_.\-]|$)", re.IGNORECASE),
+    re.compile(r"(?:^|[_.\-])GeneModels(?:[_.\-]|$)", re.IGNORECASE),
+    re.compile(r"(?:^|[_.\-])best[_.\-]models(?:[_.\-]|$)", re.IGNORECASE),
+)
+
+# Allele-resolved annotations of a dikaryotic/diploid portal - e.g.
+# Boled5_secondary_alleles_20170707.gff3.gz - which MycoCosm tags
+# `genes_filtered` and `proteins_filtered` exactly like the primary catalog.
+# They are the *other* haplotype's models, so they neither cover the primary
+# assembly nor match the primary proteome; pairing one with either silently
+# yields a partial, inconsistent entry. Screened for every annotation type,
+# since the same release publishes a .gff3, an .aa.fa and transcripts.
+_ALT_ALLELE_FILE = re.compile(
+    r"(?:^|[_.\-])(?:secondary|second|alternate|alternative|alt)?"
+    r"[_.\-]?alleles?(?:[_.\-]|$)",
+    re.IGNORECASE,
+)
+
+
 def _file_format(f):
     """Return a file's lowercase format from its metadata, falling back to the
     filename extension (ignoring a trailing .gz)."""
@@ -110,17 +149,38 @@ def _is_mito(f):
     return bool(_MITO_FILE.search(f.get("file_name", "")))
 
 
+def _is_alt_allele(f):
+    """Whether a file is a secondary/alternate-allele annotation rather than the
+    organism's primary one - see ``_ALT_ALLELE_FILE``."""
+    return bool(_ALT_ALLELE_FILE.search(f.get("file_name", "")))
+
+
+def _gff_family_rank(name):
+    """Rank a GFF3 filename by ``_GFF_FAMILIES`` preference, or None when it
+    matches no approved family and so must not be downloaded."""
+    for rank, pattern in enumerate(_GFF_FAMILIES):
+        if pattern.search(name):
+            return rank
+    return None
+
+
 def select_file(files, ftype, masked=True):
     """Choose the single best file record for `ftype` from an organism's file
     list.
 
-    Mitochondrial files are excluded outright, whatever their label - see
-    ``_MITO_FILE``. Of the remainder, preference goes in order to:
+    Mitochondrial (``_MITO_FILE``) and secondary-allele (``_ALT_ALLELE_FILE``)
+    files are excluded outright, whatever their label, and a gff3 must in
+    addition match an approved filename family (``_GFF_FAMILIES``). Of the
+    remainder, preference goes in order to:
       1. immediately-available (RESTORED) files over archived (PURGED) ones;
       2. the type's own label preference (e.g. masked assembly before unmasked
-         when ``masked`` is set).
+         when ``masked`` is set);
+      3. the type's own filename preference (e.g. GeneCatalog before
+         FilteredModels).
 
-    Returns the chosen file dict, or None if the organism has no matching file.
+    Returns the chosen file dict, or None if the organism has no approved file;
+    a gff3 refused only because no candidate was approved is logged with the
+    names it rejected, so a missing family can be added to ``_GFF_FAMILIES``.
     """
     if ftype == "fna":
         labels = (
@@ -129,37 +189,50 @@ def select_file(files, ftype, masked=True):
             else ["assembly_unmasked", "assembly_masked"]
         )
         formats = {"fasta", "fa", "fna", "fsa"}
-        name_ok = lambda n: True
+        name_rank = lambda n: 0
     elif ftype in _TYPE_LABELS:
         labels, formats = _TYPE_LABELS[ftype]
-        if ftype == "faa":
+        if ftype == "gff3":
+            name_rank = _gff_family_rank
+        elif ftype == "faa":
             # proteins_filtered also tags the .tab annotation and promoter files;
             # keep only the actual proteome fasta
-            name_ok = lambda n: bool(
-                re.search(r"\.aa\.fa(sta)?(\.gz)?$", n, re.IGNORECASE)
+            name_rank = lambda n: (
+                0 if re.search(r"\.aa\.fa(sta)?(\.gz)?$", n, re.IGNORECASE) else None
             )
         else:
-            name_ok = lambda n: True
+            name_rank = lambda n: 0
     else:
         return None
 
-    candidates = []
+    candidates, rejected = [], []
     for f in files:
         label = _jat_label(f)
         if label not in labels:
             continue
-        if _is_mito(f):
+        if _is_mito(f) or _is_alt_allele(f):
             continue
         if _file_format(f) not in formats:
             continue
-        if not name_ok(f.get("file_name", "")):
+        name = f.get("file_name", "")
+        rank = name_rank(name)
+        if rank is None:
+            rejected.append(name)
             continue
         status_rank = 0 if _is_restored(f) else 1
-        candidates.append((status_rank, labels.index(label), f))
+        candidates.append((status_rank, labels.index(label), rank, f))
     if not candidates:
+        if ftype == "gff3" and rejected:
+            # the organism has filtered gene models under no name this module
+            # recognizes; name them rather than failing mutely, so the family
+            # can be vetted and added to _GFF_FAMILIES
+            logger.warning(
+                "\t\tno approved gff3 family among filtered gene models: "
+                + ", ".join(sorted(rejected))
+            )
         return None
-    candidates.sort(key=lambda t: (t[0], t[1]))
-    return candidates[0][2]
+    candidates.sort(key=lambda t: t[:3])
+    return candidates[0][3]
 
 
 def parse_org_name(name):
