@@ -31,6 +31,7 @@ from datetime import datetime
 from collections import defaultdict
 from mycotools.lib import mtdb_sql
 from mycotools.lib.dbtools import (
+    clean_jgi_token,
     db2df,
     df2db,
     gather_taxonomy,
@@ -175,7 +176,7 @@ def init_db(init_dir, date, kingdom, nonpublished, jgi, rank2lineages):
                 config["lineage_constraints"] = {}
         elif not init_dir:
             raise FileNotFoundError(f"no configuration found at {config_path}")
-        # the persistent config options (--nonpublished/--ncbi_only) are barred
+        # the persistent config options (--nonpublished/--mycocosm) are barred
         # after initialization above, so a non-init run leaves the on-disk
         # config untouched; `mtdb configure` is what edits it now
         if init_dir != format_path(os.environ["MYCODB"] + "../../"):
@@ -960,8 +961,7 @@ def ref_update(
     update_path,
     date,
     rerun,
-    jgi_email,
-    jgi_pwd,
+    jgi_token,
     config,
     ncbi_api,
     cpus=1,
@@ -983,7 +983,7 @@ def ref_update(
     jgi_df, ncbi_df = prepare_ref_db(ref_db, date)
 
     # run JGI
-    if jgi_email and len(jgi_df) > 0:
+    if jgi_token and len(jgi_df) > 0:
         logger.info("Assimilating MycoCosm")
         jgi_predb_path = update_path + date + ".jgi.predb2.mtdb"
 
@@ -993,8 +993,7 @@ def ref_update(
             post_jgi_df, jgi_dwnld_failed = jgiDwnld(
                 jgi_df,
                 update_path,
-                jgi_email,
-                jgi_pwd,
+                jgi_token,
                 deferred=jgi_deferred,
                 restore_wait=tape_wait,
                 defer_tape=True,
@@ -1249,8 +1248,7 @@ def rogue_update(
     update_path,
     date,
     rerun,
-    jgi_email,
-    jgi_pwd,
+    jgi_token,
     config,
     ncbi_api,
     cpus=1,
@@ -1313,7 +1311,7 @@ def rogue_update(
         logger.debug("" + str(old_len - new_len) + " redundant entries removed")
 
     # run JGI
-    if jgi_email:
+    if jgi_token:
         logger.info("Assimilating MycoCosm (1 download/minute)")
         jgi_db_path = update_path + date + ".jgi.mtdb"
         mycocosm_path = update_path + date + ".mycocosm.csv"
@@ -1367,8 +1365,7 @@ def rogue_update(
             jgi_df,
             db,
             update_path,
-            jgi_email,
-            jgi_pwd,
+            jgi_token,
             date=date,
             nonpublished=config["nonpublished"],
             rerun=rerun,
@@ -1734,10 +1731,10 @@ def error_handle_args(args):
             "--nonpublished is set at initialization; "
             "change it afterward via `mtdb configure --nonpublished`"
         )
-    elif args.ncbi_only and not args.init:
+    elif args.mycocosm and not args.init:
         raise ValueError(
-            "--ncbi_only is set at initialization; "
-            "change it afterward via `mtdb configure --ncbi_only`"
+            "--mycocosm is set at initialization; "
+            "change it afterward via `mtdb configure --jgi`"
         )
     elif args.reference:
         if args.add:
@@ -1796,36 +1793,42 @@ def parse_nonpublished(kingdom, nonpublished, config):
         return False
 
 
-def gather_login(ncbi_only):
+def gather_login(mycocosm, jgi_token=None):
+    """Return (ncbi_api, jgi_token). NCBI-only is the default, so a MycoCosm
+    session token is only sought when --mycocosm opted in at initialization or
+    one was passed outright; otherwise the credential store is consulted for
+    the NCBI api key alone and MycoCosm is left off."""
+    jgi_token = clean_jgi_token(jgi_token)
+    want_jgi = bool(mycocosm or jgi_token)
 
-    ncbi_api, jgi_email, jgi_pwd = login_check()
+    ncbi_api, stored_token = login_check(jgi=want_jgi and not jgi_token)
     if ncbi_api:
         Entrez.api_key = ncbi_api
 
-    if ncbi_only:
-        jgi_email = None
+    if not want_jgi:
+        return ncbi_api, None
 
-    return ncbi_api, jgi_email, jgi_pwd
+    return ncbi_api, jgi_token or stored_token
 
 
-def set_kingdom_options(config, jgi_email): 
+def set_kingdom_options(config, jgi_token): 
     if config["branch"] in {"prokaryote", "bacteria"}:
-        jgi_email = None
+        jgi_token = None
         group = "prokaryotes"
         taxon = "bacteria"  # NEED to make DB tools pull from this
         rank = "superkingdom"
     elif config["branch"] in {"plants"}:
-        jgi_email = None
+        jgi_token = None
         group = "eukaryotes"
         taxon = "viridiplantae"
         rank = "kingdom"
     elif config["branch"] in {"animals"}:
-        jgi_email = None
+        jgi_token = None
         group = "eukaryotes"
         taxon = "metazoa"
         rank = "kingdom"
     elif config["branch"] in {"archaea"}:
-        jgi_email = None
+        jgi_token = None
         group = "prokaryotes"
         taxon = "Archaea"
         rank = "superkingdom"
@@ -1833,7 +1836,7 @@ def set_kingdom_options(config, jgi_email):
         group = "eukaryotes"
         taxon = "fungi"
         rank = "kingdom"
-    return jgi_email, group, taxon, rank
+    return jgi_token, group, taxon, rank
 
 
 def prep_predb_opts(predb, rerun_failed):
@@ -1986,7 +1989,9 @@ def main():
         help="[FUNGI, -i]: Include MycoCosm restricted-use",
     )
     conf_args.add_argument(
-        "--ncbi_only", help="[FUNGI, -i]: Forego MycoCosm", action="store_true"
+        "--mycocosm",
+        help="[FUNGI, -i]: Include MycoCosm; DEFAULT: NCBI only",
+        action="store_true",
     )
     conf_args.add_argument(
         "-l", "--lineage", help="[-i, -r]: Lineage(s) to initialize MTDB with"
@@ -2000,6 +2005,12 @@ def main():
     conf_args.add_argument("--forbidden", action="store_true", help="Rerun forbidden")
 
     run_args = parser.add_argument_group("Runtime")
+    run_args.add_argument(
+        "--jgi_token",
+        help="JGI Data Portal session token (with or without its `Bearer ` "
+        + "prefix), required for MycoCosm; DEFAULT: the token stored via "
+        + "`mtdb manage --store`",
+    )
     run_args.add_argument("--resume", type=int, help="Resume previous date (YYYYmmdd)")
     run_args.add_argument(
         "--no_md5",
@@ -2042,6 +2053,7 @@ def main():
         "Update": args.update,
         "Initialize": args.init,
         "Add": format_path(args.add),
+        "MycoCosm": bool(args.mycocosm),
         "Include Restricted": bool(args.nonpublished),
         "Resume": args.resume,
         "Retry failed": args.failed,
@@ -2060,7 +2072,7 @@ def main():
     error_handle_args(args)
     kingdom = determine_kingdom(args.kingdom)
     rank2lineages = parse_lineages(args.lineage, args.rank)
-    ncbi_api, jgi_email, jgi_pwd = gather_login(args.ncbi_only)
+    ncbi_api, jgi_token = gather_login(args.mycocosm, args.jgi_token)
 
     db_path = primary_db()
     if not args.resume or args.add:
@@ -2070,7 +2082,7 @@ def main():
 
     # initialize
     if args.init:
-        orig_db, update_path, config = init_db(format_path(args.init), date, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
+        orig_db, update_path, config = init_db(format_path(args.init), date, kingdom, args.nonpublished, bool(jgi_token), rank2lineages)
         mtdb_initialize(
             format_path(args.init), init=True
         ) 
@@ -2082,12 +2094,12 @@ def main():
             raise FileNotFoundError("MTDB not linked. Link via `mtdb -i <DB_PATH>`")
         update_path = output + "log/" + date + "/"
         orig_db = db2df(primary_db())
-        config = import_config(None, kingdom, args.nonpublished, bool(jgi_email), rank2lineages)
+        config = import_config(None, kingdom, args.nonpublished, bool(jgi_token), rank2lineages)
 
     if not Path(update_path).is_dir():
         Path(update_path).mkdir()
     orig_db = orig_db.dropna(subset=["ome"])
-    jgi_email, group, taxon, rank = set_kingdom_options(config, jgi_email)
+    jgi_token, group, taxon, rank = set_kingdom_options(config, jgi_token)
 
     # update taxonomy
     if args.taxonomy:
@@ -2124,8 +2136,7 @@ def main():
             update_path,
             date,
             failed,
-            jgi_email,
-            jgi_pwd,
+            jgi_token,
             config,
             ncbi_api,
             cpus=args.cpu,
@@ -2144,8 +2155,7 @@ def main():
             update_path,
             date,
             args.failed,
-            jgi_email,
-            jgi_pwd,
+            jgi_token,
             config,
             ncbi_api,
             cpus=args.cpu,

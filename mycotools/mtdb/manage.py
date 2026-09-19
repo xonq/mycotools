@@ -5,12 +5,15 @@ import sys
 import logging
 import argparse
 from mycotools.lib.dbtools import (
+    clean_jgi_token,
     login_check,
     primary_db,
     mtdb,
     encrypt_pw,
     get_login,
+    read_plain_login,
     store_login,
+    PLAIN_LOGIN_PATH,
 )
 from mycotools.lib import mtdb_sql
 from mycotools.lib.kontools import format_path, read_json, setup_logging
@@ -157,13 +160,19 @@ def cli():
         "-p",
         "--password",
         action="store_true",
-        help="Encrypt NCBI/JGI passwords to expedite access",
+        help="Encrypt NCBI api key/JGI session token to expedite access",
     )
     parser.add_argument(
         "-s",
         "--store",
         action="store_true",
-        help="Store NCBI/JGI credentials WITHOUT a password (unencrypted, chmod 600)",
+        help="Store NCBI api key/JGI session token WITHOUT a password "
+        + "(unencrypted, chmod 600)",
+    )
+    parser.add_argument(
+        "--jgi_token",
+        help="[-s] JGI Data Portal session token (with or without its `Bearer ` "
+        + "prefix); supplied here it is stored without an interactive prompt",
     )
     parser.add_argument(
         "-r",
@@ -181,12 +190,32 @@ def cli():
     if args.password and args.store:
         logger.error("--password and --store are mutually exclusive")
         sys.exit(1)
+    if args.jgi_token and not args.store:
+        logger.error("--jgi_token requires --store")
+        sys.exit(1)
     if args.password:
-        ncbi_api, jgi_email, jgi_pwd = login_check()
-        encrypt_pw(ncbi_api, jgi_email, jgi_pwd)
+        ncbi_api, jgi_token = login_check()
+        encrypt_pw(ncbi_api, jgi_token)
     if args.store:
-        ncbi_api, jgi_email, jgi_pwd = get_login(ncbi=True, jgi=True)
-        store_login(ncbi_api, jgi_email, jgi_pwd)
+        if args.jgi_token:
+            # the token was given outright, so --jgi_token is usable without a
+            # terminal: an already-stored NCBI key is carried over, and one is
+            # only prompted for when there is a tty to prompt on
+            ncbi_api = None
+            if Path(format_path(PLAIN_LOGIN_PATH)).is_file():
+                ncbi_api = read_plain_login()[0]
+            if not ncbi_api:
+                if sys.stdin.isatty():
+                    ncbi_api = get_login(ncbi=True, jgi=False)[0]
+                else:
+                    logger.warning(
+                        "No NCBI api key stored or supplied; storing the JGI "
+                        "session token alone"
+                    )
+            jgi_token = clean_jgi_token(args.jgi_token)
+        else:
+            ncbi_api, jgi_token = get_login(ncbi=True, jgi=True)
+        store_login(ncbi_api, jgi_token)
     if args.restrict:
         restrict_path = format_path(args.restrict)
         with open(restrict_path, "r") as raw:

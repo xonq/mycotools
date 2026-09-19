@@ -622,20 +622,35 @@ def clean_api_key(api_key):
     return cleaned
 
 
+def clean_jgi_token(token):
+    """Normalize a JGI Data Portal session token for use as a bearer credential.
+
+    Accepts the token either bare or with the ``Bearer `` prefix it is copied
+    with, and strips the surrounding whitespace and the control characters that
+    would make it an illegal HTTP header value. Falsy tokens pass through
+    untouched so callers that distinguish `None` from `""` keep doing so."""
+    if not token:
+        return token
+    cleaned = _ILLEGAL_HEADER_CHARS.sub("", str(token)).strip()
+    cleaned = re.sub(r"^[Bb]earer\s+", "", cleaned).strip()
+    return cleaned
+
+
 def get_login(ncbi, jgi):
 
-    ncbi_api, jgi_email, jgi_pwd = None, None, None
+    ncbi_api, jgi_token = None, None
     print(flush=True)
     if ncbi:
         ncbi_api = clean_api_key(
             getpass.getpass(prompt="NCBI api key (blank if none): ")
         )
     if jgi:
-        jgi_email = input("JGI email: ")
-        jgi_pwd = getpass.getpass(prompt="JGI password (required): ")
+        jgi_token = clean_jgi_token(
+            getpass.getpass(prompt="JGI session token (required): ")
+        )
     print(flush=True)
 
-    return ncbi_api, jgi_email, jgi_pwd
+    return ncbi_api, jgi_token
 
 
 # Path to the UNENCRYPTED credential store (see store_login). Kept separate from
@@ -645,8 +660,7 @@ PLAIN_LOGIN_PATH = "~/.mycotools/mtdb_credentials.json"
 
 def store_login(
     ncbi_api,
-    jgi_email,
-    jgi_pwd,
+    jgi_token,
     info_path=PLAIN_LOGIN_PATH,
     encrypted_path="~/.mycotools/mtdb_key",
 ):
@@ -655,24 +669,23 @@ def store_login(
     Credentials are written as JSON with owner-only (0600) permissions. Unlike
     `encrypt_pw`, no password is set or required to read them back - trading
     encryption for convenience. Anyone able to read the file can read the JGI
-    password in the clear, so the file permissions are its only protection.
+    session token in the clear, so the file permissions are its only protection.
     """
     info_path = format_path(info_path)
     Path(info_path).parent.mkdir(parents=True, exist_ok=True)
     data = {
         "ncbi_api": ncbi_api or "",
-        "jgi_email": jgi_email or "",
-        "jgi_pwd": jgi_pwd or "",
+        "jgi_token": clean_jgi_token(jgi_token) or "",
     }
     # create the file with restrictive permissions *before* writing the secret,
-    # so the password is never briefly exposed with a broader umask
+    # so the token is never briefly exposed with a broader umask
     fd = os.open(info_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as out:
         json.dump(data, out)
     os.chmod(info_path, 0o600)
     logger.warning(
         "Stored credentials UNENCRYPTED at %s (permissions 600). Anyone able to "
-        "read this file can read your JGI password.",
+        "read this file can read your JGI session token.",
         info_path,
     )
     # a password-encrypted key would otherwise take precedence in login_check;
@@ -684,21 +697,19 @@ def store_login(
 
 
 def read_plain_login(info_path=PLAIN_LOGIN_PATH):
-    """Return (ncbi_api, jgi_email, jgi_pwd) from the unencrypted store written
-    by `store_login`. Missing fields come back as empty strings."""
+    """Return (ncbi_api, jgi_token) from the unencrypted store written by
+    `store_login`. Missing fields come back as empty strings."""
     with open(format_path(info_path), "r") as raw:
         data = json.load(raw)
     return (
         clean_api_key(data.get("ncbi_api", "")),
-        data.get("jgi_email", ""),
-        data.get("jgi_pwd", ""),
+        clean_jgi_token(data.get("jgi_token", "")),
     )
 
 
 def encrypt_pw(
     ncbi_api,
-    jgi_email,
-    jgi_pwd,
+    jgi_token,
     info_path=format_path("~/.mycotools/mtdb_key"),
 ):
     salt = b"D9\x82\xbfSibW(\xb1q\xeb\xd1\x84\x118"
@@ -722,7 +733,7 @@ def encrypt_pw(
 
     key = base64.urlsafe_b64encode(kdf.derive(hash_pwd.encode("utf-8")))
     fernet = Fernet(key)
-    out_data = ncbi_api + "\t" + jgi_email + "\t" + jgi_pwd
+    out_data = (ncbi_api or "") + "\t" + (clean_jgi_token(jgi_token) or "")
     encrypt_data = fernet.encrypt(out_data.encode("utf-8"))
     with open(format_path(info_path), "wb") as out:
         out.write(encrypt_data)
@@ -761,23 +772,19 @@ def login_check(info_path="~/.mycotools/mtdb_key", ncbi=True, jgi=True, encrypt=
             data = raw_file.read()
         decrypted = fernet.decrypt(data)
         data = decrypted.decode("UTF-8").split("\t")
-        # legacy key files stored a leading NCBI email; drop it if present
-        if len(data) == 4:
-            data = data[1:]
-        if len(data) != 3:
+        if len(data) != 2:
             logger.error("BAD PASSWORD FILE. Delete ~/.mycotools/mtdb_key to reset.")
             sys.exit(8)
         ncbi_api = clean_api_key(data[0])
-        jgi_email = data[1].rstrip()
-        jgi_pwd = data[2].rstrip()
-        return ncbi_api, jgi_email, jgi_pwd
+        jgi_token = clean_jgi_token(data[1].rstrip())
+        return ncbi_api, jgi_token
     elif Path(format_path(PLAIN_LOGIN_PATH)).is_file():
         # unencrypted store written by store_login - no password required
         return read_plain_login(PLAIN_LOGIN_PATH)
     else:
-        ncbi_api, jgi_email, jgi_pwd = get_login(ncbi, jgi)
+        ncbi_api, jgi_token = get_login(ncbi, jgi)
         # CURRENTLY THE REST DOESNT WORK, SO SKIP FOR NOW
-        return ncbi_api, jgi_email, jgi_pwd
+        return ncbi_api, jgi_token
 
 
 # opens a `log` file path to read, searches for the `ome` code followed by a whitespace character, and edits the line with `edit`

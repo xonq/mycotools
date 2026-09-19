@@ -993,7 +993,7 @@ def cli():
     if args.api:
         ncbi_api = args.api
     else:
-        ncbi_api, jgi_email, jgi_pwd = login_check(jgi=False)
+        ncbi_api, jgi_token = login_check(jgi=False)
     if ncbi_api:
         Entrez.api_key = ncbi_api
 

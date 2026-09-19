@@ -4,15 +4,15 @@ Download MycoCosm (JGI fungal) genome data.
 
 JGI retired its legacy ``get-directory`` XML download endpoint. Downloads now go
 through the JGI Data Portal API (https://files.jgi.doe.gov), which this module
-drives directly (no Globus):
+drives directly (no Globus). Every endpoint is authorized with
+``Authorization: Bearer <session token>``, where the session token is supplied
+by the caller (``--token``, or the credential store written by
+``mtdb manage --store``) rather than obtained from a login exchange:
 
-    1. authenticate at signon.jgi.doe.gov (the ``jgi_session`` cookie value is
-       the session token);
-    2. list an organism's files via the ``mycocosm_file_list`` search endpoint;
-    3. restore any archived (PURGED, on-tape) files via ``request_archived_files``;
-    4. download immediately-available (RESTORED) files as a single zip stream via
-       the ``download_files`` endpoint, authorized with
-       ``Authorization: Bearer <session token>``.
+    1. list an organism's files via the ``mycocosm_file_list`` search endpoint;
+    2. restore any archived (PURGED, on-tape) files via ``request_archived_files``;
+    3. download immediately-available (RESTORED) files as a single zip stream via
+       the ``download_files`` endpoint.
 
 The GFF3 hierarchy selects the *filtered* gene models only - JGI ``jat_label``
 ``genes_filtered`` (i.e. the GeneCatalog / FilteredModels ``.gff``) - never the
@@ -32,15 +32,13 @@ import argparse
 import requests
 import pandas as pd
 from tqdm import tqdm
-from urllib.parse import unquote
 from mycotools.lib.kontools import format_path, outro, intro, setup_logging
-from mycotools.lib.dbtools import login_check
+from mycotools.lib.dbtools import clean_jgi_token, login_check
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 # JGI Data Portal API endpoints (non-Globus)
-SIGNON_URL = "https://signon.jgi.doe.gov/signon/create"
 SEARCH_URL = "https://files.jgi.doe.gov/mycocosm_file_list/"
 RESTORE_URL = "https://files.jgi.doe.gov/request_archived_files/"
 DOWNLOAD_URL = "https://files-download.jgi.doe.gov/download_files/"
@@ -194,28 +192,56 @@ def _fill_if_empty(df, i, col, value):
         df.at[i, col] = value
 
 
-def jgi_api_login(user, pwd, max_attempts=5, spacer="\t"):
-    """Authenticate against JGI's signon service and return (session, token).
-    The session token (the jgi_session cookie value) authorizes the search,
-    restore, and download endpoints. Exits (100) after repeated failures."""
+def jgi_api_login(token, max_attempts=5, spacer="\t"):
+    """Return (session, token) for a JGI Data Portal session token.
+
+    `token` is the bearer token copied from an authenticated JGI session, with
+    or without its ``Bearer `` prefix. It is set as the session's default
+    Authorization header so the search endpoint is authorized alongside the
+    restore and download endpoints, then validated against the search endpoint
+    so an expired token fails here rather than as a run-long string of
+    per-genome misses. Exits (100) on a rejected token."""
+    token = clean_jgi_token(token)
+    if not token:
+        logger.error(
+            f"{spacer}No JGI session token. Supply one via --token or store it "
+            "via `mtdb manage --store`"
+        )
+        sys.exit(100)
+
     session = requests.Session()
+    session.headers.update({"Authorization": "Bearer " + token})
+
     for attempt in range(1, max_attempts + 1):
         try:
-            resp = session.post(
-                SIGNON_URL, data={"login": user, "password": pwd}, timeout=120
+            resp = session.get(
+                SEARCH_URL,
+                params={"organism": "Acain1", "api_version": "2", "x": "1"},
+                headers={"accept": "application/json"},
+                timeout=120,
             )
         except requests.RequestException as error:
-            logger.warning(f"{spacer}\tJGI login error (attempt {attempt}): {error}")
+            logger.warning(
+                f"{spacer}\tJGI token check error (attempt {attempt}): {error}"
+            )
             time.sleep(5)
             continue
-        token = session.cookies.get("jgi_session")
-        if resp.status_code == 200 and token:
-            return session, unquote(token)
+        if resp.status_code in {401, 403}:
+            # an expired or malformed token is not retryable; say so and stop
+            logger.error(
+                f"{spacer}JGI rejected the session token (status "
+                f"{resp.status_code}); acquire a current one from an "
+                "authenticated JGI session"
+            )
+            sys.exit(100)
+        if resp.status_code == 200:
+            return session, token
         logger.warning(
-            f"{spacer}\tJGI login failed (attempt {attempt}, status {resp.status_code})"
+            f"{spacer}\tJGI token check failed (attempt {attempt}, status "
+            f"{resp.status_code})"
         )
         time.sleep(5)
-    logger.error(f"{spacer}Failed {max_attempts} JGI login attempts.")
+    logger.error(f"{spacer}Failed {max_attempts} JGI token validation attempts.")
     sys.exit(100)
 
 
@@ -666,8 +692,7 @@ def _finish_org(df, i, portal_id, dwnlds, dwnlded, ome_set, spacer="\t"):
 def main(
     df,
     output,
-    user,
-    pwd,
+    token,
     assembly=True,
     proteome=False,
     gff3=True,
@@ -741,8 +766,8 @@ def main(
     tmp_dir = os.path.join(output, "jgi_zip")
     Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
-    logger.info(spacer + "Logging into JGI")
-    session, token = jgi_api_login(user, pwd, spacer=spacer)
+    logger.info(spacer + "Validating the JGI session token")
+    session, token = jgi_api_login(token, spacer=spacer)
 
     logger.info(
         f"{spacer}Downloading {len(df)} JGI organism(s) via the JGI Data Portal API"
@@ -965,6 +990,11 @@ def cli():
         help="Maximum minutes to wait for a single genome's tape restore before "
         + "deferring it to a later run. DEFAULT: wait indefinitely",
     )
+    parser.add_argument(
+        "--token",
+        help="JGI Data Portal session token (with or without its `Bearer ` "
+        + "prefix); DEFAULT: the token stored via `mtdb manage --store`",
+    )
     parser.add_argument("-o", "--output", default=str(Path.cwd()), help="Output dir")
     parser.add_argument(
         "-v",
@@ -988,7 +1018,10 @@ def cli():
     ):
         logger.error("You must choose at least one download option.")
 
-    ncbi_api, user, pwd = login_check(ncbi=False)
+    if args.token:
+        jgi_token = clean_jgi_token(args.token)
+    else:
+        ncbi_api, jgi_token = login_check(ncbi=False)
 
     args_dict = {
         "JGI Table": args.input,
@@ -1030,8 +1063,7 @@ def cli():
     jgi_df, ome_set = main(
         df,
         output,
-        user,
-        pwd,
+        jgi_token,
         args.assembly,
         args.proteome,
         args.gff,

@@ -8,7 +8,7 @@ dbtools.store_login). It therefore requires:
 
   * network access to JGI and NCBI,
   * the `datasets` executable on PATH (ships in the `mycotools` conda env), and
-  * stored, accessible NCBI/JGI credentials.
+  * a stored, accessible JGI session token (and optionally an NCBI api key).
 
 Per request, a missing credential store is a hard ERROR (not a skip): the test
 raises so the absence is loud.
@@ -61,21 +61,20 @@ JGI_RESTORE_TIMEOUT = 1200
 
 
 def require_credentials():
-    """Return (ncbi_email, ncbi_api, jgi_email, jgi_pwd) from the no-password
-    store, raising if the store or any required field is absent."""
+    """Return (ncbi_api, jgi_token) from the no-password store, raising if the
+    store or the JGI session token is absent."""
     if not CREDS_PATH.is_file():
         raise RuntimeError(
             f"no-password credential store not found at {CREDS_PATH}. Store "
             "credentials first with `mtdb manage --store` (or `mtdb m -s`)."
         )
-    ncbi_email, ncbi_api, jgi_email, jgi_pwd = read_plain_login(str(CREDS_PATH))
-    required = {"ncbi_email": ncbi_email, "jgi_email": jgi_email, "jgi_pwd": jgi_pwd}
-    missing = sorted(name for name, val in required.items() if not val)
-    if missing:
+    ncbi_api, jgi_token = read_plain_login(str(CREDS_PATH))
+    if not jgi_token:
         raise RuntimeError(
-            f"credential store {CREDS_PATH} is missing required field(s): {missing}"
+            f"credential store {CREDS_PATH} is missing the JGI session token; "
+            "JGI tokens expire, so re-store a current one"
         )
-    return ncbi_email, ncbi_api, jgi_email, jgi_pwd
+    return ncbi_api, jgi_token
 
 
 def _iter_rows(source=None):
@@ -108,12 +107,12 @@ def jgi_portal_ids(n_per_source: int = N_PER_SOURCE):
     ]
 
 
-def warm_jgi_restore(portal_ids, jgi_email, jgi_pwd, timeout=JGI_RESTORE_TIMEOUT):
+def warm_jgi_restore(portal_ids, jgi_token, timeout=JGI_RESTORE_TIMEOUT):
     """Ensure the assembly + gff3 for each JGI portal id are RESTORED (on disk),
     requesting a tape restore and polling if needed. Dogfoods the jgiDwnld API
     helpers so the warmed selection matches what update_mtdb will download.
     Returns the set of portal ids whose essential files are ready."""
-    from mycotools.jgiDwnld import (
+    from mycotools.download.jgi import (
         jgi_api_login,
         search_organism,
         select_file,
@@ -123,7 +122,7 @@ def warm_jgi_restore(portal_ids, jgi_email, jgi_pwd, timeout=JGI_RESTORE_TIMEOUT
         _is_restored,
     )
 
-    session, token = jgi_api_login(jgi_email, jgi_pwd)
+    session, token = jgi_api_login(jgi_token)
     ready = set()
     for portal_id in portal_ids:
         org, files = search_organism(session, portal_id)
@@ -212,11 +211,11 @@ def read_primary_sources(init_dir: Path):
 
 @pytest.mark.integration
 def test_credentials_present():
-    """The no-password credential store exists and has NCBI + JGI logins."""
-    ncbi_email, ncbi_api, jgi_email, jgi_pwd = require_credentials()
-    assert "@" in ncbi_email
-    assert "@" in jgi_email
-    assert jgi_pwd
+    """The no-password credential store exists and holds a JGI session token."""
+    ncbi_api, jgi_token = require_credentials()
+    assert jgi_token
+    # a bearer token is stored bare, without the scheme it is copied with
+    assert not jgi_token.lower().startswith("bearer")
 
 
 @pytest.mark.integration
@@ -228,10 +227,10 @@ def test_init_primary_db_downloads_jgi_and_ncbi(isolated_home, tmp_path):
     tape restore first so the download is deterministic. Both the JGI and NCBI
     genomes must appear in the finished primary database, each with sequence and
     annotation files, and the init must never die on an XML-parse error."""
-    _, _, jgi_email, jgi_pwd = require_credentials()
+    _, jgi_token = require_credentials()
 
     portal_ids = jgi_portal_ids()
-    ready = warm_jgi_restore(portal_ids, jgi_email, jgi_pwd)
+    ready = warm_jgi_restore(portal_ids, jgi_token)
     if set(portal_ids) - ready:
         pytest.skip(
             "JGI has not finished restoring "

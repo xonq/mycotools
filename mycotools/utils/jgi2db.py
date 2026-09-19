@@ -149,8 +149,7 @@ def logged_file(log, ome, typ, output):
 
 def runjgi_dwnld(
     jgi_df,
-    user,
-    pwd,
+    token,
     ome_col,
     output,
     log,
@@ -206,8 +205,7 @@ def runjgi_dwnld(
         post_df, api_failed = jgi_dwnld(
             jgi_df.loc[todwnld_i].copy(),
             output,
-            user,
-            pwd,
+            token,
             assembly="fna" in dwnlds,
             proteome="faa" in dwnlds,
             gff3="gff3" in dwnlds,
@@ -276,8 +274,7 @@ def main(
     jgi_df,
     ref_db,
     output,
-    user,
-    pwd,
+    token,
     date=datetime.datetime.now().strftime("%Y%m%d"),
     assembly=True,
     proteome=False,
@@ -372,8 +369,7 @@ def main(
 
     jgi_df, log, failed, deferred = runjgi_dwnld(
         jgi_df,
-        user,
-        pwd,
+        token,
         ome_col,
         output,
         log,
@@ -437,7 +433,7 @@ def cli():
     parser.add_argument(
         "-l",
         "--login",
-        help=r'Login file: "<JGI username>\t<JGI Password>\n<NCBI API key>"',
+        help=r'Login file: "<JGI session token>\n<NCBI API key>"',
     )
     parser.add_argument("-d", "--database", help="Existing myctools `.db` to reference")
     parser.add_argument(

@@ -757,7 +757,7 @@ def cli():
         exit = True
 
     #   from Bio import Entrez
-    #    ncbi_email, ncbi_api, jgi_email, jgi_pwd = login_check(jgi = False)
+    #    ncbi_api, jgi_token = login_check(jgi = False)
     #  Entrez.email = ncbi_email
     # if ncbi_api:
     #    Entrez.api_key = ncbi_api
