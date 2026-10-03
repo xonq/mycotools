@@ -23,7 +23,7 @@ guide](https://github.com/xonq/mycotools/blob/master/USAGE.md).
 <br />
 
 ### Reconstruct phylogenies and synteny diagrams of the nitrate assimilation gene cluster using the Cluster Reconstruction and Phylogenetic Analysis Pipeline (CRAP):
-```acc2locus -a ustbro1_1795 -p 1 | crap -q - -s blastp -d $(mtdb) -c <CPUS>```
+```mtdb accession locus -a ustbro1_1795 -p 1 | crap -q - -s blastp -d $(mtdb) -c <CPUS>```
 
 <br />
 

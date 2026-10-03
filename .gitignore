@@ -7,8 +7,12 @@ prepUpdate.py
 *.pyc
 include.txt
 build.sh
-update_mtdb
-extract_mtdb
-predb2mtdb
-mtdb
-manage_mtdb
+# legacy root-level console-script copies (anchored so they do NOT clobber the
+# mycotools/mtdb/ package or the test/update_mtdb/ suite of the same name)
+/update_mtdb
+/extract_mtdb
+/predb2mtdb
+/mtdb
+/manage_mtdb
+.gitignore
+CLAUDE.md

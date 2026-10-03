@@ -84,15 +84,15 @@ jgiDwnld -i Ustbr1 -a -g
 
 This script will output a `predb` file that is ready for assimilating into the
 database. If you wanted to add your own genomes, you would fill out one of
-these files manually by generating a blank copy via `mtdb predb2mtdb > predb.tsv`,
+these files manually by generating a blank copy via `mtdb predb > predb.tsv`,
 then running the following commands as we will here:
 
 ```bash
-# curate the data via predb2mtdb
+# curate the data via predb
 mtdb p Ustbr1.predb.tsv
 
 # add the curated data to the primary MTDB
-mtdb u -a predb2mtdb_<YYYYmmdd>/predb2mtdb.mtdb
+mtdb u -a predb_<YYYYmmdd>/predb.mtdb
 ```
 
 Now we can check if the file was added by querying the genome code from the
@@ -196,8 +196,8 @@ have time, so let's work with a subset by copying them to a new folder:
 mkdir sco_202405
 
 # copy the top three SCOs
-for i in $(ls db2hgs_<YYYYmmdd>/single_copy_genes/ | head -3)
-  do cp db2hgs_<YYYYmmdd>/single_copy_genes/$i sco_202405/
+for i in $(ls cluster_db_<YYYYmmdd>/single_copy_genes/ | head -3)
+  do cp cluster_db_<YYYYmmdd>/single_copy_genes/$i sco_202405/
 done
 
 # run the tree building pipeline
@@ -205,7 +205,7 @@ fa2tree -i sco_202405/ --partition
 ```
 
 When complete, we will open the `concatenated.nex.contree` file in the
-resulting `fa2tree_<YYYYmmdd>` directory in FigTree, which is the consensus
+resulting `phylo_tree_<YYYYmmdd>` directory in FigTree, which is the consensus
 tree with 1000 ultrafast bootstrap replicates. 
 
 What you will note is that the tips are labeled with the ome code - but we
@@ -213,8 +213,8 @@ probably want to see the actual genus, species, and strain names, right?! Let's
 convert the phylogenomic tree from genome code tips to full names:
 
 ```bash
-ome2name fa2tree_<YYYYmmdd>/concatenated.nex.contree o \
-  > fa2tree_<YYYYmmdd>/full_name.newick
+ome2name phylo_tree_<YYYYmmdd>/concatenated.nex.contree o \
+  > phylo_tree_<YYYYmmdd>/full_name.newick
 ```
 
 Go ahead and open this one in FigTree, and let's glance at how well supported
@@ -231,11 +231,11 @@ assimilation in our dataset.
 
 First, we need to identify homologs of this gene across our database. We will
 do this by implementing a BLAST search of the protein sequence. We obtain the
-protein sequence using a handy command, `acc2fa`.
+protein sequence using a handy command, `mtdb accession fa`.
 
 ```bash
 # extract the protein accession of interest
-acc2fa -a ustbro1_1795 > ustbro1_1795.faa
+mtdb accession fa -a ustbro1_1795 > ustbro1_1795.faa
 
 # run a blast search on this gene against the primary MTDB
 db2search -a blastp -q ustbro1_1795.faa -e 2
@@ -249,10 +249,10 @@ building at the cost of some quality:
 
 ```bash
 # move the phylogenomic directory
-mv fa2tree_<YYYYmmdd> phylogenomic_<YYYYmmdd>/
+mv phylo_tree_<YYYYmmdd> phylogenomic_<YYYYmmdd>/
 
 # run the single gene phylo
-fa2tree -i db2search_<YYYYmmdd>/fastas/ustbro1_1795.search.fa -f
+fa2tree -i homology_db_<YYYYmmdd>/fastas/ustbro1_1795.search.fa -f
 ```
 
 Now, we can view this tree in FigTree.
@@ -276,7 +276,7 @@ locus, then inputting it into the CRAP pipeline:
 
 ```bash
 # extract a locus of interest, and store in a file
-acc2locus -a ustbro1_1795 -p 1 > nitrate_cluster.txt
+mtdb accession locus -a ustbro1_1795 -p 1 > nitrate_cluster.txt
 
 # run the CRAP analysis
 crap -q nitrate_cluster.txt -s blastp
@@ -311,7 +311,7 @@ mkdir clinker_<YYYYmmdd>
 Then generate GenBanks of each locus file using some basic BASH scripting:
 
 ```bash
-for i in crap_<YYYYmmdd>/loci/*txt; do o=$(basename ${i} .txt); acc2gbk -i ${i}
+for i in crap_<YYYYmmdd>/loci/*txt; do o=$(basename ${i} .txt); mtdb accession gbk -i ${i}
 > clinker_<YYYYmmdd>/${o}.gbk; done
 ```
 

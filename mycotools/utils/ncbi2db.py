@@ -7,19 +7,14 @@
 #   NEED TO EDIT REDUNDANCY CHECK TO REFERENCE QUERIED ASSEMBLY ACCESSIONS FROM
 #   BIOSAMPLES
 
+import logging
 import os
 import re
-import sys
 import copy
-import argparse
-import subprocess
-import numpy as np
-import pandas as pd
 from datetime import datetime
-from mycotools.lib.kontools import intro, outro, eprint
-from mycotools.lib.dbtools import db2df, df2db, primaryDB
-from mycotools.ncbiDwnld import main as ncbi_dwnld
-from mycotools.predb2mtdb import main as predb2mtdb
+from mycotools.download.ncbi import main as ncbi_dwnld
+
+logger = logging.getLogger(__name__)
 
 
 def redundancy_check(db, ncbi_df, ass_acc, duplicates={}):
@@ -125,7 +120,7 @@ def main(
     duplicates={},
     check_MD5=True,
     spacer="\t\t",
-    fallback=False,
+    chunk=25,
 ):
 
     os.chdir(out_dir)
@@ -157,7 +152,7 @@ def main(
             ncbi_df = ncbi_df.drop(i)
         ncbi_df = ncbi_df.reset_index()
 
-    print(spacer + "Redundancy check", flush=True)
+    logger.debug(spacer + "Redundancy check")
     update_check = {}
     if ref_db is not None:
         if len(ref_db) > 0:
@@ -174,45 +169,27 @@ def main(
             update_check = {i[-2]: i for i in updates if i[0]}
             # dict(update_check) = {assembly_accNEW: [organism, ref organism,
             # old_assembly_acc]}
-            print(
-                spacer + "\t" + str(len(ncbi_df)) + " genomes to assimilate", flush=True
-            )
+            logger.debug(spacer + "" + str(len(ncbi_df)) + " genomes to assimilate")
 
     if len(ncbi_df) > 0:
-        print(spacer + "Initializing NCBI acquisition", flush=True)
-        if fallback:
-            from mycotools.ncbi_dwnld_fallback import main as ncbi_dwnld_fallback
+        logger.debug(spacer + "Initializing NCBI acquisition")
+        ncbi_df, failed = ncbi_dwnld(
+            assembly=assem,
+            proteome=prot,
+            gff3=gff,
+            ncbi_df=ncbi_df,
+            remove=True,
+            output_path=out_dir,
+            column=ass_acc,
+            ncbi_column="assembly",
+            check_MD5=check_MD5,
+            verbose=True,
+            spacer="\t\t\t",
+            chunk=chunk,
+        )
 
-            ncbi_df, failed = ncbi_dwnld_fallback(
-                assembly=assem,
-                proteome=prot,
-                gff3=gff,
-                ncbi_df=ncbi_df,
-                remove=True,
-                output_path=out_dir,
-                column=ass_acc,
-                ncbi_column="assembly",
-                check_MD5=check_MD5,
-                spacer="\t\t\t",
-            )
-        else:
-            ncbi_df, failed = ncbi_dwnld(
-                assembly=assem,
-                proteome=prot,
-                gff3=gff,
-                ncbi_df=ncbi_df,
-                remove=True,
-                output_path=out_dir,
-                column=ass_acc,
-                ncbi_column="assembly",
-                check_MD5=check_MD5,
-                verbose=True,
-                spacer="\t\t\t",
-            )
-
-        print(
-            spacer + "\t" + str(len(ncbi_df)) + " entries with assemblies and gffs",
-            flush=True,
+        logger.debug(
+            spacer + "" + str(len(ncbi_df)) + " entries with assemblies and gffs"
         )
         ncbi_df = ncbi_df.rename(
             columns={
@@ -230,10 +207,7 @@ def main(
                 ]  # remove it from potential updates
 
         ref_db = ref_db.set_index("assembly_acc")  # update ome codes
-        #  try:
         ncbi_df = ncbi_df.set_index("assembly_acc")
-        #    except KeyError: # no entries
-        #       return ncbi_df, ref_db.reset_index(), failed, duplicates
         for assembly_acc, update_d in update_check.items():
             old_ome = update_d[-1]
             ncbi_df.at[assembly_acc, "ome"] = old_ome
